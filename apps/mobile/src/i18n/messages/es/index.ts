@@ -25,6 +25,7 @@ import { settings } from './settings.ts';
 import { assistant } from './assistant.ts';
 import { display } from './display.ts';
 import { onboarding } from './onboarding.ts';
+import { operations } from './operations.ts';
 
 export const es = {
   ...common,
@@ -48,4 +49,5 @@ export const es = {
   ...assistant,
   ...display,
   ...onboarding,
+  ...operations,
 } as const;

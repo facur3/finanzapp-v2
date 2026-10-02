@@ -33,7 +33,7 @@ export const categories: Pick<Messages, 'categories'> = {
       ventas: 'Sales',
       inversiones: 'Investments',
       regalos: 'Gifts',
-      reembolsos: 'Refunds',
+      reembolsos: 'Reimbursements',
       prestamos: 'Loans',
       otros: 'Other',
     },

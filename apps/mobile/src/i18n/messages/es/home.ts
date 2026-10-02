@@ -12,6 +12,9 @@ export const home = {
       + 'No incluye tarjetas ni deudas, y no es un saldo bancario ni tu patrimonio.',
     spendingOutOfRange: 'El total supera el rango que podemos mostrar con precisión. Tus movimientos siguen guardados.',
     balanceOutOfRange: 'El saldo total supera el rango que podemos mostrar con precisión. Tus cuentas siguen guardadas.',
+    /** 24T3 (A24): one quiet line under Gastado only while the month's net spending is below zero (devoluciones of earlier
+     * purchases); the number itself stays the exact net. */
+    refundsExceed: 'Las devoluciones superan lo gastado',
     /** The month's latest expenses and incomes. */
     recent: 'Actividad reciente',
     /** With accounts but nothing due and nothing recorded this month: the actions are the dock's «+» and the Assistant. */

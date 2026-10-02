@@ -3,14 +3,15 @@ import { Alert, View } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { categoryKey, makeEntryChange, recurringOccurrenceOf, summarizeMonthlyBudgets, type EntryChange, type EntryRecord, type Account } from '@finanzapp/domain';
+import { categoryKey, entryRefundSummary, makeEntryChange, recurringOccurrenceOf, summarizeMonthlyBudgets, todayKey, type EntryChange, type EntryRecord, type Account } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { budgetTone } from '../../src/ui/budget-presentation';
-import { AccountBadge, ActionButton, AppText, DetailRow, EmptyState, ErrorMessage, MerchantBadge, Money, Screen, Surface } from '../../src/ui/components';
+import { AccountBadge, ActionButton, AppText, DetailRow, EmptyState, ErrorMessage, MerchantBadge, Money, Screen, SectionTitle, Surface } from '../../src/ui/components';
 import { presentedAmount } from '../../src/ui/movement-amount';
 import { useI18n } from '../../src/i18n/provider';
 import { useCategoryLabel } from '../../src/ui/category-hues';
 import { installmentOfEntry } from '../../src/ui/installment-presentation';
+import { canRefundEntry } from '../../src/ui/operation-presentation';
 import { space, usePalette } from '../../src/ui/theme';
 
 export default function EntryScreen() {
@@ -29,7 +30,7 @@ export default function EntryScreen() {
 function EntryDetail({ record, account }: { record: EntryRecord; account: Account }) {
   const { updateEntry, archive, snapshot } = useLedger();
   const p = usePalette();
-  const { t, formatDate, currencyName, formatMoneyAmount, spokenMoney } = useI18n();
+  const { t, formatDate, currencyName, formatMoneyAmount, spokenMoney, moneyText } = useI18n();
   const { entry } = record;
   const card = archive?.cards?.find(item => item.accountId === account.id);
   // 24T2: a movement an instalment plan recorded (a share of one instalment: its principal, or its interest, fee or tax).
@@ -40,6 +41,11 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
   const [pending, setPending] = useState<EntryChange | null>(null);
   const saving = useRef(false);
   const confirming = useRef(false);
+  // 24T3: the devoluciones of an ordinary purchase (A26): listed here, with what was returned of the price, and the action
+  // to record another only when the domain would accept one now (a dry run with what is still returnable).
+  const refunds = archive ? entryRefundSummary(archive, entry.id) : null;
+  const liveRefunds = refunds ? [...refunds.refunds].sort((a, b) => b.dateISO.localeCompare(a.dateISO) || b.createdAt.localeCompare(a.createdAt)) : [];
+  const refundable = !!archive && !record.voided && !pending && canRefundEntry(archive, entry.id, todayKey(), new Date().toISOString());
   async function apply(change: EntryChange) {
     if (saving.current) return;
     saving.current = true;
@@ -57,8 +63,19 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
   function confirm() {
     if (saving.current || confirming.current) return;
     if (pending) { void apply(pending); return; }
-    confirming.current = true;
     const restore = record.voided;
+    // 24T3 (A26): a purchase with live devoluciones is not undone (storage refuses it). Said before any confirmation, with
+    // the way to its devoluciones; nothing is built or sent.
+    if (!restore && liveRefunds.length) {
+      confirming.current = true;
+      const latest = liveRefunds[0];
+      Alert.alert(t('operations.entry.blockedTitle'), t('operations.entry.blockedDetail', { count: liveRefunds.length }), [
+        { text: t('common.cancel'), style: 'cancel', onPress: () => { confirming.current = false; } },
+        { text: t('operations.entry.viewRefunds'), onPress: () => { confirming.current = false; router.push({ pathname: '/operation/[id]', params: { id: latest.id } }); } },
+      ], { cancelable: true, onDismiss: () => { confirming.current = false; } });
+      return;
+    }
+    confirming.current = true;
     const change = makeEntryChange(randomUUID(), record, restore ? 'restore' : 'void', new Date().toISOString());
     const adds = restore ? entry.kind === 'income' : entry.kind === 'expense';
     Alert.alert(t(restore ? 'entryDetail.restoreQuestion' : 'entryDetail.voidQuestion'),
@@ -127,10 +144,25 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
         onPress={() => router.push({ pathname: '/recurring/[id]', params: { id: rule.id } })} />}
       <DetailRow label={t('selection.currency')} value={currencyName(account.currency)} last />
     </Surface>
+    {/* 24T3: «Devuelto $ X de $ Y», then one row per devolución (newest first), each opening its own detail. */}
+    {refunds && liveRefunds.length > 0 && <View>
+      <SectionTitle caption={t('operations.entry.refunded', { amount: moneyText(refunds.refundedMinor, account.currency), total: moneyText(entry.amountMinor, account.currency) })}
+        captionLabel={t('operations.entry.refunded', { amount: spokenMoney(refunds.refundedMinor, account.currency), total: spokenMoney(entry.amountMinor, account.currency) })}>
+        {t('operations.entry.refunds')}
+      </SectionTitle>
+      <Surface grouped>
+        {/* The date written out: the row's label is also what VoiceOver reads first (no abbreviated month). */}
+        {liveRefunds.map((refund, index) => <DetailRow key={refund.id} label={formatDate(refund.dateISO, 'long')} layout="inline" value={moneyText(refund.amountMinor, account.currency)}
+          spokenValue={spokenMoney(refund.amountMinor, account.currency)} icon="arrow-undo-outline" disabled={busy} last={index === liveRefunds.length - 1}
+          onPress={() => router.push({ pathname: '/operation/[id]', params: { id: refund.id } })} />)}
+      </Surface>
+    </View>}
     <ErrorMessage message={error} />
     <View style={{ gap: 10 }}>
       {!record.voided && <ActionButton label={t('entryDetail.edit')} icon="create-outline" disabled={busy || !!pending}
         onPress={() => router.push({ pathname: '/edit-entry/[id]', params: { id: entry.id } })} />}
+      {refundable && <ActionButton label={t('operations.entry.refund')} icon="arrow-undo-outline" secondary disabled={busy}
+        onPress={() => router.push({ pathname: '/new-refund', params: { entryId: entry.id } })} />}
       <ActionButton label={pending ? t('common.retryChange') : t(record.voided ? 'entryDetail.restoreAction' : 'entryDetail.voidAction')}
         icon={record.voided ? 'arrow-redo-outline' : 'arrow-undo-outline'} onPress={confirm} busy={busy} secondary={!record.voided} />
     </View>

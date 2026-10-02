@@ -758,3 +758,42 @@ test('24UX6D: in a card\'s lists a purchase and a recorded instalment are unsign
   assert.ok(drawn(row).includes('Pago de tarjeta'), drawn(row).join(' | '));
   assert.match(pressOf(row).props.accessibilityLabel, /^Pago de tarjeta, de Banco a Visa Gold, 300,00 ARS, /);
 });
+
+// ---- 24T3: the lines a devolución and an adelanto de cuotas project (A26) ---------------------------------------
+
+test('24T3: a devolución line reads «Devolución · comercio», unsigned in ink with its own glyph, and opens its operation; an adelanto names its component', () => {
+  const pushed: unknown[] = [];
+  const ui = load('components.tsx', { 'expo-router': { router: { push: (to: unknown) => pushed.push(to) } } });
+  const account = { id: 'a', name: 'Banco', currency: 'ARS', openingMinor: 0, createdAt: 't' };
+  // A contra-expense: stored negative in the ledger line, shown as the amount returned.
+  const refund = Object.freeze({ id: 'r1', accountId: 'a', kind: 'expense', amountMinor: -20000, merchant: 'Zara', category: 'Ropa', dateISO: '2026-09-22', createdAt: 't',
+    refund: { operationId: 'r1', targetEntryId: 'buy' } });
+  const row = ui.render('EntryRow', { entry: refund, account });
+  const [money] = moneyOf(row);
+  assert.equal(JSON.stringify([money.props.minor, money.props.signed, money.props.tone]), JSON.stringify([20000, false, 'expense']), 'the amount returned, no sign, ink');
+  assert.equal(drawn(row).some(text => /[-−+]/.test(text)), false, 'no sign drawn: ' + drawn(row).join(' | '));
+  assert.ok(drawn(row).includes('Devolución · Zara'), drawn(row).join(' | '));
+  assert.equal(nodes(row).some(node => is(node, 'MerchantBadge')), false, 'its own glyph, not the purchase\'s');
+  assert.equal(nodes(row).find(node => is(node, 'GlyphTile'))!.props.icon, 'arrow-undo-outline');
+  assert.equal(pressOf(row).props.accessibilityLabel, 'Devolución, Zara, 200,00 ARS, x, Banco, Hoy', 'the kind word first');
+  pressOf(row).props.onPress();
+  assert.equal(JSON.stringify(pushed.pop()), JSON.stringify({ pathname: '/operation/[id]', params: { id: 'r1' } }));
+  assert.equal(refund.amountMinor, -20000, 'the line is never changed');
+
+  const principal = { id: 'p1_p', accountId: 'a', kind: 'expense', amountMinor: 40000, merchant: 'Electro', category: 'Hogar', dateISO: '2026-09-22', createdAt: 't',
+    payoff: { operationId: 'p1', planId: 'tv', component: 'principal' } };
+  const payoff = ui.render('EntryRow', { entry: principal, account });
+  assert.ok(drawn(payoff).includes('Adelanto de cuotas · Electro'));
+  assert.ok(nodes(payoff).some(node => is(node, 'MerchantBadge')), 'recognised card spending keeps the purchase\'s tile');
+  assert.equal(pressOf(payoff).props.accessibilityLabel, 'Adelanto de cuotas, Electro, 400,00 ARS, x, Banco, Hoy');
+  pressOf(payoff).props.onPress();
+  assert.equal(JSON.stringify(pushed.pop()), JSON.stringify({ pathname: '/operation/[id]', params: { id: 'p1' } }));
+  const interest = ui.render('EntryRow', { entry: { ...principal, id: 'p1_i', amountMinor: 400, payoff: { ...principal.payoff, component: 'interest' } }, account });
+  assert.ok(drawn(interest).includes('Adelanto de cuotas · interés · Electro'));
+  assert.equal(pressOf(interest).props.accessibilityLabel, 'Adelanto de cuotas, interés, Electro, 4,00 ARS, x, Banco, Hoy');
+  // An ordinary movement keeps its row and its route.
+  const plain = ui.render('EntryRow', { entry: { ...principal, id: 'e', payoff: undefined }, account });
+  pressOf(plain).props.onPress();
+  assert.equal(JSON.stringify(pushed.pop()), JSON.stringify({ pathname: '/entry/[id]', params: { id: 'e' } }));
+  assert.equal(pressOf(plain).props.accessibilityLabel, 'Electro, gasto, 400,00 ARS, x, Banco, Hoy');
+});

@@ -28,7 +28,7 @@ export type AssistantReason = 'unavailable' | 'session' | 'offline' | 'limit' | 
 /** What an evidence row is about, from the fact id (plus the stored category
  * name), so the screen names it in the interface language. `other` is a fact
  * this build has no name for (a future id): its protocol label is shown as is. */
-export type EvidenceSubject = { kind: 'expenses' } | { kind: 'income' } | { kind: 'category'; category: string } | { kind: 'other'; label: string };
+export type EvidenceSubject = { kind: 'expenses' } | { kind: 'income' } | { kind: 'refunds' } | { kind: 'category'; category: string } | { kind: 'other'; label: string };
 /** A number the answer rests on, taken from the local evidence that was sent,
  * never from model prose. `previousOnly`: cited only for the previous period. */
 export type EvidenceRow = { id: string; subject: EvidenceSubject; previousOnly: boolean; amountMinor: number; signed: boolean };
@@ -278,6 +278,8 @@ export function factSubject(fact: AssistantFact): EvidenceSubject {
   if (category !== null) return { kind: 'category', category };
   if (/(^|\.)expenses$/.test(fact.id)) return { kind: 'expenses' };
   if (/(^|\.)income$/.test(fact.id)) return { kind: 'income' };
+  // 24T3: the period's devoluciones (a positive fact, never income), named in the interface language.
+  if (/(^|\.)refunds$/.test(fact.id)) return { kind: 'refunds' };
   return { kind: 'other', label: fact.label };
 }
 const subjectKey = (subject: EvidenceSubject) => subject.kind === 'category' ? 'category:' + subject.category : subject.kind === 'other' ? 'other:' + subject.label : subject.kind;
@@ -288,6 +290,7 @@ const subjectKey = (subject: EvidenceSubject) => subject.kind === 'category' ? '
 export function evidenceLabel(row: EvidenceRow, t: Translate = translator('es'), categoryName: (stored: string) => string = stored => stored): string {
   const { subject } = row;
   const label = subject.kind === 'expenses' ? t('assistant.evidence.expenses') : subject.kind === 'income' ? t('assistant.evidence.income')
+    : subject.kind === 'refunds' ? t('assistant.evidence.refunds')
     : subject.kind === 'category' ? categoryName(subject.category) : subject.label;
   return row.previousOnly ? t('assistant.evidence.previousMonth', { label }) : label;
 }

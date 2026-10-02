@@ -18,11 +18,14 @@ export type DonutSlice = { key: string; label: string; value: number };
 
 /** Groups the tail of a ranked list into one slice named `othersLabel`
  * ("Otras") so the donut keeps at most five readable slices. Each named slice
- * takes its category hue; the tail is neutral because it is not one category. */
+ * takes its category hue; the tail is neutral because it is not one category.
+ * 24T3 (A24): only categories above zero are slices. A category that nets to zero or less (devoluciones of earlier
+ * purchases) is listed under the donut, never drawn and never folded into «Otras», whose value would otherwise shrink. */
 export function donutSlices(items: DonutSlice[], p: Palette, hues: Map<string, number> | ((key: string) => string), othersLabel: string, max = 5): (DonutSlice & { color: string; count?: number })[] {
   const colorOf = typeof hues === 'function' ? hues : (key: string) => categoryColor(key, hues, p);
-  const head = items.slice(0, items.length > max ? max - 1 : max).map(item => ({ ...item, color: colorOf(item.key) }));
-  const tail = items.slice(head.length);
+  const drawn = items.filter(item => item.value > 0);
+  const head = drawn.slice(0, drawn.length > max ? max - 1 : max).map(item => ({ ...item, color: colorOf(item.key) }));
+  const tail = drawn.slice(head.length);
   if (!tail.length) return head;
   return [...head, { key: OTHERS_KEY, label: othersLabel, value: tail.reduce((sum, item) => sum + item.value, 0), color: othersColor(p), count: tail.length }];
 }
@@ -64,14 +67,17 @@ export type DonutArc = { key: string; start: number; end: number; color: string;
 /** The extra stroke of a chosen slice, and the room the ring leaves for it inside the chart's square. */
 export const CHOSEN_EXTRA = 6;
 
-/** The arcs of a donut: each slice's share of the sum, clockwise from twelve, a 2 px gap between slices. */
+/** The arcs of a donut: each slice's share of the sum, clockwise from twelve, a 2 px gap between slices. 24T3 (A24): the
+ * sum is of the positive slices only, the ones drawn, so the arcs never pass a full turn whatever a caller hands in (a
+ * negative value in the sum would shrink it and stretch every other arc past 360°). */
 export function donutArcs(slices: readonly { key: string; value: number; color: string }[], size: number, thickness: number): DonutArc[] {
-  const sum = slices.reduce((acc, slice) => acc + slice.value, 0);
+  const drawn = slices.filter(slice => Number.isFinite(slice.value) && slice.value > 0);
+  const sum = drawn.reduce((acc, slice) => acc + slice.value, 0);
   if (sum <= 0) return [];
   const radius = (size - thickness - CHOSEN_EXTRA) / 2;
-  const gap = slices.length > 1 ? 2 / radius : 0; // 2 px expressed as an angle.
+  const gap = drawn.length > 1 ? 2 / radius : 0; // 2 px expressed as an angle.
   let angle = -Math.PI / 2;
-  return slices.filter(slice => slice.value > 0).map(slice => {
+  return drawn.map(slice => {
     const sweep = (slice.value / sum) * Math.PI * 2;
     const start = angle + gap / 2, end = angle + sweep - gap / 2;
     angle += sweep;
@@ -278,20 +284,27 @@ export function idleBarColor(p: Palette): string {
   return p.tertiary + (p.isDark ? '99' : 'B3');
 }
 
+/** A month's point on the bars: its signed net (24T3: devoluciones net in their own month, so it can be ≤ 0) and, from the
+ * trend, its purchase lines (`isPurchaseLine`). */
+export type MonthPoint = { monthISO: string; amountMinor: number; partial: boolean; count?: number };
+
 /** Six monthly bars on a common zero-to-max scale. The selected month is the
  * brand primary, the rest the idle ink (`idleBarColor`); a partial (current) month is outlined.
- * Tapping a bar selects that month. Bars animate between data sets, never from zero. */
+ * Tapping a bar selects that month. Bars animate between data sets, never from zero.
+ * 24T3 (A24): the scale is zero to the largest positive net; a month whose net is zero or less is drawn at zero (never a
+ * bar below the axis), VoiceOver says «sin gasto neto» when the month has records, and when the shown month nets below
+ * zero its exact net is written under the bars. */
 export function MonthBars({ points, selected, onSelect, currency, height = 120 }: {
-  points: { monthISO: string; amountMinor: number; partial: boolean }[]; selected: string; onSelect: (monthISO: string) => void; currency: Currency; height?: number;
+  points: MonthPoint[]; selected: string; onSelect: (monthISO: string) => void; currency: Currency; height?: number;
 }) {
   const p = usePalette();
   const reduced = useReduceMotion();
-  const { t, formatDate, currencySymbol, formatWholeUnits, speechLanguage } = useI18n();
-  const max = Math.max(...points.map(point => point.amountMinor), 1);
+  const { t, formatDate, currencySymbol, formatWholeUnits, speechLanguage, moneyText, spokenMoney } = useI18n();
+  const max = Math.max(...points.map(point => Math.max(0, point.amountMinor)), 1);
   const current = points.find(point => point.monthISO === selected);
   return <View style={{ gap: 8 }}>
     <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6, height }}>
-      {points.map(point => <Bar key={point.monthISO} point={point} fraction={point.amountMinor / max} selected={point.monthISO === selected}
+      {points.map(point => <Bar key={point.monthISO} point={point} fraction={Math.max(0, point.amountMinor) / max} selected={point.monthISO === selected}
         onPress={() => onSelect(point.monthISO)} currency={currency} height={height} />)}
     </View>
     <View style={{ flexDirection: 'row', gap: 6 }}>
@@ -304,11 +317,24 @@ export function MonthBars({ points, selected, onSelect, currency, height = 120 }
       {t('reports.chart.scale', { status: t(current.partial ? 'reports.chart.partialMonth' : 'reports.period.fullMonth'),
         max: currencySymbol(currency) + '\u00A0' + formatWholeUnits(max, currency) })}
     </AppText>}
+    {/* VoiceOver hears the net in spoken numbers (its twin), never the visible «−$ 6,00». */}
+    {current && current.amountMinor < 0 && Number.isSafeInteger(current.amountMinor) && <AppText secondary variant="caption" style={{ textAlign: 'center' }}
+      accessibilityLabel={t('reports.chart.netBelowZero', { month: formatDate(current.monthISO.slice(0, 7) + '-01', 'month'), amount: spokenMoney(current.amountMinor, currency) })}>
+      {t('reports.chart.netBelowZero', { month: capitalize(formatDate(current.monthISO.slice(0, 7) + '-01', 'month')), amount: moneyText(current.amountMinor, currency) })}
+    </AppText>}
   </View>;
 }
 
+const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
+/** Whether a point nets to zero or less while it has records (24T3): VoiceOver says «sin gasto neto». A month with no
+ * record at all is not «no net spending» (a month without records is not a month without spending), so it is not. */
+export function noNetSpending(point: { amountMinor: number; count?: number }): boolean {
+  return point.amountMinor < 0 || (point.amountMinor === 0 && (point.count ?? 0) > 0);
+}
+
 function Bar({ point, fraction, selected, onPress, currency, height }: {
-  point: { monthISO: string; amountMinor: number; partial: boolean }; fraction: number; selected: boolean; onPress: () => void; currency: Currency; height: number;
+  point: MonthPoint; fraction: number; selected: boolean; onPress: () => void; currency: Currency; height: number;
 }) {
   const p = usePalette();
   const reduced = useReduceMotion();
@@ -317,7 +343,7 @@ function Bar({ point, fraction, selected, onPress, currency, height }: {
   useEffect(() => { value.value = withTiming(fraction, timing('data', reduced)); }, [fraction, reduced, value]);
   const style = useAnimatedStyle(() => ({ height: Math.max(point.amountMinor > 0 ? 3 : 0, value.value * (height - 4)) }));
   return <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityState={{ selected }}
-    accessibilityLabel={t(point.partial ? 'reports.chart.barPartial' : 'reports.chart.bar',
+    accessibilityLabel={t(noNetSpending(point) ? point.partial ? 'reports.chart.barPartialNoNet' : 'reports.chart.barNoNet' : point.partial ? 'reports.chart.barPartial' : 'reports.chart.bar',
       { month: formatDate(point.monthISO.slice(0, 7) + '-01', 'month'), year: point.monthISO.slice(0, 4), amount: spokenMoney(point.amountMinor, currency) })}
     onPress={onPress} containerStyle={{ flex: 1 }} style={{ height, justifyContent: 'flex-end', minHeight: undefined }}>
     <Animated.View style={[{ borderRadius: 6, backgroundColor: selected ? p.primary : idleBarColor(p), borderWidth: point.partial ? StyleSheet.hairlineWidth * 2 : 0,

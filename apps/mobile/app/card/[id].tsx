@@ -28,11 +28,12 @@ export default function CardDetailScreen() {
   const { t, relativeDate, moneyText, spokenMoney } = useI18n();
   const { width } = useWindowDimensions();
   const card = archive?.cards?.find(item => item.id === id);
-  const summary = useMemo(() => card && snapshot ? summarizeCard(card, snapshot, day, archive?.installmentPlans, archive?.records, archive?.cardCycleDates) : null,
-    [card, snapshot, day, archive?.installmentPlans, archive?.records, archive?.cardCycleDates]);
+  const summary = useMemo(() => card && snapshot ? summarizeCard(card, snapshot, day, archive?.installmentPlans, archive?.records, archive?.purchaseOperations, archive?.cardCycleDates) : null,
+    [card, snapshot, day, archive?.installmentPlans, archive?.records, archive?.purchaseOperations, archive?.cardCycleDates]);
   const statement = useMemo(() => card && snapshot ? cardStatementActivity(card, snapshot, day, archive?.cardCycleDates) : null, [card, snapshot, day, archive?.cardCycleDates]);
   const activity = useMemo(() => summary && snapshot ? liabilityActivity(summary.account.id, snapshot) : { entries: [], transfers: [] }, [summary, snapshot]);
-  const plans = useMemo(() => card ? cardPlanSummaries(card.id, archive?.installmentPlans, archive?.records) : [], [card, archive?.installmentPlans, archive?.records]);
+  const plans = useMemo(() => card ? cardPlanSummaries(card.id, archive?.installmentPlans, archive?.records, archive?.purchaseOperations) : [],
+    [card, archive?.installmentPlans, archive?.records, archive?.purchaseOperations]);
 
   if (!snapshot || !archive || !card || !summary || !statement) return <Screen>
     <EmptyState title={t('cards.panel.notFoundTitle')} detail={t('cards.panel.notFoundDetail')} icon="card-outline" />

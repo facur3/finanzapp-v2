@@ -638,3 +638,113 @@ test('24UX6D: a tap on the neutral space around the ring clears the choice; a dr
   pressAt(small, 88, 88 + 74);
   assert.equal(JSON.stringify(ring), JSON.stringify([null, null, 'b']));
 });
+
+// Producto 24T3 (A24): devoluciones net in their own month and category, so a category, a month or a span can be ≤ 0.
+test('24T3 (A24): only categories above zero are slices; a category ≤ 0 is never drawn, never folded into «Otras», and the arcs never pass one turn', () => {
+  const charts = chartsModule(bindLocale('es-AR')) as any;
+  const items = [{ key: 'a', label: 'A', value: 500 }, { key: 'b', label: 'B', value: 400 }, { key: 'c', label: 'C', value: 300 }, { key: 'd', label: 'D', value: 200 },
+    { key: 'e', label: 'E', value: 100 }, { key: 'f', label: 'F', value: 50 }, { key: 'zero', label: 'Cero', value: 0 }, { key: 'ropa', label: 'Ropa', value: -1000 }];
+  const slices = charts.donutSlices(items, { isDark: false }, () => '#123', 'Otras') as { key: string; value: number }[];
+  assert.equal(JSON.stringify(slices.map(slice => [slice.key, slice.value])), JSON.stringify([['a', 500], ['b', 400], ['c', 300], ['d', 200], [charts.OTHERS_KEY, 150]]),
+    '«Otras» is E + F only: Ropa (−1 000) would have made it −850');
+  assert.deepEqual((charts.donutSlices(items.slice(-2), { isDark: false }, () => '#123', 'Otras') as unknown[]).length, 0, 'nothing above zero: no slice at all');
+  // Whatever a caller hands in, the arcs are each positive value's share of the positive sum: one turn, never more.
+  const arcs = charts.donutArcs([{ key: 'x', value: 300, color: '#1' }, { key: 'neg', value: -200, color: '#2' }, { key: 'y', value: 100, color: '#3' }], 176, 22) as { key: string; start: number; end: number }[];
+  assert.equal(arcs.map(arc => arc.key).join(), 'x,y');
+  const gap = 2 / ((176 - 22 - 6) / 2);
+  assert.ok(Math.abs(arcs[1].end - (Math.PI * 3 / 2 - gap / 2)) < 1e-9, 'the last arc closes the circle exactly');
+  const sweep = arcs.reduce((sum, arc) => sum + (arc.end - arc.start), 0) + gap * arcs.length;
+  assert.ok(sweep <= Math.PI * 2 + 1e-9, 'never more than one turn: ' + sweep);
+  assert.ok(Math.abs((arcs[0].end - arcs[0].start + gap) / (Math.PI * 2) - 0.75) < 1e-9, 'x is 300 of 400, not 300 of 200');
+  assert.equal(charts.donutArcs([{ key: 'neg', value: -5, color: '#1' }], 176, 22).length, 0, 'a negative sum draws nothing');
+});
+
+test('24T3 (A24): a month that nets to zero or less is a bar at zero, VoiceOver says «sin gasto neto», and the shown month\'s negative net is written under the bars', () => {
+  const i18n = bindLocale('es-AR');
+  const points = [{ monthISO: '2026-06', amountMinor: 0, partial: false, count: 0 }, { monthISO: '2026-07', amountMinor: 0, partial: false, count: 2 },
+    { monthISO: '2026-08', amountMinor: 1000, partial: false, count: 1 }, { monthISO: '2026-09', amountMinor: -600, partial: true, count: 0 }];
+  const chart = chartsModule(i18n).MonthBars({ points, selected: '2026-09', onSelect: () => {}, currency: 'ARS' });
+  const bars = flat(chart).filter(node => typeof node.type === 'function');
+  assert.deepEqual(bars.map(bar => bar.props.fraction), [0, 0, 1, 0], 'clamped at zero on a scale of 0 to the largest positive net');
+  const labels = bars.map(bar => bar.type(bar.props).props.accessibilityLabel);
+  assert.equal(labels[0], 'junio 2026, 0,00 pesos', 'a month without records is not «sin gasto neto»: no records is not no spending');
+  assert.equal(labels[1], 'julio 2026, 0,00 pesos, sin gasto neto');
+  assert.equal(labels[2], 'agosto 2026, 10,00 pesos');
+  assert.equal(labels[3], 'septiembre 2026, ' + i18n.spokenMoney(-600, 'ARS') + ', sin gasto neto, mes en curso');
+  for (const bar of bars) {
+    const height = bar.type(bar.props).props.children.props.style[1]().height;
+    assert.ok(height >= 0, 'never a bar below the axis');
+  }
+  const captions = flat(chart).filter(node => node.type === 'AppText').map(node => String(node.props.children));
+  assert.ok(captions.includes('Mes en curso hasta hoy · escala de 0 a $ 10'), captions.join(' | '));
+  assert.ok(captions.includes('Septiembre: las devoluciones superan lo gastado (' + i18n.moneyText(-600, 'ARS') + ')'), captions.join(' | '));
+  // Its spoken twin: VoiceOver hears the net in words, never the visible «−$ 6,00».
+  const caption = flat(chart).find(node => node.type === 'AppText' && String(node.props.children).startsWith('Septiembre: '))!;
+  assert.equal(caption.props.accessibilityLabel, 'septiembre: las devoluciones superan lo gastado (' + i18n.spokenMoney(-600, 'ARS') + ')');
+  assert.notEqual(i18n.spokenMoney(-600, 'ARS'), i18n.moneyText(-600, 'ARS'), 'the twin differs from what is shown');
+  const august = chartsModule(i18n).MonthBars({ points, selected: '2026-08', onSelect: () => {}, currency: 'ARS' });
+  assert.equal(flat(august).filter(node => node.type === 'AppText').length, 1, 'a month above zero gets no extra line');
+  const english = chartsModule(bindLocale('en-US')).MonthBars({ points, selected: '2026-09', onSelect: () => {}, currency: 'ARS' });
+  const englishBars = flat(english).filter(node => typeof node.type === 'function').map(bar => bar.type(bar.props).props.accessibilityLabel);
+  assert.ok(englishBars[3].endsWith(', no net spending, month in progress'));
+});
+
+/** spending-chart.tsx and spending-timeline.tsx with their hosts as descriptors (24T3 guards). */
+function realModule(file: string, i18n: ReturnType<typeof bindLocale>, extra: Record<string, unknown> = {}) {
+  const source = readFileSync(new URL('../src/ui/' + file, import.meta.url), 'utf8');
+  const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
+  const jsx = (type: any, props: any) => ({ type, props });
+  const modules: Record<string, any> = {
+    '../i18n/provider': { useI18n: () => i18n }, '../i18n/format': i18nFormat, '../i18n/locale': { DEFAULT_LOCALE },
+    react: { useEffect: () => {} },
+    'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
+    'react-native': { View: 'View', ScrollView: 'ScrollView', useWindowDimensions: () => ({ fontScale: 1, width: 393 }), StyleSheet: { hairlineWidth: 0.5 } },
+    'react-native-reanimated': { __esModule: true, default: { View: 'AnimatedView' }, useSharedValue: (value: number) => ({ value }), useAnimatedStyle: (fn: () => any) => fn,
+      withTiming: (value: number) => value, cancelAnimation: () => {} },
+    'expo-router': { router: { push: () => {} } },
+    '@expo/vector-icons/Ionicons': 'Icon', '@finanzapp/domain': domain,
+    './components': { AppText: 'AppText', CategoryBadge: 'CategoryBadge', Money: 'Money', PressFeedback: 'PressFeedback', useStacked: () => false, rowAmountText },
+    './geometry': geometry, './report-presentation': presentation,
+    './category-hues': { useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }) },
+    './motion': { timing: () => ({ duration: 0 }) },
+    './theme': { useReduceMotion: () => true, usePalette: () => ({ text: '#000', inset: '#ECEFF4', line: '#ddd', secondary: '#666', tertiary: '#999' }) },
+    ...extra,
+  };
+  const module = { exports: {} as Record<string, (props: any) => any> };
+  runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
+    if (!Object.hasOwn(modules, name)) throw new Error('Unexpected ' + file + ' dependency: ' + name);
+    return modules[name];
+  } });
+  return module.exports;
+}
+
+test('24T3 (A24): a category row ≤ 0 reads «Sin gasto neto» (never «0 %» or a dash) and names its devoluciones; a row above zero keeps its share', () => {
+  const i18n = bindLocale('es-AR');
+  const rows = realModule('spending-chart.tsx', i18n);
+  const ropa = { key: 'ropa', category: 'Ropa', amountMinor: -700, count: 0 };
+  for (const name of ['CategoryLegendRow', 'CategorySpendingRow']) {
+    const row = rows[name]({ category: ropa, totalMinor: 400, currency: 'ARS', onPress: () => {}, countLabel: '1 devolución' });
+    assert.equal(row.props.accessibilityLabel, 'Ropa, ' + i18n.spokenMinor(-700, 'ARS') + ' ARS, sin gasto neto, 1 devolución', name);
+    const shown = flat(row).filter(node => node.type === 'AppText').map(node => [node.props.children].flat().join(''));
+    assert.ok(shown.some(text => text.startsWith('Sin gasto neto')), name + ': ' + shown.join(' | '));
+    assert.equal(shown.some(text => /%|—|0 gastos/.test(text)), false, name + ': ' + shown.join(' | '));
+    const comida = rows[name]({ category: { key: 'comida', category: 'Comida', amountMinor: 400, count: 1 }, totalMinor: 400, currency: 'ARS', onPress: () => {} });
+    assert.match(comida.props.accessibilityLabel, /^Comida, 4,00 ARS, 100 % del gasto del mes, 1 gasto$/, name);
+  }
+});
+
+test('24T3 (A24): the timeline clamps a span ≤ 0 at zero, says «sin gasto neto», and when nothing nets above zero it says so instead of a maximum', () => {
+  const i18n = bindLocale('es-AR');
+  const timeline = realModule('spending-timeline.tsx', i18n, { './components': { AppText: 'AppText', PressFeedback: 'PressFeedback' }, './motion': { timing: () => ({ duration: 0 }) },
+    './theme': { useReduceMotion: () => true, usePalette: () => ({ text: '#000', line: '#ddd' }) } });
+  const bucket = (startISO: string, amountMinor: number, count: number) => ({ currency: 'ARS', startISO, endISO: startISO, amountMinor, count });
+  const tree = timeline.SpendingTimeline({ buckets: [bucket('2026-09-01', 500, 1), bucket('2026-09-02', -300, 0), bucket('2026-09-03', 0, 0)], currency: 'ARS' });
+  const presses = flat(tree).filter(node => node.type === 'PressFeedback');
+  assert.deepEqual(presses.map(press => flat(press).find(node => typeof node.type === 'function')!.props.fraction), [1, 0, 0]);
+  assert.match(presses[1].props.accessibilityLabel, /, sin gasto neto, 0 gastos registrados$/);
+  assert.equal(presses[2].props.accessibilityLabel.includes('sin gasto neto'), false, 'an empty span is not «sin gasto neto»');
+  const negative = timeline.SpendingTimeline({ buckets: [bucket('2026-09-01', -300, 0), bucket('2026-09-02', 0, 0)], currency: 'ARS' });
+  assert.ok(negative, 'a span of devoluciones is not «nothing to show»');
+  assert.equal(String(flat(negative).find(node => node.type === 'AppText')!.props.children), 'Gasto registrado · sin gasto neto en estas fechas');
+  assert.equal(timeline.SpendingTimeline({ buckets: [bucket('2026-09-01', 0, 0)], currency: 'ARS' }), null, 'no records at all: nothing');
+});

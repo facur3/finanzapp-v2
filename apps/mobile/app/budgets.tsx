@@ -120,7 +120,8 @@ const SUBLIMIT_ROW_CHROME = 144;
 
 /** The month's ceiling: what is left of it (or by how much it was passed), the
  * share used, and spent versus limit. Measured against every recorded expense
- * of the month in this currency; sublimits do not change it.
+ * of the month in this currency; sublimits do not change it. 24T3 (A24): a month whose devoluciones exceed its purchases
+ * shows its whole limit available (clamped, never more) with «Las devoluciones superan lo gastado» under it.
  *
  * 24UX6E: flat on the canvas, the CardStatusBlock rhythm (no padded card beside the grouped list, one weight per level):
  * «Disponible» / «Excedido» over the 40 pt hero, then the 6 pt bar with the share used right under it, then Gastado ·
@@ -133,13 +134,18 @@ function TotalPanel({ total, currency, spoken }: { total: BudgetProgress<TotalMo
   const tone = budgetTone(total);
   const color = tone === 'expense' ? p.expense : tone === 'warning' ? p.warning : p.secondary;
   const percent = percentUsed(total);
-  const remaining = total.remainingMinor;
+  // 24T3 (A24): devoluciones can leave the month's net below zero; what is left is then shown at the limit, never above
+  // it, and one quiet line says why (Gastado keeps the exact net).
+  const refunded = total.spentMinor < 0;
+  const remaining = Math.min(total.remainingMinor, total.budget.amountMinor);
   return <View accessible accessibilityLabel={t('budgets.total.label', { spent: spoken(total.spentMinor), limit: spoken(total.budget.amountMinor), percent,
-    status: remaining < 0 ? t('budgets.total.exceededBy', { amount: spoken(-remaining) }) : remaining === 0 ? t('budgets.total.reached') : t('budgets.total.availableAmount', { amount: spoken(remaining) }) })}
+    status: remaining < 0 ? t('budgets.total.exceededBy', { amount: spoken(-remaining) }) : refunded ? t('budgets.total.refundsAvailable', { amount: spoken(remaining) })
+      : remaining === 0 ? t('budgets.total.reached') : t('budgets.total.availableAmount', { amount: spoken(remaining) }) })}
     accessibilityLanguage={speechLanguage} style={{ gap: 20 }}>
     <View style={{ gap: 6 }}>
       <AppText secondary variant="footnote" style={{ fontWeight: '500' }}>{t(remaining < 0 ? 'budgets.total.exceeded' : 'budgets.total.available')}</AppText>
       <Money minor={Math.abs(remaining)} currency={currency} large size={40} color={tone === 'expense' ? p.expense : undefined} />
+      {refunded && <AppText secondary variant="footnote">{t('budgets.total.refundsExceed')}</AppText>}
     </View>
     <View style={{ gap: 8 }}>
       <ProgressBar fraction={Math.min(1, Math.max(0, total.ratio || 0))} color={tone === 'expense' ? p.expense : tone === 'warning' ? p.warning : p.text} height={6} />
@@ -172,10 +178,14 @@ function BudgetRow({ row, money, spoken, last }: { row: BudgetProgress<CategoryM
   const tone = state === 'expense' ? p.expense : state === 'warning' ? p.warning : p.text;
   const percent = percentUsed(row);
   const percentText = formatPercent(percent * 0.01);
+  // 24T3 (A24): a category whose devoluciones exceed its purchases this month has its whole limit left, never more.
+  const refunded = row.spentMinor < 0;
   const statusOf = (amount: (minor: number) => string) => row.exceeded ? t('budgets.row.exceededBy', { amount: amount(-row.remainingMinor) })
+    : refunded ? t('budgets.row.refundsLeft', { amount: amount(row.budget.amountMinor) })
     : row.remainingMinor === 0 ? t('budgets.row.reached') : t('budgets.row.left', { amount: amount(row.remainingMinor) });
   const limit = money(row.budget.amountMinor);
   const detail = row.exceeded ? t('budgets.row.overOf', { amount: money(-row.remainingMinor), limit })
+    : refunded ? t('budgets.row.refundsOf', { limit })
     : row.remainingMinor === 0 ? t('budgets.row.reachedOf', { limit }) : t('budgets.row.leftOf', { amount: money(row.remainingMinor), limit });
   const name = useCategoryLabel(row.budget.category);
   const stacked = labelAmountStacks(width, fontScale, name, percentText, SUBLIMIT_ROW_CHROME);

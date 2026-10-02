@@ -46,6 +46,9 @@ export const reports = {
     /** Under the donut when the smaller categories are grouped: the donut names four categories and groups the rest (`donutSlices`). */
     othersNote: 'Las cuatro mayores con nombre propio; el resto se agrupa como Otras.',
     daysNote: 'Solo días con gastos registrados.',
+    /** 24T3 (A24): in Categorías, a period whose every category nets to zero or less (devoluciones of earlier purchases):
+     * no donut is drawn, the total is the compact line and this quiet sentence says why. */
+    noNetSpending: 'Sin gasto neto en este período: las devoluciones igualan o superan lo gastado.',
     outOfRangeTitle: 'El total supera el rango disponible',
     outOfRangeDetail: 'Tus movimientos siguen guardados. No mostramos un total ni un gráfico redondeado que pueda ser incorrecto.',
     /** A day row: "Hoy · 22 sep · 3 gastos". */
@@ -91,7 +94,8 @@ export const reports = {
     /** 24UX5: what the report counts, behind the information glyph beside the total (it was a permanent paragraph at the end). */
     method: {
       title: 'Qué cuenta este reporte',
-      detail: 'Solo movimientos registrados en {currency}, sin convertir otras monedas. Los saldos iniciales, las transferencias y los pagos de tarjeta no cuentan como ingresos ni gastos. Un mes sin registros no significa que no hayas gastado.',
+      /** 24T3: a devolución is a negative expense line in its own month and category (it is not income). */
+      detail: 'Solo movimientos registrados en {currency}, sin convertir otras monedas. Los saldos iniciales, las transferencias y los pagos de tarjeta no cuentan como ingresos ni gastos. Las devoluciones restan en su mes y su categoría. Un mes sin registros no significa que no hayas gastado.',
     },
     /** Under the month name: which days the report covers. */
     period: {
@@ -120,19 +124,37 @@ export const reports = {
       /** VoiceOver for one month bar: "septiembre 2026, 1234,56 pesos". `{month}` is the full month name (the axis under the bars keeps the short one). */
       bar: '{month} {year}, {amount}',
       barPartial: '{month} {year}, {amount}, mes en curso',
+      /** 24T3 (A24): a month with records whose net is zero or less (its bar is drawn at zero): "septiembre 2026, menos 300
+       * pesos, sin gasto neto". */
+      barNoNet: '{month} {year}, {amount}, sin gasto neto',
+      barPartialNoNet: '{month} {year}, {amount}, sin gasto neto, mes en curso',
+      /** 24T3 (A24): under the bars, when the shown month nets below zero (its bar stays at zero): the exact net as text. */
+      netBelowZero: '{month}: las devoluciones superan lo gastado ({amount})',
       partialMonth: 'Mes en curso hasta hoy',
       /** Under the bars: "Mes completo · escala de 0 a $ 1.234". */
       scale: '{status} · escala de 0 a {max}',
       /** VoiceOver for a category row: "Comida, 1234,56 ARS, 30 % del gasto del mes, 3 gastos". */
       categoryLabel: '{name}, {amount} {currency}, {share} del gasto del mes, {count}',
+      /** 24T3 (A24): a category that nets to zero or less is listed, never drawn: no share, «Sin gasto neto» instead. */
+      categoryNoNetLabel: '{name}, {amount} {currency}, sin gasto neto, {count}',
+      noNet: 'Sin gasto neto',
       categoryHint: 'Abre los movimientos de esta categoría en el mes seleccionado',
       timelineMax: 'Gasto registrado · máximo {currency} {amount}',
       timelineBar: '{period}, {amount} {currency}, {count}',
+      /** 24T3 (A24): a span whose net is zero or less (its bar is drawn at zero). */
+      timelineBarNoNet: '{period}, {amount} {currency}, sin gasto neto, {count}',
+      /** 24T3 (A24): over the bars when no span nets above zero. */
+      timelineNoNet: 'Gasto registrado · sin gasto neto en estas fechas',
       timelineHint: 'Abre los gastos de estas fechas',
       timelineFooter: 'Días del período · tocá una barra para ver el detalle',
     },
     /** "3 gastos registrados". */
     recordedExpenses: { one: '{count} gasto registrado', other: '{count} gastos registrados' },
+    /** 24T3 (A23): beside the purchases of a drill-down or a day, the devoluciones listed with them: "2 gastos registrados ·
+     * 1 devolución". A devolución is not a purchase, so it never adds to `recordedExpenses`. */
+    recordedRefunds: { one: '{count} devolución', other: '{count} devoluciones' },
+    /** 24T3: a listing with lines but no purchase and no devolución (only the interest or fees of an adelanto de cuotas). */
+    recordedLines: { one: '{count} movimiento registrado', other: '{count} movimientos registrados' },
     category: {
       invalidTitle: 'Período no válido',
       invalidDetail: 'Volvé al reporte para elegir las fechas.',
@@ -159,6 +181,9 @@ export const reports = {
       same: 'El mismo gasto registrado',
       more: '{percent} más registrado',
       less: '{percent} menos registrado',
+      /** 24T3 (A24): the previous period nets to zero or less (devoluciones), so no percentage over it is claimed. */
+      moreNoShare: 'Más gasto registrado',
+      lessNoShare: 'Menos gasto registrado',
       difference: 'Diferencia respecto del período anterior',
       insufficientTitle: 'Todavía no hay suficiente información',
       insufficientDetail: 'La comparación necesita gastos registrados en ambos períodos. Que no haya registros no significa que no hayas gastado.',

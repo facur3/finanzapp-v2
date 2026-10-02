@@ -19,6 +19,8 @@ import { realModule } from './real-module.ts';
 // 24T2 (stream B): the entry form's «Pago» section derivation (pure, real in the harness).
 import * as purchasePlan from '../src/ui/purchase-plan.ts';
 import * as movementAmount from '../src/ui/movement-amount.ts';
+// 24T3: the movement detail asks whether a devolución can be recorded (a dry run of the domain's creation).
+import * as operationPresentation from '../src/ui/operation-presentation.ts';
 
 // Actual screen/form handlers with native hosts replaced by descriptors.
 // This does not render UIKit, the Files picker, animation frames or gestures.
@@ -106,6 +108,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     // 24T2 (stream B): the entry form's «Pago» section: its derivation is real, the section itself a descriptor (tests/installment-purchase.node.ts renders it).
     './purchase-plan': purchasePlan, './installment-purchase': { InstallmentPurchase: 'InstallmentPurchase' },
     './installment-presentation': installmentPresentation,
+    '../../src/ui/operation-presentation': operationPresentation,
   };
   const require = (name: string) => {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected recovery dependency: ' + name);

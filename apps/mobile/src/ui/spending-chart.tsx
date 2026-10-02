@@ -28,21 +28,33 @@ function ShareBar({ fraction, color }: { fraction: number; color: string }) {
   </View>;
 }
 
-/** A category's share of the month's spending, with a bar. */
-export function CategorySpendingRow({ category, totalMinor, currency, onPress, last = false, compact = false }: {
+/** What a category row says about its share (24T3, A24): a category above zero, its share of `totalMinor` (the positive
+ * categories' sum, the donut's own base); one that nets to zero or less (devoluciones of earlier purchases) has no share and
+ * reads «Sin gasto neto», visibly and for VoiceOver, never «0 %» or a dash. */
+export function categoryShare(category: CategorySpending, totalMinor: number, currency: Currency, count: string,
+  { t, locale, spokenMinor, spokenPercent }: Pick<ReturnType<typeof useI18n>, 't' | 'locale' | 'spokenMinor' | 'spokenPercent'>, name: string): { fraction: number; label: string; spoken: string } {
+  if (category.amountMinor <= 0) return { fraction: 0, label: t('reports.chart.noNet'),
+    spoken: t('reports.chart.categoryNoNetLabel', { name, amount: spokenMinor(category.amountMinor, currency), currency, count }) };
+  const { fraction, label } = spendingShare(category.amountMinor, totalMinor, locale);
+  return { fraction, label, spoken: t('reports.chart.categoryLabel', { name, amount: spokenMinor(category.amountMinor, currency), currency, share: spokenPercent(fraction), count }) };
+}
+
+/** A category's share of the month's spending, with a bar. `countLabel` (24T3) names its purchases and devoluciones; by
+ * default its purchase lines (`category.count`). */
+export function CategorySpendingRow({ category, totalMinor, currency, onPress, last = false, compact = false, countLabel }: {
   category: CategorySpending; totalMinor: number; currency: Currency;
-  onPress: () => void; last?: boolean; compact?: boolean;
+  onPress: () => void; last?: boolean; compact?: boolean; countLabel?: string;
 }) {
   const p = usePalette();
-  const { t, locale, spokenMinor, spokenPercent } = useI18n();
+  const i18n = useI18n();
   const { hex: color, label: name } = useCategoryLook(category.category);
-  const { fraction, label } = spendingShare(category.amountMinor, totalMinor, locale);
-  const count = t('count.expenses', { count: category.count });
+  const count = countLabel ?? i18n.t('count.expenses', { count: category.count });
+  const { fraction, label, spoken } = categoryShare(category, totalMinor, currency, count, i18n, name);
   // 24UX6C2: the same name-and-amount rule as the legend rows (this row has its chevron unless compact).
   const stacked = useCategoryRowStacks(name, category.amountMinor, currency, ROW_CHROME + (compact ? 0 : LEGEND_CHEVRON));
   return <PressFeedback feedback="highlight" accessibilityRole="button"
-    accessibilityLabel={t('reports.chart.categoryLabel', { name, amount: spokenMinor(category.amountMinor, currency), currency, share: spokenPercent(fraction), count })}
-    accessibilityHint={t('reports.chart.categoryHint')}
+    accessibilityLabel={spoken}
+    accessibilityHint={i18n.t('reports.chart.categoryHint')}
     onPress={onPress} style={{ paddingHorizontal: 16, paddingVertical: 16, flexDirection: 'row', gap: 12, alignItems: 'center',
       borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, borderBottomColor: p.line }}>
     <CategoryBadge category={category.category} />
@@ -73,19 +85,22 @@ export function useCategoryRowStacks(name: string, minor: number, currency: Curr
 
 /** Legend row for the donut: the category tile carries the slice's hue, so the row needs no swatch. 24UX6C2: a category
  * chosen on the donut is marked here too, never by colour alone: a bold name, a 1.5 pt outline in the category's hue
- * and the selected state for VoiceOver. */
-export function CategoryLegendRow({ category, totalMinor, currency, onPress, last = false, chosen = false }: {
-  category: CategorySpending; totalMinor: number; currency: Currency; onPress: () => void; last?: boolean; chosen?: boolean;
+ * and the selected state for VoiceOver. 24T3 (A24): `totalMinor` is the positive categories' sum (the donut's base), and
+ * a category at zero or less reads «Sin gasto neto» instead of a share (`categoryShare`); `countLabel` names its
+ * purchases and devoluciones. */
+export function CategoryLegendRow({ category, totalMinor, currency, onPress, last = false, chosen = false, countLabel }: {
+  category: CategorySpending; totalMinor: number; currency: Currency; onPress: () => void; last?: boolean; chosen?: boolean; countLabel?: string;
 }) {
   const p = usePalette();
-  const { t, locale, spokenMinor, spokenPercent } = useI18n();
+  const i18n = useI18n();
+  const { t } = i18n;
   const look = useCategoryLook(category.category);
   const name = look.label;
-  const { fraction, label } = spendingShare(category.amountMinor, totalMinor, locale);
-  const count = t('count.expenses', { count: category.count });
+  const count = countLabel ?? t('count.expenses', { count: category.count });
+  const { label, spoken } = categoryShare(category, totalMinor, currency, count, i18n, name);
   const stacked = useCategoryRowStacks(name, category.amountMinor, currency);
   return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityState={{ selected: chosen }}
-    accessibilityLabel={t('reports.chart.categoryLabel', { name, amount: spokenMinor(category.amountMinor, currency), currency, share: spokenPercent(fraction), count })}
+    accessibilityLabel={spoken}
     accessibilityHint={t('reports.chart.categoryHint')}
     onPress={onPress} style={[{ paddingHorizontal: 16, paddingVertical: 12, minHeight: 60, flexDirection: 'row', gap: 12, alignItems: 'center',
       borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, borderBottomColor: p.line },

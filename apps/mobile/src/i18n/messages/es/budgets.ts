@@ -42,6 +42,9 @@ export const budgets = {
       exceededBy: 'Excedido por {amount}',
       reached: 'Límite alcanzado',
       availableAmount: 'Disponible {amount}',
+      /** 24T3 (A24): the month nets below zero (devoluciones): what is left is shown at the limit, never above it. */
+      refundsAvailable: 'Disponible {amount}. Las devoluciones superan lo gastado',
+      refundsExceed: 'Las devoluciones superan lo gastado',
       exceeded: 'Excedido',
       available: 'Disponible',
       spent: 'Gastado',
@@ -63,6 +66,9 @@ export const budgets = {
       leftOf: 'Quedan {amount} de {limit}',
       overOf: '{amount} por encima de {limit}',
       reachedOf: 'Límite alcanzado · {limit}',
+      /** 24T3 (A24): the category nets below zero (devoluciones): its whole limit is left, never more. */
+      refundsOf: 'Quedan {limit} de {limit} · las devoluciones superan lo gastado',
+      refundsLeft: 'Quedan {amount}. Las devoluciones superan lo gastado',
       /** VoiceOver hint: the row opens the budget's form. */
       hint: 'Abre el presupuesto para editarlo',
     },
@@ -72,8 +78,8 @@ export const budgets = {
       scopeGeneral: 'General',
       scopeCategory: 'Por categoría',
       amount: 'Presupuesto',
-      generalNote: 'Es el techo de todos los gastos registrados del mes en esta moneda. No cuenta ingresos, transferencias ni pagos de tarjeta; una compra con tarjeta cuenta una sola vez.',
-      categoryNote: 'Se compara con los gastos registrados en esta categoría durante ese mes. Es un sublímite: no se suma al presupuesto general.',
+      generalNote: 'Es el techo de todos los gastos registrados del mes en esta moneda. No cuenta ingresos, transferencias ni pagos de tarjeta; una compra con tarjeta cuenta una sola vez. Las devoluciones restan en su mes.',
+      categoryNote: 'Se compara con los gastos registrados en esta categoría durante ese mes. Es un sublímite: no se suma al presupuesto general. Las devoluciones restan en su mes y su categoría.',
       retryNote: 'El envío quedó congelado para que Reintentar no cree otro presupuesto.',
       create: 'Crear presupuesto',
       delete: 'Eliminar presupuesto',

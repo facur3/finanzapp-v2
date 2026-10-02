@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { accountBalanceMinor, initialRecord, interestCategoryLabel, interestFromTotalFinanced, materializeInstallmentPlan, newInstallmentPlan, snapshotFromArchive,
-  spendingReport, summarizeMonthlyBudgets, type Account, type CreditCardProfile, type Entry, type LedgerArchive, type MonthlyBudget, type Transfer } from '@finanzapp/domain';
+import { accountBalanceMinor, cardStatementActivity, initialRecord, interestCategoryLabel, interestFromTotalFinanced, materializeInstallmentPlan, newInstallmentPlan, newPlanPayoff,
+  newPlanRefund, snapshotFromArchive, spendingReport, summarizeMonthlyBudgets, type Account, type CreditCardProfile, type Entry, type LedgerArchive, type MonthlyBudget,
+  type Transfer } from '@finanzapp/domain';
 import { summarizeCard } from '../src/ui/liability-presentation.ts';
 import { cardPlanSummaries, planScheduleRows, purchasePreview } from '../src/ui/installment-presentation.ts';
 
@@ -79,4 +80,34 @@ test('Codex review: a card whose plans add up beyond the exact range still opens
   // One plan alone stays exact.
   assert.deepEqual([summarizeCard(card, snapshot, today, plans.slice(0, 1), [], [], [])!.committedMinor, summarizeCard(card, snapshot, today, plans.slice(0, 1), [], [], [])!.committedFinancingMinor],
     [2, 999999999999998]);
+});
+
+test('24T3: an adelanto and a devolución reach the card through the same ledger: balance, future instalments, pending plans and the plan figures agree', () => {
+  const now = '2026-10-30T12:00:00.000Z';
+  // The rest brought forward on Oct 30, its interest recognised: ten instalments of principal and interest join the balance once.
+  const payoff = newPlanPayoff(archive, { id: 'po', planId: plan.id, financing: 'recognised', dateISO: today, todayISO: today, createdAt: now });
+  const advanced = { ...archive, purchaseOperations: [payoff] };
+  const advancedSnapshot = snapshotFromArchive(advanced);
+  const summary = summarizeCard(card, advancedSnapshot, today, advanced.installmentPlans, advanced.records, advanced.purchaseOperations)!;
+  const before = 2310000 + 2 * (10000000 + 2000000) - 5000000;
+  assert.equal(summary.debtMinor, before + 10 * (10000000 + 2000000), 'each remaining share recognised once, on the adelanto\'s date');
+  assert.deepEqual([summary.committedMinor, summary.committedFinancingMinor, summary.pendingPlans.length], [0, 0, 0], 'nothing still to come; the plan no longer pending');
+  const [row] = cardPlanSummaries(card.id, advanced.installmentPlans, advanced.records, advanced.purchaseOperations);
+  assert.deepEqual([row.status, row.figures.recognisedCount, row.figures.settledMinor, row.figures.remainingMinor], ['completed', 12, 100000000, 0]);
+  assert.equal(planScheduleRows(plan, advanced.records, advanced.purchaseOperations).filter(item => item.state === 'settled').length, 10);
+  // The card's cycle counts it as one purchase (its principal line), never as a payment.
+  const cycle = cardStatementActivity(card, advancedSnapshot, today, []);
+  assert.equal(cycle.paymentsMinor, 0);
+  // A devolución of $ 300.000,00 instead: $ 200.000,00 recorded comes back as credit, $ 100.000,00 off the last instalment.
+  const refund = newPlanRefund(archive, { id: 'rf', planId: plan.id, amountMinor: 30000000, dateISO: today, todayISO: today, createdAt: now });
+  const returned = { ...archive, purchaseOperations: [refund] };
+  const returnedSnapshot = snapshotFromArchive(returned);
+  const after = summarizeCard(card, returnedSnapshot, today, returned.installmentPlans, returned.records, returned.purchaseOperations)!;
+  assert.equal(after.debtMinor, before - 20000000, 'the credit lowers the balance now');
+  assert.equal(after.committedMinor, 10 * 10000000 - 10000000, 'the reduction lowers what is still to come, with no spending line');
+  assert.equal(after.committedFinancingMinor, 10 * 2000000, 'interest is never refunded from here');
+  assert.equal(cardStatementActivity(card, returnedSnapshot, today, []).refundsMinor, 20000000, '«devoluciones» in the cycle caption');
+  const [returnedRow] = cardPlanSummaries(card.id, returned.installmentPlans, returned.records, returned.purchaseOperations);
+  assert.deepEqual([returnedRow.figures.refundedMinor, returnedRow.figures.refundedCreditMinor, returnedRow.figures.refundedFutureMinor, returnedRow.figures.scheduledMinor],
+    [30000000, 20000000, 10000000, 90000000]);
 });

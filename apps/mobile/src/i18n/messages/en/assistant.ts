@@ -48,6 +48,8 @@ export const assistant: Pick<Messages, 'assistant'> = {
     evidence: {
       expenses: 'Recorded expenses',
       income: 'Recorded income',
+      /** 24T3: the period's devoluciones (never income). */
+      refunds: 'Refunds',
       previousMonth: '{label} (previous month)',
       spokenIncrease: '{amount} more',
     },

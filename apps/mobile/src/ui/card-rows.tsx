@@ -4,7 +4,7 @@ import type { Currency } from '@finanzapp/domain';
 import { useI18n } from '../i18n/provider';
 import { cardFaceTone } from './card-faces';
 import { AppText, GlyphTile, MerchantBadge, Money, PressFeedback, useStacked, type IconName } from './components';
-import { planProgress, type PlanProgress, type PlanScheduleRow, type PlanSummary, type ScheduleRowState } from './installment-presentation';
+import { planProgress, planStateWord, scheduleRowOpens, type PlanProgress, type PlanScheduleRow, type PlanSummary, type ScheduleRowState } from './installment-presentation';
 import type { CardSummary } from './liability-presentation';
 import { radius, useCurrentDay, usePalette, type Palette } from './theme';
 
@@ -62,7 +62,8 @@ export function ArchivedCardRow({ summary, color, onPress, last = false }: { sum
 
 /** One plan in a card's detail: the merchant, «12 cuotas · 3/12 registradas», the principal still to come
  * («$ 900.000,00 restantes»; «principal restante» when the plan carries interest, which its detail lists apart) and the
- * next instalment's statement, or the plan's end state. Never «pagadas». */
+ * next instalment's statement, or the plan's end state (24T3: «Completo», «Adelantado», «Devuelto» or «Sin seguimiento»,
+ * `planStateWord`). Never «pagadas». */
 export function PlanRow({ summary, onPress, last = false }: { summary: PlanSummary; onPress: () => void; last?: boolean }) {
   const p = usePalette();
   const day = useCurrentDay();
@@ -73,10 +74,11 @@ export function PlanRow({ summary, onPress, last = false }: { summary: PlanSumma
   const count = t('installments.row.count', { count: plan.count });
   const financed = plan.interestMinor + plan.feeMinor + plan.taxMinor > 0;
   const recorded = t('installments.row.recorded', { count: figures.recognisedCount, total: plan.count });
-  const state = status === 'completed' ? t('installments.row.completed') : status === 'cancelled' ? t('installments.row.cancelled')
-    : next ? t('installments.row.next', { date: relativeDate(next.billingDateISO, day) }) : null;
-  const spokenState = status === 'completed' ? t('installments.row.completed') : status === 'cancelled' ? t('installments.row.cancelled')
-    : next ? t('installments.row.nextSpoken', { date: formatDate(next.billingDateISO, 'long') }) : null;
+  const word = planStateWord(summary);
+  const ended = word === 'completed' ? t('installments.row.completed') : word === 'broughtForward' ? t('installments.row.broughtForward')
+    : word === 'refunded' ? t('installments.row.refunded') : word === 'stopped' ? t('installments.row.cancelled') : null;
+  const state = ended ?? (next ? t('installments.row.next', { date: relativeDate(next.billingDateISO, day) }) : null);
+  const spokenState = ended ?? (next ? t('installments.row.nextSpoken', { date: formatDate(next.billingDateISO, 'long') }) : null);
   const label = [plan.merchant, count, t('installments.row.recordedSpoken', { count: figures.recognisedCount, total: plan.count }),
     live ? t(financed ? 'installments.row.remainingPrincipal' : 'installments.row.remaining', { amount: spokenMoney(figures.remainingMinor, plan.currency) }) : null,
     spokenState].filter(Boolean).join(', ');
@@ -131,15 +133,17 @@ export function PlanProgressSummary({ summary, rows }: { summary: PlanSummary; r
   </View>;
 }
 
-/** The fill of one instalment's segment: ink for a recognised one, amber for a partly undone one, an amber outline for
- * an undone one, a solid tertiary outline (empty) for one still to come and a dashed one for a cancelled one. Outlines
+/** The fill of one instalment's segment: ink for a recognised one (24T3: or brought forward, which counts the same),
+ * amber for a partly undone one, an amber outline for an undone one, a solid tertiary outline (empty) for one still to
+ * come and a dashed one for one that is never recorded (a plan without tracking, financing not charged, a devolución
+ * that took its whole principal). Outlines
  * use the tertiary ink, which stands out from the canvas in both themes (24UX6D review: the line colour did not), and
  * filled versus outlined tells recorded from still to come without colour. Meaning is in the words; the drawing only
  * follows the Calendario's states. */
 function segmentStyle(p: Palette, state: ScheduleRowState) {
-  return state === 'recognised' ? { backgroundColor: p.text } : state === 'partial' ? { backgroundColor: p.warning }
+  return state === 'recognised' || state === 'settled' ? { backgroundColor: p.text } : state === 'partial' ? { backgroundColor: p.warning }
     : state === 'undone' ? { backgroundColor: p.warningSoft, borderWidth: 1.5, borderColor: p.warning }
-    : state === 'cancelled' ? { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: p.tertiary, borderStyle: 'dashed' as const }
+    : state === 'cancelled' || state === 'waived' || state === 'refunded' ? { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: p.tertiary, borderStyle: 'dashed' as const }
     : { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: p.tertiary };
 }
 
@@ -158,16 +162,19 @@ function PlanBar({ progress }: { progress: PlanProgress }) {
 
 const STATE_GLYPH: Record<ScheduleRowState, IconName> = {
   recognised: 'checkmark-circle', partial: 'checkmark-circle-outline', next: 'radio-button-on', future: 'ellipse-outline', undone: 'arrow-undo-circle-outline',
-  cancelled: 'remove-circle-outline',
+  cancelled: 'remove-circle-outline', settled: 'play-forward-circle-outline', waived: 'close-circle-outline', refunded: 'return-down-back-outline',
 };
 function stateColor(p: Palette, state: ScheduleRowState): string {
-  return state === 'next' ? p.text : state === 'recognised' ? p.secondary : state === 'undone' || state === 'partial' ? p.warning : p.tertiary;
+  return state === 'next' ? p.text : state === 'recognised' || state === 'settled' ? p.secondary : state === 'undone' || state === 'partial' ? p.warning : p.tertiary;
 }
 
 /** One instalment of a plan's Calendario: «Cuota 3 de 12», the statement it belongs to (its closing) and that
  * statement's due date, what it charges and its state (Registrada, Registrada en parte, Próxima, Futura, Deshecha,
- * Cancelada). Each share has its own movement: when the person undid only one of them, the row says what still counts.
- * A row whose movement exists (recorded, partial or undone) opens that movement. `financing` names the extra share:
+ * No se registra; 24T3: Adelantada, No se cobró, Devuelta). Each share has its own movement: when the person undid only
+ * one of them, the row says what still counts. 24T3: the amount is what it charges after devoluciones («Reducida por
+ * devolución: $ …» under it); a row a devolución returned whole keeps its contractual amount, faded, beside «Devuelta»;
+ * a brought-forward row whose financing was not charged says so. A row whose movement exists (recorded, partial or
+ * undone) opens that movement; a brought-forward or returned one, its operation. `financing` names the extra share:
  * interest only, or a mix. */
 export function ScheduleRow({ row, count, currency, financing, onPress, last = false }: {
   row: PlanScheduleRow; count: number; currency: Currency; financing: 'interest' | 'financing'; onPress?: () => void; last?: boolean;
@@ -175,18 +182,29 @@ export function ScheduleRow({ row, count, currency, financing, onPress, last = f
   const p = usePalette();
   const day = useCurrentDay();
   const { t, moneyText, spokenMoney, relativeDate, formatDate, speechLanguage } = useI18n();
-  const stacked = useStacked({ minor: row.totalMinor, currency });
+  // A brought-forward row charges what the adelanto recognised: its financing recorded as not charged is said apart, never
+  // inside the amount (nor in «Incluye interés»), so the row never claims more than the card's balance holds.
+  const settledWaived = row.state === 'settled' ? row.waivedMinor : 0;
+  const shown = row.state === 'refunded' ? row.totalMinor : row.effectiveMinor - settledWaived;
+  const includedFinancing = row.financingMinor - settledWaived;
+  const stacked = useStacked({ minor: shown, currency });
   const title = t('installments.schedule.number', { number: row.number, count });
   const state = t(`installments.schedule.${row.state}`);
   const dates = t('installments.schedule.dates', { closing: relativeDate(row.billingDateISO, day, true), due: relativeDate(row.dueDateISO, day, true) });
   const spokenDates = t('installments.schedule.datesSpoken', { closing: formatDate(row.billingDateISO, 'long'), due: formatDate(row.dueDateISO, 'long') });
   const extraKey = financing === 'interest' ? 'installments.schedule.interest' : 'installments.schedule.financing';
-  const extra = row.financingMinor > 0 ? t(extraKey, { amount: moneyText(row.financingMinor, currency) }) : null;
-  const spokenExtra = row.financingMinor > 0 ? t(extraKey, { amount: spokenMoney(row.financingMinor, currency) }) : null;
+  const extra = includedFinancing > 0 ? t(extraKey, { amount: moneyText(includedFinancing, currency) }) : null;
+  const spokenExtra = includedFinancing > 0 ? t(extraKey, { amount: spokenMoney(includedFinancing, currency) }) : null;
   const partial = row.state === 'partial' ? t('installments.schedule.partialDetail', { counted: moneyText(row.recognisedMinor, currency), undone: moneyText(row.undoneMinor, currency) }) : null;
   const spokenPartial = row.state === 'partial' ? t('installments.schedule.partialDetail', { counted: spokenMoney(row.recognisedMinor, currency), undone: spokenMoney(row.undoneMinor, currency) }) : null;
-  const label = [title, spokenMoney(row.totalMinor, currency), state, spokenPartial, spokenDates, spokenExtra].filter(Boolean).join(', ');
-  const faded = row.state === 'undone' || row.state === 'cancelled';
+  const reduced = row.reducedMinor > 0 && row.state !== 'refunded' ? t('installments.schedule.reduced', { amount: moneyText(row.reducedMinor, currency) }) : null;
+  const spokenReduced = row.reducedMinor > 0 && row.state !== 'refunded' ? t('installments.schedule.reduced', { amount: spokenMoney(row.reducedMinor, currency) }) : null;
+  const waivedKey = financing === 'interest' ? 'installments.schedule.waivedInterest' : 'installments.schedule.waivedFinancing';
+  const waived = row.state === 'settled' && row.waivedMinor > 0 ? t(waivedKey, { amount: moneyText(row.waivedMinor, currency) }) : null;
+  const spokenWaived = row.state === 'settled' && row.waivedMinor > 0 ? t(waivedKey, { amount: spokenMoney(row.waivedMinor, currency) }) : null;
+  const label = [title, spokenMoney(shown, currency), state, spokenPartial, spokenReduced, spokenWaived, spokenDates, spokenExtra].filter(Boolean).join(', ');
+  const faded = row.state === 'undone' || row.state === 'cancelled' || row.state === 'waived' || row.state === 'refunded';
+  const hint = { entry: 'installments.schedule.openHint', payoff: 'installments.schedule.openPayoffHint', refund: 'installments.schedule.openRefundHint' } as const;
   const content = <>
     <View style={styles.glyph}><Ionicons name={STATE_GLYPH[row.state]} size={20} color={stateColor(p, row.state)} accessible={false} /></View>
     <View style={[styles.body, stacked ? styles.stacked : null]}>
@@ -195,15 +213,17 @@ export function ScheduleRow({ row, count, currency, financing, onPress, last = f
         <AppText secondary variant="footnote">{dates}</AppText>
         {!!extra && <AppText tertiary variant="footnote">{extra}</AppText>}
         {!!partial && <AppText variant="footnote" style={{ color: p.warning }}>{partial}</AppText>}
+        {!!reduced && <AppText secondary variant="footnote">{reduced}</AppText>}
+        {!!waived && <AppText secondary variant="footnote">{waived}</AppText>}
       </View>
       <View style={{ alignItems: stacked ? 'flex-start' : 'flex-end', maxWidth: stacked ? '100%' : '56%' }}>
-        <Money minor={row.totalMinor} currency={currency} color={faded ? p.tertiary : undefined} />
+        <Money minor={shown} currency={currency} color={faded ? p.tertiary : undefined} />
         <AppText variant="caption" style={{ color: stateColor(p, row.state), fontWeight: row.state === 'next' ? '600' : '500' }}>{state}</AppText>
       </View>
     </View>
     {onPress && <Ionicons name="chevron-forward" size={16} color={p.tertiary} accessible={false} />}
   </>;
-  return onPress ? <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={label} accessibilityHint={t('installments.schedule.openHint')}
+  return onPress ? <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={label} accessibilityHint={t(hint[scheduleRowOpens(row) ?? 'entry'])}
     onPress={onPress} style={[styles.row, separator(p, last)]}>{content}</PressFeedback>
     : <View accessible accessibilityLabel={label} accessibilityLanguage={speechLanguage} style={[styles.row, separator(p, last)]}>{content}</View>;
 }

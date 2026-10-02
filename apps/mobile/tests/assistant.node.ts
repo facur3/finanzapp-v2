@@ -392,3 +392,39 @@ test('24B6: an income draft is never implied to land on a card: with cash and a 
   assert.equal(afterExpense.content.kind === 'clarification' && afterExpense.content.field, 'paymentMethod');
   assert.equal(resolveDraft(income, [visa, cash], entries, 'ARS', today).kind, 'clarification', 'without the income list (older callers) nothing changes');
 });
+
+// Producto 24T3 (A25): the evidence stays additive and never negative. Spending is sent gross (purchase lines), plus one
+// «Devoluciones» fact; the net is never a total. Synthetic fixtures through the real projection (`snapshotFromArchive`).
+test('24T3 (A25): devoluciones reach the evidence as one positive «Devoluciones» fact; categories are gross, nothing is negative and the income count is unchanged', async () => {
+  const domain = await import('@finanzapp/domain');
+  const ropa: Entry = { id: 'ropa', accountId: 'cash', kind: 'expense', amountMinor: 80000, merchant: 'Tienda', category: 'Ropa', dateISO: '2026-08-10', createdAt };
+  const comida: Entry = { id: 'comida', accountId: 'cash', kind: 'expense', amountMinor: 10000, merchant: 'Almacén', category: 'Comida', dateISO: '2026-09-10', createdAt };
+  const sueldo: Entry = { id: 'sueldo', accountId: 'cash', kind: 'income', amountMinor: 300000, merchant: 'Empresa', category: 'Sueldo', dateISO: '2026-09-05', createdAt };
+  const refund = (amountMinor: number, dateISO: string): import('@finanzapp/domain').EntryRefund => ({ id: 'dev-1', kind: 'refund', target: { entryId: 'ropa' }, accountId: 'cash',
+    currency: 'ARS', amountMinor, dateISO, voided: false, createdAt, revision: 0, updatedAt: createdAt });
+  const archive = (operations: import('@finanzapp/domain').PurchaseOperation[]) => domain.snapshotFromArchive({ accounts: [cash], records: [ropa, comida, sueldo].map(domain.initialRecord), purchaseOperations: operations });
+  const without = monthlyEvidence(archive([]), 'ARS', today);
+  // A devolución of August's purchase dated in September leaves September's Ropa at −30.000 and its net at −20.000.
+  const facts = monthlyEvidence(archive([refund(30000, '2026-09-08')]), 'ARS', today);
+  const byId = (list: typeof facts, id: string) => list.find(fact => fact.id === id);
+  const report = domain.spendingReport(archive([refund(30000, '2026-09-08')]), 'ARS', '2026-09', today);
+  assert.equal(report.status === 'ready' && report.expenseMinor, -20000, 'the report\'s net is below zero');
+  assert.ok(facts.every(fact => fact.amountMinor >= 0 && fact.count >= 0), 'never a negative number');
+  assert.deepEqual(byId(facts, 'current.expenses'), { ...byId(without, 'current.expenses'), amountMinor: 10000, count: 1 }, 'gross purchases, as without the devolución');
+  assert.deepEqual(byId(facts, 'current.refunds'), { id: 'current.refunds', label: FACT_LABELS.refunds, amountMinor: 30000, count: 1, startISO: '2026-09-01', endISO: today });
+  assert.equal(FACT_LABELS.refunds, 'Devoluciones', 'protocol data, Spanish whatever the interface language');
+  assert.deepEqual(byId(facts, 'current.income'), byId(without, 'current.income'), 'a devolución never changes income or its count');
+  assert.equal(byId(facts, 'current.income')!.count, 1);
+  assert.deepEqual(facts.filter(fact => fact.id.startsWith('current.category.')).map(fact => [fact.label, fact.amountMinor, fact.count]), [['Categoría de gasto: Comida', 10000, 1]],
+    'Ropa (only the devolución this month) is no gross category');
+  assert.equal(byId(without, 'current.refunds'), undefined, 'no «Devoluciones» fact without one');
+  assert.equal(byId(facts, 'previous.refunds'), undefined, 'August had none');
+  // Net = gross − devoluciones: the facts reconcile with the report without ever sending the net.
+  assert.equal(byId(facts, 'current.expenses')!.amountMinor - byId(facts, 'current.refunds')!.amountMinor, -20000);
+  // The request the server receives passes contract v1 (which refuses negatives) and stays within its 60 facts.
+  assert.doesNotThrow(() => validateAssistantRequest({ version: 1, action: 'explain', text: '¿Cuánto gasté?', todayISO: today, currency: 'ARS', facts }));
+  // A month made only of a devolución is still evidence (not an untracked month), with gross spending 0.
+  const only = monthlyEvidence(domain.snapshotFromArchive({ accounts: [cash], records: [ropa].map(domain.initialRecord), purchaseOperations: [refund(5000, '2026-09-08')] }), 'ARS', today);
+  assert.deepEqual(only.filter(fact => fact.id.startsWith('current.')).map(fact => [fact.id, fact.amountMinor, fact.count]),
+    [['current.expenses', 0, 0], ['current.income', 0, 0], ['current.refunds', 5000, 1]]);
+});

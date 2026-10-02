@@ -749,20 +749,34 @@ export function EntryRow({ entry, account, last = false, showDate = true, showAc
   const { t, relativeDate, spokenAmount } = useI18n();
   const dateLabel = relativeDate(entry.dateISO, day);
   const income = entry.kind === 'income';
+  // 24T3 (A26): a line a devolución or an adelanto de cuotas projected. A devolución is a contra-expense (stored negative
+  // in the ledger): its row says «Devolución · comercio», shows the amount returned unsigned in ink (never the «+» of an
+  // income, 24UX6C) and draws its own glyph. An adelanto is recognised card spending: «Adelanto de cuotas · comercio» (a
+  // financing share names its component). Both open the operation's own detail, and VoiceOver hears the kind word first.
+  const refund = entry.refund !== undefined;
+  const operationId = entry.refund?.operationId ?? entry.payoff?.operationId;
+  const component = entry.payoff?.component;
+  const title = refund ? t('operations.row.refund', { merchant: entry.merchant })
+    : component === undefined ? entry.merchant
+      : component === 'principal' ? t('operations.row.payoff', { merchant: entry.merchant }) : t(`operations.row.payoffShare.${component}`, { merchant: entry.merchant });
   // 24UX6C: the row already says it is an expense or an income; the amount is shown as stored (no minus on an expense,
   // «+» on an income), see movement-amount.ts. The ledger amount is untouched.
-  const amount = presentedAmount(entry.kind, entry.amountMinor);
+  const amount = presentedAmount(entry.kind, refund ? Math.abs(entry.amountMinor) : entry.amountMinor);
   const stacked = useStacked({ minor: amount.minor, currency: account.currency, signed: amount.signed });
   const category = useCategoryLook(entry.category, entry.kind).label;
   const detail = [category, showAccount ? account.name : null, showDate ? dateLabel : null].filter(Boolean).join(' · ');
+  const spokenKind = refund ? [t('operations.row.refundWord'), entry.merchant]
+    : component === undefined ? [entry.merchant, t(income ? 'movement.incomeWord' : 'movement.expenseWord')]
+      : [t('operations.row.payoffWord'), ...(component === 'principal' ? [] : [t(`operations.row.payoffShareSpoken.${component}`)]), entry.merchant];
   return <PressFeedback feedback="highlight" accessibilityRole="button"
-    accessibilityLabel={[entry.merchant, t(income ? 'movement.incomeWord' : 'movement.expenseWord'), spokenAmount(entry.amountMinor, account.currency), category, account.name, dateLabel].join(', ')}
-    onPress={() => router.push({ pathname: '/entry/[id]', params: { id: entry.id } })}
+    accessibilityLabel={[...spokenKind, spokenAmount(amount.minor, account.currency), category, account.name, dateLabel].join(', ')}
+    onPress={() => router.push(operationId !== undefined ? { pathname: '/operation/[id]', params: { id: operationId } } : { pathname: '/entry/[id]', params: { id: entry.id } })}
     style={[styles.row, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
-    <MerchantBadge merchant={entry.merchant} category={entry.category} kind={entry.kind} tone={income ? 'income' : 'neutral'} />
+    {refund ? <GlyphTile icon="arrow-undo-outline" />
+      : <MerchantBadge merchant={entry.merchant} category={entry.category} kind={entry.kind} tone={income ? 'income' : 'neutral'} />}
     <View style={{ flex: 1, minWidth: 0, gap: 8, flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center' }}>
       <View style={{ flex: stacked ? undefined : 1, minWidth: 0, gap: 3 }}>
-        <AppText numberOfLines={stacked ? undefined : 2} style={{ fontWeight: '500' }}>{entry.merchant}</AppText>
+        <AppText numberOfLines={stacked ? undefined : 2} style={{ fontWeight: '500' }}>{title}</AppText>
         {!!detail && <AppText secondary variant="footnote" numberOfLines={stacked ? undefined : 2}>{detail}</AppText>}
       </View>
       <View style={{ maxWidth: stacked ? '100%' : AMOUNT_COLUMN, alignItems: 'flex-end' }}>

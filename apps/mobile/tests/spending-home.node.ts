@@ -1696,3 +1696,47 @@ test('24UX6D refinement: each budget row opens Presupuestos on its own currency 
   assert.equal(view.pushed.length, 2);
   assert.equal(view.navigated.length, 0, 'pushed, never a tab switch');
 });
+
+// Producto 24T3 (A24): a devolución is a negative expense line projected from a purchase operation; it nets in its month.
+test('24T3 (A24): Gastado below zero keeps the exact net and gets one quiet line, outside the number\'s block; never in Disponible or a month above zero', () => {
+  const account = snapshot.accounts[0];
+  const august: domain.Entry = { id: 'aug', accountId: 'a', kind: 'expense', amountMinor: 1000, merchant: 'Tienda', category: 'Ropa', dateISO: '2026-08-20', createdAt };
+  const september: domain.Entry = { id: 'sep', accountId: 'a', kind: 'expense', amountMinor: 100, merchant: 'Almacén', category: 'Comida', dateISO: '2026-09-03', createdAt };
+  const refund: domain.EntryRefund = { id: 'dev-1', kind: 'refund', target: { entryId: 'aug' }, accountId: 'a', currency: 'ARS', amountMinor: 600, dateISO: '2026-09-05',
+    voided: false, createdAt, revision: 0, updatedAt: createdAt };
+  const data = domain.snapshotFromArchive({ accounts: [account], records: [august, september].map(domain.initialRecord), purchaseOperations: [refund] });
+  const caption = 'Las devoluciones superan lo gastado';
+  const view = routeHarness('(tabs)/index.tsx', {}, data);
+  let root = view.render();
+  assert.equal(find(root, 'Money').props.minor, 100 - 600, 'the number is the month\'s exact net, never clamped');
+  assert.ok(homeTexts(fieldOf(root)).includes(caption), 'one quiet line on the field');
+  assert.equal(nodes(find(root, 'ValueTransition')).some(node => node.type === 'AppText'), false, 'outside the number\'s block (24UX6C)');
+  assert.equal(nodes(fieldOf(root)).find(node => node.type === 'AppText' && textOf(node) === caption)!.props.style.color, lightPalette.heroSecondary);
+  metricOf(root).props.onChange('available');
+  root = view.render();
+  assert.equal(homeTexts(root).includes(caption), false, 'Disponible is a balance: no such line');
+  assert.equal(homeTexts(routeHarness('(tabs)/index.tsx', {}, homeData).render()).includes(caption), false, 'a month above zero: no line');
+  locale = 'en-AR';
+  try { assert.ok(homeTexts(fieldOf(routeHarness('(tabs)/index.tsx', {}, data).render())).includes('Refunds exceed what was spent')); } finally { locale = 'es-AR'; }
+  // The month's spending detail lists both lines (they add up to the header) and counts the devolución apart.
+  const detail = routeHarness('spending-detail.tsx', { currency: 'ARS', startISO: '2026-09-01', endISO: '2026-09-12' }, data).render();
+  assert.equal(detail.props.entries.length, 2);
+  assert.equal(find(detail, 'Money').props.minor, -500);
+  assert.ok(homeTexts(detail).includes('1 gasto registrado · 1 devolución'));
+});
+
+test('24T3 (A23, verifier): a missing rate lists every currency with lines, also one whose period holds only devoluciones (its subtotal below zero is never dropped)', () => {
+  const ars: domain.Account = { id: 'ars', name: 'Pesos', currency: 'ARS', openingMinor: 0, createdAt };
+  const usd: domain.Account = { id: 'usd', name: 'Dólares', currency: 'USD', openingMinor: 0, createdAt };
+  const pesos: domain.Entry = { id: 'p', accountId: 'ars', kind: 'expense', amountMinor: 1000, merchant: 'Almacén', category: 'Comida', dateISO: '2026-09-03', createdAt };
+  const shoes: domain.Entry = { id: 'shoes', accountId: 'usd', kind: 'expense', amountMinor: 8000, merchant: 'Tienda', category: 'Ropa', dateISO: '2026-08-20', createdAt };
+  const refund: domain.EntryRefund = { id: 'dev-usd', kind: 'refund', target: { entryId: 'shoes' }, accountId: 'usd', currency: 'USD', amountMinor: 3000, dateISO: '2026-09-05',
+    voided: false, createdAt, revision: 0, updatedAt: createdAt };
+  const eur: domain.Account = { id: 'eur', name: 'Euros', currency: 'EUR', openingMinor: 0, createdAt };
+  const data = domain.snapshotFromArchive({ accounts: [ars, usd, eur], records: [pesos, shoes].map(domain.initialRecord), purchaseOperations: [refund] });
+  const period = { startISO: '2026-09-01', endISO: '2026-09-12' };
+  const figure = financeView.spendingFigure(data, financeView.financeView(data, 'consolidated', 'ARS', domain.rateBook([])), period, 'offline', true);
+  assert.equal(figure.status, 'unavailable');
+  assert.deepEqual(figure.status === 'unavailable' && figure.parts, [{ currency: 'ARS', minor: 1000 }, { currency: 'USD', minor: -3000 }],
+    'USD has no purchase in September but a devolución of −30,00: its subtotal is shown, not left out; EUR, with no line at all, is still left out (no records is not a zero)');
+});

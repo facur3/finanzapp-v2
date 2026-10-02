@@ -27,20 +27,29 @@ function Bar({ fraction }: { fraction: number }) {
   </View>;
 }
 
+/** Whether a span nets to zero or less while it has records (24T3: devoluciones net in their own dates). An empty span is
+ * not «no net spending»: no records is not no spending. */
+function noNet(bucket: SpendingBucket): boolean {
+  return bucket.amountMinor < 0 || (bucket.amountMinor === 0 && bucket.count > 0);
+}
+
+/** The period's spans as bars on a zero-to-max scale. 24T3 (A24): the scale is zero to the largest positive net; a span
+ * whose net is zero or less is drawn at zero (never below the axis) and VoiceOver says «sin gasto neto» with its exact
+ * net; when no span nets above zero the line over the bars says so instead of a maximum. Absent when no span has records. */
 export function SpendingTimeline({ buckets, currency }: { buckets: SpendingBucket[]; currency: Currency }) {
   const { t, locale, formatMoneyAmount, spokenMinor } = useI18n();
   const max = Math.max(...buckets.map(b => b.amountMinor), 0);
-  if (!max) return null;
+  if (!max && !buckets.some(noNet)) return null;
   return <View style={{ gap: 8 }}>
-    <AppText secondary style={{ fontSize: 12 }}>{t('reports.chart.timelineMax', { currency, amount: formatMoneyAmount(max, currency) })}</AppText>
+    <AppText secondary style={{ fontSize: 12 }}>{max ? t('reports.chart.timelineMax', { currency, amount: formatMoneyAmount(max, currency) }) : t('reports.chart.timelineNoNet')}</AppText>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, gap: 4 }}>
       {buckets.map(bucket => <PressFeedback key={bucket.startISO} feedback="opacity" accessibilityRole="button"
-        accessibilityLabel={t('reports.chart.timelineBar', { period: periodLabel(bucket, locale), amount: spokenMinor(bucket.amountMinor, currency), currency,
+        accessibilityLabel={t(noNet(bucket) ? 'reports.chart.timelineBarNoNet' : 'reports.chart.timelineBar', { period: periodLabel(bucket, locale), amount: spokenMinor(bucket.amountMinor, currency), currency,
           count: t('reports.recordedExpenses', { count: bucket.count }) })}
         accessibilityHint={t('reports.chart.timelineHint')} containerStyle={{ flex: 1, minWidth: 44 }}
         onPress={() => router.push({ pathname: '/spending-detail', params: { currency, startISO: bucket.startISO, endISO: bucket.endISO } })}
         style={{ gap: 8, paddingTop: 8 }}>
-        <Bar fraction={bucket.amountMinor / max} />
+        <Bar fraction={max ? Math.max(0, bucket.amountMinor) / max : 0} />
         <AppText secondary style={{ textAlign: 'center', fontSize: 11, lineHeight: 16 }}>
           {Number(bucket.startISO.slice(-2))}{bucket.startISO !== bucket.endISO ? '–' + Number(bucket.endISO.slice(-2)) : ''}
         </AppText>

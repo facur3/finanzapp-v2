@@ -24,7 +24,8 @@ export const display = {
       + 'No incluye tarjetas ni deudas, y no es un saldo bancario ni tu patrimonio. Tus cuentas conservan su moneda original.',
     reportInfo: 'Gastos de todas tus cuentas en {currency}. Cada gasto se convierte con la cotización de referencia de su fecha ({source}, '
       + 'bancos centrales): se usaron cotizaciones del {oldest} al {newest}, nunca la de hoy para un mes pasado. Los movimientos conservan su '
-      + 'importe original. No incluye saldos iniciales, transferencias ni pagos de tarjeta.',
+      + 'importe original. No incluye saldos iniciales, transferencias ni pagos de tarjeta. '
+      + 'Las devoluciones se convierten con la cotización de su propia fecha y restan en su mes y su categoría.',
     /** The one line under the per-currency subtotals when there is no total. */
     unavailable: 'Sin cotización para sumarlo en {currency}',
     comparisonFooter: 'Gastos de todas tus cuentas en {currency}, cada uno con la cotización de su fecha; sin transferencias ni saldos iniciales. Las diferencias describen tus registros, no los motivos de tus gastos ni un ahorro confirmado.',
