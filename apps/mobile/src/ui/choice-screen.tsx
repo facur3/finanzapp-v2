@@ -65,9 +65,9 @@ export function ChoiceScreen<T extends string>({ title, options, pinned, recent,
         <ErrorMessage message={failed ? t('preferences.saveFailed') : null} />
         {!!note && <AppText secondary variant="footnote" style={{ paddingHorizontal: 4 }}>{note}</AppText>}
       </View>}
-      renderItem={({ item }) => item.kind === 'header'
+      renderItem={({ item, index }) => item.kind === 'header'
         ? <AppText secondary variant="eyebrow" accessibilityRole="header" style={{ paddingHorizontal: 4, paddingTop: space.l, paddingBottom: space.s }}>{item.title}</AppText>
-        : <View style={[{ backgroundColor: p.surface, overflow: 'hidden' }, groupStyle(item.position)]}>
+        : <View style={[{ backgroundColor: p.surface, overflow: 'hidden' }, groupStyle(item.position), detachedPinned(rows, index) && styles.detached]}>
           <CheckRow title={item.option.title} subtitle={item.option.subtitle} selected={item.selected} accessibilityLanguage={item.option.language}
             last={item.position === 'last' || item.position === 'only'} onPress={() => choose(item.option.value)} />
         </View>} />
@@ -79,7 +79,16 @@ export function groupStyle(position: GroupPosition) {
   return position === 'only' ? styles.only : position === 'first' ? styles.first : position === 'last' ? styles.last : styles.middle;
 }
 
+/** 24UX6E: the pinned card stands apart from the options card that follows it at once (a short list, or a query), the
+ * block gap of `Screen`; before a section header it needs none, since the header carries its own top padding. Without
+ * it the two rounded cards touched and read as one broken card. */
+function detachedPinned<T extends string>(rows: readonly ChoiceRow<T>[], index: number) {
+  const row = rows[index];
+  return row?.kind === 'choice' && row.pinned === true && rows[index + 1]?.kind === 'choice';
+}
+
 const styles = StyleSheet.create({
+  detached: { marginBottom: space.xl },
   only: { borderRadius: radius.group, marginTop: 0 },
   first: { borderTopLeftRadius: radius.group, borderTopRightRadius: radius.group },
   middle: {},

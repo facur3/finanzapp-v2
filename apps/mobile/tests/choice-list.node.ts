@@ -194,3 +194,32 @@ test('choosing from the list while a search is active saves, ticks and keeps the
   nodes(rendered(root)[0]).find(node => node.type === 'CheckRow')!.props.onPress();
   assert.deepEqual(chosen, ['JP', 'system'], 'the pinned option is choosable with a search active too');
 });
+
+// 24UX6E (bug fix): the pinned card stands 20 pt apart from the options card that follows it at once, so two rounded
+// cards no longer touch (short lists, and a query); before a section header it needs no margin, the header pads itself.
+const flatStyle = (row: Node) => Object.assign({}, ...[row.props.style].flat(Infinity).filter(Boolean));
+const renderedAt = (root: Node) => list(root).props.data.map((item: any, index: number) => list(root).props.renderItem({ item, index }));
+test('the pinned card is detached from an options card that follows it at once, not from a section header', () => {
+  const options = [{ value: 'es', title: 'Español', language: 'es' }, { value: 'en', title: 'English', language: 'en' }];
+  const few = screen({ title: 'Idioma', options, pinned, selected: 'es', onChoose: () => true });
+  let rows = renderedAt(few.render());
+  assert.deepEqual(rows.map((row: Node) => flatStyle(row).marginBottom), [20, undefined, undefined], 'short list: only the pinned card gets the block gap');
+  assert.equal(flatStyle(rows[0]).borderRadius, 16, 'the pinned card keeps its own rounded corners');
+
+  const many = regionScreen(() => true);
+  let root = many.render();
+  rows = renderedAt(root);
+  assert.equal(list(root).props.data[1].kind, 'header');
+  assert.equal(flatStyle(rows[0]).marginBottom, undefined, 'a section header follows: no margin');
+  assert.equal(rows.slice(1).filter((row: Node) => row.type === 'View' && flatStyle(row).marginBottom !== undefined).length, 0, 'no other row is detached');
+  searchField(root).props.onChangeText('jap');
+  root = many.render();
+  rows = renderedAt(root);
+  assert.deepEqual(rows.map((row: Node) => flatStyle(row).marginBottom), [20, undefined], 'a query: the pinned card stands apart from the match');
+  searchField(root).props.onChangeText('xyzzy');
+  root = many.render();
+  assert.deepEqual(renderedAt(root).map((row: Node) => flatStyle(row).marginBottom), [undefined], 'nothing follows: no margin');
+
+  const bare = screen({ title: 'Idioma', options, selected: 'es', onChoose: () => true });
+  assert.deepEqual(renderedAt(bare.render()).map((row: Node) => flatStyle(row).marginBottom), [undefined, undefined], 'without a pinned option nothing is detached');
+});

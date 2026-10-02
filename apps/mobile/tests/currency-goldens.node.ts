@@ -84,12 +84,12 @@ test('the day-net header of the movement list: sign, visible amount and spoken t
   const accounts: domain.Account[] = [{ id: 'a', name: 'Caja', currency: 'ARS', openingMinor: 0, createdAt: at }, { id: 'u', name: 'Dólares', currency: 'USD', openingMinor: 0, createdAt: at }];
   const entry = (id: string, accountId: string, kind: domain.EntryKind, amountMinor: number): domain.Entry =>
     ({ id, accountId, kind, amountMinor, merchant: 'Prueba', category: 'Comida', dateISO: '2026-09-19', createdAt: at });
-  const read = (i18n: ReturnType<typeof bindLocale>, entries: domain.Entry[]) => {
+  const read = (i18n: ReturnType<typeof bindLocale>, entries: domain.Entry[], dayNet?: boolean) => {
     const { EntryList } = load('entry-list.tsx', {
       react: { useMemo: (fn: () => any) => fn() }, 'react/jsx-runtime': { jsx, jsxs: jsx }, 'react-native': { SectionList: 'SectionList', View: 'View' }, '@finanzapp/domain': domain,
       './components': { AppText: 'AppText', MovementRow: 'MovementRow' }, '../i18n/provider': { useI18n: () => i18n }, './presentation': presentation, './theme': theme,
     });
-    const list = EntryList({ entries, accounts });
+    const list = EntryList({ entries, accounts, ...(dayNet === undefined ? {} : { dayNet }) });
     const header = list.props.renderSectionHeader({ section: list.props.sections[0] });
     const texts = flat(header).filter(node => node.type === 'AppText');
     return { date: texts[0].props.children, net: texts[1] ? [texts[1].props.children].flat().join('') : null, spoken: texts[1]?.props.accessibilityLabel ?? null };
@@ -104,6 +104,11 @@ test('the day-net header of the movement list: sign, visible amount and spoken t
   // A day that mixes currencies shows no net at all, and a zero net shows nothing either.
   assert.deepEqual(read(bindLocale('es-AR'), [entry('e1', 'a', 'expense', 1), entry('e2', 'u', 'expense', 1)]).net, null);
   assert.deepEqual(read(bindLocale('es-AR'), [entry('e1', 'a', 'expense', 7), entry('i1', 'a', 'income', 7)]).net, null);
+  // 24UX6E: a list of movements that count nowhere (Movimientos deshechos) opts out: the day heading alone, no signed
+  // figure and no spoken «Neto del día»; `dayNet: true` is the default every other caller keeps.
+  assert.deepEqual(read(bindLocale('es-AR'), mixed, false), { date: 'Ayer · 19 sep', net: null, spoken: null });
+  assert.deepEqual(read(bindLocale('en-US'), [entry('e1', 'u', 'expense', 99)], false), { date: 'Yesterday · Sep 19', net: null, spoken: null });
+  assert.deepEqual(read(bindLocale('es-AR'), mixed, true), read(bindLocale('es-AR'), mixed));
 });
 
 // ---- Producto 24B3 (stage 4): the same sites for the currencies the catalogue will open, and the shared-word rule ----
