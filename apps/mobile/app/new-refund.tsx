@@ -13,7 +13,7 @@ import { releasesDraft } from '../src/ui/presentation';
 import { useAccountNameOf, useCategoryLookOf } from '../src/ui/category-hues';
 import { withCurrencyCode } from '../src/i18n/format';
 import { useI18n } from '../src/i18n/provider';
-import { space } from '../src/ui/theme';
+import { space, useCurrentDay } from '../src/ui/theme';
 
 type Ready = Extract<RefundPreview, { status: 'ready' }>;
 
@@ -36,8 +36,11 @@ function RefundForm({ target }: { target: RefundTarget | null }) {
   const accountName = useAccountNameOf();
   const categoryLook = useCategoryLookOf('expense');
   const [operation] = useState(() => ({ id: randomUUID(), createdAt: new Date().toISOString() }));
+  // Every day on this form is a local calendar day at noon (as «Adelantar cuotas»): today's upper bound, the purchase's lower
+  // bound and the first value are the same time of day, so a devolución dated today opens with valid bounds at any hour.
+  const today = useCurrentDay();
   const [amount, setAmount] = useState('');
-  const [date, setDate] = useState(() => new Date());
+  const [date, setDate] = useState(() => new Date(today + 'T12:00:00'));
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<Ready | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +50,6 @@ function RefundForm({ target }: { target: RefundTarget | null }) {
   const header = <Stack.Screen options={{ title: t('operations.refund.title'), gestureEnabled: !busy,
     headerLeft: () => <IconButton name="close" label={t('common.close')} onPress={close} disabled={busy} /> }} />;
 
-  const today = todayKey();
   const subject = archive && target ? targetOf(archive, target) : null;
   const bounds = archive && target ? refundBounds(archive, target, today) : null;
   if (!archive || !target || !subject || !bounds) return <Screen>{header}
@@ -127,6 +129,7 @@ function RefundForm({ target }: { target: RefundTarget | null }) {
   const caption = (number: (minor: number, code: Account['currency']) => string) => t(plan ? 'operations.refund.availablePlanCaption' : 'operations.refund.availableCaption',
     { currency, amount: number(bounds.availableMinor, currency) });
   const minimum = new Date(bounds.minimumISO + 'T12:00:00');
+  const maximum = new Date(today + 'T12:00:00');
 
   return <Screen gap={space.l}>
     {header}
@@ -147,7 +150,7 @@ function RefundForm({ target }: { target: RefundTarget | null }) {
     <AmountShortcut caption={caption(formatMoneyAmount)} spokenCaption={caption(spokenMinor)} label={t('operations.refund.available')} disabled={locked}
       onPress={() => { setAmount(amountFromMinor(bounds.availableMinor, currency)); setError(null); }} />
     <Surface grouped><DateField label={t('operations.refund.date')} value={date} onChange={value => { setDate(value); setError(null); }} disabled={locked}
-      minimumDate={minimum} maximumDate={new Date()} /></Surface>
+      minimumDate={minimum} maximumDate={maximum} /></Surface>
     {shown.length > 0 && <View style={{ gap: space.s }}>
       <SectionTitle>{t('operations.refund.previewTitle')}</SectionTitle>
       {shown.map((sentence, index) => <AppText key={index} variant="subhead" accessibilityLabel={spoken[index]}>{sentence}</AppText>)}

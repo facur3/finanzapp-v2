@@ -268,6 +268,65 @@ test('account detail shows this month in and out, three actions and redirects ob
   assert.equal(JSON.stringify(redirect.props.href), JSON.stringify({ pathname: '/card/[id]', params: { id: 'card' } }));
 });
 
+test('24T3 (review): a cash account whose devoluciones net the month below zero reads «Devoluciones netas este mes» with the excess; the ledger and the balance are untouched', () => {
+  // The account's September (the clock is 2026-09-20): Café 30,00 and Super 90,00 bought, plus an August TV of 200,00.
+  // Devoluciones are negative expense lines in their own month and account (24T3); the account detail only words the net.
+  const tv: domain.Entry = { id: 'tv', accountId: cash.id, kind: 'expense', amountMinor: 20000, merchant: 'Electro', category: 'Hogar', dateISO: '2026-08-20', createdAt };
+  const base: domain.LedgerArchive = { ...archive, records: [...entries, tv].map(domain.initialRecord) };
+  const refund = (data: domain.LedgerArchive, id: string, entryId: string, amountMinor: number, dateISO: string) => domain.applyNewOperation(data,
+    domain.newEntryRefund(data, { id, entryId, amountMinor, dateISO, todayISO: '2026-09-20', createdAt: dateISO + 'T15:00:00.000Z' }), '2026-09-20');
+  const facts = (root: Node) => nodes(root).filter(node => node.type === 'Stat').map(node => node.props.label + '=' + nodes(node).find(item => item.type === 'Money')!.props.minor);
+  // Balance: the opening 1000,00, income 500,00, the purchases (30 + 90 + 7 + 200) and every devolución back.
+  const balance = (data: domain.LedgerArchive) => find(harness('account/[id].tsx', { id: 'cash' }, data).render(), 'Money').props.minor;
+  const cases: [string, domain.LedgerArchive, string, number][] = [
+    ['spending > refunds', refund(base, 'r1', 'e2', 2000, '2026-09-15'), 'Gastos este mes=10000', 2000],
+    ['spending == refunds', refund(refund(base, 'r1', 'e2', 9000, '2026-09-15'), 'r2', 'e1', 3000, '2026-09-16'), 'Gastos este mes=0', 12000],
+    ['refunds > spending', refund(base, 'r1', 'tv', 15000, '2026-09-18'), 'Devoluciones netas este mes=3000', 15000],
+  ];
+  for (const [name, data, fact, back] of cases) {
+    const root = harness('account/[id].tsx', { id: 'cash' }, data).render();
+    assert.equal(facts(root).join(','), fact + ',Ingresos este mes=50000', name);
+    const shown = nodes(root).filter(node => node.type === 'Money').map(node => node.props);
+    assert.equal(shown.some(props => props.minor < 0), false, name + ': no negative amount on screen');
+    const spent = nodes(nodes(root).find(node => node.type === 'Stat')!).find(node => node.type === 'Money')!;
+    assert.equal(JSON.stringify([spent.props.signed, spent.props.tone, spent.props.color]), JSON.stringify([undefined, undefined, undefined]), name + ': unsigned ink, never income green');
+    // The balance is what the ledger says (the devolución is money back in the account), the same with or without this wording.
+    assert.equal(balance(data), 100000 + 50000 - 3000 - 9000 - 700 - 20000 + back, name);
+    assert.equal(balance(data), domain.accountBalanceMinor(cash, domain.snapshotFromArchive(data).entries.filter(entry => entry.accountId === 'cash'), []), name);
+  }
+  // The refund stays a negative expense line in the ledger every reader shares (Inicio, Reportes, Presupuestos net it).
+  const over = cases[2][1];
+  const line = domain.snapshotFromArchive(over).entries.find(entry => entry.accountId === 'cash' && entry.amountMinor < 0)!;
+  assert.equal(JSON.stringify([line.kind, line.amountMinor, line.dateISO, line.category]), JSON.stringify(['expense', -15000, '2026-09-18', 'Hogar']));
+  // VoiceOver: one element that says what the fact means and the excess, spoken; the ordinary fact keeps Stat + Money.
+  const spanish = harness('account/[id].tsx', { id: 'cash' }, over).render();
+  const group = nodes(spanish).find(node => node.type === 'View' && node.props.accessible && /Devoluciones netas/.test(node.props.accessibilityLabel ?? ''))!;
+  assert.ok(group, 'the net-refunds fact is one accessible element');
+  assert.equal(group.props.accessibilityLabel, 'Devoluciones netas este mes: las devoluciones superan lo gastado en 30,00 pesos');
+  assert.ok(Object.hasOwn(group.props, 'accessibilityLanguage'), 'VoiceOver\'s language follows the interface (speechLanguage)');
+  assert.equal(nodes(group).find(node => node.type === 'Stat')!.props.label, 'Devoluciones netas este mes');
+  assert.equal(nodes(harness('account/[id].tsx', { id: 'cash' }).render()).some(node => node.type === 'View' && node.props.accessible), false, 'an ordinary month adds no wrapper');
+  const english = harness('account/[id].tsx', { id: 'cash' }, over, 'en-AR').render();
+  assert.equal(facts(english).join(','), 'Net refunds this month=3000,Income this month=50000');
+  const spoken = nodes(english).find(node => node.type === 'View' && node.props.accessible)!;
+  assert.match(spoken.props.accessibilityLabel, /^Net refunds this month: refunds exceed spending by 30\.00 /);
+  assert.doesNotMatch(spoken.props.accessibilityLabel, /\$|-|−/, 'spoken, unsigned');
+  // A card's account keeps its own screen (no monthly fact there); its lines would read the same if a surface ever asked.
+  const cardBuy: domain.Entry = { id: 'card-buy', accountId: cardAccount.id, kind: 'expense', amountMinor: 8000, merchant: 'Tienda', category: 'Ropa', dateISO: '2026-08-25', createdAt };
+  const onCard = refund({ ...archive, records: [...entries, cardBuy].map(domain.initialRecord) }, 'rc', 'card-buy', 5000, '2026-09-19');
+  assert.equal(harness('account/[id].tsx', { id: 'card-acc' }, onCard).render().type, 'Redirect');
+  const cardLines = domain.snapshotFromArchive(onCard).entries.filter(entry => entry.accountId === cardAccount.id);
+  assert.equal(JSON.stringify(presentation.accountMonthFacts(cardLines, '2026-09-20')), JSON.stringify({ spending: { kind: 'netRefunds', minor: 5000 }, incomeMinor: 0 }));
+  // The rule on its own: zero is ordinary spending; only below zero is the excess of devoluciones.
+  assert.equal(JSON.stringify([-1, 0, 1].map(presentation.monthSpending)), JSON.stringify([{ kind: 'netRefunds', minor: 1 }, { kind: 'spent', minor: 0 }, { kind: 'spent', minor: 1 }]));
+  assert.equal(presentation.accountMonthFacts([{ ...entries[0], amountMinor: Number.MAX_SAFE_INTEGER }, { ...entries[1], amountMinor: Number.MAX_SAFE_INTEGER }], '2026-09-20'), null, 'unsafe sums: no figure');
+  // Exact sums: a running total that passes the safe range and comes back with devoluciones is still exact (a Number sum
+  // here gives 7999999999999990).
+  const huge = (amountMinor: number, index: number): domain.Entry => ({ ...entries[0], id: 'h' + index, amountMinor });
+  const swing = [...Array.from({ length: 9 }, () => 999999999999999), 1, 999999999999997, -999999999999999, -999999999999999].map(huge);
+  assert.equal(JSON.stringify(presentation.accountMonthFacts(swing, '2026-09-20')), JSON.stringify({ spending: { kind: 'spent', minor: 7999999999999991 }, incomeMinor: 0 }));
+});
+
 test('in English Recurrentes reads in English, keeps merchant and account names, and pausing writes what Spanish writes', async () => {
   const english = harness('recurring.tsx', {}, archive, 'en-AR'), spanish = harness('recurring.tsx');
   const root = english.render();

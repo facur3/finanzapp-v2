@@ -1,6 +1,6 @@
 import { CARD_DELETED_MESSAGE, OPERATION_ACCOUNT_DELETED_MESSAGE, OPERATION_CHANGED_MESSAGE, OPERATION_HISTORY_DELETED_MESSAGE, OPERATION_PLAN_STOPPED_MESSAGE, OPERATION_STATE_MESSAGE, OPERATION_TARGET_MESSAGE, PLAN_CALENDAR_MESSAGE,
   PLAN_CARD_MESSAGE, PLAN_DELETED_MESSAGE, PLAN_MISSING_MESSAGE, PLAN_OPERATION_DATE_MESSAGE, REFUND_AMOUNT_MESSAGE, REFUND_DATE_MESSAGE, REFUND_OVER_MESSAGE,
-  REFUND_TARGET_MESSAGE, currenciesPresent, liveAccounts, labelFromISO, operationGuardMessages, type Account, type Currency, type Entry, type EntryKind,
+  REFUND_TARGET_MESSAGE, currenciesPresent, currentMonthISO, liveAccounts, labelFromISO, operationGuardMessages, type Account, type Currency, type Entry, type EntryKind,
   type Transfer } from '@finanzapp/domain';
 import { dateFromISO, daysAgo, formatDate, relativeDayName } from '../i18n/format.ts';
 import { DEFAULT_LOCALE, type AppLocale } from '../i18n/locale.ts';
@@ -38,6 +38,32 @@ export function dayNetMinor(entries: Entry[], accounts: Account[]): { currency: 
   return { currency, minor: Number(total) };
 }
 export type EntrySection = { dateISO: string; data: Entry[] };
+
+/** What a cash account's month says about its expenses (24T3, A24). Devoluciones are negative expense lines in the
+ * month and account they are dated in, so the month's expense total is a net that can fall below zero when they exceed
+ * what was bought. The value is never clamped or turned into income: below zero it is presented as «Devoluciones netas
+ * este mes» with its magnitude (`netRefunds`), at zero or above as the ordinary «Gastos este mes» (`spent`). */
+export type MonthSpending = { kind: 'spent' | 'netRefunds'; minor: number };
+export function monthSpending(netExpenseMinor: number): MonthSpending {
+  return netExpenseMinor < 0 ? { kind: 'netRefunds', minor: -netExpenseMinor } : { kind: 'spent', minor: netExpenseMinor };
+}
+
+/** An account's facts for the month of `todayISO`, from its own lines (already filtered to it): the net of its expense
+ * lines (purchases minus the devoluciones dated this month, `monthSpending`) and its income, up to today. Summed exactly
+ * (BigInt, as `dayNetMinor`): with negative devolución lines a running sum can pass the safe range and come back, so only
+ * the exact totals are checked. Null when one leaves the safe integer range (never a misleading number). */
+export function accountMonthFacts(entries: readonly Entry[], todayISO: string): { spending: MonthSpending; incomeMinor: number } | null {
+  const monthISO = currentMonthISO(todayISO);
+  let expense = 0n, income = 0n;
+  for (const entry of entries) {
+    if (entry.dateISO.slice(0, 7) !== monthISO || entry.dateISO > todayISO) continue;
+    if (!Number.isSafeInteger(entry.amountMinor)) return null;
+    if (entry.kind === 'expense') expense += BigInt(entry.amountMinor); else income += BigInt(entry.amountMinor);
+  }
+  const limit = BigInt(Number.MAX_SAFE_INTEGER);
+  const safe = (total: bigint) => !(total > limit || -total > limit);
+  return safe(expense) && safe(income) ? { spending: monthSpending(Number(expense)), incomeMinor: Number(income) } : null;
+}
 const searchable = (text: string) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es-AR');
 
 /** 24T3: the words a devolución's or an adelanto's line answers to in the search besides its merchant and category: the

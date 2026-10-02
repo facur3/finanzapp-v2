@@ -22,10 +22,11 @@ import { realModule } from './real-module.ts';
 // detail of a purchase with devoluciones (`app/entry/[id].tsx`), the movement form editing one (`src/ui/entry-form.tsx`)
 // and Movimientos deshechos (`app/undone-entries.tsx`), with native hosts replaced by descriptors and the domain, the
 // presentation and the undo/restore hook (`src/ui/operation-actions.ts`) running for real. Not a rendered iPhone screen.
-// The clock is fixed at 2026-10-02 (noon, local): `new Date()` inside the screens and `todayKey()` both read it.
+// The clock is fixed at 2026-10-02 (noon, local, unless a harness sets `clock`): `new Date()` inside the screens and
+// `todayKey()` both read it.
 type Node = { type: string | ((props: any) => Node); props: Record<string, any>; rendered?: Node };
 const TODAY = '2026-10-02';
-const NOW = new Date(TODAY + 'T12:00:00').getTime();
+let NOW = new Date(TODAY + 'T12:00:00').getTime();
 class FixedDate extends Date {
   constructor(...args: unknown[]) {
     if (args.length) super(...(args as [string]));
@@ -64,9 +65,10 @@ function undoOf(archive: domain.LedgerArchive, id: string, todayISO = TODAY): do
   return domain.applyOperationChange(archive, domain.makeOperationChange('undo-' + id, op, 'void', at(todayISO)), todayISO).archive;
 }
 
-function harness(file: string, options: { data?: domain.LedgerArchive; params?: Record<string, string>; props?: any; locale?: AppLocale;
+function harness(file: string, options: { data?: domain.LedgerArchive; params?: Record<string, string>; props?: any; locale?: AppLocale; clock?: string;
   addRefund?: (value: domain.EntryRefund | domain.PlanRefund) => Promise<void>; change?: (value: domain.OperationChange) => Promise<void>;
   update?: (value: domain.EntryChange) => Promise<void> } = {}) {
+  NOW = new Date(TODAY + 'T' + (options.clock ?? '12:00') + ':00').getTime();
   const source = readFileSync(new URL('../' + file, import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const state: unknown[] = [];
@@ -184,6 +186,42 @@ test('24T3: Movimientos deshechos rows: one per undone operation, a plan devoluc
 });
 
 // ---- the refund form: an ordinary purchase -------------------------------------------------------------------------
+
+test('24T3 (review): a devolución whose earliest day is today opens with valid picker bounds at any hour, before local noon too', async () => {
+  // Until this fix the upper bound was `new Date()` and the lower one the purchase's day at noon: before 12:00 a purchase made
+  // today gave minimumDate > maximumDate, and the first value fell outside them. Every day on the form is now a local day at noon.
+  const today: domain.Entry = { id: 'today', accountId: bank.id, kind: 'expense', amountMinor: 8000, merchant: 'Kiosco', category: 'Comida', dateISO: TODAY, createdAt: at(TODAY) };
+  const data = base({ records: [buy, salary, today].map(domain.initialRecord) });
+  for (const clock of ['00:01', '08:00', '11:59', '12:00', '12:01', '18:30', '23:59']) {
+    const view = harness('app/new-refund.tsx', { data, params: { entryId: today.id }, clock });
+    const date = find(view.render(), 'DateField');
+    const { minimumDate: lowest, maximumDate: highest, value } = date.props as { minimumDate: Date; maximumDate: Date; value: Date };
+    assert.ok(lowest.getTime() <= highest.getTime(), clock + ': minimumDate ' + lowest.toString() + ' is after maximumDate ' + highest.toString());
+    assert.ok(lowest.getTime() <= value.getTime() && value.getTime() <= highest.getTime(), clock + ': the first value is inside the bounds');
+    assert.equal([lowest, value, highest].map(day => domain.todayKey(day)).join(','), [TODAY, TODAY, TODAY].join(','), clock + ': one local day, no drift');
+    // Recorded as typed: dated today, the purchase's own day.
+    find(view.render(), 'AmountField').props.onChangeText('30');
+    await find(view.render(), 'ActionButton').props.onPress();
+    assert.equal(JSON.stringify([view.refunds.length, view.refunds[0]?.dateISO, view.refunds[0]?.amountMinor]), JSON.stringify([1, TODAY, 3000]), clock);
+  }
+  // A purchase from September keeps its whole range at 08:00: the purchase's day is still selectable, and it is recorded.
+  const view = harness('app/new-refund.tsx', { params: { entryId: buy.id }, clock: '08:00' });
+  let date = find(view.render(), 'DateField');
+  assert.equal([date.props.minimumDate, date.props.value, date.props.maximumDate].map((day: Date) => domain.todayKey(day)).join(','), [buy.dateISO, TODAY, TODAY].join(','));
+  assert.ok(date.props.minimumDate.getTime() <= date.props.value.getTime() && date.props.value.getTime() <= date.props.maximumDate.getTime());
+  date.props.onChange(date.props.minimumDate);
+  find(view.render(), 'AmountField').props.onChangeText('10');
+  date = find(view.render(), 'DateField');
+  assert.equal(domain.todayKey(date.props.value), buy.dateISO);
+  await find(view.render(), 'ActionButton').props.onPress();
+  assert.equal(view.refunds[0]?.dateISO, buy.dateISO, 'the purchase\'s own day, the floor the domain allows');
+  // The domain's floor is unchanged: a day before the purchase is still refused, whatever the picker would offer.
+  const early = harness('app/new-refund.tsx', { params: { entryId: buy.id }, clock: '08:00' });
+  find(early.render(), 'DateField').props.onChange(new FixedDate('2026-09-14T12:00:00'));
+  find(early.render(), 'AmountField').props.onChangeText('10');
+  assert.equal(find(early.render(), 'ActionButton').props.disabled, true, 'before the purchase: no Save');
+  assert.equal(early.refunds.length, 0);
+});
 
 test('24T3: «Registrar devolución» of a purchase: the facts, «Total disponible», a preview of exactly what is recorded, the Save echo, one write and close', async () => {
   const view = harness('app/new-refund.tsx', { params: { entryId: buy.id } });

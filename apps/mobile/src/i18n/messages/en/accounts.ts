@@ -16,6 +16,8 @@ export const accounts: Pick<Messages, 'accounts'> = {
       recordedBalance: 'Recorded balance',
       monthExpenses: 'Spent this month',
       monthIncome: 'Income this month',
+      monthNetRefunds: 'Net refunds this month',
+      monthNetRefundsSpoken: 'Net refunds this month: refunds exceed spending by {amount}',
       recurring: 'Recurring',
       activeRecurring: { one: '{count} active', other: '{count} active' },
       schedule: 'Schedule',

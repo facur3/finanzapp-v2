@@ -9,6 +9,8 @@
     "accounts.detail.empty": "97f91847d43d",
     "accounts.detail.monthExpenses": "225abebdf0b8",
     "accounts.detail.monthIncome": "7d1384117bd3",
+    "accounts.detail.monthNetRefunds": "dcf3f03226af",
+    "accounts.detail.monthNetRefundsSpoken": "cfdcb5cbc3c5",
     "accounts.detail.movements": "dc1cf7a4dbba",
     "accounts.detail.notFoundDetail": "def26fffd04f",
     "accounts.detail.notFoundTitle": "11d6c0f15bbc",
