@@ -1,7 +1,8 @@
 # FinanzApp: dirección visual móvil
 
 Interfaz 17 · 21 de septiembre de 2026; estado al 2 de octubre de 2026: el carril Forest (24UX6A–24UX6E) y 24T3
-mergeados, 25A-01 mergeada (PR #77) y 25A-02 en su rama, sin cambios visuales. Implementado en código; revisión visual y
+mergeados, 25A-01 y 25A-02 mergeadas (PR #77, #78, #79) sin cambios visuales, y 25UX1 en su rama (dock, Tarjetas y
+Reportes: interacción). Implementado en código; revisión visual y
 gestual en iPhone pendiente. [Alcance del producto](decisions/002-spending-first.md) ·
 [Navegación y tarjetas](decisions/003-five-tabs-and-cards.md).
 
@@ -531,7 +532,8 @@ siguen la misma familia (valores en `palette.ts`).
   horizontal), 8 pt arriba y 10 pt entre la píldora y el «+» de 60 pt. Debajo, el inset inferior menos 14 pt (nunca
   menos de 10): descansa en la parte alta del área del indicador de inicio, sin tocarlo; 10 pt en un iPhone sin
   indicador. A 375 pt cada pestaña tiene unos 65 pt de ancho; a 393 pt, unos 70.
-- **En el layout, nunca encima.** El dock es una fila sobre el lienzo de la pantalla: cada pantalla termina arriba de
+- **En el layout, nunca encima.** *(Reemplazado el 2026-10-02 por 25UX1: el dock flota sin franja detrás; ver
+  «Producto 25UX1».)* El dock es una fila sobre el lienzo de la pantalla: cada pantalla termina arriba de
   él, y el desplazamiento, el teclado, las áreas seguras y la última fila funcionan como antes. *(Confirmado
   2026-10-02, en la revisión de 24T3: la píldora y el «+» se ven sobre una franja del lienzo con el área segura, y no se
   convierten en una capa absoluta flotante. Así ninguna última fila queda debajo del dock, el teclado y el área segura
@@ -845,6 +847,51 @@ La selección de porciones dentro de la dona (solo visual, dentro del reporte) *
 barras de Día a día y una cabecera fija sólida. Siguen permitidos para una pasada siguiente; no hay ruta de detalle por comercio. El orden
 vinculante del roadmap no cambia: la próxima entrega de producto es 24T3; 24UX6C (Movimientos y Más) y 24UX6D
 (Tarjetas) siguen a 24UX6B en el carril UX, y su lugar frente a 24T3 lo decide el dueño (ver `docs/mobile-roadmap.md`).
+
+## Producto 25UX1 — interacción del dock, Tarjetas y Reportes
+
+Tres problemas que el dueño observó en el producto, en su rama `feat/producto-25ux1-interaction-polish` desde master
+a1bd181; no es un rediseño ni reabre la línea visual de Forest. Las reglas quedan en la decisión 005 («Enmienda
+2026-10-02 — Producto 25UX1»).
+
+### El dock es el control
+
+- **Sin franja.** La píldora de pino con las cuatro pestañas y el «+» aparte flotan sobre la pantalla: el dock se fija al
+  borde inferior de la ventana, sin fondo propio; lo que se ve alrededor y entre los dos es el contenido que pasa por
+  debajo (con vidrio, desenfocado por la píldora; con Reduce Transparency, la píldora opaca de siempre). Sus márgenes
+  vacíos no toman toques.
+- **La última fila sigue alcanzable.** Las raíces (Inicio, Movimientos, Reportes, Más) llegan al borde de la ventana y
+  terminan su contenido la altura del dock más arriba (`dockClearance`, 88 pt con un indicador de 34), con el indicador
+  de scroll arriba del dock: el mismo final que antes. Es un único inset (`useDockClearance`): una pantalla apilada, un
+  modal o el hub valen 0 y quedan igual. Geometría, hub, teclado, blancos y VoiceOver del dock no cambian.
+
+### Tarjetas: elegir antes de ver
+
+- **En reposo.** Al entrar, ninguna tarjeta está elegida, aunque haya una sola: el mazo en su orden guardado, la última
+  entera abajo, y una línea tranquila («Tocá una tarjeta para ver su saldo y sus movimientos.»). Ningún saldo, fecha,
+  disponible, cuota, movimiento ni acción de otra tarjeta.
+- **Primer toque.** Cualquier tarjeta, también la entera de abajo, se elige: va al frente con el movimiento del mazo
+  (260 ms, interrumpible; con Reduce Motion, al instante) y aparece su resumen: **Saldo pendiente → Vence · Cierra →
+  Disponible** (o «No calculado con cuotas» / «Sin límite cargado») **→ Pagar tarjeta → Recientes**. Una sola acción:
+  Registrar es el «+»; las cuotas futuras y los planes, el detalle.
+- **Segundo toque.** Tocar la tarjeta elegida abre su detalle. VoiceOver distingue: una tarjeta sin elegir dice
+  «Selecciona esta tarjeta y muestra su resumen»; la elegida está «Seleccionada» y dice «Abre el detalle de la tarjeta».
+- **Sin números viejos.** Al cambiar de tarjeta, el saldo, los hechos y los recientes de la anterior se van en el acto y
+  los nuevos entran (sube o aparece); nunca se ven juntos.
+- **El detalle.** La cara y los hechos del resumen arriba, las acciones, **Movimientos y después Cuotas**: los planes
+  siguen a un toque, al final de la lista.
+
+### Reportes: la categoría elegida sube
+
+- Al elegir una categoría en la dona, su fila pasa a ser la primera de la lista mientras está elegida y **viaja** desde
+  su lugar mientras las demás le hacen espacio (el movimiento de datos de la app, 260 ms, sin resorte); al limpiar la
+  elección vuelve a su lugar; al elegir otra, la anterior vuelve y la nueva sube. Sigue marcada (borde y tinte de su
+  color, nombre en negrita, «Seleccionada»).
+- No cambia su rango: los importes, los porcentajes, la dona y su orden de VoiceOver son los del dominio; sin elección
+  el orden es el canónico. La pista de VoiceOver de la fila elegida dice «Elegida en el gráfico: se muestra primero
+  mientras está elegida».
+- Un mes, una moneda o un modo nuevos limpian la elección y reordenan sin viaje; con Reduce Motion el orden cambia al
+  instante; no hay desplazamiento automático de la página.
 
 ## Producto 25A-01 — modelo de borradores de revisión (sin cambios visuales)
 
@@ -1254,7 +1301,8 @@ semántica «solo el presupuesto general» de la fila de progreso); la selecció
 ### Reportes: congelado
 
 Decisión del dueño (2026-10-01): la composición de Reportes de esta entrega (PR #74) es **vinculante** y no se reabre
-sin una nueva decisión registrada en la decisión 005.
+sin una nueva decisión registrada en la decisión 005. *(Ampliada el 2026-10-02 por 25UX1, registrado en la decisión 005:
+la fila de la categoría elegida se lista primera mientras está elegida; ver «Producto 25UX1».)*
 
 - **Categorías:** período y alcance → Categorías | Día a día → la dona grande → en el centro, por defecto, el total
   exacto del período → con una categoría elegida, su nombre, su importe y su porcentaje en el centro → su fila marcada
@@ -1344,7 +1392,8 @@ que tiene son, **como máximo, dos filas contextuales de atención**; todo lo de
 
 ### Tarjetas: el mazo
 
-- **Siempre una al frente.** Con cualquier tarjeta activa hay una al frente; una selección que ya no existe (archivada
+- **Siempre una al frente.** *(Reemplazado el 2026-10-02 por 25UX1: Tarjetas abre en reposo, sin tarjeta elegida; ver
+  «Producto 25UX1».)* Con cualquier tarjeta activa hay una al frente; una selección que ya no existe (archivada
   o eliminada) le pasa el frente a la primera. Tocar una franja la elige (háptica de selección); tocar la del frente
   abre su detalle. Solo la elegida alimenta el resumen.
 - **Por qué (vinculante; refinamiento del dueño, 2026-10-01).** Tarjetas es una pantalla de estado financiero: con una
@@ -2777,6 +2826,11 @@ color propio.
 
 ## Pendiente de revisión en iPhone
 
+- Producto 25UX1 (en su rama; sin build de EAS, nada revisado): el dock sin franja (último renglón, teclado, hub,
+  cambio rápido de pestañas, Reduce Transparency, claro y oscuro); Tarjetas en reposo, primer toque, segundo toque,
+  cambio de tarjeta sin números viejos, una y seis tarjetas, VoiceOver y Reduce Motion; el detalle con Movimientos antes
+  de Cuotas; Reportes con la quinta categoría elegida que sube, vuelve y cambia, con Reduce Motion y VoiceOver. La lista
+  exacta está en docs/mobile-device-checklist.md («Producto 25UX1»).
 - Producto 25A-02: nada que revisar en el iPhone (la base local de propuestas, en su propio archivo; ninguna pantalla la
   abre todavía); la línea de versión de Más dice «FinanzApp 0.1.0 (25A-02)» en un build de su rama.
 - Producto 25A-01 (mergeada como PR #77): nada que revisar en el iPhone (solo dominio, sin pantalla nueva).

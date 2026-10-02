@@ -1,6 +1,66 @@
 # Physical iPhone acceptance checklist
 
-## Producto 25A-02 — nothing to check on the iPhone
+## Producto 25UX1 — Dock, Cards and Reports interaction (on its branch; none done)
+
+**Not done yet: no EAS build was made and the iPhone was not touched.** Metro from this branch (`npm run start:dev-client
+-- --clear`) on the installed FinanzApp Dev build; JavaScript only, no native dependency. Record the iPhone model, iOS
+version, theme, language and text size with each result. Use your own small test data; never seed movements. Rules:
+decision 005, «Enmienda 2026-10-02 — Producto 25UX1»; design: mobile-design.md, «Producto 25UX1».
+
+**Dock (no rectangle)**
+- [ ] On Inicio, Movimientos, Reportes and Más, scroll so content passes under the dock: no white (light) or black (dark)
+      band behind the pill and the «+»; only the pill, the «+» and the content around them. Light and dark.
+- [ ] Settings → Accessibility → Display & Text Size → Reduce Transparency on: the pill is solid pine, still no band.
+      Off again on an iOS that draws Liquid Glass: the pill blurs the content under it.
+- [ ] Scroll each root to its very end: the last row (Inicio's last section, Movimientos' oldest movement, Reportes'
+      last fact, Más' last row) rests fully above the dock with the same air as before; the scroll indicator stops
+      above the dock.
+- [ ] Tap content right beside, between and just above the pill and the «+» (a row's edge): the row responds; the empty
+      margins never swallow the tap. The four tabs and the «+» still respond across their whole targets.
+- [ ] Movimientos: open the search, type: the keyboard covers the dock, the results stay reachable above the keyboard,
+      dismissing it brings the dock back unchanged.
+- [ ] The «+» opens the capture hub: its «×» sits exactly where the «+» was; the card floats above the dock; closing it
+      returns to the same root.
+- [ ] Switch tabs 30–40 times quickly (including from the middle of a scroll): never a black or blank root, no fade.
+- [ ] A pushed screen (Tarjetas, a card, an account, Presupuestos) shows no dock and keeps its usual bottom padding.
+- [ ] VoiceOver: the four tabs read «Inicio, pestaña, 1 de 4»… and the «+» as before; Large Content Viewer on a long press.
+- [ ] Landscape (if the device allows it on a root): the dock clears the sensor housing, the last row is reachable.
+
+**Tarjetas (Más → Tarjetas)**
+- [ ] With two or more active cards: on entry no card is selected; the deck shows every card's identity, a quiet line
+      «Tocá una tarjeta para ver su saldo y sus movimientos.» and no balance, dates, available amount, movements or
+      button.
+- [ ] With exactly one active card: the same idle state (its face, no figures).
+- [ ] First tap on any card (a strip, and separately the whole card at the bottom): it moves to the front with the deck's
+      slide, one selection haptic, and the snapshot appears: Saldo pendiente → Vence · Cierra → Disponible (or «No
+      calculado con cuotas» / «Sin límite cargado») → «Pagar tarjeta» (disabled with nothing owed) → Recientes. No
+      «Registrar compra», no future-instalments row.
+- [ ] Tap another card: the old card's balance, dates, available amount and recent movements never flash beside the new
+      ones; the new card comes forward smoothly.
+- [ ] Tap the selected (front) card again: its detail opens. Back: the same card is still selected.
+- [ ] Six cards: idle, then select the fourth: the page scrolls it into view if needed; strips stay 44 pt.
+- [ ] Reduce Motion on: the card moves to the front at once; the snapshot still appears without movement.
+- [ ] VoiceOver: an unselected card says «… Selecciona esta tarjeta y muestra su resumen»; after selecting, the card says
+      «Seleccionado» and «Abre el detalle de la tarjeta»; the snapshot reads in its order.
+- [ ] An archived card is only under «Archivadas» and opens its detail; archiving the selected card elsewhere returns
+      Tarjetas to idle.
+- [ ] Card detail with plans: the face and the facts at the top, the actions, then «Movimientos» (every movement), then
+      «Cuotas» with every plan at the end; each plan still opens; Pagar tarjeta / Registrar compra as before.
+
+**Reportes (Categorías)**
+- [ ] A month with five or six categories: choose the fifth slice on the donut: its row visibly travels up to the first
+      position while the rows above make room; it stays outlined, bold and tinted; its amount and percentage unchanged.
+- [ ] Choose another slice: the previous row travels back to its place, the new one rises. Clear (tap the chosen slice
+      or the hole): the canonical order returns, animated.
+- [ ] No page auto-scroll: the chosen row is simply the first row under the donut.
+- [ ] Change month, currency or the display mode with a slice chosen: the choice clears and the list shows the new order
+      at once, without travelling rows. Categorías ↔ Día a día likewise.
+- [ ] Reduce Motion on: the chosen row is first at once, no travel; clearing restores the order at once.
+- [ ] VoiceOver: swipe up/down on the donut to choose; the chosen row is read first and its hint says «Elegida en el
+      gráfico: se muestra primero mientras está elegida…»; nothing says it is the largest category.
+- [ ] Large text (AX sizes): the rows reorder without overlapping; the donut's centre readout still fits.
+
+## Producto 25A-02 — nothing to check on the iPhone (merged as PR #78 and #79)
 
 The durable local review store (`apps/mobile/src/storage/review-database.ts`, its own file) is not opened by any screen
 yet: no UI, no native dependency, no ledger schema or backup change, no EAS build. The only visible difference is the

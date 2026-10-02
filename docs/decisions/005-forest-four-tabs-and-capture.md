@@ -66,6 +66,8 @@ borra ninguna entrega pasada.
   (`tabBarBottomGap`: inset − 14, mínimo 10; 10 sin indicador). **Queda en el layout, nunca
   encima del contenido:** cada pantalla termina arriba de él, y el compositor del Asistente, el
   teclado y las áreas seguras funcionan como antes (la razón de 24UX6A sigue valiendo).
+  *(Reemplazado el 2026-10-02 por 25UX1: el dock flota sobre las raíces, sin franja detrás; ver «Enmienda 2026-10-02 —
+  Producto 25UX1», abajo.)*
 - **Pestañas solo con íconos a la vista, nombradas por completo para la tecnología de apoyo.**
   Sin texto visible. VoiceOver oye cada pestaña como la barra del sistema: en iOS un botón
   «Inicio, pestaña, 1 de 4» (`nav.tabPosition`; el rol `tab` de React Native no da rasgo en
@@ -445,3 +447,35 @@ en el roadmap.
 **Estado.** Implementado en `apps/mobile`; **nada se revisó en un iPhone** y no hubo build de EAS. La verificación en
 Linux y la lista del dispositivo están en `docs/mobile-roadmap.md` («Producto 24UX6E») y
 `docs/mobile-device-checklist.md` («Producto 24UX6E»).
+
+## Enmienda 2026-10-02 — Producto 25UX1 (dock, Tarjetas y Reportes: interacción)
+
+Tres problemas que el dueño observó en el producto; no reabre la línea visual amplia de Forest.
+
+- **El dock flota** *(reemplaza «Queda en el layout, nunca encima del contenido»)*. La píldora de pino y el «+» son el
+  control y nada más: el dock se fija al borde inferior de la ventana, fuera del layout, sin pintar fondo (no hay franja
+  ni rectángulo detrás), y sus márgenes vacíos dejan pasar los toques. Las raíces llegan hasta el borde de la ventana y
+  terminan su contenido arriba del dock con **un único inset compartido** (`dockClearance`: el aire de abajo + 60 + 8;
+  88 pt con un indicador de 34): `useDockClearance` vale eso dentro de una escena de las pestañas y 0 en cualquier otra
+  pantalla, y lo suman `Screen`, `EntryList`, Inicio y Reportes a su relleno inferior y a su indicador de scroll. La
+  geometría del dock, el hub de captura, las opciones del navegador (la mitigación de pantallas negras: sin fade,
+  detach, freeze ni lazy), Reduce Transparency (la píldora opaca), los blancos de 48 pt y VoiceOver no cambian.
+- **Tarjetas abre en reposo** *(reemplaza «Siempre una al frente» de 24UX6D, `docs/mobile-design.md`)*. Ninguna tarjeta
+  está elegida al entrar, aunque haya una sola: el mazo es el protagonista (la identidad de cada tarjeta, nunca su
+  saldo, fechas, disponible, cuotas, movimientos ni acciones). El primer toque en cualquier tarjeta la elige y la lleva
+  al frente (el movimiento de datos del mazo, 260 ms); el resumen aparece debajo: Saldo pendiente → Vence · Cierra →
+  Disponible (o su desconocido honesto) → una sola acción, Pagar tarjeta → Recientes. Registrar es el «+» del dock; las
+  cuotas futuras y los planes viven en el detalle. Tocar la elegida abre su detalle; al cambiar de tarjeta los números
+  viejos se van en el acto y los nuevos entran, nunca juntos. El detalle conserva la cara y los hechos arriba y pone
+  **Movimientos antes de Cuotas**; ningún plan ni acción desaparece. Ninguna regla contable cambia.
+- **Reportes: la fila elegida sube a la vista** *(amplía «Reportes: congelado»)*. Con una categoría elegida en la dona,
+  su fila se lista primera mientras está elegida (las demás conservan su orden canónico) y viaja hacia arriba mientras
+  las otras le hacen lugar (`rowReorder`: el movimiento de datos, 260 ms, la curva única, sin resorte); al limpiar o
+  elegir otra, vuelve a su lugar. Un cambio de mes, moneda o modo reordena en el acto; con Reduce Motion el orden cambia
+  sin viaje; Día a día nunca reordena. La dona, sus porcentajes, su paso de VoiceOver y el orden sin elección siguen
+  siendo los del dominio; la pista de VoiceOver de la fila elegida dice que se muestra primero por estar elegida, nunca
+  que gastó más. El resto de la composición de Reportes sigue congelada.
+
+**Estado.** Implementado en `apps/mobile`; **nada se revisó en un iPhone** y no hubo build de EAS. La verificación en
+Linux y la lista del dispositivo están en `docs/mobile-roadmap.md` («Producto 25UX1») y
+`docs/mobile-device-checklist.md` («Producto 25UX1»).
