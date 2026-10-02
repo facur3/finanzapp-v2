@@ -16,7 +16,12 @@ Producto 24UX6C2» al final.* *Enmendada otra vez el 2026-10-01 por Producto 24U
 externo, con el total del período en el centro de la dona; la fila del presupuesto general como fila de progreso;
 Tarjetas con el saldo y los datos planos y la regla de franjas del mazo): ver «Enmienda 2026-10-01 — Producto 24UX6D» al
 final, con su refinamiento del dueño (la atención de presupuestos de Inicio incluye los presupuestos por categoría, dos
-filas como máximo; la composición de Reportes queda congelada; la selección de Tarjetas, razonada).*
+filas como máximo; la composición de Reportes queda congelada; la selección de Tarjetas, razonada).* *Enmendada otra
+vez el 2026-10-01 por Producto 24UX6E (más destinos financieros en Forest: en Deudas el color marca el estado y no la
+dirección; el presupuesto general plano con el héroe en tinta salvo excedido; resúmenes planos y una sola nota de ciclo
+de vida en Cuentas, Presupuestos, Recurrentes, Deudas y Categorías; sin chevron en una fila que abre un editor modal; el
+ámbar de Recurrentes solo para un gasto): ver «Enmienda 2026-10-01 — Producto 24UX6E» al final. Con ella se cierra la
+línea visual amplia de Forest.*
 
 ## Decisión
 
@@ -209,6 +214,8 @@ un build de EAS.
 
 La línea **24UX6A → 24UX6B → 24UX6C → 24UX6D** se suma al roadmap de producto; no lo reemplaza:
 24T3, 25A, 25C/25C2, 25D, 25E/25F y Producto 26 siguen como están.
+*(→ 2026-10-01: la línea quedó 24UX6A → 24UX6B → 24UX6C → 24UX6C2 → 24UX6D → 24UX6E, toda antes de 24T3; 24UX6A–24UX6D
+mergeadas (PRs #70–#74); 24UX6E, su última pasada, en «Enmienda 2026-10-01 — Producto 24UX6E».)*
 
 - **24UX6B, Reportes.** Se conservan presupuestos, observaciones y flujo neto (se reordenan o
   reestilan; nunca se quitan porque una maqueta los omita). La dona seleccionable solo como
@@ -218,8 +225,9 @@ La línea **24UX6A → 24UX6B → 24UX6C → 24UX6D** se suma al roadmap de prod
   adopta la regla del 3 % en esta generación. No se inventa una ruta de detalle por comercio: el
   resumen de comercios sigue sin interacción salvo que se agregue una ruta real a propósito.
 - **24UX6C, Movimientos y Más.** *(Implementada en parte el 2026-10-01: ver «Enmienda 2026-10-01 — Producto
-  24UX6C»; los filtros por período, cuenta y categoría siguen aprobados y pendientes; desde 24UX6D pertenecen al
-  alcance de búsqueda y productividad de Producto 25C, con sus búsquedas guardadas.)* Filas, búsqueda y filtros en Forest; filtros por período,
+  24UX6C»; los filtros por cuenta, categoría, período y período a medida siguen aprobados y pendientes; desde
+  24UX6D pertenecen al alcance de búsqueda y productividad de Producto 25C, con sus búsquedas guardadas. Hoy existen la
+  búsqueda y el filtro de tipo Todos / Gastos / Ingresos / Transf.)* Filas, búsqueda y filtros en Forest; filtros por período,
   cuenta y categoría con datos del repositorio; los totales del día conservan su semántica
   actual (neto donde el repositorio define neto). No se inventa nota, origen Apple Pay ni hora
   del movimiento. Se conservan Deshacer/Recuperar (sin un borrado definitivo falso) y
@@ -281,7 +289,9 @@ leyenda y, para VoiceOver, las palabras «Gasto», «Ingreso», «Transferencia�
 transferencia en todo contexto, al detalle de un movimiento, a las filas y al detalle de Recurrentes y a la tarjeta de
 borrador del Asistente. **Todo signo calculado se conserva:** un saldo negativo, el neto del día, el flujo neto, las
 diferencias entre períodos, los saldos de tarjeta y de deuda, el exceso de un presupuesto y las filas de evidencia del
-Asistente. «Nunca color sin signo o etiqueta» sigue valiendo: la fila lleva la etiqueta.
+Asistente. «Nunca color sin signo o etiqueta» sigue valiendo: la fila lleva la etiqueta. *(→ 24UX6E: Movimientos
+deshechos no muestra neto del día, porque lo deshecho no cuenta en ningún saldo; y los «Gastos este mes» de una cuenta
+son una suma rotulada, sin signo, como los «Gastos» de Recurrentes.)*
 
 El tono `transfer` queda fuera de la ventana de Forest (158–168°) a propósito: esa ventana rige la marca y la
 interfaz, no la semántica, y un azul petróleo bien separado del pino evita que una transferencia se lea como
@@ -395,9 +405,43 @@ resumen pesa, se refina la jerarquía en lugar de esconder información detrás 
 filtro por tipo y la búsqueda, con estados de limpiar y restablecer) pertenecen al alcance de búsqueda y productividad de
 Producto 25C; no se envía un botón de filtro a medias. Los demás destinos financieros en Forest (Cuentas, Presupuestos,
 Recurrentes, Deudas y cobros y Categorías) son Producto 24UX6E, «More financial destinations in Forest» (planificada;
-solo presentación y ciclo de vida; las utilidades de Más se auditan sin rediseñarse). El orden de producto no cambia:
+solo presentación y ciclo de vida; las utilidades de Más se auditan sin rediseñarse) *(→ implementada: ver «Enmienda
+2026-10-01 — Producto 24UX6E»)*. El orden de producto no cambia:
 después del carril UX, 24T3 sigue antes de 25A.
 
 **Estado.** Implementado en `apps/mobile`; **nada se revisó en un iPhone** y no hubo build de EAS. La verificación en
 Linux y la lista del dispositivo están en `docs/mobile-roadmap.md` («Producto 24UX6D») y
 `docs/mobile-device-checklist.md` («Producto 24UX6D»).
+
+## Enmienda 2026-10-01 — Producto 24UX6E (más destinos financieros en Forest; cierre de la línea UX)
+
+Fecha: 2026-10-01. Producto 24UX6E, rama `feat/producto-24ux6e-more-financial-forest` desde master 8f758ad (24UX6D
+mergeada como PR #74). Enmienda de **presentación y ciclo de vida**, más los errores reales que aparecieron (corregidos
+y registrados como errores en `docs/mobile-roadmap.md`, «Producto 24UX6E»): no cambia el dominio, el almacenamiento, las
+reglas de saldos, presupuestos, recurrentes ni deudas, el esquema (13), la copia (v13) ni cotizaciones; sin
+dependencias nativas ni animaciones nuevas. Inicio, Reportes (congelado por 24UX6D) y Tarjetas no cambian; Tarjetas
+solo vuelve a su lista con `dismissTo` después de «Eliminar tarjeta». Solo se registran aquí las reglas visuales
+vinculantes que cambiaron; el resto del detalle está en `docs/mobile-design.md` («Producto 24UX6E»).
+
+| Antes | Dónde | Ahora |
+| --- | --- | --- |
+| El ámbar marcaba lo que debo y el verde lo que me deben, en el tile de la fila y del detalle y en los totales (Deudas y cobros, sin texto en esta decisión) | Deudas y cobros: lista, fila, detalle | **El color marca el estado, nunca la dirección ni la identidad.** Tiles neutros con la flecha de dirección y totales en tinta. Solo las palabras de estado toman tono: vencida en el tono de alerta (las dos direcciones); vence en tres días o menos en ámbar, solo en una deuda que debo (la ventana de «Vence» en Tarjetas). Una deuda cerrada nunca se dibuja vencida: no tiene línea de estado y lleva la nota de ciclo de vida |
+| El presupuesto general como resumen en una tarjeta: número → barra → Gastado / Límite → «N % utilizado», el número en ámbar en aviso (Producto 19, `docs/mobile-design.md`) | Presupuestos | **Plano sobre el lienzo**, en el orden héroe → barra → estado → Gastado / Límite; el héroe de 40 pt **en tinta** en calma y en aviso, en el tono de alerta solo cuando se excedió; el aviso va en la barra y la línea de estado. El tile de un sublímite es **solo identidad**: su tono nunca dice el estado, que llevan el porcentaje, la barra y el glifo de alerta |
+| Resúmenes por moneda en tarjetas con relleno (el pronóstico de Recurrentes, los totales de Deudas, el presupuesto general, los datos del mes de una cuenta) | Cuentas, Presupuestos, Recurrentes, Deudas y cobros | **Resúmenes planos sobre el lienzo**, como el bloque de estado de Tarjetas (24UX6D); solo las listas agrupadas siguen siendo contenedores. En Recurrentes «Gastos · ARS» va en su propia línea a ancho completo, nunca achicado ni cortado |
+| Cada estado de ciclo de vida con su propio texto suelto (un pie sobre las acciones, una fila «Estado», «Cuenta eliminada» como rótulo del saldo, la fila archivada al 0,6) | Una cuenta eliminada, un recurrente pausado, cerrado o para revisar, una deuda cerrada, una categoría archivada | **Una sola nota de ciclo de vida** (`LifecycleNote`, la forma de `CardLifecycleNote`): un glifo secundario, un título opcional y una línea que dice qué sigue haciendo, bajo el héroe (arriba del editor en una categoría), sin superficie ni color de alarma; ámbar solo en las palabras de un recurrente para revisar. Una regla cerrada dice «Cuenta eliminada» / «Tarjeta eliminada», no «Pausado». Nada se atenúa para decir un estado |
+| Filas tocables con o sin chevron sin una regla escrita | Sublímites de Presupuestos, Categorías | **Sin chevron en una fila que abre un editor modal**; el chevron promete un push (una cuenta lo lleva y lo cuenta al decidir si apila). Las filas de Recurrentes y Deudas siguen sin chevron |
+| «ámbar solo hoy y mañana» (24UX2, `docs/mobile-design.md`) | Recurrentes | **Ámbar solo para un gasto** que vence hoy o mañana: un ingreso no es una obligación. «Revisar» sigue en ámbar |
+
+**Cierre de la línea UX.** Con 24UX6E la línea visual amplia de Forest (24UX6A → 24UX6B → 24UX6C → 24UX6C2 → 24UX6D →
+24UX6E) queda **cerrada**: otra pasada visual necesita evidencia del iPhone de una regresión concreta, no un reestilo
+general. El orden de producto sigue: **24T3** es la próxima entrega, después 25A; los filtros avanzados de Movimientos
+siguen en 25C; 25C2, 25D, 25E, 25F y 26 no cambian.
+
+**Fuera de esta enmienda.** Las utilidades de Más (Copia de seguridad, Importar copia, Idioma, Región, Apariencia,
+Movimientos deshechos) se auditaron sin rediseñarse; solo se corrigieron dos errores (la tarjeta fijada de los
+selectores, separada 20 pt; Movimientos deshechos sin neto del día) y el resto quedó anotado como pulido chico posterior
+en el roadmap.
+
+**Estado.** Implementado en `apps/mobile`; **nada se revisó en un iPhone** y no hubo build de EAS. La verificación en
+Linux y la lista del dispositivo están en `docs/mobile-roadmap.md` («Producto 24UX6E») y
+`docs/mobile-device-checklist.md` («Producto 24UX6E»).

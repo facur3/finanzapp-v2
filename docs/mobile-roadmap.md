@@ -1,12 +1,17 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-01 (Producto 24UX6D on its branch: Cards in Forest and final Home/Reports polish, presentation only;
+Updated: 2026-10-01 (Producto 24UX6E on its branch: more financial destinations in Forest, presentation and
+lifecycle polish plus bug fixes; Cuentas, Presupuestos, Recurrentes, Deudas y cobros and Categorías with flat summaries
+on the canvas, one shared lifecycle note, colour marking state rather than direction or identity and no chevron on rows
+that open a modal editor; the Más utilities audited, with two bug fixes (the pinned chooser card, Movimientos deshechos
+without a day net); no domain, storage, schema (13), backup (v13), FX or native change; the broad Forest visual lane
+closes with it; device QA pending, no EAS build. Producto 24UX6D merged as PR #74, merge commit 8f758ad: Cards in Forest and final Home/Reports polish, presentation only;
 Tarjetas, the card detail and the plan detail consolidated in Forest (one card always in front, 44 pt strips from the
 fifth card, the balance and facts flat on the canvas, the plan's progress as «3 de 12 registradas»), plus two approved
 carry-ins: Reportes Categorías with the period total in the donut's centre and no «Gastado» KPI, and Inicio's
 budget attention as compact progress rows (owner refinement, 2026-10-01: the month's general budget and category
 budgets in warning or exceeded, at most two rows in one grouped surface; Reportes' composition frozen); no card
-accounting, ledger, schema, backup or native change; device QA pending, no EAS build. Producto 24UX6C2 merged as PR #73, merge commit 5c73813: a small Home
+accounting, ledger, schema, backup or native change; device QA pending. Producto 24UX6C2 merged as PR #73, merge commit 5c73813: a small Home
 activity and Reportes interaction polish; Inicio's recent activity includes this month's transfers, each once,
 «Próximos compromisos» reads a rolling 30-day window (today through today + 30, both inclusive) and one contextual
 general-budget attention row appears when the month's general budget needs attention (no permanent budget card), and
@@ -23,7 +28,7 @@ Producto 24UX6A merged as PR #70, merge commit ef24bb6
 (2026-10-01): the Forest foundation, four icon-only tabs and a separate «+» in one dock, the capture hub, the Assistant as
 a root-stack screen, Inicio's financial field, Más → Apariencia; owner decisions in decision 005 (2026-09-30); device QA
 still pending. The UX lane 24UX6A → 24UX6B → 24UX6C → 24UX6C2 → 24UX6D → 24UX6E (more financial destinations in
-Forest; planned) is layered on the product order. Producto 24T2 merged as
+Forest; on its branch, the lane's last pass) is layered on the product order. Producto 24T2 merged as
 PR #69, merge commit 8951f6c: schema 13, backup v13, the purchase in cuotas, the card's statement calendar and the
 Tarjetas deck, verified by the owner on an iPhone 14 Pro with a fresh development build). Read [decision 001](decisions/001-native-mobile.md),
 [decision 002](decisions/002-spending-first.md),
@@ -32,8 +37,10 @@ Tarjetas deck, verified by the owner on an iPhone 14 Pro with a fresh developmen
 and the capture hub, 2026-09-30, amended 2026-10-01 by 24UX6C for the movement presentation and by 24UX6C2 for Inicio's activity with transfers, the 30-day
 commitments window, the contextual general-budget row and the donut without the total, and by 24UX6D for the period
 total in the donut's centre, the compact budget progress rows (refined the same day: general and category budgets
-needing attention, two rows at most), the frozen Reportes composition and Tarjetas' flat snapshot; its navigation rule
-supersedes decision 003's five tabs). Decision 002 supersedes
+needing attention, two rows at most), the frozen Reportes composition and Tarjetas' flat snapshot, and by 24UX6E for
+colour marking a debt's state rather than its direction, Presupuestos' flat general budget, flat summaries and one
+lifecycle note on Más' financial destinations, no chevron on rows that open a modal editor and Recurrentes' amber for an
+expense only; its navigation rule supersedes decision 003's five tabs). Decision 002 supersedes
 earlier full-finance migration phases and the local-only AI preference; decision 004 makes
 the native app the product; the web/Capacitor frontend was retired on 2026-09-25 (Producto
 24REP; its last version is the tag `web-frontend-final`). This file
@@ -169,16 +176,46 @@ history file keeps the evidence of when and why.
 
 ## 1. Implemented (current state)
 
-What exists in code on `master` as of Producto 24UX6C2 (PR #73, merge commit 5c73813), after 24UX6C (PR #72, merge
+What exists in code on `master` as of Producto 24UX6D (PR #74, merge commit 8f758ad), after 24UX6C2 (PR #73, merge
+commit 5c73813), 24UX6C (PR #72, merge
 commit c673be6), 24UX6B (PR #71, merge
 commit ecfd1dc), 24UX6A (PR #70, merged 2026-10-01, merge commit ef24bb6), 24T2 (PR #69, merge commit 8951f6c), 24T1C
-(PR #68), 24T1 (PR #67) and 25B3 (PR #66), plus Producto 24UX6D on its branch. Per area,
+(PR #68), 24T1 (PR #67) and 25B3 (PR #66), plus Producto 24UX6E on its branch. Per area,
 without test inventories (those are in apps/mobile/README.md and the history
 file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_REGIONS`,
 `LEDGER_CURRENCIES`): what a build offers, verified on Linux; nothing is distributed to people yet
 (§4).
 
-- **Cards in Forest and final Home/Reports polish (24UX6D, on its branch; device QA pending).** Presentation only: no
+- **More financial destinations in Forest (24UX6E, on its branch; device QA pending).** Presentation and lifecycle
+  polish plus the bugs found on the way; no domain, storage, schema (13), backup (v13), FX or native change; Inicio,
+  Reportes and Tarjetas unchanged (Tarjetas only got the post-delete navigation fix). Shared: one `LifecycleNote`
+  (`src/ui/components.tsx`, the shape of Tarjetas' `CardLifecycleNote`: a secondary glyph, an optional title, one
+  footnote line; amber words only for a recurring rule under review) under the hero of a deleted account, a paused,
+  closed or review rule and a closed debt, and at the top of an archived category's editor; colour marks state, never
+  direction or identity; no chevron on a row that opens a modal editor (a budget sublimit, a category); per-currency
+  summaries flat on the canvas (only grouped lists keep a surface). **Cuentas:** a section header is the currency's
+  name in ink with its total, one VoiceOver header («Pesos argentinos, saldo registrado …»), the total going under the
+  name at large text; a row shows the name and the balance only (no «Cuenta · ARS») and counts its chevron when it
+  stacks (`ROW_CHEVRON`); the detail is one flat block, «Saldo registrado · ARS» with the badge over a 40 pt balance
+  and the month facts («Gastos este mes» unsigned in ink). **Presupuestos:** the general budget flat, «Disponible» or
+  «Excedido» over a 40 pt hero in ink unless exceeded, the 6 pt bar with «60 % utilizado» under it, then Gastado |
+  Límite; a sublimit row is Inicio's budget row one level quieter (the category tile as identity only, the percent as
+  Inicio writes it, a 4 pt bar, «Quedan $ X de $ Y»), no chevron. **Recurrentes:** the 30-day forecast flat, «Gastos ·
+  ARS» (was «Pagos») on its own full-width line at 22 pt, then Ingresos (only when something comes in) and
+  Vencimientos; amber «Hoy» / «Mañana» for an expense only; a rule on a deleted account or card reads «Cuenta
+  eliminada» / «Tarjeta eliminada», not «Pausado»; the detail explains the state under the hero, and in review
+  «Continuar desde hoy» sits right under that note. **Deudas y cobros:** neutral tiles and totals in ink; only a row's
+  state words take a tone (overdue in the alert tone; due within three days in amber, for a debt I owe only;
+  `debtDueState`); a closed debt has the «Deuda cerrada» note instead of a state line; the detail drops Tipo and Estado.
+  **Categorías:** rows on the Forest row geometry, archived rows no longer dimmed and naming their kind. **Utilities**
+  audited: the pinned «Según el dispositivo» / «Sistema» card 20 pt apart from the options; Movimientos deshechos with no
+  day net. Bugs fixed: Presupuestos crashing on a malformed month link or a month it cannot sum; a duplicate budget and a
+  category name clash freezing their form into a «Reintentar guardado» that could never succeed (now editable input
+  errors); an untouched save of a historical category recolouring it everywhere; a closed debt drawn overdue; the debt
+  edit form's stale name; the forecast cut at 375 pt; an account balance shrunk instead of stacked; edit modals with no
+  close button when there is nothing to edit; «Eliminar cuenta» / «Eliminar tarjeta» now `dismissTo` the list. The
+  version line reads «FinanzApp 0.1.0 (24UX6E)». Details in «Producto 24UX6E» (§3).
+- **Cards in Forest and final Home/Reports polish (24UX6D, PR #74, merge commit 8f758ad; device QA pending).** Presentation only: no
   card accounting, payment, cycle, date, instalment recognition, committed principal, available-credit gate, lifecycle,
   ledger, schema (13), backup (v13), FX or native change. **Reportes Categorías:** no «Gastado · ARS» KPI, big amount
   or daily average; the donut (`donutGeometry`: 70 % of the window less 40 pt, 200–260 pt; 247 pt at 393 pt, 234 pt at
@@ -196,8 +233,8 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   budget card or dashboard. **Tarjetas:** one card always in front; 50 pt strips up to four cards and 44 pt from
   the fifth (`DECK_FULL_STRIP_CARDS`); the balance and the facts flat on the canvas (`CardStatusBlock`: Vence · Cierra
   on one row, Disponible on its own with its bar); a lifecycle note for an archived or deleted card; the plan detail's
-  progress bar and «3 de 12 registradas» (the domain's recognised count, never «pagadas»). The version line reads
-  «FinanzApp 0.1.0 (24UX6D)». Details in «Producto 24UX6D» (§3).
+  progress bar and «3 de 12 registradas» (the domain's recognised count, never «pagadas»). The version line read
+  «FinanzApp 0.1.0 (24UX6D)» (24UX6E since). Details in «Producto 24UX6D» (§3).
 - **Home activity and Reports interaction polish (24UX6C2, PR #73, merge commit 5c73813; device QA pending).** A small polish, no
   ledger, schema, backup or native change. Inicio's «Actividad reciente» lists this month's expenses, incomes **and
   transfers** in view, newest first, merged before the four/six limit (`homeRecent` with `mergeActivity`); a transfer
@@ -269,9 +306,11 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   `cancelInstallmentPlan`, `removeInstallmentPlan`; since 24T2 the purchase form creates plans (above).
 - **Detail hierarchy (25B3).** Two corrections of hierarchy before instalments, no redesign: the
   account detail no longer prints «Saldo inicial / Opening balance» as a row (`openingMinor` is unchanged in storage,
-  backups, migrations and every balance; the recorded balance still starts from it; nothing replaced the row), and a
+  backups, migrations and every balance; the recorded balance still starts from it; nothing replaced the row; since
+  24UX6E the balance and the month facts are one flat block on the canvas), and a
   recurring rule has its own detail screen (`app/recurring/[id].tsx`: the mark, the signed amount and currency as the
-  hero, the state Activo / Pausado / Revisar, the next date, the frequency, the category, the account or card it posts
+  hero, the state Activo / Pausado / Revisar (since 24UX6E «Cuenta eliminada» / «Tarjeta eliminada» for a rule on a
+  deleted account or card, and the state's note under the hero instead of above the actions), the next date, the frequency, the category, the account or card it posts
   to, «Registrados», and the row's own Pausar/Reanudar and Eliminar with the same confirmations; Editar in the header
   opens the form, which is now only the form). Inicio → Próximos compromisos, Más → Recurrentes and a recorded
   movement's «Recurrente» row open that detail, never the form; VoiceOver hears the rule («Alquiler, mensual, …»)
@@ -284,7 +323,8 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   only with two or more currencies held; a normal account can be deleted (a dated tombstone, schema
   11: every movement and transfer stays readable as its own, it leaves Disponible, the lists and the
   forms, its active rules stop; a trailing swipe on its row and «Eliminar cuenta» on its edit screen,
-  both with a destructive confirmation); a card without a balance due can be deleted (a `deleted` flag:
+  both with a destructive confirmation; since 24UX6E its detail opens with a lifecycle note and keeps «Saldo
+  registrado · ARS» over the balance, and «Eliminar cuenta» / «Eliminar tarjeta» return with `dismissTo`); a card without a balance due can be deleted (a `deleted` flag:
   purchases, payments and the internal account stay, its rules stop in the same commit; with a balance due
   the dialog offers Pagar or Archivar instead; no swipe on a card (the carousel then, the deck since 24T2), «Eliminar tarjeta» last on its edit
   screen, the balance named in the confirmation). Backups v11 carry both records (v12 too since 24T1); every older version still imports. The
@@ -304,7 +344,7 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   hub; the Assistant is a root-stack screen opened from the hub; Más is the grouped hub (Finanzas / App y datos:
   Cuentas, Tarjetas, Presupuestos, Recurrentes, Deudas y cobros, Categorías, Idioma, Región, Apariencia, backup, the
   Assistant's data note; since 24UX6C each group under a small caps label); a Más version line («FinanzApp 0.1.0
-  (24UX6D)»; the material and locale diagnostics only in a
+  (24UX6E)»; the material and locale diagnostics only in a
   development build). The dock stays in the layout (never absolute over the content). Liquid Glass (tinted pine on the
   dock's pill) on the dock, the account detail's movement pills and the Assistant composer only in a development build
   on iOS 26 with the API present and without Reduce Transparency; opaque material otherwise (solid pine with a hairline
@@ -331,7 +371,8 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   per-currency exponent (0, 2, 3), 15-digit bound, paste markers, shortcuts (Usar todo, Pagar
   total, Saldar total, Cobrar total) that only fill the amount; Categoría and Pagado con /
   Ingresa en as stacked selection rows; the date wheel in a compact bottom sheet on iOS (24B6;
-  its entrance is corrected in 24UX1); edit, undo, contextual account correction and recovery;
+  its entrance is corrected in 24UX1); edit, undo, contextual account correction and recovery
+  (since 24UX6E Movimientos deshechos shows no day net);
   a draft kept when a save fails; historical card incomes still editable.
 - **Ledger and storage.** SQLite schema 13 (24T2: `card_cycle_dates`, a card's exact statement dates; 12 (24T1):
   `installment_plans` and `installments`; 11 (25B2): the account
@@ -339,7 +380,8 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   and debt profiles; schema 9 added `currency_units`), durable writes, audited
   edits, same-currency internal transfers, balance corrections, accounts with identity
   (display rename, archive-first), category identity (presets in code, definitions per kind,
-  normalised key, schema 8), cards and debts as internal accounts with profiles (issuer, last
+  normalised key, schema 8; since 24UX6E an untouched save of a historical category writes nothing, a name clash is an
+  editable error, and Categorías' archived rows are no longer dimmed), cards and debts as internal accounts with profiles (issuer, last
   four digits, limit, closing and due days; counterparty, direction, due date), card rules
   (24B6). A backup takes the lowest version its content needs: v8 (ARS/USD only), v9 (another currency),
   v10 (24UX4: a deleted rule or debt), v11 (25B2: a deleted account or card), v12 (24T1: an instalment
@@ -361,7 +403,11 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   already in the ledger counts as recorded even after the person edited or undid it. An instalment plan is never a
   recurring rule: its own catch-up pass runs beside this one (24T1). 25B3: a rule
   is read on its own detail before it is edited (row → detail → Editar), like a movement, an account, a card or a debt;
-  the history and the lifecycle actions moved from the form to that detail.
+  the history and the lifecycle actions moved from the form to that detail. 24UX6E (presentation): a rule on a deleted
+  account or card reads «Cuenta eliminada» / «Tarjeta eliminada» on its row and detail, amber «Hoy» / «Mañana» marks an
+  expense only, and the 30-day forecast is flat with «Gastos» on its own line; a debt's tile and the totals are neutral,
+  only its state words take a tone (overdue; due within three days for a debt I owe), and a closed debt is never drawn
+  as overdue (its detail shows a «Deuda cerrada» note).
 - **Merchant identity (24UX2).** `packages/domain/merchants.ts`: normalized merchant keys, a
   curated catalogue of 35 unambiguous brands matched only by exact alias, never a category; the
   typed name is never rewritten; bare common words (Apple, Steam, Adobe, Despegar) stay
@@ -369,7 +415,9 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   brand marks are deferred to 25C2 (no logo API, bundled brand asset, upload or provider key); a
   development-only initial preview checks recognition (docs/merchant-identity.md).
 - **Budgets and reports.** A monthly total budget plus category sublimits (schema 7); explicit
-  remaining and exceeded states; Reportes (in 24UX6B's order: the month's total, the donut and its legend or
+  remaining and exceeded states (since 24UX6E Presupuestos shows the general budget flat, its hero in ink unless
+  exceeded, the sublimit rows without a chevron and with the category tile as identity only, and refuses a duplicate
+  budget as an editable error); Reportes (in 24UX6B's order: the month's total, the donut and its legend or
   day-by-day, then the six months' trend; since 24UX6D the total is the donut's centre in Categorías and one compact
   line in Día a día) with budgets, top merchants, insights, previous-month and category comparison with explicit ranges and
   missing-history guards; one display mode and currency shared by Inicio and Reportes
@@ -414,6 +462,8 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   (lakh, minimum grouping, apostrophe, narrow and no-break spaces, other scripts' digits on paste)
   through one grouping rule, and wrote the release plan by convention family (`region-release.ts`);
   since 24R2B the gate opens 234 regions (the 23 native-digit ones wait for 24R3); none of it is distributed yet.
+  Since 24UX6E the chooser's pinned card («Según el dispositivo», Apariencia's «Sistema») stands 20 pt apart from an
+  options card that follows it.
 - **Currencies.** The ISO 4217/CLDR catalogue (178 codes, pinned, `currency:verify` offline in
   CI); the pure amount model for exponents 0–4; presentation, copy and spoken forms for any
   currency with ARS/USD byte-identical goldens; storage and forms currency-aware (24B1–24B5:
@@ -442,7 +492,23 @@ it was checked in). Metro from the branch on the installed FinanzApp Dev build s
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
-- **24UX6D — Cards in Forest and final Home/Reports polish (none done; no EAS build):** the checklist section Producto
+- **24UX6E — More financial destinations in Forest (none done; no EAS build):** the checklist section Producto 24UX6E:
+  Cuentas with one and several accounts, large positive and negative balances, several currencies (the section header
+  in ink with its total, stacking at large text, one VoiceOver header), long names, the flat detail block at 40 pt, a
+  deleted account's note; «Eliminar cuenta» and «Eliminar tarjeta» returning to their list with Atrás and the tab bar
+  intact, also from an account detail reached from Inicio through a movement; Presupuestos without a general budget, with a general budget
+  and several sublimits, calm / 85 % / exactly 100 % / exceeded (the hero in ink until exceeded, the tile never
+  coloured, no chevron), very large amounts, long category names, another currency, the «Este mes» reach, a duplicate
+  budget's editable error, a malformed month link; Recurrentes with expenses and incomes, active, paused, closed and
+  review rules, near and far dates, long merchants, the forecast at 375 pt with ≥ $ 1.000.000,00, amber only on an
+  expense due today or tomorrow; Deudas owed and receivable, partly settled, overdue, due within three days (amber only
+  for a debt I owe), closed (the note, no state line), deleted, large amounts, long names, the neutral tiles in dark;
+  Categorías active and archived (no dimming), long names, a duplicate-name rename staying editable, an untouched save
+  of a historical category keeping its look, the close button on a missing category; Idioma, Región and Apariencia with
+  the pinned card apart in light, dark and AX3; Movimientos deshechos with no day net and no explanation over the empty
+  state. Everywhere: 375 pt, AX text, light and dark, VoiceOver, Reduce Motion, Reduce Transparency, clearance above
+  the dock. Metro on the installed development build; no native dependency added.
+- **24UX6D — Cards in Forest and final Home/Reports polish (merged as PR #74; none done; no EAS build):** the checklist section Producto
   24UX6D: Reportes' donut at 393 and 375 pt (247 / 234 pt), «Total del período» and the exact total in its centre with
   nothing chosen and the chosen category's name, amount and share after a tap, the readout under the donut at the AX
   sizes or with a huge amount, never cut; clearing by the same slice, the hole, the neutral space around the ring
@@ -590,16 +656,18 @@ an iPhone 14 Pro with a fresh development build. The immediate path is visual fi
 the four-tab shell, the capture hub, Home and Appearance; merged as PR #70, merge commit ef24bb6, 2026-10-01; device QA
 pending), then **24UX6B** (Reportes hierarchy and chart polish; merged as PR #71, merge commit ecfd1dc; device QA
 pending), then **24UX6C** (movement presentation, Home polish and Más; placed by the owner right after 24UX6B; merged as PR #72,
-merge commit c673be6; device QA pending; the approved period/account/category filters of Movimientos belong to 25C's
-productivity and search scope, not to the UX lane), then **24UX6C2** (Home activity and Reports interaction polish;
-merged as PR #73, merge commit 5c7381391a8531473f0948f632dcf1c988864408; device QA pending), then **24UX6D** (this PR:
-Cards in Forest plus two approved micro-polish carry-ins, Reportes' category composition with the total in the donut's
+merge commit c673be6; device QA pending; the approved account, category, period and custom-period filters of Movimientos, with
+its saved searches, belong to 25C's productivity and search scope, not to the UX lane), then **24UX6C2** (Home activity and Reports interaction polish;
+merged as PR #73, merge commit 5c7381391a8531473f0948f632dcf1c988864408; device QA pending), then **24UX6D**
+(Cards in Forest plus two approved micro-polish carry-ins, Reportes' category composition with the total in the donut's
 centre and Inicio's budget progress rows, refined by the owner to the general and category budgets needing attention,
-two rows at most; on its branch; device QA pending), then **24UX6E — More financial destinations in Forest** (Cuentas,
+two rows at most; merged as PR #74, merge commit 8f758ad65226eda27b88f32da22a8c9766a35bad; device QA pending), then
+**24UX6E — More financial destinations in Forest** (this PR: Cuentas,
 Presupuestos, Recurrentes, Deudas y cobros and Categorías brought to the Forest hierarchy and quality of Inicio,
 Reportes and Tarjetas; presentation and lifecycle polish only unless an actual bug is found, their domain and storage
-semantics preserved; Más' utility destinations audited, not redesigned; planned, not implemented), the next focused
-visual delivery. After the UX lane **24T3** (refunds, early
+semantics preserved; Más' utility destinations audited, not redesigned; on its branch; device QA pending), the last
+pass of the UX lane: after it the broad Forest visual lane is closed unless physical-device evidence finds a specific
+regression. After the UX lane **24T3** (refunds, early
 payoff, cancellation adjustments and the final device QA of instalments) remains next before 25A, per the binding
 order, unless a new dependency is discovered; then the later roadmap below. The earlier
 plan, as reconciled by 24T1C: 24T1 left 12 of the 13 card-invariant `it.todo`
@@ -608,7 +676,7 @@ mathematics; merged), 24T2 (the card purchase with the simple financing UX, the 
 current-versus-future balances and the Tarjetas direction, all recorded under 24T below and in «Producto 24T1C»),
 24T3 (refunds, early payments, lifecycle and the final device QA).
 
-The binding order is **24UX6A → 24UX6B → 24T3 → 25A → 25C → 25C2 → 25D → 25E → 25F → 26** (launch; 24T2 merged as PR #69). Every dependency points
+The binding order is **24UX6A → 24UX6B → 24UX6C → 24UX6C2 → 24UX6D → 24UX6E → 24T3 → 25A → 25C → 25C2 → 25D → 25E → 25F → 26** (launch; 24T2 merged as PR #69; 24UX6A–24UX6D merged as PRs #70–#74). Every dependency points
 backwards in it; the scope that would need a later or optional delivery is split out explicitly (24T1C, 2026-09-28):
 
 - **24C2 is optional** and blocks nothing in this order. 25A's core works on what the ledger already represents; only
@@ -623,20 +691,21 @@ backwards in it; the scope that would need a later or optional delivery is split
   delivery in this order and the owner places it.
 - **The UX lane (decision 005, 2026-09-30) is layered on this order, never replacing it.** Its own order is fixed:
   **24UX6A → 24UX6B → 24UX6C → 24UX6C2 → 24UX6D → 24UX6E**, each one focused PR that brings real, existing functionality to Forest and changes
-  no accounting, FX, schema or backup. 24UX6A and 24UX6B keep their places above (before 24T3). 24UX6C (Movimientos + Más)
-  and 24UX6D (Tarjetas) come after 24UX6B; where they fall relative to 24T3 and the later product items is the owner's
-  call (24UX6D restyles the Tarjetas screens that 24T3 also touches). Delivered: 24UX6A (PR #70), 24UX6B (PR #71),
+  no accounting, FX, schema or backup. The whole lane, 24UX6A through 24UX6E, comes before 24T3 (placed by the owner on 2026-10-01 in the
+  24UX6D refinement; 24UX6D restyled the Tarjetas screens that 24T3 also touches). Delivered: 24UX6A (PR #70), 24UX6B (PR #71),
   24UX6C (PR #72), 24UX6C2 (PR #73, merge commit 5c7381391a8531473f0948f632dcf1c988864408, a small polish of Inicio's
-  activity and Reportes' donut); 24UX6D is this PR (Cards in Forest plus two approved micro-polish carry-ins: Reportes'
-  category composition and Inicio's budget progress rows); **24UX6E — More financial destinations in Forest** (Cuentas,
-  Presupuestos, Recurrentes, Deudas y cobros and Categorías) is the next focused visual delivery (presentation and
+  activity and Reportes' donut); 24UX6D (PR #74, merge commit 8f758ad65226eda27b88f32da22a8c9766a35bad, Cards in Forest plus two approved
+  micro-polish carry-ins: Reportes' category composition and Inicio's budget progress rows); **24UX6E — More financial
+  destinations in Forest** (Cuentas, Presupuestos, Recurrentes, Deudas y cobros and Categorías) is this PR, the lane's
+  last pass; after it the broad Forest visual lane is closed unless device evidence finds a specific regression (presentation and
   lifecycle polish only unless an actual bug is found, preserving their domain and storage semantics; the Más utility
   destinations are audited, not redesigned). After the UX lane, **24T3 remains next before 25A** unless a new dependency is
   discovered, and none of this moves anything in the product order above. None of them removes, reorders or re-scopes 24T3, 25A, 25C/25C2, 25D, 25E/25F, 26 or any other planned item; the approved decisions of each are in
   «Producto 24UX6B», «Producto 24UX6C», «Producto 24UX6D» and «Producto 24UX6E» below, so they are not asked again.
   Movimientos' approved filters (account, category, period and custom period, beside the existing type filter and
-  search, with clear/reset states) belong to 25C's productivity and search scope with its saved searches; they are not
-  in 24UX6D, and no half filter button ships before them.
+  search, with clear/reset states for the new filters) belong to 25C's productivity and search scope with its saved
+  searches; they are not in the UX lane (24UX6A–24UX6E), and no half filter button ships before them. Implemented today:
+  the search and the type filter (Todos / Gastos / Ingresos / Transf.), with «Limpiar filtros» in the no-match state.
 
 The sections below keep their historical order; this paragraph is the order that binds.
 
@@ -1703,6 +1772,8 @@ nothing of it is on a screen yet.
   lifecycle: Pausar/Reanudar recurrente and Eliminar recurrente with the same rules and confirmations as the row's
   swipe (`useRecurringManagement`, now exposing `closed`: a rule whose account or card was deleted offers Eliminar
   as its only lifecycle action and says why, «Pausado: su cuenta o tarjeta fue eliminada…», naming the recovery path below), the 24UX5 review note and «Continuar desde hoy».
+  *(→ 24UX6E: the notes sit under the hero as a `LifecycleNote`, without the «Pausado: » prefix; in review «Continuar
+  desde hoy» follows its note; see «Producto 24UX6E».)*
   Pausing or resuming keeps the detail open and updates the state (as a debt's Cerrar does); deleting asks first and
   goes back to Recurrentes. Editar (header, hidden on a rule already deleted) opens `/edit-recurring/[id]`, which is
   now only the form (Guardar cambios; no history, no lifecycle buttons). Hydration and deletion behave as the form
@@ -1718,7 +1789,8 @@ nothing of it is on a screen yet.
   (the next date moves to today or later on the rule's own day, nothing due while paused is recorded). Leaving the closed
   row unchanged keeps Reanudar unavailable. The note says so: «Pausado: su cuenta o tarjeta fue eliminada, así que no
   vuelve a registrarse. Podés elegir otra compatible desde Editar y después reanudarlo, o eliminar este recurrente.» No
-  storage, schema or backup change.
+  storage, schema or backup change. *(→ 24UX6E: the note starts «Su cuenta o tarjeta fue eliminada…», and the row and
+  the hero read «Cuenta eliminada» / «Tarjeta eliminada» instead of «Pausado».)*
 - **Navigation (exact).** Inicio → Próximos compromisos → row, Más → Recurrentes → row, and Movimiento → «Recurrente»
   row open `/recurring/[id]`; Editar is one step past the detail. Nothing else changed: Movimientos, Cuentas, Tarjetas
   and Deudas keep their detail-first navigation; the account detail's Recurrentes row still opens the filtered list.
@@ -2427,7 +2499,7 @@ nothing of it is on a screen yet.
   no device run: the device items (budget row colours and VoiceOver, the 30-day list) stay open in
   `docs/mobile-device-checklist.md`.
 
-### Producto 24UX6D — Cards in Forest and final Home/Reports polish (this PR)
+### Producto 24UX6D — Cards in Forest and final Home/Reports polish (PR #74, merged)
 
 - **Scope.** Branch `feat/producto-24ux6d-cards-forest` from master 5c73813 (24UX6C2 merged as PR #73). The Tarjetas
   pass of the UX lane (decision 005, amended 2026-10-01: «Enmienda 2026-10-01 — Producto 24UX6D»): Tarjetas, the card
@@ -2583,13 +2655,13 @@ nothing of it is on a screen yet.
     financial-status screen; with one card an extra tap would be pure friction, and with several the front card
     already communicates the selection. If the snapshot feels dense, refine its hierarchy rather than hide information
     behind a tap.
-  - **Reportes frozen.** This PR's composition is binding. Categorías: period/scope → Categorías | Día a día → the large
+  - **Reportes frozen.** 24UX6D's composition (PR #74) is binding. Categorías: period/scope → Categorías | Día a día → the large
     donut → the exact period total as the default centre → a chosen category's name, amount and % in the centre → its
     matching row marked → Evolución → the lower facts. Día a día: the compact exact total → the day analysis → the
     lower facts. No «Gastado» hero, no per-day headline, no «Tocá una categoría».
   - **Roadmap.** 24UX6E re-scoped to «More financial destinations in Forest» (below); 24T3 stays next after the UX lane,
-    before 25A; Movimientos' filters stay in 25C (no dead filter button in this PR).
-- **Status.** Implemented on its branch; not merged. Device QA pending: nothing was checked on an iPhone (checklist
+    before 25A; Movimientos' filters stay in 25C (no dead filter button in 24UX6D).
+- **Status.** Merged (PR #74, merge commit 8f758ad65226eda27b88f32da22a8c9766a35bad). Device QA pending: nothing was checked on an iPhone (checklist
   section Producto 24UX6D; the list in §2). No EAS build; no native dependency added; schema 13 and backup v13
   unchanged.
 - **Review.**
@@ -2619,7 +2691,7 @@ nothing of it is on a screen yet.
   `check` OK; `export:ios` OK (a JS bundle, not an Xcode build). Root `npm test` 415 passed, 1 todo; `npm run
   check:repo` OK (384 files). No EAS, no device run.
 
-### Producto 24UX6E — More financial destinations in Forest (planned, not implemented)
+### Producto 24UX6E — More financial destinations in Forest (this PR)
 
 *(Re-scoped by the owner on 2026-10-01 in the 24UX6D refinement; it was «Accounts, Recurring and Debts in Forest».)*
 
@@ -2638,6 +2710,220 @@ nothing of it is on a screen yet.
   recorded here instead of enlarging 24UX6E.
 - **Order.** After 24UX6D; after the UX lane **24T3 remains next before 25A** unless a new dependency is discovered.
   It removes, reorders or re-scopes nothing in 25A, 25C, 25C2, 25D, 25E, 25F or 26.
+- **Scope.** Branch `feat/producto-24ux6e-more-financial-forest` from master 8f758ad (24UX6D merged as PR #74). The
+  last pass of the UX lane (decision 005, amended 2026-10-01: «Enmienda 2026-10-01 — Producto 24UX6E»). Planned from one
+  audit per area (Cuentas, Presupuestos, Recurrentes, Deudas y cobros, Categorías, the Más utilities), each answered by
+  an adversarial critique; where they disagreed, the delivery's written decisions bound. Six lanes implemented it:
+  Presupuestos; Cuentas; Recurrentes; Deudas y cobros; Categorías with the edit modals' exits and the post-delete
+  navigation; the Más utilities (bugs only). The shared `LifecycleNote` and the test harness mocks landed first
+  (commit 5a2bb26). Not in scope: Inicio, Reportes (frozen by 24UX6D), Tarjetas (frozen; only the post-delete
+  navigation line of `src/ui/card-form.tsx`), Movimientos' filters (25C), 24T3, notifications, the Assistant.
+- **Approved decisions (2026-10-01; binding for these destinations, not to be asked again).**
+  - **Colour marks state, never direction or identity.** The alert tone (`expense`) only for overdue, over a limit, a
+    real negative balance or a destructive action; `warning` for due soon or a budget at 85–100 %; a category's colour
+    only on its identity tile.
+  - **No chevron on a row that opens a modal editor** (a budget sublimit, a category); a chevron only for a push
+    (AccountRow). RecurringRow and DebtRow keep no chevron (sibling swipe rows).
+  - **Flat on the canvas.** The per-currency padded `Surface` summaries become flat blocks (Recurrentes' forecast,
+    Deudas' totals, the general budget, the account's month facts); only `Surface grouped` lists stay containers.
+    Separators are `StyleSheet.hairlineWidth`, never 0.5.
+  - **Due soon.** Recurrentes keeps «Hoy» / «Mañana» in amber, for an expense only. Debts use Tarjetas' window (three
+    days or less, `daysUntil`) and only for a debt I owe; overdue keeps the alert tone in both directions, on the state
+    words only.
+  - **Spoken twins.** A date written out for VoiceOver follows the card panel's pattern (the relative word stays; a
+    plain day is read as «1 de octubre de 2026»); a visible formatter never feeds an accessibility label.
+  - **One lifecycle note.** `LifecycleNote({ icon, title?, detail, tone? })` for every lifecycle note; no private copies;
+    `CardLifecycleNote` untouched.
+- **What changed: shared pieces.** `LifecycleNote` (`src/ui/components.tsx`): an 18 pt secondary glyph hidden from
+  VoiceOver, an optional subhead/600 title and one footnote line, no surface or banner; `tone="warning"` colours only the
+  words (a rule under review). `ROW_CHEVRON = 28` (`src/ui/geometry.ts`: the 16 pt chevron plus its 12 pt gap), what a
+  row that draws that chevron (today `AccountRow`) subtracts before `rowStacks`. `EntryList` takes `dayNet` (default true; false drops the day
+  net and its spoken twin).
+- **What changed: Cuentas.** `app/accounts.tsx`: a section header is the currency's name as a heading (subhead/600, ink,
+  `flexShrink`) beside its recorded total (15 pt, secondary; the alert tone and the minus only when negative), one
+  accessible element with the header role and the label «Pesos argentinos, saldo registrado 1423,00 pesos» (new
+  `accounts.list.sectionLabel`); the total goes under the name when `labelAmountStacks` says they do not fit (always
+  above 1.2× text). `AccountRow` draws the badge, the name and the balance only (the «Cuenta · ARS» line and the
+  `kindLabel` prop removed; `accountKinds.account` kept) and stacks with `rowStacks(width − ROW_CHEVRON, …)`.
+  `app/account/[id].tsx`: one flat status block, the badge and «Saldo registrado · ARS» (footnote/500) over the balance
+  at 40 pt (the alert tone only when negative), then «Gastos este mes» (unsigned, ink, like Recurrentes' «Gastos») and
+  «Ingresos este mes» («+» in green) in a `StatRow` with no surface. A deleted account opens with
+  `LifecycleNote` (trash, «Cuenta eliminada», the existing `deletedNote`) at the top; its eyebrow stays «Saldo
+  registrado · ARS» and its month facts stay, as history.
+- **What changed: Presupuestos.** `app/budgets.tsx`: the general budget flat on the canvas (`CardStatusBlock`'s rhythm:
+  20 pt between groups, 6 pt in the hero): «Disponible» / «Excedido» (footnote/500, no currency code) over a 40 pt hero
+  in ink when calm and in warning, in the alert tone only when exceeded; the 6 pt bar fed by the domain's ratio,
+  clamped; the status line right under it («60 % utilizado», «… · cerca del límite», «… · límite alcanzado», «… ·
+  excedido»; the state colour at 600 in warning or exceeded, the alert glyph before it when exceeded); Gastado | Límite
+  last. The accessible summary sentence is unchanged. A sublimit row: the category tile (identity only, no state tone),
+  the name (500, unlimited lines when stacked) beside the percent Inicio shows (`formatPercent`, so «1.235 %» rather
+  than «1235 %»; the state colour; the alert glyph when exceeded), a 4 pt bar, one quiet uncoloured line («Quedan $ X de
+  $ Y», «$ X por encima de $ Y», «Límite alcanzado · $ Y»); min height 64, hairline, no chevron, hint «Abre el
+  presupuesto para editarlo»; the spoken sentence unchanged. The month header's state and «Este mes» wrap at large text;
+  «Este mes» uses the `link` colour and reaches 44 pt through `hitSlop`; «Además gastaste …» has a spoken twin.
+  `src/ui/budget-form.tsx`: «Eliminar presupuesto» is the destructive button (secondary, alert tone, trash glyph), the
+  month title and the retry note on the type scale.
+- **What changed: Recurrentes.** `app/recurring.tsx`: the 30-day forecast flat, one block per currency, never summed:
+  «Gastos · ARS» (es «Pagos» → «Gastos»: FinanzApp pays nothing) as its own full-width `Stat` at 22/700, a row figure
+  rather than a hero; then a `StatRow` with «Ingresos» («+», green; only when something comes in) and «Vencimientos»
+  (tabular digits); an out-of-range projection a plain secondary line. A row's amber «Hoy» / «Mañana» marks an expense
+  only («Revisar» stays amber for both kinds); opened for one account, the rows leave the account's name out; a rule on
+  a deleted account or card reads «Cuenta eliminada» / «Tarjeta eliminada» where the day goes (calm, never amber; review
+  suppressed), and VoiceOver hears the same word (`recurring.row.labelClosed` with `{state}`). `app/recurring/[id].tsx`:
+  the hero's state names a closed rule the same way; `LifecycleNote` right under the hero, without a title (closed:
+  unlink glyph and `closedNote`; paused: `pausedNote`; review: `reviewNote` with `tone="warning"`), the «Pausado: » prefix
+  dropped from both notes since the word is right above; in review «Continuar desde hoy» and its one error line follow the
+  note; the next date is spoken written out. English: the history footnote points to «Activity», and the deletion
+  messages say «transaction».
+- **What changed: Deudas y cobros.** `app/debts.tsx`: the totals one flat block in ink (no amber for «Debo», no green
+  for «Me deben»), an out-of-range sum a plain line. `DebtRow` (`src/ui/liability-rows.tsx`): a neutral tile with the
+  direction arrow, the amount in ink, a hairline, the hint «Abre el detalle de la deuda»; only the state words of the
+  caption take a tone (their own text node: overdue in the alert tone, soon in amber, 500); VoiceOver hears the day
+  written out. Pure `debtDueState(debt, outstanding, today)` and `spokenDueDay` (`src/ui/liability-presentation.ts`,
+  added only): closed → settled → none → overdue → soon (≤ 3 days, owed by me) → due. `app/debt/[id].tsx`: the neutral
+  tile; the state line in the same tones, absent for a closed debt, which shows `LifecycleNote` (archive, «Deuda
+  cerrada», «No cuenta como pendiente. Conserva su saldo y sus pagos; «Reabrir deuda» la vuelve a pendientes.», or «sus
+  cobros»); the facts drop Tipo and Estado, list «Vencimiento» only when the state line no longer carries the date
+  (settled or closed) and «Nota» when present, and the grouped surface appears only with a row. `src/ui/debt-form.tsx`:
+  the edit summary shows Tipo and Moneda (what an edit cannot change), not the counterparty being renamed.
+- **What changed: Categorías and the edit modals.** `app/categories.tsx`: rows on the Forest row geometry (16 × 12,
+  64 pt minimum, hairline), name at 500, wrapping when `useStacked` says so, no chevron (a modal editor); an archived row
+  is not dimmed (it was at 0.6 opacity, below AA for its caption) and, in Archivadas, leads with its kind («Gasto ·
+  …»); VoiceOver «Regalos, ingreso, Predeterminada · editada, archivada» with its own hint. `src/ui/category-form.tsx`:
+  an archived category's editor opens with `LifecycleNote` («Archivada», what it keeps and how to unarchive;
+  `archivedNote` removed); the rename note is a `FieldNote` under the name field; a historical category opens on the
+  curated icon its synonym already draws. `app/edit-category.tsx`, `edit-account/[id].tsx`, `edit-recurring/[id].tsx`,
+  `edit-budget/[id].tsx` and `edit-debt/[id].tsx`: the not-found branch (and a deleted account's) keeps a close button
+  with the form's own fallback.
+- **What changed: Más utilities (bugs only).** `src/ui/choice-screen.tsx`: the pinned card stands `space.xl` (20 pt)
+  apart from an options card that follows it at once (a short list or a query); before a section header nothing
+  changes. `app/undone-entries.tsx`: `dayNet={false}`; the explanation on the subhead variant, shown only when something
+  was undone.
+- **Bugs fixed** (each found by the audits and fixed here; nothing else in these areas changed behaviour):
+  - Presupuestos: a route month such as `2026-13` passed the shape check and the summary threw during render; now
+    `validMonthISO` with the current month as fallback, in `/budgets` and `/new-budget` (which used it as the form's
+    title and failed only at save).
+  - Presupuestos: a month whose recorded spending leaves the safe range made `summarizeMonthlyBudgets` throw during
+    render; it is caught and «No pudimos calcular este mes» replaces the content under the period block, the month
+    stepper and the currency switch still usable.
+  - Budget form: a duplicate general budget or a duplicate category budget for the same currency and month was refused
+    by storage after the form froze into a «Reintentar guardado» that could never succeed; it is now checked first with
+    the domain's `validateBudgetCollection` (the rule storage applies) and shown as an editable error. The frozen retry
+    stays for real write failures.
+  - Presupuestos: the sublimit's tile was repainted amber or red by its state; the percent read «1235 %» while Inicio
+    showed «1.235 %»; the name was capped at two lines at every size; «Este mes» had a 28 pt target.
+  - Category form: an untouched «Guardar cambios» on a historical category (no stored icon or colour) wrote an
+    other/graphite definition and re-glyphed and recoloured it on every screen; archiving a never-adopted historical
+    synonym stored icon «other». Both now keep what the app already drew.
+  - Category form: a rename into a taken name (a preset, another identity's key or another definition's display name)
+    reached storage after the form froze; both storage rules (`assertCategoryName`, `validateCategoryDefinitions`) now
+    run first, so it is an editable error.
+  - Categorías: archived rows at 0.6 opacity put their caption below AA; archived rows read the same across kinds
+    (Regalos exists in both).
+  - Debts: a closed debt with a date and a balance showed a red «Vencida · Ayer» in its detail hero while its row said
+    «Cerrada»; an overdue row turned its whole caption («Debo …» included) the alert colour; the edit form showed the
+    stored counterparty above the field that renames it.
+  - Recurrentes: the 30-day forecast's amounts were shrunk and then cut at 375 / 393 pt (three columns in a padded
+    card); a closed rule read as a bare «Pausado» although it cannot be resumed; a closed rule still active (old or
+    imported data) showed no note and could be offered Continuar; English pointed to a «Transactions» tab that does not
+    exist.
+  - Cuentas: `AccountRow` ignored its chevron when deciding to stack, so a balance about 125–141 pt wide («$
+    1.234.567,89» at 375 pt) was shrunk beside the name; the section header never stacked, its name had no `flexShrink`,
+    and VoiceOver read the total with no context.
+  - Navigation: after «Eliminar cuenta» and «Eliminar tarjeta» the editor called `dismissAll()` and then `replace()`;
+    now `router.dismissTo('/accounts')` / `('/cards')`, which pops to the list when it is in the stack and otherwise
+    replaces the modal with it (the installed expo-router's behaviour, read in `router.d.ts`). From Inicio → a movement →
+    its account's detail → Editar → Eliminar, Cuentas replaces the modal and the deleted account's readable detail stays beneath it
+    (better than replacing the tabs' root; to be checked on the iPhone).
+  - Edit modals: the not-found branch of edit-category, edit-recurring, edit-budget, edit-debt and edit-account (and a
+    deleted account's) had no close button.
+  - ChoiceScreen: the pinned card touched the options card that followed it on Idioma, Región and Apariencia, so the
+    background showed at the inner corners.
+  - Movimientos deshechos: a signed «Neto del día» (visible and spoken) summed voided movements that count nowhere; the
+    explanation was at a raw 15 pt and sat above «Nada para recuperar».
+- **What did not change.** The domain (`packages/domain`), storage, SQLite schema 13, backup v13, FX, every balance,
+  budget, recurring and debt rule (`useDebtManagement` semantics, the catch-up, per-occurrence identity, deletion
+  records), the copy of `debts.detail.explain`, native code and dependencies. Inicio, Reportes (frozen) and Tarjetas
+  (frozen): `src/ui/card-form.tsx` only got the post-delete `dismissTo` line; `CardLifecycleNote` and
+  `liability-presentation.ts`' existing exports untouched. No new motion; the bars keep the data timing (instant with
+  Reduce Motion).
+- **Deliberately left unchanged (audited).** Copia de seguridad (`app/backup.tsx`), Importar copia
+  (`app/backup-import.tsx`: its flow, conflicts, per-currency «Disponible después» and spoken counts), Idioma, Región
+  and Apariencia beyond the pinned-card fix (`LocaleChooser`, save-before-apply, the search `Field` seen only in a
+  preview build), `IconColorPicker`, and the Más hub (24UX6C's result, only the release marker bumped).
+- **Later small polish (recorded, not scheduled).**
+  - **UT-3, Importar copia:** one action stack (primary first, gap 10) instead of three buttons 20 pt apart, and the raw
+    14 / 13 pt texts on the type scale. Whether a negative «Disponible después» takes the alert tone is a cross-screen
+    decision (Inicio's hero does not colour it, Cuentas' totals do), not part of this polish.
+  - **UT-4, Copia de seguridad:** the intro and the note on the subhead and footnote variants (same size, line heights
+    1–2 pt different).
+  - **Copia de seguridad's duplicate label:** the card's title and its only button both say «Compartir copia», heard
+    twice by VoiceOver; it needs new copy in both languages.
+  - **RecurringRow's spoken date** still uses the abbreviated relative day, while DebtRow and the rule's detail now
+    write the day out.
+  - **Reportes' percent strings** (frozen): its share prints «{percent} %» with an ASCII space and no grouping, so at
+    1000 % or more it differs from Presupuestos and Inicio («1.235 %»).
+  - Smaller copy points: the «Pausados» caption is slightly inaccurate for a closed rule (its row word covers it);
+    «Vencimientos» also counts income dates; English `cards.panel.deletedDetail` still says «stay in Transactions» (the tab
+    is «Activity»; Tarjetas frozen); while an archive write of a category is unverified, the primary button reads
+    «Reintentar guardado».
+  - Blocked on the domain: a debt's paid-versus-original progress, its opening amount and a balance whose sign has
+    crossed (`debtOutstandingMinor` clamps at 0); a never-adopted historical category's derived hue is not a palette id,
+    so it cannot be preselected.
+- **Owner decisions pending.**
+  - A closed debt: «Registrar pago» is disabled, yet the delete-blocked dialog (25B2) offers «Saldar», which opens the
+    payment form. The note never claims it cannot be paid.
+  - `debts.detail.explain` («Saldar la obligación mueve saldo entre registros…») may conflict with «Menos texto»; left as
+    it is.
+  - Presupuestos: the header «+» opens the form on «Por categoría» while the empty state's button opens it on General.
+  - A closed month with no budgets still invites «Dale un límite a tu mes».
+  - `percentUsed` rounds: a calm 84.99 % can show «85 %» beside an amber 85 %, and 99.6 % shows «100 %» with «Quedan …»;
+    the rounding is shared with the frozen Inicio and Reportes.
+- **Copy and marker.** es/en catalogues: new `accounts.list.sectionLabel`; `budgets.screen.unavailableTitle`,
+  `unavailableDetail`, `budgets.row.leftOf`, `overOf`, `reachedOf`, `hint` (removed `budgets.row.of`, `percent`;
+  `budgets.total.used` takes the formatted percent); `recurring.row.closed`, `closedCard`, `labelClosed` (changed
+  `recurring.list.payments` «Gastos», `emptyDetailAccount` «un gasto o ingreso», `pausedNote` and `closedNote` without
+  the prefix; English `history.older`, `deleteDetail`, `deleteDetailEmpty`); `debts.row.openHint`,
+  `debts.detail.closedTitle`, `closedDetailOwed`, `closedDetailReceivable` (removed `debts.detail.state`,
+  `debts.form.owedTo`, `owedBy`); `categoryManager.list.rowHintArchived`, `form.archivedTitle`, `archivedDetail`
+  (changed `rowLabelArchived` with `{kind}`; removed `form.archivedNote`). The English lock re-accepted. The release
+  marker reads «FinanzApp 0.1.0 (24UX6E)».
+- **Tests.** `tests/polish-routes.node.ts` (17 new: the flat general budget and its order hero → bar and status →
+  Gastado | Límite, the sublimit row and its stacking, the unavailable month and the malformed link, English; the flat
+  account detail, a deleted account's note, the section header's VoiceOver and stacking; the flat forecast, amber for an
+  expense only, the account left out, closed rows and heroes, the note under the hero, the review error placement, the
+  spoken next date, English «Activity»); `tests/budgets-routes.node.ts` (the duplicate as an editable error, the frozen
+  retry on a real write failure, the destructive button, `/new-budget`'s month); `tests/liabilities-routes.node.ts`
+  (`debtDueState`, neutral tiles and ink totals, the toned state words, the closed note, the facts, the spoken day, the
+  edit summary); `tests/personalization-routes.node.ts` (an untouched historical save, both name clashes, the archived
+  note and the rename note, every edit modal's close, `dismissTo('/accounts')`); `tests/card-form-cycle.node.ts`
+  (`dismissTo('/cards')`); `tests/more-routes.node.ts` (category rows, archived rows, Movimientos deshechos, the version
+  marker 24UX6E); `tests/ui-rows.node.ts` (`LifecycleNote`, `AccountRow` without the kind line and with
+  `ROW_CHEVRON`); `tests/choice-list.node.ts` (the detached pinned card); `tests/currency-goldens.node.ts` (`dayNet`);
+  `tests/recovery-routes.node.ts` (the notes read from `LifecycleNote`). Deliberate expectation changes: the percent
+  with a non-breaking space («60 % utilizado»), the account's expenses unsigned, the forecast labels («Gastos · ARS»,
+  Ingresos hidden at 0), the notes without «Pausado: », the debt detail without Tipo/Estado, the archived category's
+  spoken kind.
+- **Status.** Implemented on its branch; not merged. Device QA pending: nothing was checked on an iPhone (checklist
+  section Producto 24UX6E; the list in §2). No EAS build; no native dependency added; schema 13 and backup v13
+  unchanged.
+- **Gates.** 2026-10-01, local. `apps/mobile`: typecheck OK; `node --experimental-strip-types --test tests/*.node.ts`
+  1107 passed, 0 failed (real SQLite included); `i18n:check -- --strict` 0 errors, 0 stale (English lock accepted);
+  `currency:verify` OK; `regions:verify` OK; `check` OK; `export:ios` OK (a JS bundle, not an Xcode build). Root `npm
+  test` 415 passed, 1 todo; `npm run check:repo` OK (384 files). No EAS, no device run.
+- **Review.** Before the push an adversarial review ran over seven lenses (the five destinations, the utilities and a
+  cross-cutting pass on i18n, VoiceOver, frozen screens and domain creep), with two skeptics per finding. It confirmed 4
+  findings (one reported twice) and refuted 3; all 4 are fixed, each with a test checked to fail without the fix:
+  - the 30-day forecast still projected a rule left active on a deleted account or card (old or imported data), which
+    its row now calls «Cuenta eliminada» and the catch-up skips; only rules that can still record are projected;
+  - that rule's detail still announced a «Próxima fecha»; a closed rule now announces none, like a paused one;
+  - archiving a category skipped the new name pre-checks, so a clash (Combustible renamed «Nafta», then archiving the
+    historical «nafta» row) still froze the form into an endless «Reintentar guardado»; Guardar and Archivar now share
+    the storage rules check;
+  - `ROW_CHEVRON`'s comment named a debt row as a user; only AccountRow draws that chevron.
+- **After 24UX6E.** The broad Forest visual lane (24UX6A–24UX6E) is **closed**: a further visual pass needs
+  physical-device evidence of a specific regression, not a general restyle. The next product delivery remains **24T3**,
+  then **25A**; Movimientos' advanced filters remain in **25C**; 25C2, 25D, 25E, 25F and 26 are unchanged.
 
 ### Later notes recorded in 24UX6A (future; document only, not scheduled)
 
@@ -2686,8 +2972,8 @@ nothing of it is on a screen yet.
   CSV import with a reviewed draft before anything is written and categorisation rules that only
   pre-fill; reports and search improvements (account and custom-period filters, saved
   searches; this includes Movimientos' approved filters, reconciled here on 2026-10-01 by 24UX6D: account, category,
-  period and custom period beside the existing type filter and search, with clear/reset states; not in 24UX6D, and no
-  half filter button ships before them); legacy web import as an optional, previewed importer. **Searchable notes on expenses and
+  period and custom period beside the existing type filter and search, with clear/reset states for the new filters; not
+  in the UX lane (24UX6A–24UX6E), and no half filter button ships before them); legacy web import as an optional, previewed importer. **Searchable notes on expenses and
   incomes** (24UX5 audit): today only a transfer carries a note, and the search reads merchant, category
   (stored and localized) and account; a note on an `Entry` needs a schema and backup version, the form field,
   the detail row, indexing in `selectEntries`, the Assistant's evidence (never sent without consent) and
