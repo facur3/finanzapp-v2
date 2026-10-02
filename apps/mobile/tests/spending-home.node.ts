@@ -35,6 +35,8 @@ const harnessPalette = () => {
 };
 /** The day the harness's `useCurrentDay` answers; a test may move it and must restore it. */
 let today = '2026-09-12';
+// 25OPS1: what the shared dock hook hands a tab root; off the tabs by default, a test sets the in-tabs value.
+let dock: { extraPadding: number; indicator: { bottom: number } | undefined } = { extraPadding: 0, indicator: undefined };
 /** The safe area of an iPhone with a Dynamic Island, portrait. */
 const INSETS = { top: 47, bottom: 34, left: 0, right: 0 };
 
@@ -134,7 +136,7 @@ function routeHarness(file: string, params: Record<string, unknown>, initialData
     '../src/ui/home-focus': homeFocus,
     '../src/ui/category-color': categoryColor,
     '../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: glyphAliases.get(s) ?? 'glyph-' + String(s).toLowerCase() }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) },
-    '../src/ui/dock-clearance': { useDockInset: () => ({ extraPadding: 0, inset: undefined }) },
+    '../src/ui/dock-clearance': { useDockInset: () => dock },
     '../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', rowReorder: 'rowReorder', selectionHaptic: () => {}, impactHaptic: () => {}, duration: { press: 100, release: 160, state: 200, data: 260, enter: 200, exit: 100, reveal: 480 }, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
     '../src/ui/theme': { useCurrentDay: () => today, useReduceMotion: () => false, space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
       usePalette: harnessPalette },
@@ -1740,4 +1742,18 @@ test('24T3 (A23, verifier): a missing rate lists every currency with lines, also
   assert.equal(figure.status, 'unavailable');
   assert.deepEqual(figure.status === 'unavailable' && figure.parts, [{ currency: 'ARS', minor: 1000 }, { currency: 'USD', minor: -3000 }],
     'USD has no purchase in September but a devolución of −30,00: its subtotal is shown, not left out; EUR, with no line at all, is still left out (no records is not a zero)');
+});
+
+test('25OPS1: Inicio ends its content the dock\'s height above the window\'s bottom, as padding, with no native content inset', () => {
+  assert.equal(routeHarness('(tabs)/index.tsx', {}, homeData).render().props.contentContainerStyle.paddingBottom, 48, 'the harness default (no dock): the root\'s own padding');
+  dock = { extraPadding: 88, indicator: { bottom: 88.125 } };
+  try {
+    const root = routeHarness('(tabs)/index.tsx', {}, homeData).render();
+    assert.equal(root.type, 'ScrollView');
+    assert.equal(root.props.contentContainerStyle.paddingBottom, 48 + 88, 'true scrollable space: the last recent movement rests above the dock');
+    assert.equal(root.props.contentContainerStyle.flexGrow, 1);
+    assert.equal(root.props.contentInset, undefined, 'nothing the native scroll view could lose');
+    assert.equal(root.props.scrollIndicatorInsets, dock.indicator, 'the indicator ends above the dock');
+    assert.equal(root.props.contentInsetAdjustmentBehavior, 'never');
+  } finally { dock = { extraPadding: 0, indicator: undefined }; }
 });

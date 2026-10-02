@@ -14,6 +14,7 @@ import * as i18nLocale from '../src/i18n/locale.ts';
 import * as moneyInput from '../src/ui/money-input.ts';
 import type { AppLocale } from '../src/i18n/locale.ts';
 import * as movementAmount from '../src/ui/movement-amount.ts';
+import * as presentation from '../src/ui/presentation.ts';
 
 // Producto 22.1: the row and field components at source level (React Native
 // replaced by descriptors). Structure, hierarchy and labels are checked here;
@@ -47,7 +48,7 @@ function load(file: string, extra: Record<string, unknown> = {}, fontScale = 1, 
     './theme': { radius: { chip: 14, tile: 12, group: 16, card: 20, sheet: 24, creditCard: 18, button: 14 }, space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
       type: { body: { fontSize: 17 }, subhead: { fontSize: 15 }, footnote: { fontSize: 13 }, caption: { fontSize: 12 }, title2: { fontSize: 22 }, title3: { fontSize: 20 }, headline: { fontSize: 17 }, eyebrow: {} },
       usePalette: () => p, useReduceMotion: () => true, useCurrentDay: () => '2026-09-22' },
-    './categories': {}, './dock-clearance': { useDockInset: () => ({ extraPadding: 0, inset: undefined }) }, './category-color': { tintOf: () => '#EEE' }, './category-hues': { useAccountLook: () => ({ glyph: 'wallet-outline', hex: '#2557D6' }), useCategoryLook: () => ({ glyph: 'pricetag-outline', hex: '#3E6FB0', label: 'x' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ glyph: 'wallet-outline', hex: '#2557D6' }), useCategoriesInUse: () => [], useCategoryDefinitions: () => [] },
+    './categories': {}, './dock-clearance': { useDockInset: () => ({ extraPadding: 0, indicator: undefined }) }, './category-color': { tintOf: () => '#EEE' }, './category-hues': { useAccountLook: () => ({ glyph: 'wallet-outline', hex: '#2557D6' }), useCategoryLook: () => ({ glyph: 'pricetag-outline', hex: '#3E6FB0', label: 'x' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ glyph: 'wallet-outline', hex: '#2557D6' }), useCategoriesInUse: () => [], useCategoryDefinitions: () => [] },
     './geometry': geometry, './merchant-mark': merchantMark, './movement-amount': movementAmount,
     './motion': { duration: { press: 100, release: 160 }, easeOut: 'ease', selectionHaptic: () => haptics.push('selection'), timing: () => ({}) },
     './money-input': moneyInput,
@@ -796,4 +797,33 @@ test('24T3: a devolución line reads «Devolución · comercio», unsigned in in
   pressOf(plain).props.onPress();
   assert.equal(JSON.stringify(pushed.pop()), JSON.stringify({ pathname: '/entry/[id]', params: { id: 'e' } }));
   assert.equal(pressOf(plain).props.accessibilityLabel, 'Electro, gasto, 400,00 ARS, x, Banco, Hoy');
+});
+
+test('25OPS1: Screen and EntryList (Más, Movimientos) take the dock clearance as bottom padding; a pushed screen keeps its own', () => {
+  const tabs = { './dock-clearance': { useDockInset: () => ({ extraPadding: 88, indicator: { bottom: 88.125 } }) } };
+  // Más (and every tab root drawn with Screen).
+  const root = load('components.tsx', tabs).exports.Screen({ children: null });
+  assert.equal(root.type, 'ScrollView');
+  assert.equal(flat(root.props.contentContainerStyle).paddingBottom, 48 + 88, 'true scrollable space: the version line rests above the dock');
+  assert.equal(root.props.contentInset, undefined, 'no native content inset');
+  assert.deepEqual(root.props.scrollIndicatorInsets, { bottom: 88.125 });
+  assert.equal(root.props.contentInsetAdjustmentBehavior, 'never', 'the safe area is never added on top of the clearance');
+  assert.equal(root.props.automaticallyAdjustKeyboardInsets, true, 'the keyboard still lifts the content');
+  // A pushed screen or a modal: exactly as before.
+  const pushed = load('components.tsx').exports.Screen({ children: null });
+  assert.equal(flat(pushed.props.contentContainerStyle).paddingBottom, 48);
+  assert.deepEqual([pushed.props.contentInset, pushed.props.scrollIndicatorInsets, pushed.props.contentInsetAdjustmentBehavior], [undefined, undefined, 'automatic']);
+  // Movimientos (and a pushed list, which keeps 40).
+  const list = (extra: Record<string, unknown>) => load('entry-list.tsx', { 'react-native': { SectionList: 'SectionList', View: 'View' },
+    './components': { AppText: 'AppText', MovementRow: 'MovementRow' }, './presentation': presentation, ...extra }).exports.EntryList({ entries: [], accounts: [] });
+  const activity = list(tabs);
+  assert.equal(activity.type, 'SectionList');
+  assert.equal(activity.props.contentContainerStyle.paddingBottom, 40 + 88, 'the oldest movement rests above the dock');
+  assert.equal(activity.props.contentInset, undefined);
+  assert.deepEqual(activity.props.scrollIndicatorInsets, { bottom: 88.125 });
+  assert.equal(activity.props.contentInsetAdjustmentBehavior, 'never');
+  assert.equal(activity.props.automaticallyAdjustKeyboardInsets, true, 'the search keyboard still lifts the list');
+  const account = list({});
+  assert.equal(account.props.contentContainerStyle.paddingBottom, 40);
+  assert.deepEqual([account.props.contentInset, account.props.scrollIndicatorInsets, account.props.contentInsetAdjustmentBehavior], [undefined, undefined, 'automatic']);
 });

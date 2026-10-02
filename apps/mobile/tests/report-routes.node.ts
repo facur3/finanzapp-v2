@@ -22,6 +22,9 @@ import type { AppLocale } from '../src/i18n/locale.ts';
 // descriptors. This is NOT a rendered iOS screen or gesture/animation test.
 type Node = { type: string; props: Record<string, any> };
 const createdAt = '2026-09-12T12:00:00Z';
+// 25OPS1: what the shared dock hook hands a tab root; off the tabs by default, a test sets the in-tabs value.
+let dock: { extraPadding: number; indicator: { bottom: number } | undefined } = { extraPadding: 0, indicator: undefined };
+
 const snapshot: domain.LedgerSnapshot = { accounts: [
   { id: 'a', name: 'ARS de prueba', currency: 'ARS', openingMinor: 10000, createdAt },
   { id: 'u', name: 'USD de prueba', currency: 'USD', openingMinor: 10000, createdAt },
@@ -109,7 +112,7 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
     '../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) },
     '../src/ui/quick-actions': { QuickActions: 'QuickActions', AssistantEntry: 'AssistantEntry' },
     'react-native-reanimated': { __esModule: true, default: { FlatList: 'FlatList' } },
-    '../src/ui/dock-clearance': { useDockInset: () => ({ extraPadding: 0, inset: undefined }) },
+    '../src/ui/dock-clearance': { useDockInset: () => dock },
     '../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', rowReorder: 'rowReorder', selectionHaptic: () => {}, impactHaptic: () => {}, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
     '../src/ui/theme': { useCurrentDay: () => '2026-09-12', useReduceMotion: () => reduced, space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
       usePalette: () => ({ background: '#F5F6F8', surface: '#FFFFFF', primary: '#2557D6', primaryFill: '#2557D6', onPrimary: '#fff', text: '#000', secondary: '#666', tertiary: '#999', line: '#ddd', inset: '#eee', expense: '#c00', warning: '#a60', isDark: false }) },
@@ -1239,4 +1242,19 @@ test('25UX1: promoteChosen puts the chosen row first and keeps every other row i
   assert.deepEqual(reportPresentation.promoteChosen(frozen, ' others').map(row => row.key), ['a', 'b', 'c', 'd'], '«Otras» is no row: nothing moves');
   assert.notEqual(reportPresentation.promoteChosen(frozen, null), frozen, 'always a new array');
   assert.deepEqual(frozen.map(row => row.key), ['a', 'b', 'c', 'd']);
+});
+
+test('25OPS1: Reportes ends its content the dock\'s height above the window\'s bottom, as padding, with no native content inset', () => {
+  const off = routeHarness('(tabs)/reports.tsx', { currency: 'ARS', month: '2026-08' }).render();
+  assert.equal(off.props.contentContainerStyle.paddingBottom, 48, 'the harness default (no dock): the root\'s own padding');
+  dock = { extraPadding: 88, indicator: { bottom: 88.125 } };
+  try {
+    const root = routeHarness('(tabs)/reports.tsx', { currency: 'ARS', month: '2026-08' }).render();
+    assert.equal(root.type, 'FlatList');
+    assert.equal(root.props.contentContainerStyle.paddingBottom, 48 + 88, 'true scrollable space: the last fact rests above the dock');
+    assert.equal(root.props.contentContainerStyle.flexGrow, 1);
+    assert.equal(root.props.contentInset, undefined, 'nothing the native scroll view could lose');
+    assert.equal(root.props.scrollIndicatorInsets, dock.indicator, 'the indicator ends above the dock');
+    assert.equal(root.props.contentInsetAdjustmentBehavior, 'never', 'and the system adds no inset of its own');
+  } finally { dock = { extraPadding: 0, indicator: undefined }; }
 });

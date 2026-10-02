@@ -24,8 +24,8 @@ export function EntryList({ entries, transfers, accounts, accountId, header, emp
   return <SectionList<ActivityItem, { dateISO: string; data: ActivityItem[] }> sections={sections} keyExtractor={item => item.key}
     style={{ flex: 1, backgroundColor: p.background }}
     contentContainerStyle={{ padding: 20, paddingBottom: 40 + dock.extraPadding, flexGrow: 1 }}
-    contentInset={dock.inset} scrollIndicatorInsets={dock.inset}
-    contentInsetAdjustmentBehavior={dock.inset || dock.extraPadding ? 'never' : 'automatic'} automaticallyAdjustKeyboardInsets
+    scrollIndicatorInsets={dock.indicator}
+    contentInsetAdjustmentBehavior={dock.extraPadding ? 'never' : 'automatic'} automaticallyAdjustKeyboardInsets
     keyboardDismissMode="interactive" keyboardShouldPersistTaps="handled"
     stickySectionHeadersEnabled={false} removeClippedSubviews={false}
     initialNumToRender={12} maxToRenderPerBatch={12} windowSize={7}

@@ -209,8 +209,8 @@ export default function ReportsScreen() {
     // 25UX1 review: the chosen row's cell is layered above the others, so it travels over the rows it passes.
     CellRendererComponentStyle={({ item }: { item: CategorySpending | DailySpending }) => 'key' in item && item.key === chosenKey ? { zIndex: 1 } : undefined}
     style={{ flex: 1, backgroundColor: p.background }}
-    // 25UX1: the root runs under the floating dock; its last row ends the dock's height higher (`useDockInset`).
-    contentContainerStyle={{ padding: space.xl, paddingBottom: 48 + dock.extraPadding, flexGrow: 1 }} contentInset={dock.inset} scrollIndicatorInsets={dock.inset}
+    // 25UX1, 25OPS1: the root runs under the floating dock; its content ends the dock's height higher (`useDockInset`).
+    contentContainerStyle={{ padding: space.xl, paddingBottom: 48 + dock.extraPadding, flexGrow: 1 }} scrollIndicatorInsets={dock.indicator}
     contentInsetAdjustmentBehavior="never" removeClippedSubviews={false}
     initialNumToRender={10} maxToRenderPerBatch={10} windowSize={7}
     ListHeaderComponent={<View style={{ gap: space.xxl, paddingBottom: space.m }}>
