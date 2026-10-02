@@ -24,6 +24,7 @@ import {
   isEntryRefund, isPlanPayoff, isPlanRefund, newEntryRefund, newPlanPayoff, newPlanRefund, operationFromRow, operationLineIds, operationPlanId, operationToRow,
   planCatchUpInserts, reactivateInstallmentPlan as reactivateInstallmentPlanRecord, sameOperationInputs, samePurchaseOperation, validatePurchaseOperation,
   type OperationChange, type PurchaseOperation, type PurchaseOperationRow,
+  assertWriteIdAvailable,
 } from '@finanzapp/domain';
 
 type SqlValue = string | number | null;
@@ -747,6 +748,7 @@ export async function createEntry(db: LedgerDatabase, input: Entry): Promise<voi
     assertNewEntryId(entry.id); // 24T1: an instalment's id is written by the instalment catch-up only.
     // 24T3: nor an operation's id or one of the ids its projected lines take (this write does not run validateArchive).
     if ((archive.purchaseOperations ?? []).some(operation => operation.id === entry.id || operationLineIds(operation).includes(entry.id))) throw new Error(OPERATION_ID_MESSAGE);
+    assertWriteIdAvailable(archive, entry.id, 'entry'); // 25A-02: nor a transfer's or a plan's id (one id, one kind of write).
     assertPostingAccount(entry.accountId, archive.debts);
     assertOpenAccount(entry.accountId, archive.accounts, archive.cards, archive.debts); // 25B2: nothing new on a deleted account or card.
     if (entry.kind === 'income') assertIncomeAccount(entry.accountId, archive.cards, archive.debts); // 24B6: never a plain income on a card.
@@ -885,6 +887,7 @@ export async function createTransfer(db: LedgerDatabase, input: Transfer): Promi
     const archive = await readArchive(tx);
     validateTransfer(transfer, archive.accounts);
     assertTransferSides(transfer, archive.cards, archive.debts, archive.accounts); // 24B6: a card is only ever paid, never a source; no obligation-to-obligation transfer. 25B2: no deleted side.
+    assertWriteIdAvailable(archive, transfer.id, 'transfer'); // 25A-02: one id, one kind of write.
     const existing = archive.transfers?.find(r => r.transfer.id === transfer.id);
     if (existing) {
       if (existing.revision !== 0 || !sameTransfer(existing.transfer, transfer)) throw new Error('Esta transferencia ya existe con otros datos.');
@@ -1322,6 +1325,7 @@ export async function createInstallmentPlan(db: LedgerDatabase, input: Installme
     const archive = await readArchive(tx);
     validateInstallmentPlan(plan, archive.cards ?? [], archive.accounts);
     const card = archive.cards!.find(item => item.id === plan.cardId)!;
+    assertWriteIdAvailable(archive, plan.id, 'plan'); // 25A-02: never a movement's, a transfer's or an operation's id.
     const existing = archive.installmentPlans?.find(item => item.id === plan.id);
     if (existing) {
       if (sameInstallmentPlan(existing, plan)) return; // Committed already; a refresh failed.
