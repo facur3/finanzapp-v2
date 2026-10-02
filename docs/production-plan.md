@@ -156,10 +156,11 @@ No environment is created by this document. The matrix is the target; the "today
 ### 2.3 Rules
 
 **DECIDED** (owner's 25OPS1 brief): staging and production never silently share a database, provider credentials, an
-AI budget, StoreKit assumptions or admin data. Concretely:
+AI budget, StoreKit assumptions or admin data. The five rules below are this plan's implementation of that decision:
 
 1. A build can reach exactly one backend origin, fixed at build time by `EXPO_PUBLIC_MOBILE_API_ORIGIN`. A staging
-   build can never be pointed at production by a runtime switch, and the reverse.
+   build can never be pointed at production by a runtime switch, and the reverse. (Today the app reads that name
+   through an `env` object; the literal read that makes it a build-time constant is a gate, §4.7.)
 2. `EXPO_PUBLIC_*` values are compiled into the app and readable by anyone with the binary. No secret is ever one.
 3. Each environment has its own Supabase project, its own provider key and its own budget. A key is never copied
    between them.
@@ -170,7 +171,8 @@ AI budget, StoreKit assumptions or admin data. Concretely:
 ### 2.4 Staging access on Vercel
 
 **RESEARCH GATE, OWNER DECISION.** Vercel's Standard Deployment Protection puts an authentication wall in front of
-every non-production URL, which a phone app cannot pass. The options, as documented by Vercel on 2026-10-02:
+every non-production URL, which a phone app cannot pass. The options (the last three are Vercel's documented staging
+patterns as read on 2026-10-02; the first is this plan's own proposal, to be confirmed against plan limits and cost):
 
 | Option | Trade-off |
 | --- | --- |
@@ -268,8 +270,9 @@ bill. The choice turns on porting cost, plan cost and measured latency.
   monetisation. Which plan the project is on today was not inspected. Supabase's Free plan pauses a project after a week
   without activity and has no backups, so it is not a production backend either. Each is a paid subscription and needs
   the owner's authorization (AGENTS rule 3).
-- **OWNER ACTION — Node version.** Vercel disabled Node.js 20 for new deployments on 2026-10-01. The repository
-  declares no `engines`, so the project setting decides. Check it before the next deployment; adding `engines.node` to
+- **OWNER ACTION — Node version.** Vercel disabled Node.js 20 for new deployments on 2026-10-01. The root
+  `package.json` (what the Vercel project reads) declares no `engines` (`apps/mobile/package.json` declares one for the
+  app's tooling only), so the project setting decides. Check it before the next deployment; adding `engines.node` to
   the root `package.json` is the durable fix and belongs to the next server slice.
 - **IMPLEMENTATION GATE — Supabase keys.** Supabase states it is deprecating the `anon` and `service_role` keys by the
   end of 2026 in favour of publishable and secret keys. The server already reads a publishable key
@@ -376,7 +379,8 @@ never by an agent on its own initiative. The procedure when a project exists:
   and, by `on delete cascade`, the inbox and usage rows. Supabase notes that a deleted user's token stays valid until
   it expires; the server's per-request session check covers that. Export of server-side data is an endpoint the app
   defines; none exists.
-- **Logging privacy (DECIDED).** No prompt text, amount, merchant, token or provider body is logged
+- **Logging privacy (DECIDED: roadmap «Producto 25F», "consumption telemetry (usage and cost, not content)"; owner's
+  25OPS1 brief, logging privacy).** No prompt text, amount, merchant, token or provider body is logged
   (`server/mobile/handlers.js` already echoes none). Both Supabase and Vercel retain IP address, user agent, path and
   query string for their log window, and Supabase's auth logs carry the user id and e-mail. Therefore no identifier
   and no money ever goes in a URL or a query string.
@@ -395,7 +399,7 @@ Values are never written in the repository, in a document or in a chat.
 | `MOBILE_SUPABASE_PUBLISHABLE_KEY` | `server/mobile/runtime.js` | **EXISTS TODAY.** A publishable key, safe to expose but kept server-side. |
 | `MOBILE_AI_ENABLED` | `server/mobile/runtime.js` | **EXISTS TODAY.** Assistant route only. The first kill switch. |
 | `MOBILE_OPENAI_API_KEY` | `server/mobile/runtime.js` | **EXISTS TODAY.** A secret. The name is provider-specific; the provider port (§5.5) replaces it with a neutral name. |
-| `EXPO_PUBLIC_MOBILE_API_ORIGIN` | `apps/mobile/src/assistant/client.ts` | **EXISTS TODAY.** Public by construction; unset means disconnected. |
+| `EXPO_PUBLIC_MOBILE_API_ORIGIN` | `apps/mobile/src/assistant/client.ts` | **EXISTS TODAY** as a name, read through a passed `env` object, not a literal `process.env.EXPO_PUBLIC_MOBILE_API_ORIGIN`; Expo inlines only literal reads into a release bundle, so rule 1 of §2.3 needs the literal read (**IMPLEMENTATION GATE**, roadmap 25A server lane, "literal env reads"), verified in an exported release bundle. Public by construction; unset means disconnected. |
 | `APP_VARIANT`, `EXPO_PUBLIC_EAS_PROJECT_ID` | `apps/mobile/app.config.ts`, `eas.json` | **EXISTS TODAY.** Build identity; not secrets. |
 | Model id, reasoning effort, service tier, per-request token caps | to be added | **NOT IMPLEMENTED.** Today the model id is a default parameter in code. Names are fixed in the slice that adds them. |
 | Monetary ceilings (per user, global daily, global monthly) and alert thresholds | to be added | **NOT IMPLEMENTED** (§6). |
@@ -502,7 +506,7 @@ nothing is sent, because the client is disconnected. When connected, a request c
 | Action | Sent | Not sent |
 | --- | --- | --- |
 | `parse` (record something) | The person's text (up to 2 000 characters), today's local date, the screen's currency. **No facts.** | Any ledger data. |
-| `explain` (an analytical question) | The text, the date, the currency, and at most 60 aggregated facts: month-to-date and the comparable previous period, as totals and counts of expenses, income and refunds, and up to 26 category totals labelled with the person's category names. | Merchants, account names, balances, individual movements, cards, debts, budgets, any identifier. |
+| `explain` (an analytical question) | The text, the date, the currency, and at most 60 aggregated facts: month-to-date and the comparable previous period, as totals and counts of expenses, income and refunds, and, for each of the two periods, up to 26 category totals labelled with the person's category names. | Merchants, account names, balances, individual movements, cards, debts, budgets, any identifier. |
 
 Using AI does not upload the ledger. A custom category name is the most personal thing an `explain` request carries.
 The consent screen must say exactly this. New fact kinds (budgets, cards, commitments) are added one at a time, each
@@ -555,7 +559,8 @@ proves provenance, not that every sentence is correct; the evaluation in §5.8 m
   Google documents for the unpaid Gemini tier) must never receive real user text. The privacy policy states the chosen
   provider's actual terms, re-read on the day it is written. Never write "nothing is retained".
 - **Prompt-injection boundary.** Three surfaces carry untrusted text: what the person types, text they paste
-  (a receipt, a bank message), and later a capture payload. All of it travels as data in the user message, JSON-encoded,
+  (a receipt, a bank message), and later, only if a remote-inbox capture is ever sent for parsing with consent, its
+  payload (a Wallet capture, §7, is never sent to a model). All of it travels as data in the user message, JSON-encoded,
   never concatenated into instructions. Because of §5.1 to §5.3 the worst a successful injection can do is produce a
   wrong or misleading **draft or answer**, which the person sees before anything is written. It cannot write, read
   other data, call a network or spend beyond the request's own cap.
@@ -569,7 +574,9 @@ it. A model is chosen by running a recorded evaluation, and re-chosen the same w
 the schema changes. **No paid evaluation was run for this document**; the first one is the single paid slice of 25A
 and needs the owner's configured account and approval.
 
-**The evaluation set** is synthetic and written for the purpose (AGENTS rule 6: no real ledger). Each case has the
+**The evaluation set** is made of real phrases written by the owner and anonymised, plus deliberately ambiguous and
+adversarial ones (roadmap «Producto 25A», Gates); its ledger facts and fixtures are synthetic (AGENTS rule 6: no real
+ledger). Each case has the
 expected draft, the expected clarification, or the expected refusal:
 
 | Group | Examples of what it covers |
@@ -642,7 +649,7 @@ convenience, but a modified client must not be able to spend more.
 | Per-request maximum input | Body, text and fact limits as today; an explicit input-token estimate before the call. | Size limits **EXIST TODAY**; token estimate **NOT IMPLEMENTED** |
 | Per-request maximum output | An explicit output cap per model and effort. On OpenAI the cap includes reasoning tokens, so a low cap with a reasoning model can end the response before any JSON appears; the cap and the effort are tested together (§5.8). | Cap **EXISTS TODAY**; the pairing is an **IMPLEMENTATION GATE** |
 | Per-user request quota | Daily, reserved before the call. | **EXISTS TODAY** |
-| Per-user monetary ceiling | Where feasible: accumulated estimated cost per user per day and month, from recorded `usage` and a price table kept in server configuration. | **NOT IMPLEMENTED** |
+| Per-user monetary ceiling | Accumulated estimated cost per user per day and month, from recorded `usage` and a price table kept in server configuration. | **NOT IMPLEMENTED** |
 | Global daily and monthly monetary ceiling | Checked before every call; when reached, the route answers "not available" until the period ends or the owner raises it. | **NOT IMPLEMENTED** |
 | Provider-project hard budget and alert | A dedicated project or workspace and key for the Assistant only, with the provider's hard limit set **below** the owner's tolerated monthly amount and alerts at lower thresholds. | **OWNER ACTION, REMOTE SETUP** |
 | Server-side usage accounting | Per request: model, tier actually served, input, output and reasoning tokens, estimated cost, outcome. No content. | **NOT IMPLEMENTED** |
@@ -654,11 +661,13 @@ convenience, but a modified client must not be able to spend more.
 
 ### 6.3 Why the server's own accounting is the primary control
 
-Read on 2026-10-02: every provider checked now offers a hard spend limit, and none is exact. OpenAI's guide says
-enforcement "is not instantaneous" and spend can slightly exceed the limit. Google's project spend cap is described as
-experimental with roughly ten minutes of latency. Vercel's AI Gateway calls its budgets "a soft cap, not a hard
-limit". Anthropic's customer-set limit is a hard stop whose overshoot behaviour is not stated. The providers' usage
-and cost APIs report in daily buckets, which makes them reconciliation tools, not real-time caps.
+Read on 2026-10-02: the three model vendors checked each offer a hard spend limit. OpenAI's guide says enforcement
+"is not instantaneous" and spend can slightly exceed the limit; Google's project spend cap is described as experimental
+with roughly ten minutes of latency; whether Anthropic's customer-set limit can overshoot is not stated (*unverified*).
+Vercel's AI Gateway budget is documented as "a soft cap, not a hard limit". Of the usage and cost reports, Anthropic's
+cost report is daily (its usage report has minute, hour and day buckets); OpenAI's costs endpoint is reported as
+daily-only but its reference page was not opened (*unverified*); nothing was read for Google. The plan therefore treats
+every provider report as a reconciliation tool, not a real-time cap.
 
 So the order is: the server's own counters stop the call first; the provider's hard limit is the backstop for a bug in
 those counters; the monthly reconciliation against the provider's cost report catches drift in the price table. The
@@ -830,19 +839,24 @@ Concretely, with the app terminated, suspended and freshly unlocked, each repeat
 
 1. A `LiveActivityIntent` run as the action of a Shortcuts automation is allowed to start a Live Activity. Apple
    documents the capability generically; it does not say it holds for an automation run without asking.
-2. The Confirmar button's intent launches the app process, React Native's JavaScript runtime starts, the app's own
-   TypeScript confirmation (`confirmReviewItem`, the same function the review card calls) runs and commits to SQLite,
-   and it finishes well inside the roughly 30 seconds Apple gives a background intent. Nothing documents whether the
-   runtime is ready in time.
-3. The activity shows success only **after** the commit (AGENTS rule 9: save locally before confirming success).
-4. Failure cases each leave exactly one movement or none, and the draft intact on failure: the process killed
+2. Before the activity is requested, with the app terminated, the JavaScript runtime parses the spooled capture into a
+   `ReviewDraft` in the review store (`parseReviewDraft`, `captureReviewItem`), so what the activity shows and whether
+   it may offer Confirmar come from the domain, never from Swift. If that cannot run in time, no activity content or
+   Confirmar is derived in Swift: the fallback is the review alert or the tray.
+3. The Confirmar button's intent launches the app process, React Native's JavaScript runtime starts, the app's own
+   TypeScript confirmation (`confirmReviewItem`, the same function the review card of 25A-03 will call; no screen calls
+   it today) runs and commits to SQLite, and it finishes well inside the roughly 30 seconds Apple gives a background
+   intent. Nothing documents whether the runtime is ready in time.
+4. The activity shows success only **after** the commit (AGENTS rule 9: save locally before confirming success).
+5. Failure cases each leave exactly one movement or none, and the draft intact on failure: the process killed
    mid-confirm, a failed write, the item already confirmed or dismissed in the app, a double tap, a draft that became
    stale.
 
 **Decision rule.**
 
-- If complete, immediate confirmation from the Dynamic Island is proven safe, Confirmar there uses **the same frozen
-  write and idempotency machinery** as the review card (the write id fixed at capture, the write frozen before the
+- If complete, immediate confirmation from the Dynamic Island is proven safe, and the owner takes the decision the
+  roadmap's 25A2 section reserves (whether Confirmar may write from outside the review card), Confirmar there uses **the same frozen
+  write and idempotency machinery** as the review card will (the write id fixed at capture, the write frozen before the
   ledger is asked, reconciliation after an interruption).
 - If it is not proven, or is flaky, Confirmar **authenticates and opens the exact review item**, and the one existing
   dispatcher completes it in the foreground. That is still one path.
@@ -873,9 +887,9 @@ The review tray **always** keeps the draft, whatever happens to the presentation
 
 | Situation | Behaviour |
 | --- | --- |
-| Device has no Dynamic Island | The Lock Screen presentation, or a brief banner when unlocked. No persistent control while the phone is in use; the tray holds the draft. |
+| Device has no Dynamic Island | The Lock Screen presentation, or a brief banner when unlocked only if the start or update carries an alert configuration (**DEVICE QA**). No persistent control while the phone is in use; the tray holds the draft. |
 | Live Activities disabled in Settings | No activity. A review alert (§9) if notifications are permitted; otherwise the tray and its badge. |
-| App terminated | The intent spools the capture; presentation depends on gate 1 above. The draft exists regardless. |
+| App terminated | The intent spools the capture; presentation depends on gates 1 and 2 above. The capture is kept in the spool regardless; the draft exists once the app drains it. |
 | Locked device | The activity appears on the Lock Screen with private content; buttons act only after the person authenticates. |
 | Authentication required | Confirmar always passes the device's authentication, and the app's own lock (§11) if enabled. Never a write from a locked phone. |
 | The person dismisses the activity | Nothing is written and nothing is discarded. The draft stays pending. |
@@ -923,7 +937,7 @@ Requirements, each a gate of 25D:
 
 - **Opt-in**, per family, configurable.
 - **Permission requested in context**: when the person turns a family on, with the reason shown first. Never at first
-  launch without a reason (§12).
+  launch (§12).
 - **Time-zone aware.** *Unverified* on Apple's pages: how a calendar trigger behaves when the device changes time zone.
   **DEVICE QA:** schedule a due-date reminder, change the time zone, compare.
 - **Rescheduled after edits.** Changing a rule, a card's dates or a plan cancels or replaces every pending
@@ -1143,7 +1157,7 @@ is unchanged: 25A → 25A2 → 25C → 25C2 → 25D → 25E → 25F → 26. Sect
 | **25C2** — merchants, rules, commitments | The financial calendar; local categorisation rules (which also pre-fill Wallet drafts); suggested recurring detection; merchant marks. | §10 |
 | **25D** — Face ID, notifications, Apple integrations | Hide amounts; Face ID lock; the data-protection and SQLCipher evaluation; the app-switcher cover; the local notification families and the review alert; widgets; broader App Intents, Siri and Spotlight; Apple Watch; the FinanceKit research gate. | §9, §11 |
 | **25E** — optional sync and privacy | Only if still chosen: the account, the outbox and sync requirements, cloud backup, export and deletion of cloud data, remote push if a server event justifies it, Sign in with Apple if not already delivered. | §1.4, §4, §9.4 |
-| **25F** — monetisation | Free and Pro, StoreKit and subscriptions, the paywall, the subscriber backend and admin view, App Store Server Notifications, premium AI quotas tied to an entitlement. | launch §1 to §5; §6 here |
+| **25F** — monetisation | Free and Pro, StoreKit and subscriptions, the paywall, the subscriber backend and admin view, App Store Server Notifications, premium AI quotas tied to an entitlement. Its sandbox gate needs the Paid Apps Agreement, tax and banking (launch §6) and the app record, so the identity decision of 26 must be taken before 25F's sandbox purchases, or the owner records a different 25F/26 order. | launch §1 to §6; §6 here |
 | **26** — TestFlight and publication | The production identity and profile, TestFlight, App Review, privacy labels, support, privacy and legal pages, the store listing and its localization, analytics decisions, banking and tax readiness, the landing page as a launch asset (its privacy, terms and support pages are required to submit; the marketing page itself may follow), the launch itself. | launch §6 to §14 |
 | **After launch** (roadmap §5) | Conversion tests, advertising, iterations of the landing page, Android. | launch §9, §14 |
 
@@ -1178,7 +1192,7 @@ Nothing below is complete unless it says **EXISTS TODAY**. "Launch §n" is a sec
 | Vercel plan and Node version; Supabase plan | 25A, 26 | **OWNER ACTION**, **LAUNCH BLOCKER** for monetisation | The owner checks and authorizes the plans |
 | Staging access through deployment protection | 25A | **RESEARCH GATE**, **OWNER DECISION** | §2.4 |
 | Supabase staging and production projects | 25A, 26 | **NOT IMPLEMENTED**, **REMOTE SETUP** | Created and migrated by the owner's decision |
-| Migration files and the deployment procedure | 25A | **DECIDED** procedure; **IMPLEMENTATION GATE** | The server lane |
+| Migration files and the deployment procedure | 25A | **DECIDED** rule (AGENTS rule 3); procedure proposed; **IMPLEMENTATION GATE** | The server lane |
 | RLS validation with two users | 25A | **IMPLEMENTATION GATE** | Run in staging, kept in SQL tests |
 | Direct callability of `mobile_reserve_usage` | 25A | **IMPLEMENTATION GATE** | Fixed in the server lane |
 | Sign-in, session storage, account deletion | 25A, 25E | **NOT IMPLEMENTED**, **OWNER DECISION** (method), **LAUNCH BLOCKER** once accounts exist | The session slice |
@@ -1209,7 +1223,7 @@ Nothing below is complete unless it says **EXISTS TODAY**. "Launch §n" is a sec
 | Paywall | 25F | **NOT IMPLEMENTED** | Launch §3 |
 | Subscriber identity, admin view, complimentary access | 25F | **NOT IMPLEMENTED**, **OWNER DECISION** | Launch §4 |
 | App Store Server Notifications and entitlements | 25F | **NOT IMPLEMENTED**, **IMPLEMENTATION GATE** | Launch §5 |
-| Paid Apps Agreement, banking, tax forms | 26 | **OWNER ACTION**, **LAUNCH BLOCKER** for paid features; needs qualified advice | Launch §6 |
+| Paid Apps Agreement, banking, tax forms | 25F (before its sandbox gate), 26 | **OWNER ACTION**, **LAUNCH BLOCKER** for paid features; needs qualified advice | Launch §6 |
 | Product analytics | 26 | **OWNER DECISION**; **NOT IMPLEMENTED** | Launch §7 |
 | App Store Connect analytics | 26 | **NOT IMPLEMENTED** (no app record), **REMOTE SETUP** | The app record and the first release; launch §8 |
 | ASO and store listing | 26 | **NOT IMPLEMENTED**, **OWNER DECISION** | Launch §9 |
@@ -1257,8 +1271,8 @@ Nothing below is complete unless it says **EXISTS TODAY**. "Launch §n" is a sec
 
 ## 16. Sources
 
-All read on **2026-10-02**. Pages on supabase.com, developers.openai.com, ai.google.dev and genai.owasp.org were read
-through a summarising fetch; re-read the page before quoting it or relying on a number. Facts about the repository
+All read on **2026-10-02**. Pages on supabase.com, developers.openai.com, ai.google.dev, genai.owasp.org and some on
+platform.claude.com were read through a summarising fetch; re-read the page before quoting it or relying on a number. Facts about the repository
 were read from the files named in the text.
 
 **Apple**

@@ -71,7 +71,7 @@ order of the work: "margins calculated from measured costs before any price" and
 | Local reminders (25D) | Always | No | Guideline 4.10 (notifications); they run on the device at no cost. |
 | Assistant, cloud AI (25A) | A small allowance, if measured cost allows one | Usage above the allowance | The one capability with a real marginal cost per request. The allowance and the Pro quota come from the measured-cost report of 25F, never from a guess. Server-side ceilings apply to Free and Pro alike (production-plan.md §6). |
 | Voice input for the Assistant (25A, last slice) | **OWNER DECISION** | Candidate | A transcription provider adds its own cost per request. |
-| Optional cloud backup and multi-device sync (25E) | Export and deletion of cloud data, always | Candidate | Ongoing storage and operations cost; fits Apple's "cloud support" example of an acceptable subscription. Only if 25E is still chosen. |
+| Optional cloud backup and multi-device sync (25E) | Export and deletion of cloud data, and restoring a cloud backup that already exists, always | Candidate (new cloud backups and live sync) | Ongoing storage and operations cost; fits Apple's "cloud support" example of an acceptable subscription. Only if 25E is still chosen. |
 | Wallet capture and its Live Activity (25A2) | **OWNER DECISION** | Candidate ("advanced automation") | It runs on the device with no marginal cost, and it is the product's fastest capture. Charging for it trades reach for revenue; decide with usage evidence. |
 | Widgets, Apple Watch surface (25D) | **OWNER DECISION** | Candidate | No marginal cost. Check guideline 4.10 before charging for an OS surface. |
 | Financial calendar, saved searches, advanced filters, rollover budgets, goals, CSV import (25C, 25C2) | **OWNER DECISION** | Candidates ("advanced analytics and features") | Development cost only. Each one moved to Pro narrows the free product; none is required for the core to be useful. |
@@ -93,7 +93,7 @@ evidence of real use, after TestFlight.
 | Introductory, promotional and win-back offers | Introductory (new subscribers); promotional (existing or former subscribers, needs a server-generated signature); win-back (churned subscribers, eligibility set in App Store Connect); offer codes (§4.5). | Start with none or with one introductory offer. Promotional offers need server signing: **NOT IMPLEMENTED**, not needed for launch. |
 | Upgrade / downgrade | Within one subscription group Apple handles the change: an upgrade is immediate, a downgrade applies at the next renewal (`DID_CHANGE_RENEWAL_PREF`). Guideline 3.1.2(b): people "should not be able to inadvertently subscribe to multiple variations of the same thing". | One subscription group, one entitlement ("Pro"), monthly and annual as its two products. |
 | Restore purchases | `AppStore.sync()`; and "When users reinstall your app or download it on a new device, the app automatically has all transactions available to it upon initial launch." Guideline 3.1.1 requires a restore mechanism. | A «Restaurar compras» action on the paywall and in Más (§3). |
-| Cancellation | Done in the system's subscription settings; `AppStore.showManageSubscriptions(in:)` opens them in the app. Refunds are Apple's (Schedule 1 §3.4). | A «Administrar suscripción» row that opens Apple's sheet. Never a custom cancellation flow, never an obstacle. |
+| Cancellation | Done in the system's subscription settings; `AppStore.showManageSubscriptions(in:)` opens them in the app. Refunds are Apple's (Program License Agreement, Attachment 2 §3.4). | A «Administrar suscripción» row that opens Apple's sheet. Never a custom cancellation flow, never an obstacle. |
 | Grace period | Opt-in in App Store Connect: 3, 16 or 28 days. During it "ensure that you provide full service". | **OWNER DECISION:** enable it and for how long. Recommended on: it avoids cutting access for a card problem. |
 | Billing retry | "The App Store attempts to collect payment for up to 60 days"; since iOS 16.4 a system sheet asks the person to fix billing on launch. | After the grace period Pro capabilities stop; the local app is unaffected. Copy points to Apple's billing page, no nagging. |
 | Family Sharing | Opt-in per product, and one-way: "After you enable Family Sharing for an Apple In-App Purchase, you can't turn it off." Up to five family members. | **OWNER DECISION**, default **off**: with AI as the paid capability one payment would fund up to six people's usage, and the switch cannot be undone. Revisit only with cost data. |
@@ -198,8 +198,9 @@ Apple's requirements (guideline 3.1.2(c), Schedule 2 §3.8, and "Clearly describ
 - that it renews automatically until cancelled, and where to cancel (Apple's subscription settings);
 - **«Restaurar compras»**;
 - links to the **Terms of Use** and the **Privacy Policy**, inside the app; the same two links go in the App Store
-  metadata (§12);
-- a visible close control. Closing returns to exactly where the person was.
+  metadata (§12).
+
+FinanzApp's own rule: a visible close control, and closing returns to exactly where the person was.
 
 Monthly and annual are shown side by side with honest arithmetic; no preselected plan disguised as the only one, no
 countdown, no false scarcity, no "No thanks, I don't want to save money" wording, no repeated prompts after a refusal,
@@ -408,7 +409,8 @@ closed (no `appAccountToken`) and its later association; the backfill from notif
 
 ```
 customer
-  → Apple In-App Purchase (Apple is the seller of record; Apple handles payment and refunds)
+  → Apple In-App Purchase (Apple acts as the developer's agent or commissionaire under Schedule 2 §1 and Exhibit A;
+    Apple collects the payment and issues refunds; who the seller is for tax purposes is for the accountant)
   → Apple's commission, and the taxes and adjustments Apple applies in that storefront
   → App Store Connect financial reports (per fiscal month, Apple's fiscal calendar)
   → proceeds (consolidated per currency, converted by Apple's bank to the bank account's currency)
@@ -527,9 +529,8 @@ anything not named is not sent.
 | `notification_permission` | The system prompt is answered | granted, denied, provisional; the reminder family that asked |
 | `paywall_viewed` | The paywall opens | trigger (quota, Más row, feature) |
 | `trial_started`, `subscription_purchased`, `subscription_restored` | From Apple's notifications, server side | product id, offer type; no client event needed |
-| Retention and cohort milestones | Derived: active on day 1, 7, 30 after first use | derived from an opened-the-app ping and the first-use date bucket (week), nothing else |
 
-**Never sent, by default:** an exact financial amount; merchant text; account, card or category names; transaction
+**Never sent:** an exact financial amount; merchant text; account, card or category names; transaction
 descriptions or notes; whole or partial ledger rows; balances; the text of an Assistant message; a backup. Not as
 event properties, not as "context", not in error reports. Amount buckets are not sent either unless a later, recorded
 decision names the question that needs them.
@@ -704,7 +705,7 @@ DECISION:** which row is the first market, and when each further row opens. Noth
 | Candidate storefront | Metadata localization Apple shows there | Name, subtitle, keywords | Screenshots | Description | Pricing | Support | Privacy and legal | Terminology |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | **Argentina** | **Spanish (Mexico)** by default, English (U.K.) additional ([App Store localizations](https://developer.apple.com/help/app-store-connect/reference/app-information/app-store-localizations/)) | Spanish, in the Spanish (Mexico) slot | Spanish, ARS examples | Spanish | Price for the storefront. Apple's report currency for Argentina is USD; the currency a customer there sees was not found stated (*unverified*); local taxes on the charge are outside Apple's pages | Spanish | Policy and terms in Spanish; tax position for the accountant (§6) | Rioplatense: cuotas, «Saldo pendiente», gastos |
-| Mexico, Chile, Colombia, Peru, Uruguay and other Spanish-speaking Latin America | Spanish (Mexico) (the same slot Argentina uses) | The same Spanish copy: it must read well outside Argentina too, or stay neutral | Spanish; a local currency in the examples, if targeted | Spanish | Per storefront | Spanish | As above; Apple remits tax in some (Exhibit B) | "Cuotas" is "meses sin intereses" or "mensualidades" elsewhere; voseo reads as Argentine |
+| Mexico, Chile, Colombia, Peru, Paraguay, Bolivia and other Spanish-speaking Latin America (Uruguay is listed by Apple as English (U.K.) first, Spanish (Mexico) additional) | Spanish (Mexico) (the same slot Argentina uses) | The same Spanish copy: it must read well outside Argentina too, or stay neutral | Spanish; a local currency in the examples, if targeted | Spanish | Per storefront | Spanish | As above; Apple remits tax in some (Exhibit B) | "Cuotas" is "meses sin intereses" or "mensualidades" elsewhere; voseo reads as Argentine |
 | Spain | Spanish (Spain), with Catalan and English (U.K.) additional | A separate Spanish (Spain) localization, or none (then another language is shown) | Spanish (Spain), EUR examples | Spanish (Spain) | EUR | Spanish | EU: DSA trader status, consumer law; professional review | Peninsular vocabulary (tarjeta de crédito, plazos) |
 | United States | English (U.S.), with Spanish (Mexico) among the additional languages | English (U.S.) | English, USD examples | English | USD (a natural base storefront) | English | Policy and terms in English | Installments are less central; lead with expense tracking and budgets |
 | Other English-speaking storefronts | English (U.K.) is the usual additional language outside the US | English (U.K.) localization or fall back to the primary language | English | English | Per storefront | English | Per country | Spelling and currency examples |
@@ -771,7 +772,7 @@ profiles»):
 
 | Item | State | Notes |
 | --- | --- | --- |
-| The definitive bundle identifier and app identity | **OWNER DECISION**, **LAUNCH BLOCKER**; Producto 26 | AGENTS rule 3: never changed without an explicit release decision. `com.facur3.finanzapp` "was registered by the retired Capacitor app and is not reassigned by the retirement" (`apps/mobile/README.md`); whether production reuses it or takes a new identifier is that decision. A bundle identifier cannot be changed after the app record exists; subscriptions, the app group and the URL scheme hang from it. Decide before the first TestFlight build that is meant to become the store app, because TestFlight testers, sandbox purchases and App Store Connect records belong to one identifier. |
+| The definitive bundle identifier and app identity | **OWNER DECISION**, **LAUNCH BLOCKER**; Producto 26 | AGENTS rule 3: never changed without an explicit release decision. `com.facur3.finanzapp` "was registered by the retired Capacitor app and is not reassigned by the retirement" (`apps/mobile/README.md`); whether production reuses it or takes a new identifier is that decision. Apple: the bundle ID of an app record can't be changed after a build is uploaded; subscriptions, the app group and the URL scheme hang from it. Decide before the first TestFlight build that is meant to become the store app, because TestFlight testers, sandbox purchases and App Store Connect records belong to one identifier. |
 | A `production` variant in `app.config.ts` and a `production` profile in `eas.json` | **NOT IMPLEMENTED** | Store distribution, EAS environment `production`, the definitive name and scheme, `pilot` removed; pinned by a test beside the existing `tests/app-config.node.ts`. |
 | The `testflight` profile's purpose | To settle with the identity | Today it is a store-signed build of the *preview* identity: usable for an internal pilot of that identity, not the path to the store listing. After the decision, either it becomes the staging lane (its own identifier and backend) or it is replaced by `production`. |
 | Environment separation | **NOT IMPLEMENTED** | A profile's EAS environment selects its variables. Staging and production never share a backend origin, database or provider key (production-plan.md §2). |
@@ -862,10 +863,11 @@ sandbox with daily renewals (§4.5). Sandbox notifications go to the staging bac
   never for new features or a change in data flows (guideline 2.5.2; Expo: "changes to your app's behavior need to be
   reviewed"), and **never for a schema migration**: `expo-updates` "will only fix forward and will not roll back" once
   an update has run, and SQLite changes persist. An update reaches a person on the second launch after publishing.
-- **Emergency kill switches. EXISTS TODAY:** the server flags `MOBILE_INTEGRATIONS_ENABLED` and `MOBILE_AI_ENABLED`.
-  With either off, the endpoints fail closed (503) and the app falls back to manual entry; no app build is needed, but
+- **Emergency kill switches. EXISTS TODAY:** the server flags `MOBILE_INTEGRATIONS_ENABLED` (off: both routes answer
+  503) and `MOBILE_AI_ENABLED` (off: only `/api/mobile/assistant` answers 503; the capture inbox stays on). The app
+  falls back to manual entry; no app build is needed, but
   on Vercel a changed variable takes effect only with a new deployment of the server (production-plan.md §6.2). They
-  stop cloud capabilities, which are the only parts that can cost money or leak data. **NOT IMPLEMENTED:** the monetary
+  stop cloud capabilities, the only parts that can cost money; the reference-rate download has no remote switch. **NOT IMPLEMENTED:** the monetary
   circuit breaker of production-plan.md §6, and any remote switch for an app-side feature. A purely local feature has
   no kill switch but a new build; that is one more reason local features ship only after device QA.
 - **Removing the app from sale** takes it off the store within 24 hours; existing installs keep working, which for a
@@ -945,7 +947,7 @@ and promises no compliance.
 | Terms of use | Apple's standard EULA or a custom one; if custom, the app is a record-keeping tool, not financial advice | Submission (**OWNER DECISION**) | **Yes** if custom |
 | Subscription terms | Title, length, price, renewal, cancellation, trial terms (Schedule 2 §3.8; §3.2 above); what Pro includes; what happens to data when it ends | 25F | **Yes** |
 | Data deletion and export instructions | Local: export a backup, delete the app's data, what uninstalling does (production-plan.md §1). Cloud, once it exists: export and delete from inside the app | Submission (local); 25A/25E (cloud) | Review the wording |
-| AI data disclosure and consent | Before any send: which provider, what travels (the person's text; for analytical questions, aggregated facts with category names), what never travels, retention as the provider states it, how to turn it off. The plan may say: not used for training by default; prompts and outputs may be held in the provider's abuse-monitoring logs for a limited time; `store: false` is not zero retention. It may not say "nothing is retained" (production-plan.md §5) | 25A, before the first live call | **Yes** (consent wording) |
+| AI data disclosure and consent | Before any send: which provider, what travels (the person's text; for analytical questions, aggregated facts with category names), what never travels, retention as the provider states it, how to turn it off. Once the provider and tier are chosen, state its actual training and retention terms as re-read that day (for OpenAI's API as read on 2026-10-02: not used for training by default; prompts and outputs may be held in abuse-monitoring logs for a limited time; `store: false` is not zero retention). It may not say "nothing is retained" (production-plan.md §5) | 25A, before the first live call | **Yes** (consent wording) |
 | Analytics disclosure | What events are, that they carry no financial content, opt-in, how to turn off and delete (§7) | Only if analytics is ever enabled | Review the wording |
 | Notification privacy | Amounts and merchants hidden on the Lock Screen by default; what a reminder says (production-plan.md §9) | 25D | No |
 | Account deletion | In-app deletion of the account and its cloud data; token revocation with Sign in with Apple; what remains on the device | The first build with accounts | Review the wording |
@@ -964,7 +966,7 @@ and promises no compliance.
 | Expo (EAS) | Build time | Source and credentials to build and sign; nothing from users. EAS Update, if ever added, would see update requests from installs | Build service only |
 | Vercel (mobile API host) | Only once the owner configures the backend and the person uses a cloud capability | Requests to `api/mobile/*` | **NOT IMPLEMENTED** as a live service: unconfigured and failing closed |
 | Supabase (identity, database) | Same | Session, quota rows, capture inbox rows; later entitlement and optional sync data | **NOT IMPLEMENTED** |
-| AI provider (the adapter in code targets OpenAI; the choice is open, production-plan.md §5) | Only with the person's consent, per request | The person's message; for analytical questions aggregated facts with category names; never merchants, account names, balances or movements | **NOT IMPLEMENTED**: no key, no live call |
+| AI provider (the adapter in code targets OpenAI; the choice is open, production-plan.md §5) | Only with the person's consent, per request | The person's message (which may itself name a merchant or an amount); for analytical questions aggregated facts with category names; never the ledger's merchants, account names, balances or movements | **NOT IMPLEMENTED**: no key, no live call |
 | RevenueCat | Only if chosen in 25F | Purchase history and an app user ID | **NOT IMPLEMENTED**; DPA and sub-processors to read first (§2) |
 | An analytics vendor | Only if chosen (§7) | Events without financial content | **NOT IMPLEMENTED** |
 
@@ -977,7 +979,9 @@ to publish.
 
 ## 14. Landing page
 
-**NOT IMPLEMENTED, and not built in this delivery.** A later launch asset (roadmap §5: "landing and support pages").
+**NOT IMPLEMENTED, and not built in this delivery.** A launch asset: the support, privacy and terms pages are needed to
+submit (Producto 26); whether the marketing page ships with 1.0 or after it is an **OWNER DECISION** (roadmap §5:
+"landing and support pages").
 
 - **The retired product web app does not return. DECIDED** (decision 004; AGENTS rule 4). The marketing site is a
   separate, simple marketing surface, not a web version of FinanzApp: no ledger, no login, no account data, nothing

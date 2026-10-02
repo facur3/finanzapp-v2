@@ -3693,7 +3693,9 @@ nothing of it is on a screen yet.
   the fade plays); the scroll indicator of Movimientos and Más losing the dock clearance after any keyboard (the
   clearance is now the iOS `contentInset`, which React Native restores); a Reportes row travelling beneath the rows it
   passes (its cell is layered above, `CellRendererComponentStyle`); and the risk of a VoiceOver double-tap on a row under
-  the dock landing on the dock (mitigated by the same inset; to confirm on the iPhone).
+  the dock landing on the dock (mitigated by the same inset; to confirm on the iPhone). *(→ 25OPS1: the clearance is
+  content padding again; the native inset did not hold on the owner's iPhone and the VoiceOver risk stays open; see
+  «Producto 25OPS1».)*
 
 ### Producto 25OPS1 — Production & Launch Plan + dock clearance follow-up (this PR)
 
@@ -3732,7 +3734,10 @@ nothing of it is on a screen yet.
   activated by a synthesized tap at its centre (React Native's `Pressable` sets no `onAccessibilityTap`), which the pill
   can receive; 25UX1's inset was meant to mitigate that and did not hold on the owner's iPhone, so the risk is as it was on the iPhone. A
   candidate mitigation (the shared press primitive activating directly under VoiceOver) changes every button's
-  activation path and is left for a device-verified delivery. Both are in the checklist.
+  activation path and is left for a device-verified delivery. The scroll indicator's inset is the full clearance while
+  `automaticallyAdjustsScrollIndicatorInsets` keeps React Native's default, so UIKit may add the home-indicator inset on
+  top and stop the indicator about 34 pt higher than the pill's top; cosmetic, device-only, and if the iPhone shows it the
+  four roots set that prop to false. All three are in the checklist.
 - **B. Documentation.** New: [production-plan.md](production-plan.md) and [app-store-launch.md](app-store-launch.md).
   External facts (Apple, Expo, Supabase, Vercel, AI providers, RevenueCat) were read from primary documentation on
   2026-10-02 and are cited there; whatever could not be verified is labelled, never asserted. Phase by phase:
@@ -3741,7 +3746,7 @@ nothing of it is on a screen yet.
   | --- | --- |
   | 25A | The Assistant's capability boundary and allowlist, the one review path, provider port and model evaluation, session and consent, environments, the Vercel mobile API with Supabase staging, the monetary safety stack (production-plan §2–§6) |
   | 25A2 | Wallet Transaction Automation → App Intent → review draft, the card/pass mapping, dedupe, and the Dynamic Island / Live Activity proof of concept and fallbacks (production-plan §7–§8) |
-  | 25C, 25C2 | The financial calendar's place and its four distinguishable states (production-plan §10) |
+  | 25C2 | The financial calendar's place and its four distinguishable states (production-plan §10) |
   | 25D | Notification families and when push is justified, hide amounts, Face ID, data protection, the FinanceKit gate (production-plan §9, §11) |
   | 25E | Optional account, sync and backup requirements; identity (production-plan §1, §4) |
   | 25F | Free and Pro, StoreKit or RevenueCat, paywall, subscriber identity and admin, server notifications (app-store-launch §1–§5) |
@@ -3784,7 +3789,11 @@ nothing of it is on a screen yet.
     25F, not an installed SDK.
   - **Launch markets** are chosen per storefront; a technically released region or currency is not a commercial launch
     market, and the existing region and currency gates stay as written.
-  - **The landing page** is a later, separate marketing surface; the retired product web app does not return.
+  - **The landing page** is a separate marketing surface, never the retired product web app; its support, privacy and
+    terms pages are needed to submit (26), and whether the marketing page ships with 1.0 is the owner's decision.
+  - **Apple and StoreKit are authoritative** for App Store transactions; a backend only mirrors the entitlement and is
+    corrected when they disagree. **No paywall in the first opening** (AGENTS rule 15; 25B): the offer is contextual and
+    later.
 - **Device QA.** Pending for A: checklist section «Producto 25OPS1». B has nothing to check on the iPhone. The version
   line reads «FinanzApp 0.1.0 (25OPS1)».
 - **Status.** On its branch; not merged.
@@ -3793,8 +3802,14 @@ nothing of it is on a screen yet.
   geometry, the four scrollers' props; and one rendered assertion each for Inicio, Reportes, `Screen` and `EntryList`);
   `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0 errors, 0 stale (no new string); `check` OK;
   `export:ios` OK. No EAS build, no iPhone, no remote migration, no provider or network call from the app or the server.
-  An adversarial review in six lenses (each finding checked by a second reader) ran on 2026-10-02; its confirmed
-  findings are being applied before the PR is opened.
+  An adversarial review in six lenses (dock, repository truth, external facts of each document, consistency, the
+  brief's failure modes; each finding checked by a second reader) and a completeness check against the brief ran on
+  2026-10-02: 52 findings, 33 confirmed and all applied (among them: the kill-switch flags described exactly, the
+  provider spend-limit facts narrowed to what was read, the Live Activity gate requiring the TypeScript draft before any
+  presentation, the money flow stating Apple's agency wording instead of a seller-of-record conclusion, the evaluation
+  set as the owner's real phrases, the retention event dropped from analytics, the per-user monetary ceiling no longer
+  optional, the landing page mapped to 26 with the marketing page an owner decision). Rejected findings are recorded in
+  the review's transcript only.
 
 ### Later notes recorded in 24UX6A (future; document only, not scheduled)
 

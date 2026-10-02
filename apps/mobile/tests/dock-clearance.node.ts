@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { DOCK, DOCK_INDICATOR_STEPS, dockClearance, dockIndicatorInset, dockRestGap, tabBarBottomGap } from '../src/ui/dock-geometry.ts';
@@ -54,7 +55,7 @@ function hook({ os = 'ios', inTabs = true, bottom = 34 }: { os?: string; inTabs?
   const mount = () => {
     const instance: Instance = { state: [], effects: [], cursor: 0, effectCursor: 0 };
     return {
-      render: (): Inset => { current = instance; instance.cursor = 0; instance.effectCursor = 0; const { extraPadding, indicator } = exports.useDockInset(); return { extraPadding, indicator }; },
+      render: (): Inset => { current = instance; instance.cursor = 0; instance.effectCursor = 0; return exports.useDockInset(); },
       unmount: () => instance.effects.forEach(effect => effect.cleanup?.()),
     };
   };
@@ -66,7 +67,7 @@ function hook({ os = 'ios', inTabs = true, bottom = 34 }: { os?: string; inTabs?
   };
 }
 
-test('25OPS1: at the real end of the scroll the last row rests above the pill, on every device', () => {
+test('25OPS1: the geometry of the end of the scroll: base padding plus the clearance ends above the pill, on every device (the rendered roots are pinned in spending-home, report-routes and ui-rows)', () => {
   // The base paddings the four roots keep under their last row: Inicio, Reportes and Más 48, Movimientos 40.
   for (const base of [48, 40]) for (const bottom of [0, 21, 34, 48]) {
     const pillTop = tabBarBottomGap(bottom) + DOCK.height;
@@ -160,6 +161,8 @@ test('25OPS1: the four tab-root scrollers take the one shared clearance, as padd
     assert.doesNotMatch(code, /dockClearance|useDockClearance|tabBarBottomGap/, path + ': no geometry of its own');
   }
   // Nothing else in the app reads the clearance: a pushed screen cannot inherit the dock's padding by accident.
+  const users = execSync("grep -rl \"dock-clearance'\" app src", { cwd: new URL('..', import.meta.url), encoding: 'utf8' }).trim().split('\n').sort();
+  assert.equal(users.join(), ['app/(tabs)/index.tsx', 'app/(tabs)/reports.tsx', 'src/ui/components.tsx', 'src/ui/entry-list.tsx'].join(), 'only the four scrollers import the hook');
   const source = read('src/ui/dock-clearance.ts');
   assert.match(source, /BottomTabBarHeightContext/, 'a scene of the tab navigator is what has a clearance');
   assert.match(source, /inTabs \? dockClearance\(insets\.bottom\) : 0/);

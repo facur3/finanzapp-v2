@@ -868,8 +868,8 @@ detrás de la píldora y, tras un rebote, volvía a meterse debajo.
 
 ## Producto 25UX1 — interacción del dock, Tarjetas y Reportes
 
-Tres problemas que el dueño observó en el producto, en su rama `feat/producto-25ux1-interaction-polish` desde master
-a1bd181; no es un rediseño ni reabre la línea visual de Forest. Las reglas quedan en la decisión 005 («Enmienda
+Tres problemas que el dueño observó en el producto, mergeados como PR #80 (commit de merge d45eca6; rama
+`feat/producto-25ux1-interaction-polish` desde master a1bd181); no es un rediseño ni reabre la línea visual de Forest. Las reglas quedan en la decisión 005 («Enmienda
 2026-10-02 — Producto 25UX1»).
 
 ### El dock es el control

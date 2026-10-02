@@ -22,7 +22,8 @@ padding) on every platform, no longer an inset of the native scroll view; only t
 - [ ] **Movimientos:** at the end, the oldest movement rests fully above the pill and opens on a tap.
 - [ ] On each of the four: an overscroll at the end (pull up and release) returns to that same resting position, not
       lower. The air above the dock is the same as on a pushed screen's end, not a long empty footer.
-- [ ] The scroll indicator ends above the dock on the four roots.
+- [ ] The scroll indicator ends above the dock on the four roots. Note where it stops: just above the pill, or about
+      34 pt higher (then iOS added the home-indicator inset on top of the clearance; cosmetic, recorded in the roadmap).
 - [ ] **Movimientos search:** open the search and type: the results stay reachable above the keyboard; dismiss the
       keyboard: the dock is back, the list's end still rests above it, and the scroll indicator still ends above the
       dock (scroll once to see it).
