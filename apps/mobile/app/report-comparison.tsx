@@ -40,7 +40,9 @@ export default function ReportComparisonScreen() {
       {comparison.capped && <AppText secondary>{t('reports.comparison.capped', { day: Number(current.endISO.slice(-2)) })}</AppText>}
       {comparison.status === 'out-of-range' ? <EmptyState title={t('reports.outOfRangeTitle')} detail={t('reports.comparison.outOfRangeDetail')} /> : <>
         {comparison.status === 'ready' && deltaMinor !== null && previous?.status === 'ready' && <View style={{ gap: 10 }}>
+          {/* 24T3 (A24): a previous period that nets to zero or less (devoluciones) gives no percentage, only the direction. */}
           <AppText accessibilityRole="header" variant="title2">{deltaMinor === 0 ? t('reports.comparison.same')
+            : previous.expenseMinor <= 0 ? t(deltaMinor > 0 ? 'reports.comparison.moreNoShare' : 'reports.comparison.lessNoShare')
             : t(deltaMinor > 0 ? 'reports.comparison.more' : 'reports.comparison.less', { percent: changePercent(deltaMinor, previous.expenseMinor, locale) })}</AppText>
           <Money minor={deltaMinor} currency={selection.currency} large />
           <AppText secondary>{t('reports.comparison.difference')}</AppText>
@@ -53,14 +55,15 @@ export default function ReportComparisonScreen() {
       </>}
       {comparison.categories.length > 0 && <SectionTitle>{t('reports.comparison.changedTitle')}</SectionTitle>}
     </View>}
+    // 24T3 (A23): a side opens its drill-down when it has lines: purchases, or devoluciones alone (a count of 0 with a net).
     renderItem={({ item }) => <Surface grouped>
       <View style={{ padding: 16, gap: 6 }}>
         <AppText style={{ fontWeight: '600', fontSize: 17 }}>{lookOf(item.category).label}</AppText>
         <AppText secondary>{item.deltaMinor === 0 ? t('reports.comparison.noChange')
           : t(item.deltaMinor > 0 ? 'reports.comparison.amountMore' : 'reports.comparison.amountLess', { amount: amount(Math.abs(item.deltaMinor)) })}</AppText>
       </View>
-      <DetailRow label={t('reports.comparison.thisPeriod')} value={amount(item.currentMinor)} spokenValue={spoken(item.currentMinor)} onPress={item.currentCount ? () => openCategory(current, item.key) : undefined} />
-      <DetailRow label={t('reports.comparison.previous')} value={amount(item.previousMinor)} spokenValue={spoken(item.previousMinor)} last onPress={item.previousCount && previous ? () => openCategory(previous, item.key) : undefined} />
+      <DetailRow label={t('reports.comparison.thisPeriod')} value={amount(item.currentMinor)} spokenValue={spoken(item.currentMinor)} onPress={item.currentCount || item.currentMinor ? () => openCategory(current, item.key) : undefined} />
+      <DetailRow label={t('reports.comparison.previous')} value={amount(item.previousMinor)} spokenValue={spoken(item.previousMinor)} last onPress={(item.previousCount || item.previousMinor) && previous ? () => openCategory(previous, item.key) : undefined} />
     </Surface>}
     ListFooterComponent={<AppText secondary style={{ fontSize: 12, lineHeight: 18 }}>{t(view.mode === 'consolidated' ? 'fx.comparisonFooter' : 'reports.comparison.footer', { currency: selection.currency })}</AppText>} />;
 }

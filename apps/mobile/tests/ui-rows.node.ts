@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
@@ -304,6 +304,52 @@ test('segmented labels cap their scaling and fit their segment instead of trunca
     assert.equal(label.props.minimumFontScale, 0.8);
     assert.equal(label.props.maxFontSizeMultiplier, 1.3);
   }
+});
+
+test('24T3 carry-in: Reportes\' prominent switch reads at the subhead size, semibold/medium, never shrinks, 44 pt; the others stay as they were', () => {
+  const ui = load('components.tsx');
+  const options = [{ value: 'categories', label: 'Categorías' }, { value: 'days', label: 'Día a día' }];
+  const control = ui.render('Choices', { prominent: true, value: 'categories', onChange: () => {}, options });
+  const labels = nodes(control).filter(node => node.type === 'Animated.Text');
+  assert.equal(labels.length, 2);
+  for (const label of labels) {
+    // No shrink-to-fit path at all: on iOS's new architecture its floor is 4 pt, the «tiny label» found on the iPhone.
+    assert.notEqual(label.props.adjustsFontSizeToFit, true);
+    assert.equal(label.props.minimumFontScale, undefined);
+    assert.equal(label.props.maxFontSizeMultiplier, 1.3);
+    assert.equal(label.props.numberOfLines, 1);
+    assert.deepEqual([flat(label.props.style).fontSize, flat(label.props.style).lineHeight], [15, 20]);
+  }
+  assert.deepEqual(labels.map(label => flat(label.props.style).fontWeight), ['600', '500'], 'semibold chosen, medium other');
+  const segments = [...new Set(nodes(control).filter(node => node.type === 'Pressable'))];
+  assert.equal(segments.length, 2);
+  for (const segment of segments) assert.ok(flat(segment.props.style).minHeight + 2 * geometry.SEGMENT_PADDING >= 44, 'a 44 pt track');
+  // Every other caller keeps the 13 pt default with its shrink (Movimientos' four short labels need it).
+  const plain = nodes(ui.render('Choices', { value: 'categories', onChange: () => {}, options })).filter(node => node.type === 'Animated.Text');
+  assert.equal(flat(plain[0].props.style).fontSize, 13);
+  assert.equal(plain[0].props.adjustsFontSizeToFit, true);
+});
+
+test('24T3 carry-in: the prominent labels fit their segment on a 375 pt screen at the 1.3× cap, in Spanish and English', () => {
+  const room = geometry.segmentLayout(375 - 40, 2, 0).width - 16; // Reportes' 20 pt padding each side; 8 pt inside each segment
+  for (const locale of ['es-AR', 'en-AR'] as const) {
+    const t = bindLocale(locale).t;
+    for (const label of [t('reports.viewCategories'), t('reports.viewDays')]) {
+      // labelWidthEm already errs wide; 6 % more for the semibold weight.
+      const width = geometry.labelWidthEm(label) * geometry.PROMINENT_SEGMENT.fontSize * geometry.PROMINENT_SEGMENT.maxScale * 1.06;
+      assert.ok(width <= room, `${locale} «${label}» needs ${width.toFixed(1)} of ${room.toFixed(1)} pt`);
+    }
+  }
+});
+
+test('24T3 carry-in: only Reportes\' analysis switch is prominent', () => {
+  const files = (dir: string): string[] => readdirSync(new URL(dir, import.meta.url)).flatMap(name => {
+    const path = dir + name;
+    if (statSync(new URL(path, import.meta.url)).isDirectory()) return files(path + '/');
+    return path.endsWith('.tsx') ? [path] : [];
+  });
+  const users = [...files('../app/'), ...files('../src/ui/')].filter(path => /<Choices\b[^>]*\bprominent\b/.test(readFileSync(new URL(path, import.meta.url), 'utf8')));
+  assert.deepEqual(users.join(','), '../app/(tabs)/reports.tsx');
 });
 
 test('the currency list is the 146 gated currencies (24M), ARS and USD first, with a search helper', () => {
@@ -711,4 +757,43 @@ test('24UX6D: in a card\'s lists a purchase and a recorded instalment are unsign
   assert.equal(nodes(row).find(node => node.type === 'Text' && node.props.style?.fontVariant)!.props.style.color, '#2D6476');
   assert.ok(drawn(row).includes('Pago de tarjeta'), drawn(row).join(' | '));
   assert.match(pressOf(row).props.accessibilityLabel, /^Pago de tarjeta, de Banco a Visa Gold, 300,00 ARS, /);
+});
+
+// ---- 24T3: the lines a devolución and an adelanto de cuotas project (A26) ---------------------------------------
+
+test('24T3: a devolución line reads «Devolución · comercio», unsigned in ink with its own glyph, and opens its operation; an adelanto names its component', () => {
+  const pushed: unknown[] = [];
+  const ui = load('components.tsx', { 'expo-router': { router: { push: (to: unknown) => pushed.push(to) } } });
+  const account = { id: 'a', name: 'Banco', currency: 'ARS', openingMinor: 0, createdAt: 't' };
+  // A contra-expense: stored negative in the ledger line, shown as the amount returned.
+  const refund = Object.freeze({ id: 'r1', accountId: 'a', kind: 'expense', amountMinor: -20000, merchant: 'Zara', category: 'Ropa', dateISO: '2026-09-22', createdAt: 't',
+    refund: { operationId: 'r1', targetEntryId: 'buy' } });
+  const row = ui.render('EntryRow', { entry: refund, account });
+  const [money] = moneyOf(row);
+  assert.equal(JSON.stringify([money.props.minor, money.props.signed, money.props.tone]), JSON.stringify([20000, false, 'expense']), 'the amount returned, no sign, ink');
+  assert.equal(drawn(row).some(text => /[-−+]/.test(text)), false, 'no sign drawn: ' + drawn(row).join(' | '));
+  assert.ok(drawn(row).includes('Devolución · Zara'), drawn(row).join(' | '));
+  assert.equal(nodes(row).some(node => is(node, 'MerchantBadge')), false, 'its own glyph, not the purchase\'s');
+  assert.equal(nodes(row).find(node => is(node, 'GlyphTile'))!.props.icon, 'arrow-undo-outline');
+  assert.equal(pressOf(row).props.accessibilityLabel, 'Devolución, Zara, 200,00 ARS, x, Banco, Hoy', 'the kind word first');
+  pressOf(row).props.onPress();
+  assert.equal(JSON.stringify(pushed.pop()), JSON.stringify({ pathname: '/operation/[id]', params: { id: 'r1' } }));
+  assert.equal(refund.amountMinor, -20000, 'the line is never changed');
+
+  const principal = { id: 'p1_p', accountId: 'a', kind: 'expense', amountMinor: 40000, merchant: 'Electro', category: 'Hogar', dateISO: '2026-09-22', createdAt: 't',
+    payoff: { operationId: 'p1', planId: 'tv', component: 'principal' } };
+  const payoff = ui.render('EntryRow', { entry: principal, account });
+  assert.ok(drawn(payoff).includes('Adelanto de cuotas · Electro'));
+  assert.ok(nodes(payoff).some(node => is(node, 'MerchantBadge')), 'recognised card spending keeps the purchase\'s tile');
+  assert.equal(pressOf(payoff).props.accessibilityLabel, 'Adelanto de cuotas, Electro, 400,00 ARS, x, Banco, Hoy');
+  pressOf(payoff).props.onPress();
+  assert.equal(JSON.stringify(pushed.pop()), JSON.stringify({ pathname: '/operation/[id]', params: { id: 'p1' } }));
+  const interest = ui.render('EntryRow', { entry: { ...principal, id: 'p1_i', amountMinor: 400, payoff: { ...principal.payoff, component: 'interest' } }, account });
+  assert.ok(drawn(interest).includes('Adelanto de cuotas · interés · Electro'));
+  assert.equal(pressOf(interest).props.accessibilityLabel, 'Adelanto de cuotas, interés, Electro, 4,00 ARS, x, Banco, Hoy');
+  // An ordinary movement keeps its row and its route.
+  const plain = ui.render('EntryRow', { entry: { ...principal, id: 'e', payoff: undefined }, account });
+  pressOf(plain).props.onPress();
+  assert.equal(JSON.stringify(pushed.pop()), JSON.stringify({ pathname: '/entry/[id]', params: { id: 'e' } }));
+  assert.equal(pressOf(plain).props.accessibilityLabel, 'Electro, gasto, 400,00 ARS, x, Banco, Hoy');
 });

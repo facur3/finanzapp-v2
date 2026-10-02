@@ -14,6 +14,7 @@ export const home: Pick<Messages, 'home' | 'quickActions'> = {
       + 'It excludes cards and debts, and it is not a bank balance or your net worth.',
     spendingOutOfRange: 'The total is beyond the range we can show precisely. Your transactions are still saved.',
     balanceOutOfRange: 'The total balance is beyond the range we can show precisely. Your accounts are still saved.',
+    refundsExceed: 'Refunds exceed what was spent',
     recent: 'Recent activity',
     quietTitle: 'No transactions this month yet',
     quietTitleIn: 'No transactions in {currency} this month yet',

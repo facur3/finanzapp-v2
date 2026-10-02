@@ -15,7 +15,7 @@ declare const __DEV__: boolean | undefined;
 // Diagnostic: where this launch read the device languages. "módulo nativo" proves the build links expo-localization.
 const LOCALE_SOURCE_LABELS = { native: 'settings.localeSource.native', intl: 'settings.localeSource.intl', none: 'settings.localeSource.none' } as const;
 /** The pilot's version and the internal release name; neither is translated. */
-const VERSION = '0.1.0', RELEASE = '24UX6E';
+const VERSION = '0.1.0', RELEASE = '24T3';
 /** 24UX5: the material and locale diagnostics are for a tester on a development build; everyone else sees the version,
  * like the About line of an iOS app. `__DEV__` is false in a preview or store bundle, so the line is compiled away. */
 const DIAGNOSTICS = typeof __DEV__ !== 'undefined' && __DEV__;
@@ -52,7 +52,9 @@ export default function MoreScreen() {
   const currentBudgets = archive?.budgets?.filter(budget => budget.active && budget.monthISO === currentMonthISO(todayKey())).length ?? 0;
   const customCategories = archive?.categories?.filter(definition => !definition.archived).length ?? 0;
   const activeCards = archive?.cards?.filter(card => card.active).length ?? 0;
-  const undone = (archive?.records.filter(record => record.voided).length ?? 0) + (archive?.transfers?.filter(record => record.voided).length ?? 0);
+  // 24T3: an undone devolución or adelanto is listed (and restored) in Movimientos deshechos too, so it counts here.
+  const undone = (archive?.records.filter(record => record.voided).length ?? 0) + (archive?.transfers?.filter(record => record.voided).length ?? 0)
+    + (archive?.purchaseOperations?.filter(operation => operation.voided).length ?? 0);
   const tile = (key: keyof typeof FINANCE_ROW_LOOKS) => <GlyphTile icon={FINANCE_ROW_LOOKS[key].glyph} color={appearanceHex(FINANCE_ROW_LOOKS[key].color, p)} size={34} />;
   const neutral = (icon: IconName) => <GlyphTile icon={icon} size={34} />;
 

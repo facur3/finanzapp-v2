@@ -22,7 +22,8 @@ export const display = {
       + 'It excludes cards and debts, and it is not a bank balance or your net worth. Your accounts keep their original currency.',
     reportInfo: 'Spending across all your accounts in {currency}. Each expense is converted at the reference rate of its own date ({source}, '
       + 'central banks): rates from {oldest} to {newest} were used, never today\'s rate for a past month. Transactions keep their original '
-      + 'amount. Opening balances, transfers and card payments are not included.',
+      + 'amount. Opening balances, transfers and card payments are not included. '
+      + 'Refunds are converted at the rate of their own date and count against their own month and category.',
     unavailable: 'No rate to add it up in {currency}',
     comparisonFooter: 'Spending across all your accounts in {currency}, each at the rate of its own date; no transfers or opening balances. The differences describe your records, not the reasons for your spending or a confirmed saving.',
     fetching: 'Getting exchange rates',

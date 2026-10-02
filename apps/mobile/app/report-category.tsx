@@ -4,7 +4,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { expensesInPeriod, isStorableCurrency, spendingReport } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { useFinanceView } from '../src/fx/rates-provider';
-import { listingSnapshot } from '../src/fx/finance-view';
+import { lineCounts, listingSnapshot, recordedCountLabel } from '../src/fx/finance-view';
 import { AppText, CategoryBadge, EmptyState, Money, Screen, SectionTitle } from '../src/ui/components';
 import { EntryList } from '../src/ui/entry-list';
 import { selectEntries } from '../src/ui/presentation';
@@ -53,7 +53,9 @@ export default function ReportCategoryScreen() {
     <View style={{ gap: 10 }}>
       {category ? <Money minor={category.amountMinor} currency={selection.currency} large />
         : <AppText secondary>{t('reports.category.totalUnavailable')}</AppText>}
-      <AppText secondary variant="subhead">{t('reports.recordedExpenses', { count: entries.length })}</AppText>
+      {/* 24T3 (A23): every line is listed (so the rows add up to the total), but only purchases count as gastos; a
+          devolución is named as such. */}
+      <AppText secondary variant="subhead">{recordedCountLabel(lineCounts(entries), t)}</AppText>
     </View>
     <SectionTitle>{t('reports.category.movements')}</SectionTitle>
   </View>} />;

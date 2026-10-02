@@ -23,3 +23,4 @@ export * from './merchants.ts';
 export * from './fx.ts';
 export * from './installments.ts';
 export * from './card-cycles.ts';
+export * from './operations.ts';

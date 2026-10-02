@@ -286,6 +286,11 @@ test('23.1B2: Reportes in English changes only words; amounts, user data and rou
   const es = routeHarness('(tabs)/reports.tsx', params);
   const en = routeHarness('(tabs)/reports.tsx', params, snapshot, { locale: 'en-AR' });
   const root = en.render(), words = texts(root);
+  // 24T3 carry-in: the analysis switch is the prominent variant, its words in English.
+  const control = find(root, 'Choices');
+  assert.equal(control.props.prominent, true);
+  assert.equal(control.props.options.map((option: { label: string }) => option.label).join(','), 'Categories,Day by day');
+  assert.equal(find(es.render(), 'Choices').props.options.map((option: { label: string }) => option.label).join(','), 'Categorías,Día a día');
   find(root, 'IconButton', 'Previous month');
   find(root, 'IconButton', 'Next month');
   assert.ok(words.includes('August 2026'));
@@ -1045,4 +1050,109 @@ test('24UX6D: Categorías ↔ Día a día clears the choice; coming back, the do
   assert.equal(find(root, 'DonutChart').props.chosen, null, 'cleared by the mode change itself, not merely hidden while it lasted');
   assert.equal(find(root, 'DonutChart').props.total, 606, 'the centre is the period total again');
   assert.equal(rowChoices(root), noneChosen(root));
+});
+
+// Producto 24T3 (A23, A24): devoluciones are negative expense lines projected by `snapshotFromArchive` from a purchase
+// operation; they net in their own month and category. Synthetic fixtures, through the real projection.
+const ars: domain.Account = { id: 'a', name: 'ARS de prueba', currency: 'ARS', openingMinor: 100000, createdAt };
+const purchase = (id: string, amountMinor: number, category: string, dateISO: string, merchant = 'Tienda'): domain.Entry =>
+  ({ id, accountId: 'a', kind: 'expense', amountMinor, merchant, category, dateISO, createdAt });
+const devolucion = (id: string, target: domain.Entry, amountMinor: number, dateISO: string): domain.EntryRefund =>
+  ({ id, kind: 'refund', target: { entryId: target.id }, accountId: target.accountId, currency: 'ARS', amountMinor, dateISO, voided: false, createdAt, revision: 0, updatedAt: createdAt });
+const projected = (entries: domain.Entry[], operations: domain.PurchaseOperation[]): domain.LedgerSnapshot =>
+  domain.snapshotFromArchive({ accounts: [ars], records: entries.map(domain.initialRecord), purchaseOperations: operations });
+const rowOf = (root: Node, item: unknown, index = 0) => {
+  const view = root.props.renderItem({ item, index }) as Node;
+  return nodes(view).find(node => node.type === 'CategoryLegendRow' || node.type === 'DetailRow')!;
+};
+
+test('24T3 (A24): a devolución in a later month makes its category negative there: the donut draws the positive categories only, over their sum, and the centre stays the net', () => {
+  const ropa = purchase('ropa', 1000, 'Ropa', '2026-08-03');
+  const comida = purchase('comida', 400, 'Comida', '2026-09-10', 'Almacén');
+  const data = projected([ropa, comida], [devolucion('dev-1', ropa, 700, '2026-09-05')]);
+  assert.equal(data.entries.find(entry => entry.id === 'dev-1')!.amountMinor, -700, 'the real projection: a negative expense line');
+  const view = routeHarness('(tabs)/reports.tsx', { currency: 'ARS' }, data);
+  let root = view.render();
+  const donut = find(root, 'DonutChart');
+  assert.equal(donut.props.total, 400 - 700, 'the centre is the report\'s exact net, below zero');
+  assert.deepEqual(donut.props.slices.map((slice: { key: string }) => slice.key), ['comida'], 'Ropa (−700) is never a slice and never folded into «Otras»');
+  assert.equal(donut.props.shareOf(400).label, reportPresentation.spendingShare(400, 400, 'es-AR').label, 'shares are over the positive sum: Comida is 100 %, not 400 / −300');
+  assert.deepEqual(root.props.data.map((item: domain.CategorySpending) => [item.key, item.amountMinor, item.count]), [['comida', 400, 1], ['ropa', -700, 0]],
+    'the category ≤ 0 is listed, last, with no purchase counted');
+  const comidaRow = rowOf(root, root.props.data[0]), ropaRow = rowOf(root, root.props.data[1], 1);
+  assert.equal(comidaRow.props.totalMinor, 400, 'the rows share the donut\'s base');
+  assert.equal(ropaRow.props.totalMinor, 400);
+  assert.equal(comidaRow.props.countLabel, '1 gasto');
+  assert.equal(ropaRow.props.countLabel, '1 devolución', 'a devolución is named as such, never «0 gastos»');
+  // The history: both months have purchase lines, so both are recorded months; September's point is its net.
+  const bars = find(root, 'MonthBars');
+  assert.deepEqual(bars.props.points.slice(-2).map((point: { monthISO: string; amountMinor: number; count: number }) => [point.monthISO, point.amountMinor, point.count]),
+    [['2026-08', 1000, 1], ['2026-09', -300, 1]]);
+  // Día a día: the devolución's day is listed with its net and counted as a devolución.
+  find(root, 'Choices').props.onChange('days');
+  root = view.render();
+  const days = root.props.data as domain.DailySpending[];
+  const refundDay = days.findIndex(item => item.dateISO === '2026-09-05');
+  assert.equal(days[refundDay].amountMinor, -700);
+  assert.ok(rowOf(root, days[refundDay], refundDay).props.label.endsWith(' · 1 devolución'));
+  // Its drill-downs list every line (they add up to the header) and count purchases and devoluciones apart.
+  const category = routeHarness('report-category.tsx', { currency: 'ARS', month: '2026-09', category: 'ropa' }, data).render();
+  assert.equal(category.props.entries.map((entry: domain.Entry) => entry.id).join(), 'dev-1');
+  assert.equal(nodes(category).find(node => node.type === 'Money' && node.props.large)!.props.minor, -700);
+  assert.ok(texts(category).includes('1 devolución'));
+  assert.equal(texts(category).some(text => /0 gastos/.test(text)), false);
+  const dayView = routeHarness('report-day.tsx', { currency: 'ARS', date: '2026-09-05' }, data).render();
+  assert.equal(nodes(dayView).find(node => node.type === 'Money')!.props.minor, -700);
+  assert.ok(texts(dayView).includes('1 devolución · ARS'));
+});
+
+test('24T3 (A24): a month made only of devoluciones gets a quiet state: no donut, the net total as a line, and why', () => {
+  const ropa = purchase('ropa', 1000, 'Ropa', '2026-08-03');
+  const data = projected([ropa], [devolucion('dev-1', ropa, 600, '2026-09-05')]);
+  const root = routeHarness('(tabs)/reports.tsx', { currency: 'ARS' }, data).render();
+  assert.equal(nodes(root).some(node => node.type === 'DonutChart'), false, 'nothing positive to draw');
+  assert.ok(texts(root).includes('Sin gasto neto en este período: las devoluciones igualan o superan lo gastado.'));
+  assert.equal(nodes(root.props.ListHeaderComponent).find(node => node.type === 'Money')!.props.minor, -600, 'the exact net, never clamped');
+  assert.equal(rowOf(root, root.props.data[0]).props.countLabel, '1 devolución');
+  // A recorded month is one with purchase lines: August is, September (only a devolución) is not, so the history still shows.
+  const bars = find(root, 'MonthBars');
+  assert.deepEqual(bars.props.points.slice(-2).map((point: { amountMinor: number; count: number }) => [point.amountMinor, point.count]), [[1000, 1], [-600, 0]]);
+  assert.equal(root.props.data.length, 1, 'the list has its row, so «Sin gastos en este período» never shows');
+  // Día a día keeps its compact total line with the same net, and the day counts its devolución.
+  const view = routeHarness('(tabs)/reports.tsx', { currency: 'ARS' }, data);
+  find(view.render(), 'Choices').props.onChange('days');
+  const days = view.render();
+  assert.equal(nodes(days.props.ListHeaderComponent).find(node => node.type === 'Money')!.props.minor, -600);
+  assert.ok(rowOf(days, days.props.data[0]).props.label.endsWith(' · 1 devolución'));
+});
+
+test('24T3 (A24): a previous period that nets to zero or less gets no percentage, on Reportes or the comparison', () => {
+  const july = purchase('july', 1000, 'Ropa', '2026-07-10');
+  const august = purchase('aug', 100, 'Comida', '2026-08-05', 'Almacén');
+  const september = purchase('sep', 300, 'Comida', '2026-09-10', 'Almacén');
+  const data = projected([july, august, september], [devolucion('dev-1', july, 500, '2026-08-06')]);
+  const comparison = domain.spendingComparison(data, 'ARS', '2026-09', '2026-09-12');
+  assert.equal(comparison.status, 'ready');
+  assert.equal(comparison.previous?.status === 'ready' && comparison.previous.expenseMinor, -400);
+  const reports = routeHarness('(tabs)/reports.tsx', { currency: 'ARS' }, data).render();
+  assert.equal(nodes(reports).some(node => node.type === 'DetailRow' && /Frente a/.test(node.props.label)), false, 'no «— más» row');
+  const list = routeHarness('report-comparison.tsx', { currency: 'ARS', month: '2026-09' }, data).render();
+  assert.ok(texts(list).includes('Más gasto registrado'));
+  assert.equal(texts(list).some(text => text.includes('—')), false);
+  // Ropa has only the devolución in August: its previous side opens the drill-down that lists it.
+  const ropa = list.props.data.findIndex((item: domain.CategoryChange) => item.key === 'ropa');
+  const rows = nodes(list.props.renderItem({ item: list.props.data[ropa] })).filter(node => node.type === 'DetailRow');
+  assert.equal(rows[0].props.onPress, undefined, 'nothing this period');
+  assert.equal(typeof rows[1].props.onPress, 'function', 'a side made of a devolución has lines to list');
+});
+
+test('24T3 (A24): «Tu mayor gasto» states the purchase net of its devoluciones, the amount the domain ranked', () => {
+  const big = purchase('big', 900, 'Ropa', '2026-09-03');
+  const data = projected([big, purchase('small', 100, 'Ropa', '2026-09-02'), purchase('food', 500, 'Comida', '2026-09-04', 'Almacén')],
+    [devolucion('dev-1', big, 300, '2026-09-08')]);
+  const insight = domain.spendingInsights(data, [], 'ARS', '2026-09', '2026-09-12', String).find(item => item.id.startsWith('largest:'))!;
+  assert.deepEqual([insight.id, insight.amountMinor], ['largest:big', 600]);
+  const shown = texts(routeHarness('(tabs)/reports.tsx', { currency: 'ARS' }, data).render());
+  assert.ok(shown.some(text => text.startsWith('$ 6,00 · Ropa')), 'the net 6,00, never the gross 9,00');
+  assert.equal(shown.some(text => text.startsWith('$ 9,00 · Ropa')), false);
 });

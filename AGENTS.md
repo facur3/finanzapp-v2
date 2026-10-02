@@ -35,7 +35,7 @@ is no web version of the product ([decision 004](docs/decisions/004-native-first
    obligation tied to one purchase, never a recurring expense. Unknown cost/quote is unknown,
    not zero or a simulated value. The card invariants (one expense per purchase without
    instalments; with instalments, one purchase and one plan whose principal is recognised
-   instalment by instalment, never the full price up front; a payment is a transfer, no
+   instalment by instalment, never the full price up front on the purchase date; a payment is a transfer, no
    per-purchase bank link, personal debts never mixed with a card's balance, no debit-card
    ledger, «Saldo pendiente» never «Deuda» in card copy) are in decision 003 and pinned by
    `packages/domain/card-invariants.test.ts`.

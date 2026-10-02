@@ -10,7 +10,7 @@ import { radius, space, type, useCurrentDay, usePalette, useReduceMotion, type P
 import type { IconName } from './categories';
 import { tintOf } from './category-color';
 import { useAccountLook, useAccountNameOf, useCategoryLook } from './category-hues';
-import { AMOUNT_FIELD, ROW_CHEVRON, ROW_STACK_SCALE, SEGMENT_GAP, SEGMENT_PADDING, amountFieldLayout, fitFontSize, rowStacks, segmentLayout } from './geometry';
+import { AMOUNT_FIELD, PROMINENT_SEGMENT, ROW_CHEVRON, ROW_STACK_SCALE, SEGMENT_GAP, SEGMENT_PADDING, amountFieldLayout, fitFontSize, rowStacks, segmentLayout } from './geometry';
 import { duration, easeOut, selectionHaptic, timing } from './motion';
 import { AmountInput, displayAmount, precisionOf, splitAmount, type AmountNotice, type PasteRejection } from './money-input';
 import { BUILD_MERCHANT_MARK_PREVIEW, merchantMark } from './merchant-mark';
@@ -377,19 +377,24 @@ export function AmountShortcut({ label, caption, spokenCaption, onPress, disable
   </View>;
 }
 
-function Choice({ label, spokenLabel, selected, disabled, onPress, compact = false, onField = false }: {
-  label: string; spokenLabel?: string; selected: boolean; disabled?: boolean; onPress: () => void; compact?: boolean; onField?: boolean;
+function Choice({ label, spokenLabel, selected, disabled, onPress, compact = false, onField = false, prominent = false }: {
+  label: string; spokenLabel?: string; selected: boolean; disabled?: boolean; onPress: () => void; compact?: boolean; onField?: boolean; prominent?: boolean;
 }) {
   const p = usePalette();
   const reduced = useReduceMotion();
   const { speechLanguage } = useI18n();
+  const color = onField ? (selected ? p.heroThumbInk : p.heroSecondary) : selected ? (compact ? p.text : p.primary) : p.secondary;
   // Compact: 28 pt segments (32 pt with the track) and an 8 pt vertical slop, so the target stays 44 pt tall; none sideways, where the neighbour is.
   return <Pressable accessibilityRole="button" accessibilityLabel={spokenLabel} accessibilityState={{ selected, disabled }} disabled={disabled} accessibilityLanguage={speechLanguage}
-    onPress={onPress} style={[styles.choice, compact && styles.choiceCompact, onField && styles.choiceField]} hitSlop={compact ? { top: 8, bottom: 8 } : 4}>
-    <Animated.Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={1.3}
+    onPress={onPress} style={[styles.choice, compact && styles.choiceCompact, onField && styles.choiceField, prominent && { minHeight: PROMINENT_SEGMENT.minHeight }]}
+    hitSlop={compact ? { top: 8, bottom: 8 } : 4}>
+    {/* 24T3: the prominent label has no shrink-to-fit at all (its labels fit at the 1.3× cap; see PROMINENT_SEGMENT). */}
+    {prominent ? <Animated.Text numberOfLines={1} maxFontSizeMultiplier={PROMINENT_SEGMENT.maxScale}
+      style={{ fontSize: PROMINENT_SEGMENT.fontSize, lineHeight: PROMINENT_SEGMENT.lineHeight, textAlign: 'center', fontWeight: selected ? '600' : '500',
+        color, transitionProperty: 'color', transitionDuration: reduced ? 0 : duration.state }}>{label}</Animated.Text>
+    : <Animated.Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={1.3}
       style={{ fontSize: onField ? 15 : 13, lineHeight: onField ? 20 : 18, textAlign: 'center', fontWeight: (compact || onField) && !selected ? '500' : '600',
-        color: onField ? (selected ? p.heroThumbInk : p.heroSecondary) : selected ? (compact ? p.text : p.primary) : p.secondary,
-        transitionProperty: 'color', transitionDuration: reduced ? 0 : duration.state }}>{label}</Animated.Text>
+        color, transitionProperty: 'color', transitionDuration: reduced ? 0 : duration.state }}>{label}</Animated.Text>}
   </Pressable>;
 }
 
@@ -403,12 +408,15 @@ function Choice({ label, spokenLabel, selected, disabled, onPress, compact = fal
  * edge (the way UISegmentedControl draws it), and in dark mode a track one step
  * above the black ground with a clearly brighter thumb (`thumb`), so the header
  * is quiet but its state is unmistakable, without cobalt. */
-export function Choices<T extends string>({ value, options, onChange, disabled, compact = false, onField = false }: {
+export function Choices<T extends string>({ value, options, onChange, disabled, compact = false, onField = false, prominent = false }: {
   /** An option's `spokenLabel` is what VoiceOver reads when its short label is not a sentence (a date written out). */
   value: T; options: { value: T; label: string; spokenLabel?: string }[]; onChange: (value: T) => void; disabled?: boolean; compact?: boolean;
   /** 24UX6A, Inicio's Gastado | Disponible on the pine field: a capsule track in the field's control fill, a near-white
    * capsule thumb with pine text for the chosen value and the field's secondary ink for the other. Same slide and haptic. */
   onField?: boolean;
+  /** 24T3 carry-in, Reportes' «Categorías | Día a día» only: the screen's main switch at the subhead size (semibold chosen,
+   * medium other), a 44 pt track and no shrink-to-fit (`PROMINENT_SEGMENT`). Same thumb, colours, slide and haptic. */
+  prominent?: boolean;
 }) {
   const p = usePalette();
   const reduced = useReduceMotion();
@@ -431,7 +439,7 @@ export function Choices<T extends string>({ value, options, onChange, disabled, 
     {width > 0 && <Animated.View pointerEvents="none" style={[styles.thumb, onField && styles.thumbField, { width, backgroundColor: thumb }, thumbEdge,
       p.isDark || onField ? {} : { shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } }, thumbStyle]} />}
     {options.map(option => <Choice key={option.value} label={option.label} spokenLabel={option.spokenLabel} selected={value === option.value} compact={compact}
-      onField={onField} disabled={disabled} onPress={() => { if (option.value !== value) { selectionHaptic(); onChange(option.value); } }} />)}
+      onField={onField} prominent={prominent} disabled={disabled} onPress={() => { if (option.value !== value) { selectionHaptic(); onChange(option.value); } }} />)}
   </View>;
 }
 
@@ -741,20 +749,34 @@ export function EntryRow({ entry, account, last = false, showDate = true, showAc
   const { t, relativeDate, spokenAmount } = useI18n();
   const dateLabel = relativeDate(entry.dateISO, day);
   const income = entry.kind === 'income';
+  // 24T3 (A26): a line a devolución or an adelanto de cuotas projected. A devolución is a contra-expense (stored negative
+  // in the ledger): its row says «Devolución · comercio», shows the amount returned unsigned in ink (never the «+» of an
+  // income, 24UX6C) and draws its own glyph. An adelanto is recognised card spending: «Adelanto de cuotas · comercio» (a
+  // financing share names its component). Both open the operation's own detail, and VoiceOver hears the kind word first.
+  const refund = entry.refund !== undefined;
+  const operationId = entry.refund?.operationId ?? entry.payoff?.operationId;
+  const component = entry.payoff?.component;
+  const title = refund ? t('operations.row.refund', { merchant: entry.merchant })
+    : component === undefined ? entry.merchant
+      : component === 'principal' ? t('operations.row.payoff', { merchant: entry.merchant }) : t(`operations.row.payoffShare.${component}`, { merchant: entry.merchant });
   // 24UX6C: the row already says it is an expense or an income; the amount is shown as stored (no minus on an expense,
   // «+» on an income), see movement-amount.ts. The ledger amount is untouched.
-  const amount = presentedAmount(entry.kind, entry.amountMinor);
+  const amount = presentedAmount(entry.kind, refund ? Math.abs(entry.amountMinor) : entry.amountMinor);
   const stacked = useStacked({ minor: amount.minor, currency: account.currency, signed: amount.signed });
   const category = useCategoryLook(entry.category, entry.kind).label;
   const detail = [category, showAccount ? account.name : null, showDate ? dateLabel : null].filter(Boolean).join(' · ');
+  const spokenKind = refund ? [t('operations.row.refundWord'), entry.merchant]
+    : component === undefined ? [entry.merchant, t(income ? 'movement.incomeWord' : 'movement.expenseWord')]
+      : [t('operations.row.payoffWord'), ...(component === 'principal' ? [] : [t(`operations.row.payoffShareSpoken.${component}`)]), entry.merchant];
   return <PressFeedback feedback="highlight" accessibilityRole="button"
-    accessibilityLabel={[entry.merchant, t(income ? 'movement.incomeWord' : 'movement.expenseWord'), spokenAmount(entry.amountMinor, account.currency), category, account.name, dateLabel].join(', ')}
-    onPress={() => router.push({ pathname: '/entry/[id]', params: { id: entry.id } })}
+    accessibilityLabel={[...spokenKind, spokenAmount(amount.minor, account.currency), category, account.name, dateLabel].join(', ')}
+    onPress={() => router.push(operationId !== undefined ? { pathname: '/operation/[id]', params: { id: operationId } } : { pathname: '/entry/[id]', params: { id: entry.id } })}
     style={[styles.row, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
-    <MerchantBadge merchant={entry.merchant} category={entry.category} kind={entry.kind} tone={income ? 'income' : 'neutral'} />
+    {refund ? <GlyphTile icon="arrow-undo-outline" />
+      : <MerchantBadge merchant={entry.merchant} category={entry.category} kind={entry.kind} tone={income ? 'income' : 'neutral'} />}
     <View style={{ flex: 1, minWidth: 0, gap: 8, flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center' }}>
       <View style={{ flex: stacked ? undefined : 1, minWidth: 0, gap: 3 }}>
-        <AppText numberOfLines={stacked ? undefined : 2} style={{ fontWeight: '500' }}>{entry.merchant}</AppText>
+        <AppText numberOfLines={stacked ? undefined : 2} style={{ fontWeight: '500' }}>{title}</AppText>
         {!!detail && <AppText secondary variant="footnote" numberOfLines={stacked ? undefined : 2}>{detail}</AppText>}
       </View>
       <View style={{ maxWidth: stacked ? '100%' : AMOUNT_COLUMN, alignItems: 'flex-end' }}>

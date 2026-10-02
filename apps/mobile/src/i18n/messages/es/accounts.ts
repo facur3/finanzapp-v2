@@ -14,6 +14,10 @@ export const accounts = {
       recordedBalance: 'Saldo registrado',
       monthExpenses: 'Gastos este mes',
       monthIncome: 'Ingresos este mes',
+      /** 24T3 (A24): the month's devoluciones exceed its purchases; the amount beside it is the excess. */
+      monthNetRefunds: 'Devoluciones netas este mes',
+      /** What VoiceOver reads for that fact: what it means and the excess, spoken. */
+      monthNetRefundsSpoken: 'Devoluciones netas este mes: las devoluciones superan lo gastado en {amount}',
       recurring: 'Recurrentes',
       /** Value of the Recurrentes row: how many active rules post to this account. */
       activeRecurring: { one: '{count} activo', other: '{count} activos' },

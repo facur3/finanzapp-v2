@@ -531,7 +531,11 @@ siguen la misma familia (valores en `palette.ts`).
   menos de 10): descansa en la parte alta del área del indicador de inicio, sin tocarlo; 10 pt en un iPhone sin
   indicador. A 375 pt cada pestaña tiene unos 65 pt de ancho; a 393 pt, unos 70.
 - **En el layout, nunca encima.** El dock es una fila sobre el lienzo de la pantalla: cada pantalla termina arriba de
-  él, y el desplazamiento, el teclado, las áreas seguras y la última fila funcionan como antes.
+  él, y el desplazamiento, el teclado, las áreas seguras y la última fila funcionan como antes. *(Confirmado
+  2026-10-02, en la revisión de 24T3: la píldora y el «+» se ven sobre una franja del lienzo con el área segura, y no se
+  convierten en una capa absoluta flotante. Así ninguna última fila queda debajo del dock, el teclado y el área segura
+  siguen siendo deterministas y se conserva la estrategia de pestañas montadas contra las pantallas negras de
+  `src/ui/navigation.ts`.)*
 - **Solo íconos a la vista, nunca para la accesibilidad.** Glifo de 24 pt en `dockInk`; la pestaña elegida lleva el
   glifo relleno en `dockActiveInk` sobre una cápsula `dockActive`: dos señales, nunca solo el color. Cada pestaña es un
   blanco de 48 pt de alto y de unos 65 pt de ancho a 375 pt (unos 70 a 393 pt). En iOS, VoiceOver dice «Inicio, pestaña, 1 de
@@ -840,6 +844,155 @@ La selección de porciones dentro de la dona (solo visual, dentro del reporte) *
 barras de Día a día y una cabecera fija sólida. Siguen permitidos para una pasada siguiente; no hay ruta de detalle por comercio. El orden
 vinculante del roadmap no cambia: la próxima entrega de producto es 24T3; 24UX6C (Movimientos y Más) y 24UX6D
 (Tarjetas) siguen a 24UX6B en el carril UX, y su lugar frente a 24T3 lo decide el dueño (ver `docs/mobile-roadmap.md`).
+
+## Producto 24T3 — Devoluciones, adelanto de cuotas y ciclo de vida del plan
+
+La última entrega de 24T, en su rama `feat/producto-24t3-refunds-payoff-lifecycle` desde master d30b77f (24UX6E
+mergeada como PR #75): una compra devuelta (la **devolución**), las cuotas que faltaban adelantadas (el **adelanto de
+cuotas**), dejar de seguir un plan y reactivarlo, más un arrastre chico de Reportes. Implementado en código; **la
+revisión en iPhone está pendiente** (no hubo build de EAS) y su lista está en docs/mobile-device-checklist.md
+(«Producto 24T3», que debe pasar antes del merge). No es un rediseño: Tarjetas y el detalle de tarjeta quedan como los
+dejó 24UX6D; las pantallas nuevas usan las piezas de Forest que ya existen (modal de formulario, filas agrupadas,
+`LifecycleNote`, `CheckRow`, `DateField`, `AmountField`). La regla contable vinculante está en la decisión 003, regla 7
+(«Devoluciones, adelanto de cuotas y ciclo de vida del plan», 2026-10-01); el detalle técnico, en el roadmap
+(«Producto 24T3»). Reemplaza, marcadas en su lugar, las frases de este documento sobre la única acción del detalle del
+plan y el estado «Cancelada».
+
+### Palabras
+
+- **«Devolución»**, nunca «Reembolso» (es la categoría predefinida de ingreso; al elegirla, el formulario dice «¿Te
+  devolvieron una compra? Registrala desde la compra con «Registrar devolución»: no es un ingreso.»). En inglés
+  "Refund", y la categoría de ingreso pasó a "Reimbursements".
+- **«Registrar devolución»** y **«Registrar adelanto de cuotas»**: la app registra, no actúa; nunca «Adelantar» ni
+  «Devolver» como si FinanzApp moviera plata.
+- **«Dejar de seguir el plan»** (el estado se lee «Sin seguimiento»; sus cuotas, «No se registra») y **«Reactivar
+  plan»**. Nunca «Cancelar plan» ni «Cancelado»: en Argentina «cancelar» una deuda es pagarla.
+- **«Adelantada»** ("Brought forward") para una cuota que cubrió un adelanto, **«No se cobró»** para la financiación que
+  el emisor no cobró, **«Devuelta»** para una cuota que una devolución llevó a cero, **«Reducida por devolución: $ X»**
+  bajo una cuota que bajó. **Nunca «pagada»** ni "paid": el pago a la tarjeta es su propia transferencia.
+- Las vistas previas dicen **«con fecha …»**, nunca «ahora», y siempre «No es un ingreso» para una devolución.
+
+### Pantallas
+
+- **Detalle de una compra.** «Registrar devolución» solo cuando el dominio lo aceptaría (gasto vivo, cuenta viva, no
+  una cuota, algo por devolver). Una sección «Devoluciones» con «Devuelto $ X de $ Y» y una fila por devolución (fecha
+  escrita entera para VoiceOver) que abre la operación. Deshacer una compra con devoluciones se frena antes de la
+  confirmación con «Esta compra tiene devoluciones» y «Ver devoluciones». Al editarla, el tipo y la cuenta quedan fijos,
+  el monto no baja de lo devuelto y la fecha no pasa de la primera devolución, con una nota que lo explica.
+- **Registrar devolución** (`/new-refund`, modal). Arriba la compra (precio, comercio, cuenta o tarjeta con su glifo,
+  fecha, «Ya devuelto» si algo se devolvió); el importe con el atajo «Total disponible» (en un plan, «Hasta $ X: el
+  precio; el interés no se devuelve desde acá»); la fecha entre la compra (en un plan, su piso) y hoy, cada día a las
+  12:00 locales como en el adelanto (revisión: antes de mediodía, una compra de hoy daba un mínimo posterior al máximo);
+  «Qué se registra»,
+  la vista previa calculada por la misma función que guarda («Se acreditan $ X en Banco con fecha … y se restan de Ropa en
+  octubre. No es un ingreso.»; en un plan, lo que vuelve a la tarjeta, «Las cuotas 11 a 12 bajan $ Y en total y no se
+  registran por esa parte.» y «El interés de esas cuotas sigue como estaba.»; si no queda precio pero sigue el interés,
+  lo dice y sugiere dejar de seguir el plan). Guardar repite el importe; sin nada por devolver, un estado vacío con la
+  razón en lugar del formulario.
+- **Registrar adelanto de cuotas** (`/plan-payoff/[id]`, modal). «Cuotas que faltaban · ARS» sobre el importe, las
+  cuotas cubiertas («Cuotas 3–12») y una fila por componente («Importe», o «Principal de las cuotas», «Interés»,
+  «Comisiones», «Impuestos de financiación»). Con financiación futura, dos `CheckRow` sin nada elegido: «Los registro
+  ahora» y «El emisor no los cobró» (un cargo por adelantar se registra aparte, como gasto de la tarjeta); Guardar queda
+  apagado hasta elegir. La fecha acotada entre el piso del plan y hoy. La frase «FinanzApp registra con fecha … las cuotas
+  que faltaban ($ X) en el saldo pendiente de la tarjeta. El pago a la tarjeta se registra aparte, con Pagar tarjeta.»
+  y, si hay cuotas deshechas, que siguen pendientes. Al terminar, «Adelanto registrado» con «Pagar tarjeta» (la
+  transferencia hacia esa tarjeta, con tope en su saldo; el importe no se precarga) y «Listo».
+- **Detalle de la operación** (`/operation/[id]`, push, solo lectura). Héroe: el glifo de devolución
+  (`arrow-undo-outline`) o la marca del comercio para un adelanto, el importe sin signo en tinta y el estado
+  («Registrada · resta del gasto, no es un ingreso», «Registrado · las cuotas restantes cuentan con esta fecha»,
+  «Deshecha · no cuenta en saldos ni reportes»). Filas a la compra o al plan y a la cuenta o tarjeta, categoría, fecha;
+  «Qué registra» con cada efecto (las cuotas reducidas, cada componente adelantado, «No se cobró», y que el pago se
+  registra aparte). «Deshacer devolución» / «Deshacer adelanto» y sus «Restaurar» solo cuando la prueba en seco del
+  dominio pasa; si no, una nota con la razón en lugar del botón. La confirmación dice qué cambia, las cuotas que se
+  registran en sus cierres y «Este adelanto no podrá restaurarse» cuando corresponde.
+- **Devolución de compra, no reintegro** (revisión del dueño, 2026-10-02). Bajo la compra, una nota de una línea con
+  su ayuda contextual (`FieldNote` + `InfoButton`): «Devolución de compra: el comercio te devuelve toda o parte de esta
+  compra.»; la ayuda dice «Usá esta opción cuando un comercio te devuelve total o parcialmente una compra. Si recibiste un
+  reintegro, cashback o promoción bancaria en una cuenta, registralo como ingreso en esa cuenta.» Un reintegro, un
+  cashback o una promoción del banco no es una devolución: es un ingreso en la cuenta que lo recibió (la pista de la
+  categoría «Reembolsos» lo dice). La copia de 24T3 dice «devolución» para la operación; el código sigue con `refund`.
+  La contabilidad no cambia: la devolución vuelve a la cuenta o tarjeta de la compra.
+- **Eliminar una tarjeta que todavía tiene un monto** (revisión del dueño). Un saldo pendiente, un saldo a favor o
+  cuotas pendientes no se borran (B3): un solo diálogo, «Todavía no se puede eliminar», nombra cada hecho («Esta tarjeta
+  todavía tiene saldo a favor de $ X y cuotas pendientes.»), dice qué conserva archivar («Podés archivarla para sacarla
+  de tus tarjetas activas sin perder el saldo ni el historial.») y ofrece **Cancelar · Archivar tarjeta** (con «Pagar»
+  antes si hay saldo pendiente); archivar es la acción preferida y se hace ahí mismo. Una tarjeta ya archivada lo dice y
+  no ofrece archivar. Una tarjeta creada por error, sin nada que la retenga, se elimina como siempre.
+- **Detalle del plan.** Las acciones según el estado, cada una solo si el almacenamiento la aceptaría: activo,
+  «Registrar devolución», «Registrar adelanto de cuotas» y «Dejar de seguir el plan» (o «Eliminar plan» si todavía no
+  registró nada; nunca las dos); sin seguimiento, una `LifecycleNote` bajo el héroe («Las cuotas que faltaban no se
+  registran…»), «Registrar devolución» mientras haya principal registrado por devolver y «Reactivar plan»; completo,
+  «Registrar devolución» si queda algo. El estado en una palabra: «Activo», «Completo», «Adelantado», «Devuelto» o «Sin
+  seguimiento». La alerta de dejar de seguir dice cuánto deja de registrarse, que lo registrado queda, que no es una
+  devolución ni un pago, y antes, si hace falta, «Antes se registra la cuota 3, que ya cerró ($ X)»; la de reactivar
+  nombra las cuotas que cerraron mientras no se seguía, su total y sus fechas. Cifras nuevas, cada una en su fila y solo
+  si existe: «Cuotas adelantadas» / «Principal adelantado», «Interés no cobrado» / «Financiación no cobrada», «Devuelto a
+  la tarjeta», «Cuotas reducidas por devolución»; «No se registra» reemplaza «Cancelado». «N de 12 registradas» cuenta
+  las adelantadas.
+- **Calendario.** «Adelantada» cuenta como registrada (segmento lleno en tinta); «No se cobró», «Devuelta» y «No se
+  registra» van atenuadas con segmento punteado. Una cuota reducida muestra lo que cobra ahora y debajo «Reducida por
+  devolución: $ X»; una adelantada cuyo interés no se cobró muestra solo lo reconocido y «Interés no cobrado $ X» (nunca
+  más de lo que tiene el saldo). Las filas adelantadas y devueltas abren su operación, con su propia pista de VoiceOver.
+- **Filas de movimientos.** Una devolución es «Devolución · comercio», el importe **sin signo, en tinta** (el «+» queda
+  para el ingreso, regla de 24UX6C) y su glifo propio (`arrow-undo-outline`); un adelanto es «Adelanto de cuotas ·
+  comercio» (con «· interés ·» en la línea de financiación). VoiceOver oye primero la palabra del tipo. Abren
+  `/operation/[id]`. En Movimientos están bajo Todos y Gastos (nunca Ingresos) y la búsqueda las encuentra por
+  «devolución» o «adelanto de cuotas».
+- **Movimientos deshechos.** Una sección «Devoluciones y adelantos», una fila por operación deshecha (también una
+  devolución que solo bajó cuotas y no tiene línea), con «Restaurar» solo si la prueba en seco pasa; si no, la razón.
+
+### Cuando las devoluciones superan lo gastado
+
+Una devolución resta en su mes y su categoría, así que un mes, un día, una categoría o un presupuesto pueden quedar en
+cero o debajo. Nunca se dibuja un número negativo como si fuera gasto:
+
+- **Dona.** Solo las categorías positivas, con porcentajes sobre su suma; el centro sigue siendo el total neto exacto
+  (puede ser negativo). Una categoría en cero o debajo se lista al final con «Sin gasto neto», nunca dentro de «Otras»
+  ni como «0 %». Un período sin ninguna categoría positiva no tiene dona: el total va en la línea compacta y debajo
+  «Sin gasto neto en este período: las devoluciones igualan o superan lo gastado.»
+- **Barras de meses.** La escala va de 0 al mayor neto positivo; una barra en cero o debajo se dibuja en cero,
+  VoiceOver agrega «sin gasto neto» (solo si el mes tiene registros) y, cuando el mes elegido queda debajo de cero, una
+  línea dice su neto exacto («septiembre: las devoluciones superan lo gastado (−$ 300,00)»), con su versión hablada.
+- **Comparaciones.** Contra un período anterior en cero o debajo no se dice porcentaje ni crecimiento («Más gasto
+  registrado»); la fila de variación se oculta.
+- **Rankings y «Tu mayor gasto».** Los comercios netean sus devoluciones y los que quedan en cero o debajo salen; «Tu
+  mayor gasto» muestra la compra neta de sus devoluciones.
+- **Conteos.** Cuentan compras: «2 gastos registrados · 1 devolución»; una lista con solo financiación de un
+  adelanto dice «N movimientos registrados».
+- **Inicio y Presupuestos.** Gastado muestra el neto exacto; debajo de cero, una línea callada «Las devoluciones superan
+  lo gastado», fuera del bloque del número. En Presupuestos, Gastado queda exacto y Disponible no pasa del límite, con
+  la misma frase; un sublímite dice «Quedan $ Y de $ Y · las devoluciones superan lo gastado».
+- **Detalle de una cuenta** (revisión). «Gastos este mes» es el neto de sus líneas de gasto, devoluciones incluidas; en
+  cero o encima se muestra igual que siempre. Debajo de cero, el mismo dato se lee **«Devoluciones netas este mes»**
+  ("Net refunds this month") con el exceso sin signo, en tinta: las palabras llevan el sentido, no un color ni un
+  «−», y nunca es un ingreso. VoiceOver lo lee como un elemento: «Devoluciones netas este mes: las devoluciones
+  superan lo gastado en …». El saldo, el libro y Reportes/Presupuestos no cambian; una tarjeta sigue en su propio
+  detalle, que no tiene ese dato.
+- Las notas de método de Reportes (moneda sola y consolidado) dicen que las devoluciones restan en su mes y su
+  categoría.
+
+### Reportes: el selector «Categorías | Día a día»
+
+El control principal de Reportes lee al tamaño subhead: una variante `prominent` de `Choices` solo para él, etiquetas
+de **15/20 pt**, semibold la elegida y medium la otra, segmentos de 40 pt en una pista de 44 pt, Dynamic Type hasta 1,3×
+y **sin achicar para entrar** (en la nueva arquitectura de iOS el piso de ese achique es 4 pt, no `minimumFontScale`).
+El pulgar, los colores, la háptica y VoiceOver no cambian; ningún otro `Choices` cambia.
+
+### Lo que no cambia
+
+Tarjetas y el detalle de tarjeta (solo arreglos de compilación), Deudas y cobros, la composición congelada de Reportes
+salvo las guardas de arriba, Inicio salvo su línea debajo de cero, ninguna animación nueva (las barras conservan su
+tiempo y saltan con Reduce Motion), nada nativo.
+
+### Pendiente en iPhone
+
+Todo, en la sección «Producto 24T3» de docs/mobile-device-checklist.md: la actualización a esquema 14 con copia antes,
+devoluciones en efectivo, con tarjeta y de un plan antes y después de un cierre, el tope, adelantos con y sin interés y
+Pagar tarjeta, dejar de seguir y reactivar, eliminar una tarjeta con saldo a favor o con un plan pendiente, deshacer y
+restaurar, las filas, Reportes con una categoría debajo de cero y el selector a 375 pt en los dos idiomas con texto
+chico, grande y AX, VoiceOver en las pantallas nuevas, claro y oscuro; la fecha de una devolución dada antes de
+mediodía, «Devoluciones netas este mes» en el detalle de una cuenta y, solo como evaluación, la densidad de la raíz de
+Tarjetas.
 
 ## Producto 24UX6E — Más destinos financieros en Forest
 
@@ -1209,7 +1362,7 @@ que tiene son, **como máximo, dos filas contextuales de atención**; todo lo de
 - **La barra de progreso** (`PlanProgressSummary`, plana bajo el héroe, desde el puro `planProgress`): un segmento de
   8 pt por cuota hasta `PLAN_SEGMENT_MAX = 24` (4 pt entre segmentos hasta 12, 2 pt más allá); un plan más largo (hasta
   120) dibuja una barra continua. Los segmentos siguen los estados del Calendario: registrada en tinta, en parte en
-  ámbar, deshecha `warningSoft` con contorno ámbar, próxima y futura con contorno terciario vacío, cancelada con contorno terciario punteado (revisión: el color de línea casi no se veía sobre el lienzo); lleno frente a contorno distingue registrada de pendiente sin depender del color. Es
+  ámbar, deshecha `warningSoft` con contorno ámbar, próxima y futura con contorno terciario vacío, cancelada con contorno terciario punteado (revisión: el color de línea casi no se veía sobre el lienzo) *(→ 24T3: «Adelantada» llena en tinta como registrada; «No se cobró», «Devuelta» y «No se registra» punteadas)*; lleno frente a contorno distingue registrada de pendiente sin depender del color. Es
   dibujo: el sentido está en las palabras.
 - **Vocabulario.** «3 de 12 registradas» («3 of 12 recorded»), del `figures.recognisedCount` del dominio; «Próxima
   cuota · fecha» y el principal que falta («restantes»; «principal restante» con interés) solo mientras el plan está
@@ -1219,7 +1372,10 @@ que tiene son, **como máximo, dos filas contextuales de atención**; todo lo de
   interés, comisiones e impuestos solo cuando existen. Un solo elemento de VoiceOver.
 - **Lista de datos.** Sale la fila del conteo (`recordedCount`, `recordedCountValue`); «Restante» aparece solo en un
   plan completo o cancelado (uno activo lo muestra en el progreso). El Calendario, `ScheduleRow` y la regla de
-  eliminar (solo `summary.deletable`) no cambian.
+  eliminar (solo `summary.deletable`) no cambian. *(→ 24T3: el detalle suma las acciones por estado, las cifras de
+  adelanto, no cobrado y devolución y los estados Adelantada, No se cobró, Devuelta y No se registra del Calendario;
+  eliminar sigue siendo solo `summary.deletable`, que ahora también exige que el plan no tenga ninguna operación. Ver
+  «Producto 24T3».)*
 
 ### Tarjetas: movimientos
 
@@ -1548,7 +1704,9 @@ pruebas están en el roadmap («Producto 24T2»).
 - **Detalle del plan.** Como un movimiento: la marca, «Compra en cuotas · ARS», el precio como héroe, «12 cuotas · Sin
   interés» y el estado *(→ 24UX6D: «12 cuotas sin interés» y la barra de progreso con «3 de 12 registradas»)*; después solo lo que el plan y el libro saben, una cifra por fila (con interés, las cifras dicen
   que son principal y el interés que falta tiene su fila); el Calendario con Registrada, Registrada en parte, Próxima,
-  Futura y Deshecha. Nunca «pagada». La única acción es Eliminar plan, si todavía no registró nada.
+  Futura y Deshecha. Nunca «pagada». La única acción es Eliminar plan, si todavía no registró nada. *(→ 24T3:
+  también Registrar devolución, Registrar adelanto de cuotas, Dejar de seguir el plan y Reactivar plan, según el
+  estado; ver «Producto 24T3».)*
 - **Compra en cuotas.** «Pago» [Una vez][En cuotas] bajo la fecha, solo en un gasto nuevo con una tarjeta activa, tan
   liviano como una compra común: 3 · 6 · 12 · 18 · Otra (12 por defecto), «12 cuotas de $ …» («aprox.» cuando el resto
   agranda las primeras), «Primera cuota» con los dos cierres posibles y «Cierra el … y vence el …», «Con interés»
@@ -1609,7 +1767,8 @@ usa todavía. Las palabras que 24T2 dibujará y que ninguna pantalla mezcla:
 - **Saldo pendiente actual**: lo exigible hoy (compras y cuotas reconocidas menos pagos). **Cuotas comprometidas**:
   el principal futuro, al lado del saldo pendiente y nunca dentro. **Principal restante**: lo no reconocido.
 - **Pago**: una transferencia a la tarjeta. Nunca «paga» una cuota concreta: no existe «3/12 pagadas»; existe «3/12
-  facturadas». La palabra «pagada» no aparece salvo que el sistema lo sepa de verdad.
+  facturadas». La palabra «pagada» no aparece salvo que el sistema lo sepa de verdad. *(→ 24T2/24UX6D, alineado en
+  24T3: en pantalla se dice solo «registradas»; «facturada» queda como sinónimo del dominio.)*
 - **Financiación**: tres componentes independientes, **Intereses**, **Comisiones** e **Impuestos de financiación**, cada
   uno un gasto aparte en su propia categoría; nunca principal ni mezclados entre sí. Reportes los muestra por separado
   de la **Compra** (el principal).
@@ -2592,6 +2751,20 @@ crédito, marca elegida) y los filetes de las píldoras, el chip y el compositor
 color propio.
 
 ## Pendiente de revisión en iPhone
+
+- Producto 24T3 (sin build de EAS, nada revisado todavía; una pasada dirigida que debe pasar antes del merge): la
+  actualización a esquema 14 con una copia antes; una devolución en efectivo parcial y total, una de una compra con
+  tarjeta que baja el saldo pendiente y una de un plan antes y después de un cierre con las últimas cuotas reducidas; el
+  tope que rechaza devolver de más; un adelanto con y sin interés (las dos opciones de financiación) y después Pagar
+  tarjeta; dejar de seguir y reactivar un plan; eliminar una tarjeta frenado por un saldo a favor y por un plan
+  pendiente, y permitido después; deshacer y restaurar una devolución y un adelanto; las filas de Movimientos y
+  Movimientos deshechos; Reportes con una categoría debajo de cero y las etiquetas del selector «Categorías | Día a
+  día» a 375 pt en español e inglés con texto chico, grande y XXXL; Deudas sin cambios (una devolución nunca aparece
+  como pago o cobro); VoiceOver en las pantallas nuevas; claro y oscuro; la fecha de una devolución de una compra de
+  hoy antes de mediodía; «Devoluciones netas este mes» en el detalle de una cuenta; la nota «Devolución de compra» con su
+  ayuda; el diálogo de eliminar una tarjeta que archiva ahí mismo; la densidad de la raíz de Tarjetas
+  frente a una composición más de mazo, al estilo Wallet (solo evaluar, sin rediseño en 24T3). Lista en
+  docs/mobile-device-checklist.md.
 
 - Producto 24UX6E (sin build de EAS, nada revisado todavía): Cuentas con una y varias cuentas, saldos grandes
   positivos y negativos, varias monedas, la cabecera de moneda en tinta con su total (apilada con texto grande, un solo

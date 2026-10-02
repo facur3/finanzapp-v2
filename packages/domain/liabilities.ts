@@ -2,6 +2,7 @@ import { ACCOUNT_DELETED_MESSAGE, accountBalanceMinor, isLiveAccount, validDateI
 import { assertStorableCurrency, sortCurrencies } from './currency.ts';
 import { CARD_PLAN_MESSAGE, cardHasPendingInstallments, installmentOccurrenceOf, type InstallmentPlan, type RecordedEntry } from './installments.ts';
 import { cardCycleView, type CardCycleDates } from './card-cycles.ts';
+import type { PurchaseOperation } from './operations.ts';
 
 /** A credit card is a hidden internal ledger account. A purchase (without
  * instalments) is an expense posted to that account exactly once for its full price
@@ -45,6 +46,9 @@ export const CARD_ARCHIVED_MESSAGE = 'Esta tarjeta está archivada. Reactivala p
  * `assertCardDeletable`); archiving never erases a plan either. The copy says «saldo pendiente», never «deuda»: that
  * word names the Deudas y cobros section (personal debts). */
 export const CARD_DEBT_MESSAGE = 'Esta tarjeta tiene saldo pendiente. Pagalo o archivala; no se puede eliminar.';
+/** Producto 24T3 (owner decision B3): a card holding a credit (an overpayment, or a devolución after the card was paid) is
+ * archived, never deleted: deleting would make the person's claim on the issuer vanish from every total. */
+export const CARD_CREDIT_MESSAGE = 'Tiene saldo a favor; archivala.';
 /** The deletion record is written by `deleteCreditCard` in storage (it also stops the card's rules); a plain save never flips it. */
 export const CARD_DELETE_PATH_MESSAGE = 'Una tarjeta se elimina con su propia acción, no con un cambio de datos.';
 
@@ -216,12 +220,16 @@ export function assertAcceptsNewObligation(accountId: string, cards: readonly Cr
   if (!card.active) throw new Error(CARD_ARCHIVED_MESSAGE);
 }
 
-/** Whether a card may be deleted now: no balance due and (24T1) no pending instalment plan: a live plan with an instalment
- * not yet recognised (future, not recorded, or undone). The one place of that rule: storage and the UI both call it. */
-export function assertCardDeletable(card: CreditCardProfile, snapshot: LedgerSnapshot, plans: readonly InstallmentPlan[] = [], records: readonly RecordedEntry[] = []): void {
+/** Whether a card may be deleted now: no balance due, (24T3, B3) no credit in the holder's favour, and (24T1) no pending
+ * instalment plan: a live plan with a share scheduled or undone, read with its devoluciones and adelantos (a completed,
+ * stopped, fully refunded or brought-forward plan is not pending). `snapshot` is `snapshotFromArchive`'s (projected lines
+ * included). The one place of that rule: storage and the UI both call it. */
+export function assertCardDeletable(card: CreditCardProfile, snapshot: LedgerSnapshot, plans: readonly InstallmentPlan[], records: readonly RecordedEntry[],
+  operations: readonly PurchaseOperation[]): void {
   if (card.deleted) throw new Error(CARD_DELETED_MESSAGE);
   if (cardDebtMinor(card, snapshot) > 0) throw new Error(CARD_DEBT_MESSAGE);
-  if (cardHasPendingInstallments(card, plans, records)) throw new Error(CARD_PLAN_MESSAGE);
+  if (cardCreditMinor(card, snapshot) > 0) throw new Error(CARD_CREDIT_MESSAGE);
+  if (cardHasPendingInstallments(card, plans, records, operations)) throw new Error(CARD_PLAN_MESSAGE);
 }
 
 /** The deletion record of a card (25B2): inactive, deleted, one revision on. Never twice. */
@@ -339,9 +347,10 @@ export function cardCreditMinor(card: CreditCardProfile, snapshot: LedgerSnapsho
  * instalments (the whole plan, or only the billed part) is not assumed, so a card with a pending plan answers null
  * (unknown). 24T2 shows that state as «No calculado con cuotas», never as zero or an invented figure; the caller tells
  * «no limit» (`creditLimitMinor === null`) from «unknown» (a limit and a pending plan). */
-export function cardAvailableLimitMinor(card: CreditCardProfile, snapshot: LedgerSnapshot, plans: readonly InstallmentPlan[] = [], records: readonly RecordedEntry[] = []): number | null {
+export function cardAvailableLimitMinor(card: CreditCardProfile, snapshot: LedgerSnapshot, plans: readonly InstallmentPlan[], records: readonly RecordedEntry[],
+  operations: readonly PurchaseOperation[]): number | null {
   if (card.creditLimitMinor === null) return null;
-  if (cardHasPendingInstallments(card, plans, records)) return null;
+  if (cardHasPendingInstallments(card, plans, records, operations)) return null;
   return card.creditLimitMinor - cardDebtMinor(card, snapshot);
 }
 
@@ -413,10 +422,13 @@ export interface CardStatementActivity extends CardCycle {
   paymentCount: number;
 }
 
-/** Recorded purchases (an expense: a purchase paid once, or the principal of an instalment), refunds (income) and payments
+/** Recorded purchases (an expense: a purchase paid once, or the principal of an instalment), refunds and payments
  * (transfers into the card) inside the open statement window: the open cycle's activity (Tarjetas' «Este ciclo»), what the
  * ledger holds, never a statement amount. An instalment's financing shares are recorded as their own movements and
- * counted apart (`financingMinor`), so one instalment with interest is one purchase, not two. Exact minor units. */
+ * counted apart (`financingMinor`), so one instalment with interest is one purchase, not two. 24T3 (A19) classifies the
+ * projected lines by their metadata: a devolución line adds its credit to `refundsMinor` (never a purchase, no count;
+ * legacy card incomes stay there too), an adelanto's principal line is one purchase per operation, and its financing lines
+ * are financing. Exact minor units. */
 export function cardStatementActivity(card: CreditCardProfile, snapshot: LedgerSnapshot, todayISO: string, cycleDates: readonly CardCycleDates[] = []): CardStatementActivity {
   const cycle = cardCycle(card, todayISO, cycleDates.filter(row => row.cardId === card.id));
   const inWindow = (dateISO: string) => dateISO >= cycle.startISO && dateISO <= cycle.closingISO;
@@ -424,6 +436,12 @@ export function cardStatementActivity(card: CreditCardProfile, snapshot: LedgerS
   for (const entry of snapshot.entries) {
     if (entry.accountId !== card.accountId || !inWindow(entry.dateISO)) continue;
     if (entry.kind !== 'expense') { refunds += BigInt(entry.amountMinor); continue; }
+    if (entry.refund) { refunds -= BigInt(entry.amountMinor); continue; }
+    if (entry.payoff) {
+      if (entry.payoff.component === 'principal') { purchases += BigInt(entry.amountMinor); purchaseCount++; }
+      else financing += BigInt(entry.amountMinor);
+      continue;
+    }
     const share = installmentOccurrenceOf(entry.id);
     if (share && share.component !== 'principal') financing += BigInt(entry.amountMinor);
     else { purchases += BigInt(entry.amountMinor); purchaseCount++; }

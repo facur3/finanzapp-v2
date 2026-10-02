@@ -3,6 +3,7 @@
  * Existing legacy float rules are deliberately unchanged during migration. */
 import { LEDGER_CURRENCIES, assertLedgerCurrency, assertStorableCurrency, isLegacyCurrency, sortCurrencies,
   type CurrencyGate, type IsoCurrencyCode } from './currency.ts';
+import type { InstallmentComponent } from './installments.ts';
 
 /** The currency of an account: any ISO 4217 code the catalogue knows. Which codes a row may
  * actually hold is decided by `validateAccount` (read acceptance: a storable fiat currency)
@@ -62,7 +63,16 @@ export interface Entry {
   category: string;
   dateISO: string;
   createdAt: string;
+  /** Producto 24T3: present only on a line `snapshotFromArchive` projects from a live devolución (operations.ts): a
+   * contra-expense (`kind: 'expense'`, negative amount) whose id is the operation's. Never stored: `validateEntry` refuses
+   * it on a stored record. */
+  refund?: { operationId: string; targetEntryId?: string; targetPlanId?: string };
+  /** Producto 24T3: present only on a line projected from a live adelanto de cuotas: one line per recognised component
+   * (`${operationId}_p|_i|_f|_t`), positive. Never stored. */
+  payoff?: { operationId: string; planId: string; component: InstallmentComponent };
 }
+/** 24T3: a projected line (a devolución or an adelanto) is read, never saved as a movement. */
+export const PROJECTED_ENTRY_MESSAGE = 'Una devolución o un adelanto de cuotas no se guarda como movimiento.';
 
 export interface LedgerSnapshot {
   accounts: Account[];
@@ -162,6 +172,7 @@ export function accountIdsInCurrency(accounts: readonly Account[], currency: Cur
 
 export function validateEntry(entry: Entry, accounts: Account[]): void {
   if (!validId(entry.id) || !validId(entry.accountId)) throw new Error('Identificador inválido.');
+  if (Object.hasOwn(entry, 'refund') || Object.hasOwn(entry, 'payoff')) throw new Error(PROJECTED_ENTRY_MESSAGE);
   if (!accounts.some(account => account.id === entry.accountId)) throw new Error('Elegí una cuenta existente.');
   if (!['expense', 'income'].includes(entry.kind)) throw new Error('Elegí gasto o ingreso.');
   if (!Number.isSafeInteger(entry.amountMinor) || entry.amountMinor <= 0) {
@@ -219,7 +230,9 @@ export function totalsByCurrency(snapshot: LedgerSnapshot): Partial<Record<Curre
 }
 
 export function createPilotBackup(snapshot: LedgerSnapshot, now: Date = new Date()) {
-  if (snapshot.transfers?.length || snapshot.accounts.some(a => a.revision !== undefined || a.updatedAt !== undefined)) {
+  // 24T3 (A11): a devolución or an adelanto (a projected line) has no place in the v1 file either.
+  if (snapshot.transfers?.length || snapshot.accounts.some(a => a.revision !== undefined || a.updatedAt !== undefined)
+    || snapshot.entries.some(entry => entry.refund !== undefined || entry.payoff !== undefined)) {
     throw new Error('Usá la copia actual para conservar transferencias y correcciones de cuentas.');
   }
   snapshot.accounts.forEach(validateAccount);

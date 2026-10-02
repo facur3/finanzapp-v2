@@ -3,7 +3,7 @@ import { dailySpending, expensesInPeriod, isStorableCurrency, validDateISO, type
 import { useMemo } from 'react';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { useFinanceView } from '../src/fx/rates-provider';
-import { listingSnapshot } from '../src/fx/finance-view';
+import { lineCounts, listingSnapshot, recordedCountLabel } from '../src/fx/finance-view';
 import { AppText, EmptyState, Money, Screen } from '../src/ui/components';
 import { withCurrencyCode } from '../src/i18n/format';
 import { useI18n } from '../src/i18n/provider';
@@ -36,7 +36,8 @@ export default function ReportDayScreen() {
   return <EntryList entries={entries} accounts={real.accounts} header={<View style={{ gap: 16 }}>
     <AppText accessibilityRole="header" variant="title2">{formatDate(date, 'long')}</AppText>
     {total !== null ? <Money minor={total} currency={currency} large /> : <AppText>{t('reports.day.totalUnavailable')}</AppText>}
-    <AppText secondary>{withCurrencyCode(t('reports.recordedExpenses', { count: entries.length }), currency)}</AppText>
+    {/* 24T3 (A23): purchases and devoluciones counted apart; every line stays listed below. */}
+    <AppText secondary>{withCurrencyCode(recordedCountLabel(lineCounts(entries), t), currency)}</AppText>
     {!entries.length && <EmptyState title={t('reports.day.emptyTitle')} detail={t('reports.day.emptyDetail')} />}
   </View>} />;
 }

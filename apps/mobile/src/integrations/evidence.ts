@@ -1,4 +1,4 @@
-import { spendingComparison, type Currency, type LedgerSnapshot } from '@finanzapp/domain';
+import { spendingComparison, spendingFacts, type Currency, type LedgerSnapshot } from '@finanzapp/domain';
 import type { AssistantFact } from '../../../../packages/integrations/contracts.js';
 
 /** Fact labels are protocol data, not interface copy: they are what the
@@ -10,7 +10,7 @@ import type { AssistantFact } from '../../../../packages/integrations/contracts.
  * The v1 request carries no language (the contract rejects unknown keys) and
  * the server answers in Spanish; how the interface language and region will
  * reach the model, and how facts become language-neutral, is docs/i18n.md §11. */
-export const FACT_LABELS = { expenses: 'Gastos registrados', income: 'Ingresos registrados', categoryPrefix: 'Categoría de gasto: ' } as const;
+export const FACT_LABELS = { expenses: 'Gastos registrados', income: 'Ingresos registrados', refunds: 'Devoluciones', categoryPrefix: 'Categoría de gasto: ' } as const;
 
 /** The stored category name a `*.category.N` fact is about, or null for any other fact.
  * The fact contract has no field for it, so the name travels inside the label
@@ -21,7 +21,14 @@ export function factCategory(fact: Pick<AssistantFact, 'id' | 'label'>): string 
   return fact.label.startsWith(FACT_LABELS.categoryPrefix) ? fact.label.slice(FACT_LABELS.categoryPrefix.length) : fact.label;
 }
 
-/** Aggregate on-device; only send this scoped context after explicit consent. */
+/** Aggregate on-device; only send this scoped context after explicit consent.
+ *
+ * 24T3 (A25): every fact is additive and never negative (contract v1 refuses a negative amount). Spending is sent split,
+ * never netted: `*.expenses` is the gross of the purchase lines (purchases, instalments, an adelanto's components) with
+ * their purchase count, each `*.category.N` that category's gross (only those above zero), and one `*.refunds` fact
+ * («Devoluciones») carries the period's devoluciones as a positive amount and their count, only when there are any. The
+ * net Reportes shows is `expenses − refunds`; it is never sent as a total. Income is counted directly, so a devolución
+ * never changes it. Two sides of at most 3 + 26 facts stay within the contract's 60. */
 export function monthlyEvidence(snapshot: LedgerSnapshot, currency: Currency, todayISO: string): AssistantFact[] {
   const comparison = spendingComparison(snapshot, currency, todayISO.slice(0, 7), todayISO);
   if (comparison.status === 'out-of-range') return [];
@@ -29,13 +36,14 @@ export function monthlyEvidence(snapshot: LedgerSnapshot, currency: Currency, to
   for (const [prefix, report] of [['current', comparison.current], ['previous', comparison.previous]] as const) {
     if (!report || report.status !== 'ready') continue;
     const period = { startISO: report.startISO, endISO: report.endISO };
+    const side = spendingFacts(snapshot, { currency, ...period });
+    if (side.status !== 'ready') continue;
     // Do not turn an untracked period into evidence of zero actual spending.
-    if (!report.count) continue;
-    facts.push({ id: prefix + '.expenses', label: FACT_LABELS.expenses, amountMinor: report.expenseMinor,
-      count: report.categories.reduce((count, c) => count + c.count, 0), ...period });
-    facts.push({ id: prefix + '.income', label: FACT_LABELS.income, amountMinor: report.incomeMinor,
-      count: report.count - report.categories.reduce((count, c) => count + c.count, 0), ...period });
-    report.categories.slice(0, 26).forEach((category, index) => facts.push({ id: prefix + '.category.' + index,
+    if (!side.purchaseCount && !side.incomeCount && !side.refundCount) continue;
+    facts.push({ id: prefix + '.expenses', label: FACT_LABELS.expenses, amountMinor: side.grossPurchasesMinor, count: side.purchaseCount, ...period });
+    facts.push({ id: prefix + '.income', label: FACT_LABELS.income, amountMinor: side.incomeMinor, count: side.incomeCount, ...period });
+    if (side.refundCount) facts.push({ id: prefix + '.refunds', label: FACT_LABELS.refunds, amountMinor: side.refundsMinor, count: side.refundCount, ...period });
+    side.categories.slice(0, 26).forEach((category, index) => facts.push({ id: prefix + '.category.' + index,
       label: FACT_LABELS.categoryPrefix + category.category, amountMinor: category.amountMinor, count: category.count, ...period }));
   }
   return facts;

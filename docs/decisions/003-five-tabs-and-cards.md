@@ -107,7 +107,10 @@ y la decisión es la contraria (regla 7). 24T1 (PR #67) convirtió en pruebas 12
    propios.
 7. **Compras en cuotas (Producto 24T; contrato decidido el 2026-09-28; el motor,
    el esquema y la copia implementados por 24T1 el 2026-09-28, la interfaz en 24T2,
-   reintegros y cancelaciones en 24T3).** Una compra financiada es **una compra y un plan**
+   reintegros y cancelaciones en 24T3).** *(→ 2026-10-01, Producto 24T3: devoluciones, adelanto de
+   cuotas y ciclo de vida del plan decididos por el dueño e implementados; ver «Devoluciones, adelanto de
+   cuotas y ciclo de vida del plan» abajo. Las frases anteriores que dicen otra cosa quedan como registro
+   y llevan una nota «→ 24T3».)* Una compra financiada es **una compra y un plan**
    (`InstallmentPlan`), nunca una `RecurringRule`. Si la persona eligió cuotas,
    FinanzApp **no** contabiliza además el precio completo como gasto inmediato.
    Ejemplo: USD 1.200 en 12 × USD 100.
@@ -122,6 +125,8 @@ y la decisión es la contraria (regla 7). 24T1 (PR #67) convirtió en pruebas 12
      principal total. Intereses, cargos e impuestos de financiación se registran por
      separado, con su propia categoría, y nunca se disfrazan de principal. Pagar el
      resumen sigue siendo una transferencia (regla 3), nunca un segundo gasto.
+     *(→ 24T3: un adelanto de cuotas reconoce las cuotas que faltaban en la fecha del adelanto,
+     una sola vez; una devolución resta en su propio mes. Ver abajo.)*
    - **Cifras distintas que el diseño de 24T muestra y nunca mezcla** (revisado en
      la revisión de 24T1): 1) precio / principal original de la compra; 2) saldo de
      la tarjeta facturado/exigible hoy; 3) principal futuro comprometido; 4)
@@ -130,12 +135,17 @@ y la decisión es la contraria (regla 7). 24T1 (PR #67) convirtió en pruebas 12
      deriva de ellos que una cuota o un plan estén pagados**: no existe «3/12
      pagadas» a partir de una transferencia a la tarjeta; sí «3/12 facturadas».
      programada ≠ reconocida/facturada ≠ pagada; «pagada» solo cuando FinanzApp
-     tenga evidencia real de ese pago concreto.
+     tenga evidencia real de ese pago concreto. *(→ 24T2/24UX6D, alineado en 24T3: en el dominio
+     «facturada» es sinónimo de «reconocida»; en pantalla se dice solo «registradas» («3 de 12
+     registradas»), nunca «facturadas» ni «pagadas». Una cuota adelantada es «Adelantada», nunca
+     «pagada».)*
    - **Crédito disponible: gate abierto.** Cómo afectan las cuotas futuras al límite
      disponible del emisor (muchos emisores reservan el total; otros no) no se
      asume: se decide y se registra aquí antes de implementar
      `cardAvailableLimitMinor` con planes. Hasta entonces el límite disponible no
-     se calcula para una tarjeta con planes. **24T2 (2026-09-28) decide solo la
+     se calcula para una tarjeta con planes *(→ 24T3: «con un plan pendiente», como dicen el
+     resto de esta regla y el código; un plan completo, sin seguimiento, devuelto o adelantado ya
+     no está pendiente y deja de ocultar el disponible)*. **24T2 (2026-09-28) decide solo la
      presentación, no una fórmula:** sin límite cargado, «Sin límite cargado»; con
      límite y sin plan pendiente, la cifra; con límite y un plan pendiente, «No
      calculado con cuotas» con una ayuda que explica por qué. Nunca un cero ni una
@@ -145,9 +155,92 @@ y la decisión es la contraria (regla 7). 24T1 (PR #67) convirtió en pruebas 12
      saldo pendiente **o** cualquier plan pendiente (`assertCardDeletable` es el
      único lugar de esa regla); una tarjeta eliminada conserva todo su historial y
      sus planes terminados. Pausar o eliminar un recurrente nunca afecta un plan.
+     *(→ 24T3, B3: también con saldo a favor; ver abajo.)*
    - **Reintegros y cancelación anticipada:** nunca duplican un gasto; quedan
      vinculados a la compra/plan original; un reintegro parcial conserva el resto;
-     un pago anticipado reduce la obligación y no crea un gasto nuevo.
+     un pago anticipado reduce la obligación y no crea un gasto nuevo. *(→ 24T3: el
+     contrato exacto, abajo. «No crea un gasto nuevo» se cumple porque el adelanto reconoce, una sola
+     vez y en su fecha, las cuotas que faltaban registrar; cada cuota cuenta una vez.)*
+   - **Devoluciones, adelanto de cuotas y ciclo de vida del plan (decidido el 2026-10-01
+     por el dueño, Producto 24T3; B1–B3).** Una devolución y un adelanto son **operaciones de
+     la compra** (`packages/domain/operations.ts`): filas propias, solo agregadas, con id de
+     formulario, revisión y «deshecha» (restaurable); nunca reescriben un movimiento, un plan, un
+     calendario ni un pago guardados. Su efecto se **proyecta** al leer el libro como líneas
+     derivadas que nunca se guardan como movimientos.
+     - **Palabras.** «Devolución» (una compra devuelta, entera o en parte; nunca «Reembolso»,
+       que es la categoría predefinida de ingreso), «Registrar devolución», «Registrar adelanto
+       de cuotas», «Dejar de seguir el plan», «Reactivar plan». **Nota de redacción:** en el
+       castellano de Argentina «cancelar» una deuda es pagarla; la «cancelación anticipada» de las
+       frases anteriores de esta regla es el **adelanto de cuotas**, y el estado `cancelled` del
+       dominio es **dejar de seguir** el plan (no es un pago, una devolución ni una condonación).
+       Por eso la pantalla nunca dice «Cancelar plan» ni «Cancelado»: dice «Dejar de seguir el
+       plan» y «Sin seguimiento».
+     - **Devolución.** Nunca es un ingreso: es una línea de gasto con importe negativo
+       (contra-gasto) en **su propia fecha y su propio mes**, en la **categoría de la compra
+       leída al momento** (si se corrige la categoría de la compra, la devolución la sigue), y
+       acreditada en **la cuenta de la compra** (una tarjeta archivada se acepta; una cuenta o
+       tarjeta eliminada, no; elegir otra cuenta queda para después). Fecha entre la de la
+       compra y hoy. Tope: la suma de devoluciones vivas nunca supera el precio. Mientras una
+       compra tenga devoluciones vivas no se deshace, no baja de lo devuelto, no pasa a
+       ingreso, no cambia de cuenta ni de moneda y no se fecha después de su primera
+       devolución (el archivo lo verifica en cada lectura, edición e importación).
+     - **Devolución de un plan (B2).** Devuelve solo principal. Primero revierte el principal ya
+       reconocido (o adelantado) en esa fecha, como una línea de crédito en la tarjeta en la
+       categoría de la última cuota de principal registrada (si no hay, la del plan); el resto
+       baja el principal de las **últimas cuotas**, de la última hacia atrás, cada una hasta cero
+       antes de tocar la anterior: esas cuotas se registran por lo que queda y una cuota en cero
+       queda «Devuelta» sin movimiento (nunca fue gasto, así que no hay línea de gasto). La
+       financiación no se toca. En un plan sin seguimiento solo se devuelve lo ya registrado.
+       Invariantes: por componente, reconocido + adelantado + programado + reducciones +
+       deshecho + sin seguimiento + no cobrado (solo financiación) = total del componente; Σ
+       devoluciones = Σ créditos + Σ reducciones.
+     - **Adelanto de cuotas (B1).** La persona registra que las cuotas que faltaban se
+       adelantaron: cada cuota todavía no registrada se reconoce **una sola vez, en la fecha del
+       adelanto**, en la categoría de su componente, en el saldo pendiente de la tarjeta; el pago
+       a la tarjeta es la transferencia de siempre («Pagar tarjeta»), registrada aparte; nada se
+       infiere ni se marca «pagada». La financiación futura la elige la persona, sin valor por
+       defecto: «Los registro ahora» (se reconoce con el principal) o «El emisor no los cobró»
+       (queda «No se cobró»: ni reconocida ni pendiente). Una cuota deshecha no se adelanta y
+       sigue pendiente. La fecha va desde el piso del plan (la mayor entre la compra, el cierre de
+       la última cuota registrada y un adelanto vivo) hasta hoy, y antes del cierre de cada cuota
+       que cubre. Un adelanto sin principal se rechaza. Un adelanto parcial (N cuotas) queda para
+       después.
+     - **Dejar de seguir y reactivar.** Dejar de seguir (estado `cancelled`) conserva las cuotas
+       registradas y deja de registrar las que faltan («No se registra»): no crea un gasto, una
+       devolución ni un pago. Antes de dejar de seguir se registran, en la misma transacción, las
+       cuotas cuyo resumen ya cerró. Se rechaza si no queda nada por registrar. «Reactivar plan»
+       es la única vuelta atrás permitida (`cancelledAt` a nulo, una revisión más, plan no
+       eliminado): registra en sus propias fechas de cierre las cuotas que cerraron mientras no se
+       seguía; se permite en una tarjeta archivada y no en una eliminada.
+     - **Estados y cifras efectivas.** Cada parte, por cuota y por componente, está en uno de:
+       *recognised* (su movimiento), *undone*, *settled* («Adelantada», cuenta como reconocida),
+       *waived* («No se cobró»), *refunded* («Devuelta»: reducida a cero sin movimiento),
+       *cancelled* («No se registra») o *scheduled*. El importe efectivo de una parte es su
+       calendario menos sus reducciones vivas, y es el que debe tener su movimiento (*→ reemplaza
+       «un movimiento de cuota conserva importe»*: conserva el importe efectivo). Un plan vivo
+       está **pendiente** mientras tiene una parte programada o deshecha, y **completo** cuando no
+       tiene ninguna. Cifras por componente: total, reconocido (con lo adelantado), adelantado,
+       deshecho, programado, sin seguimiento, no cobrado, devuelto como crédito, devuelto en
+       cuotas futuras y restante; ninguna «pagado».
+     - **Pendiente y eliminación.** Un plan completo, sin seguimiento, devuelto entero o
+       adelantado no está pendiente y no bloquea eliminar su tarjeta; uno cuyo principal se
+       devolvió entero pero conserva financiación programada sigue pendiente. **B3 enmienda la
+       regla única de eliminación:** `assertCardDeletable` rechaza una tarjeta eliminada, con saldo
+       pendiente, **con saldo a favor** («Tiene saldo a favor; archivala.») o con un plan pendiente;
+       sigue siendo el único lugar de la regla. Un plan se elimina solo sin cuotas registradas
+       **y sin ninguna operación**, aunque esté deshecha; dejar de seguir y eliminar nunca se
+       ofrecen juntos.
+     - **Deshacer y restaurar** una operación son cambios normales (una revisión más, un
+       recibo idempotente); deshacer un adelanto devuelve sus cuotas a pendientes y registra en
+       sus cierres las que ya cerraron. Restaurar vuelve a verificar todo salvo la fecha y el
+       reparto, y se rechaza si duplicaría una cuota, superaría un tope o contradice una cuota
+       registrada después. En una tarjeta o cuenta eliminada no se registra, deshace ni restaura
+       nada.
+     - **Lo que queda abierto o para después:** la regla de crédito disponible del emisor (gate
+       de arriba); devolver o condonar financiación fuera de un adelanto; otra cuenta de
+       crédito; devoluciones sobre cuentas o tarjetas eliminadas; migrar los ingresos históricos
+       en tarjetas (siguen contando como «devoluciones» del ciclo); el adelanto parcial; los
+       borradores de devolución del Asistente (25A).
    - **Moneda extranjera (24T + 24C2):** el modelo distingue moneda original de la
      compra, moneda en que la tarjeta factura, moneda de la cuenta que paga, importe
      exacto debitado y exacto acreditado, y tasa/cargos con su procedencia. Una
@@ -211,12 +304,15 @@ y la decisión es la contraria (regla 7). 24T1 (PR #67) convirtió en pruebas 12
      que siempre coinciden con el libro, el saldo de la tarjeta y Reportes. Plan:
      *active*, *completed* (todas las partes reconocidas), *cancelled*, *deleted*.
      Cifras por componente: total, reconocido, deshecho, futuro comprometido,
-     cancelado, restante; ninguna «pagado».
+     cancelado, restante; ninguna «pagado». *(→ 24T3: los estados y cifras efectivos de arriba;
+     `completed` = ninguna parte programada ni deshecha; `cancelled` se muestra «Sin seguimiento».)*
    - **Guardas libro↔plan:** un movimiento de cuota conserva importe, fecha, cuenta y
      tipo (comercio y categoría se corrigen; deshacer y restaurar son cambios
      normales); un movimiento nuevo no puede usar un id de cuota; cada lectura del
      archivo verifica que todo movimiento con id de cuota pertenezca a un plan y
      coincida con su calendario (un desvío rechaza la escritura, nunca se muestra).
+     *(→ 24T3: «coincida con su calendario» es con su importe efectivo, el calendario menos las
+     reducciones vivas de una devolución, también para un movimiento deshecho.)*
    - **Ciclo de vida de la tarjeta (revisión de 24T1):** *activa*: acepta compras
      nuevas, planes nuevos, recurrentes nuevos y pagos. *Archivada*: conserva todo su
      historial y sus planes; los planes pendientes siguen reconociéndose; acepta
@@ -235,6 +331,10 @@ y la decisión es la contraria (regla 7). 24T1 (PR #67) convirtió en pruebas 12
      reconocidas quedan). Ningún guardado cambia precio, cuotas ni fechas: un
      reintegro, un pago anticipado o un ajuste será una operación del plan con su
      propio registro (24T3); hasta entonces el validador rechaza ese estado.
+     *(→ 24T3: eliminar también se rechaza con saldo a favor (B3); un plan con historia **deja de
+     seguirse** («Sin seguimiento») y uno con cualquier operación nunca se elimina; la devolución y el
+     adelanto son esas operaciones, cada una con su registro; no hizo falta una operación de «ajuste»
+     y ningún guardado sigue cambiando precio, cuotas ni fechas.)*
    - **Crédito disponible:** con un plan pendiente `cardAvailableLimitMinor` responde
      null (desconocido) hasta que este documento registre la regla del emisor.
    - **Falla de la puesta al día:** si el paso de cuotas no puede escribir (base llena,

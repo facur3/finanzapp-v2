@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { Alert } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { assertOpenAccount, cardDebtMinor, cardHasPendingInstallments, closePersonalDebt, debtDeletion, debtOutstandingMinor, deleteRecurringRule, liabilityActivity, pauseRecurringRule, recurringHistory,
+import { assertCardDeletable, assertOpenAccount, cardCreditMinor, cardDebtMinor, cardHasPendingInstallments, closePersonalDebt, debtDeletion, debtOutstandingMinor, deleteRecurringRule, liabilityActivity, pauseRecurringRule, recurringHistory,
   reopenPersonalDebt, resumeRecurringRule, todayKey, type Account, type CreditCardProfile, type PersonalDebtProfile, type RecurringRule } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { useI18n } from '../i18n/provider';
@@ -207,15 +207,14 @@ export function useAccountManagement() {
   return { busyId, error, remove, actions, consequences };
 }
 
-/** Producto 25B2: deleting a card from its edit screen. The confirmation names the recorded debt, when there is one,
- * and that every purchase and payment stays; the record is written through the same path as an archive. */
-/** Producto 25B2: deleting a card from its edit screen. A card with a recorded debt is not deleted: the dialog says so and
- * offers to pay it (the reviewed transfer form, prefilled) or to archive it instead; nothing is cancelled or written
- * silently. Without debt, the confirmation names that every purchase and payment stays, and Eliminar writes the record
- * through `removeCard` (which also stops the card's active rules, in the same commit). */
+/** Producto 25B2: deleting a card from its edit screen. A card with a balance due, a credit or a pending plan is not
+ * deleted: one dialog says which, and offers to archive it instead (and to pay a balance due, the reviewed transfer form,
+ * prefilled); nothing is cancelled or written silently. Otherwise (a card created by mistake, or one settled), the
+ * confirmation names that every purchase and payment stays, and Eliminar writes the record through `removeCard` (which
+ * also stops the card's active rules, in the same commit). */
 export function useCardManagement() {
   const { saveCard, removeCard, snapshot, archive: ledger } = useLedger();
-  const { t, moneyText } = useI18n();
+  const { t, moneyText, errorText } = useI18n();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const writing = useRef(false);
@@ -241,21 +240,35 @@ export function useCardManagement() {
   function remove(card: CreditCardProfile, done?: () => void) {
     const account = snapshot?.accounts.find(item => item.id === card.accountId);
     const debt = snapshot && account ? cardDebtMinor(card, snapshot) : 0;
-    if (debt > 0 && account) {
-      const buttons: Parameters<typeof Alert.alert>[2] = [
-        { text: t('common.cancel'), style: 'cancel' },
-        { text: t('cards.form.blockedPay'), onPress: () => router.push({ pathname: '/new-transfer', params: { toAccountId: account.id, maxAmountMinor: String(debt) } }) },
-      ];
-      if (card.active) buttons.push({ text: t('cards.form.blockedArchive'), onPress: () => { void archive(card, done); } });
-      Alert.alert(t('cards.form.blockedTitle'), t('cards.form.blockedDetail', { amount: moneyText(debt, account.currency) }), buttons);
+    const credit = snapshot && account ? cardCreditMinor(card, snapshot) : 0;
+    // 24T1: the same rule storage enforces (`assertCardDeletable`): a pending instalment plan is archived with the card, never deleted.
+    const plan = cardHasPendingInstallments(card, ledger?.installmentPlans ?? [], ledger?.records ?? [], ledger?.purchaseOperations ?? []);
+    // 25B2 / 24T1 / 24T3 (B3): a balance due, a credit in the holder's favour or a pending plan is a real amount, so the card
+    // is never deleted. The person whose goal is «I no longer use this card» gets one dialog that names every one of those
+    // facts and offers «Archivar tarjeta» right there (it leaves the active cards and keeps the balance, the plans and the
+    // history), plus «Pagar» for a balance due (the reviewed payment form, capped at it). An archived card is told it
+    // already is. Opening the dialog writes nothing; nothing is zeroed.
+    if (account && (debt > 0 || credit > 0 || plan)) {
+      const amount = moneyText(debt > 0 ? debt : credit, account.currency);
+      const reason = debt > 0 ? (plan ? 'cards.form.blockedReasonDebtPlan' : 'cards.form.blockedReasonDebt')
+        : credit > 0 ? (plan ? 'cards.form.blockedReasonCreditPlan' : 'cards.form.blockedReasonCredit') : 'cards.form.blockedReasonPlan';
+      const balance = debt > 0 || credit > 0;
+      const keep = card.active ? (balance ? 'cards.form.blockedKeepBalance' : 'cards.form.blockedKeepHistory')
+        : (balance ? 'cards.form.blockedArchivedBalance' : 'cards.form.blockedArchivedHistory');
+      const extra = plan ? (debt > 0 ? 'cards.form.blockedPlanPay' : 'cards.form.blockedPlanNote') : debt > 0 ? 'cards.form.blockedPayNote' : null;
+      const buttons: Parameters<typeof Alert.alert>[2] = [{ text: t('common.cancel'), style: 'cancel' }];
+      if (debt > 0) buttons.push({ text: t('cards.form.blockedPay'), onPress: () => router.push({ pathname: '/new-transfer', params: { toAccountId: account.id, maxAmountMinor: String(debt) } }) });
+      if (card.active) buttons.push({ text: t('cards.form.archive'), isPreferred: true, onPress: () => { void archive(card, done); } });
+      Alert.alert(t('cards.form.blockedTitle'), [t(reason, { amount }), t(keep), extra ? t(extra) : ''].filter(Boolean).join(' '), buttons);
       return;
     }
-    // 24T1: the same rule storage enforces (`assertCardDeletable`): a pending instalment plan is archived with the card, never deleted.
-    if (cardHasPendingInstallments(card, ledger?.installmentPlans, ledger?.records)) {
-      const buttons: Parameters<typeof Alert.alert>[2] = [{ text: t('common.cancel'), style: 'cancel' }];
-      if (card.active) buttons.push({ text: t('cards.form.blockedArchive'), onPress: () => { void archive(card, done); } });
-      Alert.alert(t('cards.form.blockedTitle'), t('cards.form.blockedPlanDetail'), buttons);
-      return;
+    // Every other reason storage refuses (`assertCardDeletable`, the one rule) is said before the destructive question,
+    // never after it.
+    if (snapshot) {
+      try { assertCardDeletable(card, snapshot, ledger?.installmentPlans ?? [], ledger?.records ?? [], ledger?.purchaseOperations ?? []); } catch (cause) {
+        Alert.alert(t('cards.form.blockedTitle'), errorText(cause instanceof Error ? cause.message : 'cards.form.deleteFailed'), [{ text: t('common.cancel'), style: 'cancel' }]);
+        return;
+      }
     }
     Alert.alert(t('cards.form.deleteTitle'), t('cards.form.deleteDetail'), [
       { text: t('common.cancel'), style: 'cancel' },

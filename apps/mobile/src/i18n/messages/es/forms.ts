@@ -27,6 +27,8 @@ export const forms = {
     optionBalance: 'saldo {amount}',
     budgetExceeded: 'Presupuesto excedido por {amount}',
     budgetUsed: '{spent} de {total} este mes',
+    /** 24T3 (A24): devoluciones net the category below zero this month: its whole limit is left, never a negative amount. */
+    budgetRefunds: 'Quedan {total} este mes · las devoluciones superan lo gastado',
     cardNote: 'Cuenta como gasto una sola vez y suma al saldo pendiente de la tarjeta. El pago del resumen se registra desde Tarjetas.',
     correctionNote: 'Corregís el movimiento original. No se registra otro gasto o ingreso.',
     retryNote: 'Conservamos el envío para reintentar sin duplicarlo. Para cambiar los datos, cerrá y revisá primero Movimientos.',

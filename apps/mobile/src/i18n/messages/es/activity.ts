@@ -51,9 +51,15 @@ export const activity = {
     budget: 'Presupuesto',
     budgetExceeded: 'Excedido por {amount}',
     budgetUsed: '{percent} % usado · quedan {amount}',
+    /** 24T3 (A24): devoluciones net the category below zero: what is left is the whole limit, never more. */
+    budgetRefunds: 'Quedan {amount} · las devoluciones superan lo gastado',
     edit: 'Editar movimiento',
     restoreAction: 'Recuperar movimiento',
     voidAction: 'Deshacer movimiento',
+    /** 24T3 (A13): an undo the domain refuses (a devolución or an adelanto uses this instalment), said before any confirmation with the reason. */
+    voidBlockedTitle: 'No se puede deshacer ahora',
+    viewRefund: 'Ver devolución',
+    viewPayoff: 'Ver adelanto',
     /** 24T2: a movement an instalment plan recorded: its title, and the row that opens its plan ("3 de 12"). */
     installmentTitle: 'Cuota de tarjeta',
     installment: 'Cuota',

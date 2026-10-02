@@ -296,3 +296,83 @@ test('24B5: the budget form offers the gate\'s currencies before the amount; wit
   await find(kwd.render(), 'ActionButton', 'Crear presupuesto').props.onPress();
   assert.deepEqual([kwd.saved[0].currency, kwd.saved[0].amountMinor], ['KWD', 12345]);
 });
+
+// Producto 24T3 (A24): the Presupuestos screen when devoluciones leave the month (or a category) below zero. The actual
+// route with its hosts as descriptors and the real projection (`snapshotFromArchive`) of a purchase operation.
+async function budgetsScreen(data: domain.LedgerArchive, locale: AppLocale = 'es-AR') {
+  const presentation = await import('../src/ui/presentation.ts');
+  const reportPresentation = await import('../src/ui/report-presentation.ts');
+  const budgetPresentation = await import('../src/ui/budget-presentation.ts');
+  const geometry = await import('../src/ui/geometry.ts');
+  const source = readFileSync(new URL('../app/budgets.tsx', import.meta.url), 'utf8');
+  const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
+  const jsx = (type: Node['type'], props: Node['props']) => ({ type, props });
+  const state: unknown[] = [];
+  let cursor = 0;
+  const names = ['ActionButton', 'AppText', 'CategoryBadge', 'EmptyState', 'IconButton', 'Money', 'PressFeedback', 'Screen', 'SectionTitle', 'Stat', 'StatRow', 'Surface'];
+  const modules: Record<string, unknown> = {
+    '../src/i18n/provider': { useI18n: () => bindLocale(locale) },
+    react: { useEffect: () => {}, useMemo: (fn: () => unknown) => fn(), useState: (initial: unknown) => {
+      const index = cursor++;
+      if (!(index in state)) state[index] = typeof initial === 'function' ? (initial as () => unknown)() : initial;
+      return [state[index], (value: unknown) => { state[index] = value; }];
+    } },
+    'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
+    'react-native': { View: 'View', StyleSheet: { hairlineWidth: 0.5 }, useWindowDimensions: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }) },
+    'expo-router': { Stack: { Screen: 'Stack.Screen' }, useLocalSearchParams: () => ({ currency: 'ARS', month: '2026-09' }), router: { push: () => {} } },
+    'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View' }, useSharedValue: (value: number) => ({ value }), withTiming: (value: number) => value, useAnimatedStyle: (fn: () => unknown) => fn() },
+    '@expo/vector-icons/Ionicons': 'Ionicons',
+    '@finanzapp/domain': domain,
+    '../src/storage/LedgerProvider': { useLedger: () => ({ archive: data, snapshot: domain.snapshotFromArchive(data) }) },
+    '../src/ui/budget-presentation': budgetPresentation,
+    '../src/ui/category-hues': { useCategoryLabel: (s: string) => s },
+    '../src/ui/components': Object.fromEntries(names.map(name => [name, name])),
+    '../src/ui/currency-switch': { CurrencySwitch: 'CurrencySwitch' },
+    '../src/ui/geometry': geometry,
+    '../src/ui/use-default-currency': { useDefaultCurrency: () => 'ARS' },
+    '../src/ui/presentation': presentation, '../src/ui/report-presentation': reportPresentation,
+    '../src/ui/motion': { timing: () => ({ duration: 0 }) },
+    '../src/ui/theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, useCurrentDay: () => '2026-09-20', useReduceMotion: () => true,
+      usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', line: '#ddd', inset: '#eee', expense: '#c00', warning: '#a60', link: '#1D5647' }) },
+  };
+  const module = { exports: {} as { default?: () => Node } };
+  runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
+    if (!Object.hasOwn(modules, name)) throw new Error('Unexpected budgets dependency: ' + name);
+    return modules[name];
+  } });
+  // The screen's own row and panel components are expanded, so their texts and labels are read too.
+  const expand = (value: any): any[] => !value || typeof value !== 'object' ? [] : Array.isArray(value) ? value.flatMap(expand)
+    : !value.props ? [] : [value, ...(typeof value.type === 'function' ? expand(value.type(value.props)) : []), ...expand(value.props.children)];
+  return () => { cursor = 0; return expand(module.exports.default!()) as Node[]; };
+}
+
+test('24T3 (A24): devoluciones above a month\'s purchases leave the whole limit available, never more, and say so; Gastado keeps the exact net', async () => {
+  const ropa: domain.Entry = { id: 'ropa', accountId: 'a', kind: 'expense', amountMinor: 80000, merchant: 'Tienda', category: 'Ropa', dateISO: '2026-08-20', createdAt };
+  const comida: domain.Entry = { id: 'comida', accountId: 'a', kind: 'expense', amountMinor: 10000, merchant: 'Almacén', category: 'Comida', dateISO: '2026-09-10', createdAt };
+  const refund: domain.EntryRefund = { id: 'dev-1', kind: 'refund', target: { entryId: 'ropa' }, accountId: 'a', currency: 'ARS', amountMinor: 30000, dateISO: '2026-09-05',
+    voided: false, createdAt, revision: 0, updatedAt: createdAt };
+  const ropaBudget: domain.MonthlyBudget = { ...food, id: 'ropa-budget', category: 'Ropa', amountMinor: 50000 };
+  const data: domain.LedgerArchive = { accounts: [account], records: [ropa, comida].map(domain.initialRecord), purchaseOperations: [refund], budgets: [total, food, ropaBudget] };
+  const summary = domain.summarizeMonthlyBudgets(domain.snapshotFromArchive(data), data.budgets!, 'ARS', '2026-09');
+  assert.equal(summary.total!.spentMinor, 10000 - 30000);
+  assert.equal(summary.total!.remainingMinor, 500000 + 20000, 'the domain keeps limit − spent (documented); the screen clamps it');
+  const tree = (await budgetsScreen(data))();
+  const textOf = (node: Node) => [node.props.children].flat().join('');
+  const shown = tree.filter(node => node.type === 'AppText').map(textOf);
+  const hero = tree.find(node => node.type === 'Money' && node.props.large)!;
+  assert.equal(hero.props.minor, 500000, 'Disponible is the limit, never above it');
+  assert.ok(shown.includes('Las devoluciones superan lo gastado'));
+  const spent = tree.filter(node => node.type === 'Stat').map(node => [node.props.label, (node.props.children as Node).props.minor]);
+  assert.equal(JSON.stringify(spent), JSON.stringify([['Gastado', -20000], ['Límite', 500000]]), 'Gastado is the exact net: the devolución is shown');
+  const panel = tree.find(node => node.type === 'View' && typeof node.props.accessibilityLabel === 'string' && node.props.accessibilityLabel.startsWith('Presupuesto general'))!;
+  assert.equal(panel.props.accessibilityLabel, 'Presupuesto general: ' + bindLocale('es-AR').spokenMoney(-20000, 'ARS') + ' de 5000,00 pesos, 0 por ciento usado. Disponible 5000,00 pesos. Las devoluciones superan lo gastado');
+  // The Ropa sublimit: its devolución exceeds its (zero) purchases this month; the Comida one is untouched.
+  const rows = tree.filter(node => node.type === 'PressFeedback' && /^Presupuesto (Ropa|Comida)/.test(node.props.accessibilityLabel));
+  assert.equal(rows.find(row => row.props.accessibilityLabel.startsWith('Presupuesto Ropa'))!.props.accessibilityLabel,
+    'Presupuesto Ropa: ' + bindLocale('es-AR').spokenMoney(-30000, 'ARS') + ' de 500,00 pesos, 0 por ciento. Quedan 500,00 pesos. Las devoluciones superan lo gastado');
+  assert.ok(shown.includes('Quedan $ 500,00 de $ 500,00 · las devoluciones superan lo gastado'));
+  assert.ok(shown.includes('Quedan $ 1.400,00 de $ 1.500,00'), 'Comida: 100,00 of 1.500,00 as before');
+  assert.equal(shown.some(text => /Además gastaste/.test(text)), false, 'nothing unbudgeted is invented: the domain clamps it at zero');
+  const english = (await budgetsScreen(data, 'en-AR'))().filter(node => node.type === 'AppText').map(textOf);
+  assert.ok(english.includes('Refunds exceed what was spent'));
+});

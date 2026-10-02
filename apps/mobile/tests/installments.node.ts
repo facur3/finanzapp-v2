@@ -81,8 +81,8 @@ test('schema 12 is reached from a real schema 11 file by an additive migration: 
     INSERT INTO entries (id, accountId, kind, amountMinor, merchant, category, dateISO, createdAt, revision, voided, updatedAt) VALUES ('p1', 'c', 'expense', 100, 'Súper', 'Comida', '2026-09-10', '${createdAt}', 0, 0, '${createdAt}');`);
   assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 11);
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 13, '24T2: the file continues to schema 13 (an empty card_cycle_dates table)');
-  assert.equal(DATABASE_VERSION, 13);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 14, '24T2/24T3: the file continues to schema 14 (an empty card_cycle_dates table, empty operation tables)');
+  assert.equal(DATABASE_VERSION, 14);
   const archive = await readArchive(db);
   assert.equal(archive.installmentPlans, undefined, 'old data gets no plan');
   assert.deepEqual(archive.cards?.[0], { ...card, accountId: 'c', creditLimitMinor: null });
@@ -91,8 +91,8 @@ test('schema 12 is reached from a real schema 11 file by an additive migration: 
   // Idempotent: the step runs again on a file that already has the tables (an interrupted step), and reaches 12 once more.
   await db.execAsync('PRAGMA user_version = 11');
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 13);
-  await db.execAsync('PRAGMA user_version = 14');
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 14);
+  await db.execAsync('PRAGMA user_version = 15');
   await assert.rejects(initializeDatabase(db), /versión más nueva/);
   // The foreign keys hold: an instalment row needs its plan, a plan its card.
   await assert.rejects(db.withExclusiveTransactionAsync(async tx => { await tx.runAsync("INSERT INTO installments (planId, number, billingDateISO, dueDateISO, principalMinor, interestMinor, feeMinor, taxMinor) VALUES ('nope', 1, '2026-09-20', '2026-10-05', 1, 0, 0, 0)"); }), /FOREIGN KEY/);
@@ -134,7 +134,7 @@ test('a plan is created without moving any account or recording anything; the ca
   assert.equal(await catchUpInstallments(reopened, '2030-01-01'), 6);
   assert.equal(await catchUpInstallments(reopened, '2030-01-01'), 0);
   const archive = await readArchive(reopened);
-  const figures = installmentPlanFigures(archive.installmentPlans![0], archive.records);
+  const figures = installmentPlanFigures(archive.installmentPlans![0], archive.records, archive.purchaseOperations ?? []);
   assert.deepEqual([figures.status, figures.recognisedMinor, figures.remainingMinor, figures.scheduledMinor, figures.recognisedCount], ['completed', 120000, 0, 0, 12]);
   assert.equal(archive.records.filter(record => record.entry.id.startsWith('inst_tv')).reduce((sum, record) => sum + record.entry.amountMinor, 0), 120000, 'the recognised principal is exactly the price');
   assert.equal(cardDebtMinor(card, await readSnapshot(reopened)), 23100 + 120000);
@@ -184,9 +184,9 @@ test('financing is recognised beside each instalment in its own category; report
   assert.equal(summarizeMonthlyBudgets(snapshot, [budget], 'ARS', '2026-10').totalSpentMinor, 20100);
   assert.equal(cardDebtMinor(card, snapshot), 23100 + 20000 + 10100);
   const archive = await readArchive(db);
-  assert.equal(cardCommittedMinor(card, archive.installmentPlans, archive.records), 100000 + 20000, 'the future principal, beside the balance due, never inside it');
-  assert.equal(cardAvailableLimitMinor(card, snapshot, archive.installmentPlans, archive.records), null, 'the issuer-reservation gate');
-  assert.equal(installmentPlanFigures(archive.installmentPlans!.find(plan => plan.id === 'fin')!, archive.records).financingRecognisedMinor, 100);
+  assert.equal(cardCommittedMinor(card, archive.installmentPlans ?? [], archive.records, archive.purchaseOperations ?? []), 100000 + 20000, 'the future principal, beside the balance due, never inside it');
+  assert.equal(cardAvailableLimitMinor(card, snapshot, archive.installmentPlans ?? [], archive.records, archive.purchaseOperations ?? []), null, 'the issuer-reservation gate');
+  assert.equal(installmentPlanFigures(archive.installmentPlans!.find(plan => plan.id === 'fin')!, archive.records, archive.purchaseOperations ?? []).financingRecognisedMinor, 100);
 });
 
 test('a card payment lowers the balance due and assigns no instalment; the movements a plan recorded keep their amount, date and card, may be relabelled, undone (never recreated) and restored', async () => {
@@ -195,7 +195,7 @@ test('a card payment lowers the balance due and assigns no instalment; the movem
   await createTransfer(db, transfer('pay', 'bank', 'card-account', 30000, '2026-10-26'));
   let archive = await readArchive(db);
   assert.equal(cardDebtMinor(card, await readSnapshot(db)), 23100 + 20000 - 30000);
-  const figuresBefore = installmentPlanFigures(archive.installmentPlans![0], archive.records);
+  const figuresBefore = installmentPlanFigures(archive.installmentPlans![0], archive.records, archive.purchaseOperations ?? []);
   assert.deepEqual([figuresBefore.recognisedMinor, figuresBefore.remainingMinor], [20000, 100000], 'a payment changes no plan figure');
   const record = archive.records.find(item => item.entry.id === 'inst_tv_002')!;
   await assert.rejects(changeEntry(db, makeEntryChange('op1', record, 'edit', now, { ...record.entry, amountMinor: 9999 })), new RegExp(INSTALLMENT_ENTRY_MESSAGE));
@@ -207,7 +207,7 @@ test('a card payment lowers the balance due and assigns no instalment; the movem
   await changeEntry(db, makeEntryChange('op4', relabelled, 'void', now));
   assert.equal(await catchUpInstallments(db, '2026-10-25'), 0);
   archive = await readArchive(db);
-  const undone = installmentPlanFigures(archive.installmentPlans![0], archive.records);
+  const undone = installmentPlanFigures(archive.installmentPlans![0], archive.records, archive.purchaseOperations ?? []);
   assert.deepEqual([undone.recognisedMinor, undone.undoneMinor, undone.remainingMinor, undone.status], [10000, 10000, 110000, 'active']);
   assert.equal(cardDebtMinor(card, await readSnapshot(db)), 23100 + 10000 - 30000);
   await assert.rejects(deleteInstallmentPlan(db, 'tv', now), new RegExp(PLAN_HISTORY_MESSAGE), 'an undone instalment is history too');
@@ -215,7 +215,7 @@ test('a card payment lowers the balance due and assigns no instalment; the movem
   const voided = archive.records.find(item => item.entry.id === 'inst_tv_002')!;
   await changeEntry(db, makeEntryChange('op5', voided, 'restore', now));
   archive = await readArchive(db);
-  assert.equal(installmentPlanFigures(archive.installmentPlans![0], archive.records).recognisedMinor, 20000);
+  assert.equal(installmentPlanFigures(archive.installmentPlans![0], archive.records, archive.purchaseOperations ?? []).recognisedMinor, 20000);
   await assert.rejects(createEntry(db, { ...expense('inst_tv_003', 'card-account', 10000, '2026-11-20') }), new RegExp(INSTALLMENT_ID_MESSAGE));
   await assert.rejects(createEntry(db, { ...expense('insti_tv_003', 'card-account', 10000, '2026-11-20') }), new RegExp(INSTALLMENT_ID_MESSAGE));
   // Drift is refused at the door: a row rewritten behind the app's back makes the archive unreadable rather than wrong.
@@ -227,16 +227,17 @@ test('the plan lifecycle: cancelled keeps the recognised instalments and stops t
   const { db } = await seeded();
   await createInstallmentPlan(db, financed);
   await catchUpInstallments(db, '2026-10-25');
-  await cancelInstallmentPlan(db, 'tv', now);
+  await cancelInstallmentPlan(db, 'tv', 0, '2026-10-25', now);
   const cancelled = await planOf(db, 'tv');
   assert.deepEqual([cancelled.cancelledAt, cancelled.revision, cancelled.updatedAt], [now, 1, now]);
   assert.equal(await catchUpInstallments(db, '2030-01-01'), 4, 'fin 2 and fin 3 only (principal and interest each): tv records nothing more');
   assert.deepEqual((await instalmentIds(db)).filter(id => id.includes('tv')), ['inst_tv_001', 'inst_tv_002'], 'the recognised instalments stay');
-  await cancelInstallmentPlan(db, 'tv', '2026-09-29T10:00:00.000Z');
+  // 24T3 (A15): a retry names the revision the screen showed: one revision on and already stopped is a no-op.
+  await cancelInstallmentPlan(db, 'tv', 0, '2026-10-25', '2026-09-29T10:00:00.000Z');
   assert.deepEqual(await planOf(db, 'tv'), cancelled, 'a retry changes nothing');
   await assert.rejects(deleteInstallmentPlan(db, 'tv', now), new RegExp(PLAN_HISTORY_MESSAGE));
   await assert.rejects(deleteInstallmentPlan(db, 'fin', now), new RegExp(PLAN_HISTORY_MESSAGE));
-  await assert.rejects(cancelInstallmentPlan(db, 'nope', now), new RegExp(PLAN_MISSING_MESSAGE));
+  await assert.rejects(cancelInstallmentPlan(db, 'nope', 0, '2026-10-25', now), new RegExp(PLAN_MISSING_MESSAGE));
   // A plan created by mistake, nothing recorded yet: deleted (a tombstone; the row and its schedule stay); twice is a no-op.
   const mistake = newInstallmentPlan({ id: 'oops', card, cardAccount, merchant: 'Error', category: 'Otros', purchaseDateISO: '2026-11-01', principalMinor: 900, count: 3, placement: 'next', createdAt: now });
   await createInstallmentPlan(db, mistake);
@@ -275,7 +276,7 @@ test('the card lifecycle with plans: archived keeps recording and paying; deleti
   await deleteCreditCard(db, 'card', now);
   const archive = await readArchive(db);
   assert.equal(archive.cards![0].deleted, true);
-  assert.deepEqual([archive.installmentPlans![0].id, installmentPlanFigures(archive.installmentPlans![0], archive.records).status], ['tv', 'completed']);
+  assert.deepEqual([archive.installmentPlans![0].id, installmentPlanFigures(archive.installmentPlans![0], archive.records, archive.purchaseOperations ?? []).status], ['tv', 'completed']);
   assert.equal(archive.records.filter(record => record.entry.id.startsWith('inst_tv')).length, 12, 'history intact');
   await assert.rejects(createInstallmentPlan(db, { ...financed, id: 'late' }), new RegExp(CARD_DELETED_MESSAGE));
   await assert.rejects(createTransfer(db, transfer('pay3', 'bank', 'card-account', 1, '2027-08-22')), new RegExp(CARD_DELETED_MESSAGE));
@@ -304,7 +305,7 @@ test('a plan is not a recurring rule and not a personal debt: the recurring catc
   archive = await readArchive(db);
   const snapshot = await readSnapshot(db);
   assert.deepEqual(debtTotalsByCurrency(archive.debts!, snapshot), [{ status: 'ready', currency: 'ARS', owedMinor: 0, receivableMinor: 0 }]);
-  assert.equal(installmentPlanFigures(archive.installmentPlans![0], archive.records).recognisedMinor, 30000);
+  assert.equal(installmentPlanFigures(archive.installmentPlans![0], archive.records, archive.purchaseOperations ?? []).recognisedMinor, 30000);
   assert.deepEqual(liquidTotalsByCurrency(snapshot, archive.cards, archive.debts), { ARS: 500000 - 30000 }, 'Disponible: cash only, no instalment, no debt');
   // A plan needs a card: a cash account or a debt is refused; deleting a cash account changes nothing of the plan.
   await assert.rejects(createInstallmentPlan(db, { ...financed, id: 'x', cardId: 'debt' }), /tarjeta de crédito existente/);
@@ -319,7 +320,7 @@ test('backup v12: export, restore into a fresh device (nothing recorded twice, t
   const { db } = await seeded();
   await createInstallmentPlan(db, financed);
   await catchUpInstallments(db, '2026-10-25');
-  await cancelInstallmentPlan(db, 'fin', now);
+  await cancelInstallmentPlan(db, 'fin', 0, '2026-10-25', now);
   const source = await readArchive(db);
   const backup = createRecoveryBackup(source, new Date(now));
   assert.equal(backup.schema, 'finanzapp.native-pilot.v12');
@@ -351,7 +352,8 @@ test('backup v12: export, restore into a fresh device (nothing recorded twice, t
   // The refusal contract: a v12 file read by a build that knows up to v11 (its parser told the file is v11) refuses the extra key; a v14 file is refused by name.
   assert.throws(() => parsePilotBackup(JSON.stringify({ ...backup, schema: 'finanzapp.native-pilot.v11' })), /campos faltantes/);
   assert.throws(() => parsePilotBackup(JSON.stringify({ ...backup, schema: 'finanzapp.native-pilot.v13' })), /campos faltantes/, 'a v12 file told v13 lacks cardCycleDates');
-  assert.throws(() => parsePilotBackup(JSON.stringify({ ...backup, schema: 'finanzapp.native-pilot.v14' })), /versiones 1 a 13/);
+  assert.throws(() => parsePilotBackup(JSON.stringify({ ...backup, schema: 'finanzapp.native-pilot.v14' })), /campos faltantes/, '24T3: a v12 file told v14 lacks cardCycleDates and purchaseOperations');
+  assert.throws(() => parsePilotBackup(JSON.stringify({ ...backup, schema: 'finanzapp.native-pilot.v15' })), /versiones 1 a 14/);
   // Without a plan the file stays as before (v11 here: the seeded card is live, so v8 with no plan).
   const plainDb = setup().db;
   await initializeDatabase(plainDb);
@@ -470,7 +472,7 @@ test('a plan with interest, fee and financing tax stores each component with its
   const principal = archive.records.find(record => record.entry.id === 'inst_nb_001')!;
   await changeEntry(db, makeEntryChange('undo-p', principal, 'void', now));
   archive = await readArchive(db);
-  let figures = installmentPlanFigures(archive.installmentPlans!.find(plan => plan.id === 'nb')!, archive.records);
+  let figures = installmentPlanFigures(archive.installmentPlans!.find(plan => plan.id === 'nb')!, archive.records, archive.purchaseOperations ?? []);
   assert.deepEqual([figures.recognisedMinor, figures.undoneMinor, figures.financingRecognisedMinor], [0, 10000, 3334 + 334 + 167]);
   assert.equal(cardDebtMinor(card, await readSnapshot(db)), 23100 + 10000 + 3334 + 334 + 167);
   // Undo the fee only, then restore both: each part comes back on its own; the catch-up never recreates an undone share.
@@ -478,12 +480,12 @@ test('a plan with interest, fee and financing tax stores each component with its
   await changeEntry(db, makeEntryChange('undo-f', fee, 'void', now));
   assert.equal(await catchUpInstallments(db, '2026-09-25'), 0);
   archive = await readArchive(db);
-  figures = installmentPlanFigures(archive.installmentPlans!.find(plan => plan.id === 'nb')!, archive.records);
+  figures = installmentPlanFigures(archive.installmentPlans!.find(plan => plan.id === 'nb')!, archive.records, archive.purchaseOperations ?? []);
   assert.deepEqual([figures.components.fee.undoneMinor, figures.components.interest.recognisedMinor], [334, 3334]);
   await changeEntry(db, makeEntryChange('restore-f', archive.records.find(record => record.entry.id === 'instf_nb_001')!, 'restore', now));
   await changeEntry(db, makeEntryChange('restore-p', (await readArchive(db)).records.find(record => record.entry.id === 'inst_nb_001')!, 'restore', now));
   archive = await readArchive(db);
-  figures = installmentPlanFigures(archive.installmentPlans!.find(plan => plan.id === 'nb')!, archive.records);
+  figures = installmentPlanFigures(archive.installmentPlans!.find(plan => plan.id === 'nb')!, archive.records, archive.purchaseOperations ?? []);
   assert.deepEqual([figures.recognisedMinor, figures.financingRecognisedMinor], [10000, 3835]);
   // Backup v12: each component's identity and category survive; the restored ids keep the catch-up from repeating.
   const backup = createRecoveryBackup(archive, new Date(now));

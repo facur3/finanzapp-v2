@@ -227,7 +227,13 @@ function note(provenance: Provenance, legs: readonly RateLeg[]): void {
  * Transfers are left out: they are never spending or income, and their two legs are one currency.
  * Opening balances are not converted here (balances use `consolidatedBalance`). Movements whose
  * rate is unknown are absent from `snapshot` and listed in `unconverted`; `complete` tells a
- * screen whether a period may be shown as a total. Never written anywhere. */
+ * screen whether a period may be shown as a total. Never written anywhere.
+ *
+ * Producto 24T3: a projected line (a devolución's negative expense line, an adelanto's
+ * components) is a movement like any other: converted with the rates of its own date (a
+ * devolución at the devolución's date, not the purchase's; rounding is symmetric, so a same-day
+ * full devolución nets to exactly 0), its `refund`/`payoff` metadata kept, and, being
+ * `kind: 'expense'`, counted by `complete`, `missingIn` and `provenance` for 'expense'. */
 export interface ConsolidatedLedger {
   target: IsoCurrencyCode;
   snapshot: LedgerSnapshot;

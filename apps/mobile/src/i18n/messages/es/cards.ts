@@ -139,12 +139,21 @@ export const cards = {
       deleteDetail: 'Deja de aparecer en Tarjetas y de aceptar compras y pagos. Las compras y los pagos anteriores siguen en tus registros y reportes; ningún saldo cambia.',
       /** 25B2 review: a card with a balance due is paid or archived, never deleted (a deleted card takes no payment). */
       blockedTitle: 'Todavía no se puede eliminar',
-      blockedDetail: 'Esta tarjeta tiene un saldo pendiente de {amount}. Pagalo primero, o archivala: pasa a Archivadas en Tarjetas, donde podés pagarla cuando quieras.',
+      /** The blocked dialog's sentences (25B2 / 24T1 / 24T3 B3), joined: what still holds the card (a balance due, a credit,
+       * pending instalments), what archiving keeps (or that it already is archived), then what still happens. */
+      blockedReasonDebt: 'Esta tarjeta todavía tiene un saldo pendiente de {amount}.',
+      blockedReasonDebtPlan: 'Esta tarjeta todavía tiene un saldo pendiente de {amount} y cuotas pendientes.',
+      blockedReasonCredit: 'Esta tarjeta todavía tiene saldo a favor de {amount}.',
+      blockedReasonCreditPlan: 'Esta tarjeta todavía tiene saldo a favor de {amount} y cuotas pendientes.',
+      blockedReasonPlan: 'Esta tarjeta todavía tiene cuotas pendientes.',
+      blockedKeepBalance: 'Podés archivarla para sacarla de tus tarjetas activas sin perder el saldo ni el historial.',
+      blockedKeepHistory: 'Podés archivarla para sacarla de tus tarjetas activas sin perder el historial.',
+      blockedArchivedBalance: 'Ya está archivada: sigue en Archivadas en Tarjetas con su saldo y su historial.',
+      blockedArchivedHistory: 'Ya está archivada: sigue en Archivadas en Tarjetas con su historial.',
+      blockedPlanNote: 'Sus cuotas se siguen registrando.',
+      blockedPlanPay: 'Sus cuotas se siguen registrando y podés pagarla cuando quieras.',
+      blockedPayNote: 'Podés pagarla cuando quieras.',
       blockedPay: 'Pagar',
-      /** 24T1: a card with a pending instalment plan (the same rule storage enforces). Archiving keeps every instalment
-       * recorded as its statement closes (24T2: under «Archivadas», where the card takes payments and is reactivated). */
-      blockedPlanDetail: 'Esta tarjeta tiene cuotas pendientes. Archivala: pasa a Archivadas en Tarjetas, sus cuotas se siguen registrando y podés pagarla y reactivarla.',
-      blockedArchive: 'Archivar',
       deleteConfirm: 'Eliminar',
       deleteFailed: 'No pudimos eliminar la tarjeta. Sigue como estaba; probá nuevamente.',
     },

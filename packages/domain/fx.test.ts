@@ -3,7 +3,7 @@ import { FX_PIVOT, RATE_MAX_AGE_DAYS, consolidatedLedger, convertMinor, convertO
   rateBook, roundHalfAwayFromZero, type ExchangeRate } from './fx';
 import type { Account, Entry, LedgerSnapshot, Transfer } from './ledger';
 import { liquidTotalsByCurrency, type CreditCardProfile } from './liabilities';
-import { spendingReport } from './spending-report';
+import { spendingFacts, spendingReport } from './spending-report';
 import { spendingOverview, spendingWindow } from './spending-overview';
 import { monthlySpendingTrend, topMerchants } from './report-trend';
 
@@ -254,5 +254,50 @@ describe('consolidated views', () => {
     expect(quotesNeeded(['USD'], 'EUR')).toEqual(['EUR']);
     expect(quotesNeeded(['ARS', 'USD', 'JPY'], 'EUR')).toEqual(['ARS', 'EUR', 'JPY']);
     expect(FX_PIVOT).toBe('USD');
+  });
+});
+
+describe('24T3: projected lines in the consolidated view', () => {
+  // A USD card purchase of 100,00 on 2026-09-10, a devolución of 40,00 on 2026-09-20, an adelanto on 2026-09-25.
+  const accounts = [account('ars', 'ARS'), account('usd-card', 'USD')];
+  const purchase = expense('buy', 'usd-card', 10000, '2026-09-10', 'Ropa', 'Tienda');
+  const refund: Entry = { ...expense('r-1', 'usd-card', -4000, '2026-09-20', 'Ropa', 'Tienda'), refund: { operationId: 'r-1', targetEntryId: 'buy' } };
+  const payoff: Entry = { ...expense('p-1_p', 'usd-card', 2000, '2026-09-25', 'Hogar', 'Electro'), payoff: { operationId: 'p-1', planId: 'tv', component: 'principal' } };
+  const snapshot: LedgerSnapshot = { accounts, entries: [purchase, refund, payoff] };
+  const rows = [rate('ARS', '2026-09-10', '1400'), rate('ARS', '2026-09-20', '1500'), rate('ARS', '2026-09-25', '1500')];
+
+  it('converts a devolución at its own date (not the purchase’s), keeps its metadata, and nets in ARS', () => {
+    const view = consolidatedLedger(snapshot, 'ARS', rateBook(rows));
+    expect(view.unconverted).toEqual([]);
+    const byId = Object.fromEntries(view.snapshot.entries.map(entry => [entry.id, entry]));
+    // 100,00 × 1400 = 140.000,00; −40,00 × 1500 (its own date) = −60.000,00; 20,00 × 1500 = 30.000,00.
+    expect([byId['buy'].amountMinor, byId['r-1'].amountMinor, byId['p-1_p'].amountMinor]).toEqual([14000000, -6000000, 3000000]);
+    expect(byId['r-1'].refund).toEqual({ operationId: 'r-1', targetEntryId: 'buy' });
+    expect(byId['p-1_p'].payoff).toEqual({ operationId: 'p-1', planId: 'tv', component: 'principal' });
+    const report = spendingReport(view.snapshot, 'ARS', '2026-09', '2026-09-30');
+    expect(report).toMatchObject({ expenseMinor: 14000000 - 6000000 + 3000000, count: 2,
+      categories: [{ key: 'ropa', amountMinor: 8000000, count: 1 }, { key: 'hogar', amountMinor: 3000000, count: 1 }] });
+    expect(spendingFacts(view.snapshot, { currency: 'ARS', startISO: '2026-09-01', endISO: '2026-09-30' }))
+      .toMatchObject({ grossPurchasesMinor: 17000000, refundsMinor: 6000000, refundCount: 1, purchaseCount: 2 });
+    expect(view.provenance('2026-09-20', '2026-09-20', 'expense')).toEqual({ converted: 1, oldest: '2026-09-20', newest: '2026-09-20', sources: ['Prueba'] });
+  });
+
+  it('a full devolución on the purchase’s own day nets to exactly 0, rounding being symmetric', () => {
+    const sameDay: LedgerSnapshot = { accounts, entries: [expense('odd', 'usd-card', 333, '2026-09-10', 'Ropa'),
+      { ...expense('r-2', 'usd-card', -333, '2026-09-10', 'Ropa'), refund: { operationId: 'r-2', targetEntryId: 'odd' } }] };
+    const view = consolidatedLedger(sameDay, 'ARS', rateBook([rate('ARS', '2026-09-10', '1400.5')]));
+    expect(view.snapshot.entries.map(entry => entry.amountMinor)).toEqual([466367, -466367]);
+    expect(spendingReport(view.snapshot, 'ARS', '2026-09', '2026-09-30')).toMatchObject({ expenseMinor: 0, count: 1 });
+  });
+
+  it('a devolución without a rate for its date makes the period’s expenses incomplete, like any expense', () => {
+    // No rate after 2026-09-10: the devolución (20th) and the adelanto (25th) are more than a week later.
+    const view = consolidatedLedger(snapshot, 'ARS', rateBook([rate('ARS', '2026-09-10', '1400')]));
+    expect(view.unconverted.map(item => [item.entryId, item.kind, item.dateISO, item.reason])).toEqual([
+      ['r-1', 'expense', '2026-09-20', 'missing'], ['p-1_p', 'expense', '2026-09-25', 'missing']]);
+    expect(view.complete('2026-09-01', '2026-09-30', 'expense')).toBe(false);
+    expect(view.complete('2026-09-01', '2026-09-19', 'expense')).toBe(true);
+    expect(view.complete('2026-09-01', '2026-09-30', 'income')).toBe(true);
+    expect(view.missingIn('2026-09-15', '2026-09-22', 'expense').map(item => item.entryId)).toEqual(['r-1']);
   });
 });

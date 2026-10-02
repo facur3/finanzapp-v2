@@ -4,7 +4,7 @@ import { expensesInPeriod, isStorableCurrency, spendingOverview, validDateISO, t
 import { useMemo } from 'react';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { useFinanceView } from '../src/fx/rates-provider';
-import { listingSnapshot } from '../src/fx/finance-view';
+import { lineCounts, listingSnapshot, recordedCountLabel } from '../src/fx/finance-view';
 import { AppText, CategoryBadge, EmptyState, Money, Screen, SectionTitle } from '../src/ui/components';
 import { withCurrencyCode } from '../src/i18n/format';
 import { useI18n } from '../src/i18n/provider';
@@ -47,7 +47,8 @@ export default function SpendingDetailScreen() {
     </View>
     <View style={{ gap: 10 }}>
       {total !== null ? <Money minor={total} currency={currency} large /> : <AppText secondary>{t('spendingDetail.totalUnavailable')}</AppText>}
-      <AppText secondary variant="subhead">{t('spendingDetail.count', { count: entries.length })}</AppText>
+      {/* 24T3 (A23): purchases and devoluciones counted apart (the same words as Reportes' drill-downs); every line stays listed. */}
+      <AppText secondary variant="subhead">{recordedCountLabel(lineCounts(entries), t)}</AppText>
     </View>
     {entries.length ? <SectionTitle>{t('spendingDetail.movements')}</SectionTitle> : <AppText secondary>{t('spendingDetail.none')}</AppText>}
   </View>} />;

@@ -1,14 +1,14 @@
 import { useMemo } from 'react';
 import { View } from 'react-native';
 import { Redirect, router, Stack, useLocalSearchParams } from 'expo-router';
-import { accountBalanceMinor, currentMonthISO, isLiveAccount } from '@finanzapp/domain';
+import { accountBalanceMinor, isLiveAccount } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { AccountBadge, AppText, DetailRow, EmptyState, IconButton, LifecycleNote, Money, Screen, SectionTitle, Stat, Surface, StatRow } from '../../src/ui/components';
 import { withCurrencyCode } from '../../src/i18n/format';
 import { useI18n } from '../../src/i18n/provider';
 import { QuickActions } from '../../src/ui/quick-actions';
 import { EntryList } from '../../src/ui/entry-list';
-import { selectEntries, selectTransfers } from '../../src/ui/presentation';
+import { accountMonthFacts, selectEntries, selectTransfers } from '../../src/ui/presentation';
 import { space, useCurrentDay, usePalette } from '../../src/ui/theme';
 
 /** A cash account as a financial object: its recorded balance, this month's
@@ -22,30 +22,24 @@ import { space, useCurrentDay, usePalette } from '../../src/ui/theme';
  * `CardStatusBlock`): «Saldo registrado · ARS» with the badge, the balance at 40 pt (the expense tone only when it is
  * really negative), then Gastos · Ingresos este mes with no surface of their own. «Gastos este mes» is a labelled sum
  * of expenses, unsigned in ink like Recurrentes' «Gastos» (24UX6C keeps signs for balances, nets and differences);
- * «Ingresos este mes» keeps its «+» in green. A deleted account says so once, calmly, in a `LifecycleNote` at the top
- * (the state, under the navigation title that names it); its balance keeps its label and its month facts stay, as
- * history. */
+ * «Ingresos este mes» keeps its «+» in green. 24T3 (A24): devoluciones net the month's expenses, so when they exceed what
+ * was bought the same fact reads «Devoluciones netas este mes» with the excess, still unsigned ink (the words carry it, not
+ * a colour or a minus; never income), and VoiceOver hears that the devoluciones exceed what was spent and by how much.
+ * A deleted account says so once, calmly, in a `LifecycleNote` at the top (the state, under the navigation title that
+ * names it); its balance keeps its label and its month facts stay, as history. */
 export default function AccountScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { snapshot, archive } = useLedger();
   const day = useCurrentDay();
   const p = usePalette();
-  const { t } = useI18n();
+  const { t, spokenMoney, speechLanguage } = useI18n();
   const entries = useMemo(() => snapshot ? selectEntries(snapshot.entries, snapshot.accounts, 'all', '', id) : [], [snapshot, id]);
   const transfers = useMemo(() => snapshot ? selectTransfers(snapshot.transfers ?? [], snapshot.accounts, '', id) : [], [snapshot, id]);
   const account = snapshot?.accounts.find(item => item.id === id);
   const recurringCount = archive?.recurring?.filter(rule => rule.accountId === id && rule.active).length ?? 0;
   const card = archive?.cards?.find(item => item.accountId === id);
   const debt = archive?.debts?.find(item => item.accountId === id);
-  const month = useMemo(() => {
-    const monthISO = currentMonthISO(day);
-    let expense = 0, income = 0;
-    for (const entry of entries) {
-      if (entry.dateISO.slice(0, 7) !== monthISO || entry.dateISO > day) continue;
-      if (entry.kind === 'expense') expense += entry.amountMinor; else income += entry.amountMinor;
-    }
-    return Number.isSafeInteger(expense) && Number.isSafeInteger(income) ? { expense, income } : null;
-  }, [entries, day]);
+  const month = useMemo(() => accountMonthFacts(entries, day), [entries, day]);
   if (card) return <Redirect href={{ pathname: '/card/[id]', params: { id: card.id } }} />;
   if (debt) return <Redirect href={{ pathname: '/debt/[id]', params: { id: debt.id } }} />;
   if (!account || !snapshot) return <Screen><EmptyState title={t('accounts.detail.notFoundTitle')}
@@ -67,8 +61,13 @@ export default function AccountScreen() {
           <Money minor={balance} currency={account.currency} large size={40} color={balance < 0 ? p.expense : undefined} />
         </View>
         {month && <StatRow>
-          <Stat label={t('accounts.detail.monthExpenses')}><Money minor={month.expense} currency={account.currency} size={17} /></Stat>
-          <Stat label={t('accounts.detail.monthIncome')}><Money minor={month.income} currency={account.currency} size={17} tone={month.income ? 'income' : 'neutral'} signed={month.income > 0} /></Stat>
+          {month.spending.kind === 'netRefunds'
+            ? <View accessible accessibilityLanguage={speechLanguage}
+              accessibilityLabel={t('accounts.detail.monthNetRefundsSpoken', { amount: spokenMoney(month.spending.minor, account.currency) })}>
+              <Stat label={t('accounts.detail.monthNetRefunds')}><Money minor={month.spending.minor} currency={account.currency} size={17} /></Stat>
+            </View>
+            : <Stat label={t('accounts.detail.monthExpenses')}><Money minor={month.spending.minor} currency={account.currency} size={17} /></Stat>}
+          <Stat label={t('accounts.detail.monthIncome')}><Money minor={month.incomeMinor} currency={account.currency} size={17} tone={month.incomeMinor ? 'income' : 'neutral'} signed={month.incomeMinor > 0} /></Stat>
         </StatRow>}
       </View>
       {live && <QuickActions accountId={id} currency={account.currency} />}

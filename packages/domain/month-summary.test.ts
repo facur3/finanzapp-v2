@@ -48,3 +48,22 @@ describe('native monthly recorded flow', () => {
     expect(JSON.stringify(data)).toBe(before);
   });
 });
+
+describe('24T3: devoluciones and adelantos (A23)', () => {
+  const refundLine = (id: string, target: string, amountMinor: number, dateISO = '2026-09-12') =>
+    entry({ id, amountMinor: -amountMinor, dateISO, refund: { operationId: id, targetEntryId: target } });
+  it('a devolución nets the month’s expenses, is never income and is not counted; an adelanto counts once', () => {
+    const data = { ...snapshot, entries: [entry({ id: 'buy', amountMinor: 30000, dateISO: '2026-09-02' }), refundLine('r', 'buy', 12000),
+      entry({ id: 'p_p', amountMinor: 90000, payoff: { operationId: 'p', planId: 'tv', component: 'principal' } }),
+      entry({ id: 'p_i', amountMinor: 900, payoff: { operationId: 'p', planId: 'tv', component: 'interest' } }),
+      entry({ id: 'in', kind: 'income', amountMinor: 5000 })] };
+    // 30.000 − 12.000 + 90.000 + 900 = 108.900; count: the purchase, the adelanto once and the income.
+    expect(summarizeMonth(data, 'ARS', '2026-09-12')).toMatchObject({ status: 'ready', expenseMinor: 108900, incomeMinor: 5000, count: 3 });
+  });
+  it('a month made only of a devolución has a negative net and no counted movement', () => {
+    const data = { ...snapshot, entries: [entry({ id: 'buy', amountMinor: 30000, dateISO: '2026-08-20' }), refundLine('r', 'buy', 30000, '2026-09-03')] };
+    expect(summarizeMonth(data, 'ARS', '2026-09-12')).toEqual({ currency: 'ARS', startISO: '2026-09-01', endISO: '2026-09-12', status: 'ready',
+      incomeMinor: 0, expenseMinor: -30000, count: 0 });
+    expect(summarizeMonth(data, 'ARS', '2026-08-31')).toMatchObject({ expenseMinor: 30000, count: 1 });
+  });
+});

@@ -214,8 +214,8 @@ un build de EAS.
 
 La línea **24UX6A → 24UX6B → 24UX6C → 24UX6D** se suma al roadmap de producto; no lo reemplaza:
 24T3, 25A, 25C/25C2, 25D, 25E/25F y Producto 26 siguen como están.
-*(→ 2026-10-01: la línea quedó 24UX6A → 24UX6B → 24UX6C → 24UX6C2 → 24UX6D → 24UX6E, toda antes de 24T3; 24UX6A–24UX6D
-mergeadas (PRs #70–#74); 24UX6E, su última pasada, en «Enmienda 2026-10-01 — Producto 24UX6E».)*
+*(→ 2026-10-01: la línea quedó 24UX6A → 24UX6B → 24UX6C → 24UX6C2 → 24UX6D → 24UX6E, toda antes de 24T3; 24UX6A–24UX6E
+mergeadas (PRs #70–#75); 24UX6E, su última pasada, en «Enmienda 2026-10-01 — Producto 24UX6E».)*
 
 - **24UX6B, Reportes.** Se conservan presupuestos, observaciones y flujo neto (se reordenan o
   reestilan; nunca se quitan porque una maqueta los omita). La dona seleccionable solo como

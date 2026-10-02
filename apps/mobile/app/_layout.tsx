@@ -134,6 +134,11 @@ function Navigation() {
       <Stack.Screen name="edit-debt/[id]" options={{ title: t('nav.titles.editDebt'), presentation: 'modal' }} />
       <Stack.Screen name="edit-transfer/[id]" options={{ title: t('nav.titles.editTransfer'), presentation: 'modal' }} />
       <Stack.Screen name="transfer/[id]" options={{ title: t('nav.titles.transfer') }} />
+      {/* 24T3: a devolución (of a purchase or of an instalment plan) and an adelanto de cuotas are reviewed forms over the
+          screen that opened them; the operation's own detail is pushed, like a movement's. */}
+      <Stack.Screen name="new-refund" options={{ title: t('operations.titles.refund'), presentation: 'modal' }} />
+      <Stack.Screen name="plan-payoff/[id]" options={{ title: t('operations.titles.payoff'), presentation: 'modal' }} />
+      <Stack.Screen name="operation/[id]" options={{ title: t('operations.titles.operation') }} />
     </Stack>
   </View></ThemeProvider>;
 }

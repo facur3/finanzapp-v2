@@ -63,8 +63,8 @@ describe('credit card accounting', () => {
     const overpaid: LedgerSnapshot = { accounts, entries: [], transfers: [{ ...payment, amountMinor: 25000 }] };
     expect(cardDebtMinor(card, overpaid)).toBe(0);
     expect(cardCreditMinor(card, overpaid)).toBe(5000);
-    expect(cardAvailableLimitMinor(card, overpaid)).toBe(500000);
-    expect(cardAvailableLimitMinor({ ...card, creditLimitMinor: null }, overpaid)).toBeNull();
+    expect(cardAvailableLimitMinor(card, overpaid, [], [], [])).toBe(500000);
+    expect(cardAvailableLimitMinor({ ...card, creditLimitMinor: null }, overpaid, [], [], [])).toBeNull();
   });
 
   it('Disponible excludes card, debt and receivable accounts while validation still covers every account', () => {

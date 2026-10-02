@@ -42,6 +42,8 @@ export const backup = {
         budgets: 'Presupuestos nuevos',
         /** 24T2: purchases in instalments the copy adds (each with its schedule). */
         plans: 'Planes de cuotas nuevos',
+        /** 24T3: devoluciones and adelantos de cuotas the copy adds (live ones; undone ones count in «Deshechos a conservar»). */
+        operations: 'Devoluciones y adelantos nuevos',
         voided: 'Deshechos a conservar',
         present: 'Registros ya presentes',
       },
@@ -59,7 +61,7 @@ export const backup = {
       nothingNew: 'Esta copia ya está incorporada. No hay nada nuevo para agregar.',
       reviewAgain: 'Volver a revisar',
       confirmImport: 'Confirmar importación',
-      formats: 'Copias de FinanzApp v1 a v13 · JSON de hasta 5 MB.',
+      formats: 'Copias de FinanzApp v1 a v14 · JSON de hasta 5 MB.',
       /** Review row: the currency scales a v9 copy pins that this device has not pinned yet. */
       units: 'Escalas de moneda nuevas',
       /** Shown instead of the import button when the copy pins a currency at another number of decimals than this device. {codes} lists them. */

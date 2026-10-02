@@ -164,6 +164,9 @@ export default function HomeScreen() {
         </View>
         {!scope && help}
       </ValueTransition>
+      {/* 24T3 (A24): the one exception to «no line under the number» (24UX6C). Gastado is the month's exact net, and
+          devoluciones of earlier purchases can leave it below zero; one quiet line says why, only then. */}
+      {spending && hero.status === 'ready' && hero.minor < 0 && <AppText variant="footnote" style={{ color: p.heroSecondary }}>{t('home.refundsExceed')}</AppText>}
       {/* 5. What the number counts: it switches the number only. */}
       <Choices onField value={metric} onChange={setMetric}
         options={[{ value: 'spending', label: t('home.spending') }, { value: 'available', label: t('home.available') }]} />

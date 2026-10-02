@@ -1,4 +1,7 @@
-import { currenciesPresent, liveAccounts, labelFromISO, type Account, type Currency, type Entry, type EntryKind, type Transfer } from '@finanzapp/domain';
+import { CARD_DELETED_MESSAGE, OPERATION_ACCOUNT_DELETED_MESSAGE, OPERATION_CHANGED_MESSAGE, OPERATION_HISTORY_DELETED_MESSAGE, OPERATION_PLAN_STOPPED_MESSAGE, OPERATION_STATE_MESSAGE, OPERATION_TARGET_MESSAGE, PLAN_CALENDAR_MESSAGE,
+  PLAN_CARD_MESSAGE, PLAN_DELETED_MESSAGE, PLAN_MISSING_MESSAGE, PLAN_OPERATION_DATE_MESSAGE, REFUND_AMOUNT_MESSAGE, REFUND_DATE_MESSAGE, REFUND_OVER_MESSAGE,
+  REFUND_TARGET_MESSAGE, currenciesPresent, currentMonthISO, liveAccounts, labelFromISO, operationGuardMessages, type Account, type Currency, type Entry, type EntryKind,
+  type Transfer } from '@finanzapp/domain';
 import { dateFromISO, daysAgo, formatDate, relativeDayName } from '../i18n/format.ts';
 import { DEFAULT_LOCALE, type AppLocale } from '../i18n/locale.ts';
 
@@ -35,19 +38,53 @@ export function dayNetMinor(entries: Entry[], accounts: Account[]): { currency: 
   return { currency, minor: Number(total) };
 }
 export type EntrySection = { dateISO: string; data: Entry[] };
+
+/** What a cash account's month says about its expenses (24T3, A24). Devoluciones are negative expense lines in the
+ * month and account they are dated in, so the month's expense total is a net that can fall below zero when they exceed
+ * what was bought. The value is never clamped or turned into income: below zero it is presented as «Devoluciones netas
+ * este mes» with its magnitude (`netRefunds`), at zero or above as the ordinary «Gastos este mes» (`spent`). */
+export type MonthSpending = { kind: 'spent' | 'netRefunds'; minor: number };
+export function monthSpending(netExpenseMinor: number): MonthSpending {
+  return netExpenseMinor < 0 ? { kind: 'netRefunds', minor: -netExpenseMinor } : { kind: 'spent', minor: netExpenseMinor };
+}
+
+/** An account's facts for the month of `todayISO`, from its own lines (already filtered to it): the net of its expense
+ * lines (purchases minus the devoluciones dated this month, `monthSpending`) and its income, up to today. Summed exactly
+ * (BigInt, as `dayNetMinor`): with negative devolución lines a running sum can pass the safe range and come back, so only
+ * the exact totals are checked. Null when one leaves the safe integer range (never a misleading number). */
+export function accountMonthFacts(entries: readonly Entry[], todayISO: string): { spending: MonthSpending; incomeMinor: number } | null {
+  const monthISO = currentMonthISO(todayISO);
+  let expense = 0n, income = 0n;
+  for (const entry of entries) {
+    if (entry.dateISO.slice(0, 7) !== monthISO || entry.dateISO > todayISO) continue;
+    if (!Number.isSafeInteger(entry.amountMinor)) return null;
+    if (entry.kind === 'expense') expense += BigInt(entry.amountMinor); else income += BigInt(entry.amountMinor);
+  }
+  const limit = BigInt(Number.MAX_SAFE_INTEGER);
+  const safe = (total: bigint) => !(total > limit || -total > limit);
+  return safe(expense) && safe(income) ? { spending: monthSpending(Number(expense)), incomeMinor: Number(income) } : null;
+}
 const searchable = (text: string) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es-AR');
+
+/** 24T3: the words a devolución's or an adelanto's line answers to in the search besides its merchant and category: the
+ * kind word in Spanish and in English (the two catalogue languages), and `operationWords` for the interface language. */
+const REFUND_WORDS = 'devolucion refund';
+const PAYOFF_WORDS = 'adelanto de cuotas installments brought forward';
 
 // Filtering never changes stored data or adds currencies together. `categoryLabel`
 // adds the name a category shows (a built-in one in the interface language) to the
 // searchable text, so "food" finds a Comida movement when the app reads English.
+// 24T3: a devolución or an adelanto de cuotas is an expense line (a contra-expense, a recognised purchase): it is listed
+// under «Gastos» and «Todos», never under «Ingresos», and the search finds it by its kind word too.
 export function selectEntries(entries: Entry[], accounts: Account[], filter: EntryFilter = 'all', query = '', accountId?: string,
-  categoryLabel?: (entry: Entry) => string) {
+  categoryLabel?: (entry: Entry) => string, operationWords?: { refund: string; payoff: string }) {
   const names = new Map(accounts.map(account => [account.id, account.name]));
   const terms = searchable(query).trim().split(/\s+/).filter(Boolean);
   if (filter === 'transfer') return [];
   return entries.filter(entry => {
     if ((filter !== 'all' && entry.kind !== filter) || (accountId && entry.accountId !== accountId)) return false;
-    const text = searchable([entry.merchant, entry.category, categoryLabel?.(entry) ?? '', names.get(entry.accountId) ?? ''].join(' '));
+    const kindWords = entry.refund ? REFUND_WORDS + ' ' + (operationWords?.refund ?? '') : entry.payoff ? PAYOFF_WORDS + ' ' + (operationWords?.payoff ?? '') : '';
+    const text = searchable([entry.merchant, entry.category, categoryLabel?.(entry) ?? '', names.get(entry.accountId) ?? '', kindWords].join(' '));
     return terms.every(term => text.includes(term));
   }).sort((a, b) => {
     if (a.dateISO !== b.dateISO) return a.dateISO < b.dateISO ? 1 : -1;
@@ -168,4 +205,18 @@ export function sharedGlyphs(rows: readonly { category: string; glyph: string }[
   const categories = new Map<string, Set<string>>();
   for (const row of rows) categories.set(row.glyph, (categories.get(row.glyph) ?? new Set()).add(row.category));
   return new Set([...categories].filter(([, names]) => names.size > 1).map(([glyph]) => glyph));
+}
+
+/** 24T3 (A13): the refusals that storage decides before writing anything and that a new attempt can resolve once the person
+ * reviews the draft (the card's calendar changed, the instalments changed, an amount over what can be returned, a date out
+ * of range, a purchase with devoluciones, a deleted account, card or plan, a stopped plan, an undo or restore of a devolución
+ * or adelanto that changed since it was shown). A form that gets one releases its
+ * frozen submission so the fields unlock and the next Save builds it again from the current ledger, with the same id.
+ * Anything else (a refresh that failed after the commit, an unknown outcome) keeps the submission frozen for an exact retry. */
+const DETERMINISTIC_REFUSALS = new Set<string>([PLAN_CALENDAR_MESSAGE, OPERATION_CHANGED_MESSAGE, REFUND_OVER_MESSAGE, REFUND_AMOUNT_MESSAGE, REFUND_DATE_MESSAGE,
+  REFUND_TARGET_MESSAGE, PLAN_OPERATION_DATE_MESSAGE, OPERATION_ACCOUNT_DELETED_MESSAGE, OPERATION_PLAN_STOPPED_MESSAGE, OPERATION_TARGET_MESSAGE,
+  CARD_DELETED_MESSAGE, PLAN_CARD_MESSAGE, PLAN_DELETED_MESSAGE, PLAN_MISSING_MESSAGE, OPERATION_STATE_MESSAGE, OPERATION_HISTORY_DELETED_MESSAGE,
+  ...operationGuardMessages()]);
+export function releasesDraft(message: string): boolean {
+  return DETERMINISTIC_REFUSALS.has(message);
 }

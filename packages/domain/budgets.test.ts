@@ -213,3 +213,31 @@ describe('total monthly budget', () => {
     expect(Object.hasOwn(scopedMonthlyBudget({ ...storedTotal, category: null }), 'category')).toBe(false);
   });
 });
+
+describe('24T3: devoluciones in monthly budgets', () => {
+  const line = (id: string, amountMinor: number, category: string, dateISO = '2026-09-20', refund?: Entry['refund']): Entry =>
+    ({ id, accountId: 'ars', kind: 'expense', amountMinor, merchant: 'Tienda', category, dateISO, createdAt: account.createdAt, ...(refund ? { refund } : {}) });
+  const total: TotalMonthlyBudget = { id: 'total', scope: 'total', currency: 'ARS', monthISO: '2026-09', amountMinor: 20000, active: true,
+    createdAt: budget.createdAt, revision: 0, updatedAt: budget.updatedAt };
+  it('a devolución in the same month lowers the category’s spent; ratio and state follow', () => {
+    // Comida: 3.000 + 2.500 − 4.000 = 1.500 of 5.000.
+    const refunded: LedgerSnapshot = { ...snapshot, entries: [...entries, line('r', -4000, 'Comida', '2026-09-20', { operationId: 'r', targetEntryId: 'food-a' })] };
+    const summary = summarizeMonthlyBudgets(refunded, [budget, total], 'ARS', '2026-09');
+    expect(summary.rows[0]).toMatchObject({ spentMinor: 1500, remainingMinor: 3500, ratio: 0.3, exceeded: false });
+    expect(summary.total).toMatchObject({ spentMinor: 2700, remainingMinor: 17300, exceeded: false });
+    expect([summary.totalSpentMinor, summary.spentBudgetedMinor, summary.unbudgetedSpentMinor]).toEqual([2700, 1500, 1200]);
+  });
+  it('a later devolución can leave a category below zero: ratio clamps at 0, remaining stays limit − spent, unbudgeted clamps at 0', () => {
+    // October: Comida 5.000 (the 'october' entry) − 12.000 refunded = −7.000; Ropa −9.000 is unbudgeted.
+    const october: LedgerSnapshot = { ...snapshot, entries: [...entries, line('clothes', 9000, 'Ropa', '2026-09-25'),
+      line('r1', -12000, 'Comida', '2026-10-05', { operationId: 'r1', targetEntryId: 'food-a' }),
+      line('r2', -9000, 'Ropa', '2026-10-06', { operationId: 'r2', targetEntryId: 'clothes' })] };
+    const food = { ...budget, monthISO: '2026-10' };
+    const summary = summarizeMonthlyBudgets(october, [food, { ...total, monthISO: '2026-10' }], 'ARS', '2026-10');
+    expect(summary.rows[0]).toMatchObject({ spentMinor: -7000, remainingMinor: 12000, ratio: 0, exceeded: false });
+    expect(budgetState(summary.rows[0])).toBe('calm');
+    expect(summary.total).toMatchObject({ spentMinor: -16000, remainingMinor: 36000, ratio: 0, exceeded: false });
+    // Not −9.000: devoluciones outside the budgeted categories never show as negative «sin presupuesto».
+    expect([summary.totalSpentMinor, summary.spentBudgetedMinor, summary.remainingMinor, summary.unbudgetedSpentMinor]).toEqual([-16000, -7000, 12000, 0]);
+  });
+});

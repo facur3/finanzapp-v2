@@ -22,10 +22,10 @@ export default function CardsScreen() {
   const { archive, snapshot } = useLedger();
   const { t } = useI18n();
   const day = useCurrentDay();
-  const cards = useMemo(() => snapshot ? activeCards(archive?.cards, snapshot, day, archive?.installmentPlans, archive?.records, archive?.cardCycleDates) : [],
-    [archive?.cards, archive?.installmentPlans, archive?.records, archive?.cardCycleDates, snapshot, day]);
-  const archived = useMemo(() => snapshot ? archivedCards(archive?.cards, snapshot, day, archive?.installmentPlans, archive?.records, archive?.cardCycleDates) : [],
-    [archive?.cards, archive?.installmentPlans, archive?.records, archive?.cardCycleDates, snapshot, day]);
+  const cards = useMemo(() => snapshot ? activeCards(archive?.cards, snapshot, day, archive?.installmentPlans, archive?.records, archive?.purchaseOperations, archive?.cardCycleDates) : [],
+    [archive?.cards, archive?.installmentPlans, archive?.records, archive?.purchaseOperations, archive?.cardCycleDates, snapshot, day]);
+  const archived = useMemo(() => snapshot ? archivedCards(archive?.cards, snapshot, day, archive?.installmentPlans, archive?.records, archive?.purchaseOperations, archive?.cardCycleDates) : [],
+    [archive?.cards, archive?.installmentPlans, archive?.records, archive?.purchaseOperations, archive?.cardCycleDates, snapshot, day]);
   // The selection is a card, not a position: a card that leaves the deck (archived, deleted) hands the front to the first one.
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // The deck's box, and its top inside the scrolled content (so the scroll offset follows from two window measurements).

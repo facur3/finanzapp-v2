@@ -15,6 +15,7 @@ import { bindLocale } from '../src/i18n/bind.ts';
 import type { AppLocale } from '../src/i18n/locale.ts';
 import { realModule } from './real-module.ts';
 import * as movementAmount from '../src/ui/movement-amount.ts';
+import * as operationPresentation from '../src/ui/operation-presentation.ts';
 
 // Producto 24T2: the card surfaces with instalment plans (Tarjetas, a card's detail, a plan's detail and the movement an
 // instalment recorded), their real handlers against descriptor hosts. The snapshot pieces (card-panel) and the rows
@@ -42,7 +43,9 @@ const archive: domain.LedgerArchive = { accounts: [cash, cardAccount, amexAccoun
   cards: [card, amex], installmentPlans: [tv] };
 
 function harness(file: string, options: { params?: Record<string, string>; data?: domain.LedgerArchive | null; day?: string; locale?: AppLocale;
-  remove?: (id: string) => Promise<void>; stacked?: boolean } = {}) {
+  remove?: (id: string) => Promise<void>; stacked?: boolean;
+  /** 24T3: the plan's writes (an adelanto, a stop, a reactivation), recorded in `writes`; a throw is a failed write. */
+  write?: (action: 'payoff' | 'stop' | 'reactivate', arg: unknown) => Promise<void> } = {}) {
   const source = readFileSync(new URL('../app/' + file, import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   let data = (options.data === undefined ? archive : options.data) as domain.LedgerArchive;
@@ -52,12 +55,17 @@ function harness(file: string, options: { params?: Record<string, string>; data?
   const state: unknown[] = [], refs: { current: unknown }[] = [];
   let cursor = 0, refCursor = 0, backs = 0, haptics = 0, uuid = 0;
   const pushed: unknown[] = [], alerts: { title: string; message: string; buttons: any[] }[] = [], updates: domain.EntryChange[] = [], removals: string[] = [];
+  const writes: { action: 'payoff' | 'stop' | 'reactivate'; arg: unknown }[] = [];
+  const write = async (action: 'payoff' | 'stop' | 'reactivate', arg: unknown) => { writes.push({ action, arg }); await options.write?.(action, arg); };
   const jsx = (type: unknown, props: Record<string, unknown>) => ({ type, props });
   const ledger = { useLedger: () => ({ archive: data, snapshot: data ? domain.snapshotFromArchive(data) : null,
     updateEntry: async (change: domain.EntryChange) => { updates.push(change); },
-    removeInstallmentPlan: async (id: string) => { removals.push(id); await options.remove?.(id); } }) };
-  const componentNames = ['AccountBadge', 'ActionButton', 'AppText', 'DetailRow', 'EmptyState', 'ErrorMessage', 'GlyphTile', 'IconButton', 'MerchantBadge', 'Money',
-    'MovementRow', 'PressFeedback', 'Screen', 'SectionTitle', 'Stat', 'StatRow', 'Surface'];
+    removeInstallmentPlan: async (id: string) => { removals.push(id); await options.remove?.(id); },
+    addPayoff: (payoff: domain.PlanPayoff) => write('payoff', payoff),
+    cancelInstallmentPlan: (planId: string, expectedRevision: number) => write('stop', { planId, expectedRevision }),
+    reactivateInstallmentPlan: (planId: string, expectedRevision: number) => write('reactivate', { planId, expectedRevision }) }) };
+  const componentNames = ['AccountBadge', 'ActionButton', 'AppText', 'CheckRow', 'DetailRow', 'EmptyState', 'ErrorMessage', 'GlyphTile', 'IconButton', 'LifecycleNote',
+    'MerchantBadge', 'Money', 'MovementRow', 'PressFeedback', 'Screen', 'SectionTitle', 'Stat', 'StatRow', 'Surface'];
   // `stacked`: the largest text sizes or an amount too wide for its row (the real rule is in components.tsx).
   const components = { ...Object.fromEntries(componentNames.map(name => [name, name])), toneColors: () => ({ color: '#c00', soft: '#fee' }), useStacked: () => options.stacked ?? false };
   const palette = { isDark: false, text: '#000', secondary: '#666', tertiary: '#999', line: '#ddd', inset: '#eee', expense: '#c00', income: '#080', warning: '#a60', warningSoft: '#fec',
@@ -94,6 +102,10 @@ function harness(file: string, options: { params?: Record<string, string>; data?
     ...both('ui/liability-presentation', liabilityPresentation), ...both('ui/installment-presentation', installmentPresentation), ...both('ui/presentation', presentation),
     ...both('ui/budget-presentation', budgetPresentation), ...both('ui/motion', motion), ...both('ui/theme', theme), ...both('ui/category-hues', hues),
     ...both('i18n/format', i18nFormat), ...both('i18n/provider', i18nProvider),
+    // 24T3: the adelanto sheet's date row (a descriptor; its bounds are props).
+    ...both('ui/form-controls', { DateField: 'DateField' }),
+    // 24T3: the operations lane's pure reader (instalment number runs, the movement detail's refund check), run for real.
+    ...both('ui/operation-presentation', operationPresentation),
     // What the real card-panel.tsx and card-rows.tsx import from src/ui.
     './components': components, './theme': theme, './card-faces': cardFaces, './liability-presentation': liabilityPresentation, './motion': motion,
     // 24UX6D: the plan detail's progress reads the pure `planProgress` (card-rows.tsx).
@@ -111,7 +123,7 @@ function harness(file: string, options: { params?: Record<string, string>; data?
     render: () => { cursor = 0; refCursor = 0; return module.exports.default(); },
     setData: (next: domain.LedgerArchive | null) => { data = next as domain.LedgerArchive; },
     setLocale: (next: AppLocale) => { locale = next; },
-    pushed, alerts, updates, removals, backs: () => backs, haptics: () => haptics,
+    pushed, alerts, updates, removals, writes, backs: () => backs, haptics: () => haptics,
   };
 }
 
@@ -360,7 +372,7 @@ test('plan detail: the price first, then only its figures (recorded, future, rem
   const liveSegments = [byName(root, 'PlanBar')[0].rendered!.props.children].flat().map((segment: Node) => Object.assign({}, ...[segment.props.style].flat()));
   assert.equal(liveSegments.map(style => style.backgroundColor === '#000' ? 'ink' : style.borderColor === '#999' && !style.borderStyle ? 'outline' : '?').join(','),
     'ink,ink' + ',outline'.repeat(10), '24UX6D review: still to come is a solid tertiary outline, distinct from recorded and from cancelled');
-  assert.equal(nodes(progress).find(node => node.type === 'Money')!.props.minor, installmentPresentation.planSummary(tv, withPlans.records).figures.remainingMinor);
+  assert.equal(nodes(progress).find(node => node.type === 'Money')!.props.minor, installmentPresentation.planSummary(tv, withPlans.records, withPlans.purchaseOperations ?? []).figures.remainingMinor);
   assert.deepEqual(rowsOf(root), [
     'Tarjeta=Visa Gold', 'Categoría=Hogar', 'Fecha de compra=10 ago 2026 (10 de agosto de 2026)', 'Precio=$ 1.200.000,00 (1200000,00 pesos)',
     'Ya registrado=$ 200.000,00 (200000,00 pesos)', 'Cuotas futuras=$ 1.000.000,00 (1000000,00 pesos)',
@@ -387,8 +399,16 @@ test('plan detail: the price first, then only its figures (recorded, future, rem
   assert.equal(third.props.accessibilityLabel, 'Cuota 3 de 12, 100000,00 pesos, Próxima, cierra 28 de octubre de 2026, vence 5 de noviembre de 2026');
   const last = rows.at(-1)!.rendered!;
   assert.deepEqual(texts(last), ['Cuota 12 de 12', 'Cierra 28 jul 2027 · vence 5 ago 2027', 'Futura'], 'a date in another year carries it');
-  // Something recorded already: no action is offered (cancelling is 24T3).
-  assert.equal(nodes(root).some(node => node.type === 'ActionButton'), false);
+  // 24T3 (deliberate change: 24T2 offered no action once something was recorded): a live plan with history offers its
+  // three operations, each because storage would accept it; the stop is never beside «Eliminar plan». A devolución and an
+  // adelanto open their own reviewed forms; nothing is written from here without its form or its alert.
+  assert.deepEqual(nodes(root).filter(node => node.type === 'ActionButton').map(node => node.props.label),
+    ['Registrar devolución', 'Registrar adelanto de cuotas', 'Dejar de seguir el plan']);
+  find(root, 'ActionButton', 'Registrar devolución').props.onPress();
+  assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/new-refund', params: { planId: 'tv' } }));
+  find(root, 'ActionButton', 'Registrar adelanto de cuotas').props.onPress();
+  assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/plan-payoff/[id]', params: { id: 'tv' } }));
+  assert.equal(view.writes.length + view.alerts.length, 0, 'opening a form writes nothing and asks nothing');
   assert.equal(JSON.stringify(texts(root)).includes('pagad'), false);
 });
 
@@ -408,10 +428,13 @@ test('plan detail: an undone instalment counts nowhere, stays pending and opens 
   assert.ok(texts(second).includes('Deshecha'));
   second.props.onPress();
   assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/entry/[id]', params: { id: 'inst_tv_002' } }));
-  // Cancelled after two instalments: they stay recorded; the rest is cancelled, never «future».
+  // Cancelled after two instalments: they stay recorded; the rest is cancelled, never «future». 24T3 (A28, deliberate
+  // copy change): the state reads «Sin seguimiento» and says what it means under the hero; the rest «No se registra».
   const cancelled = domain.cancelInstallmentPlan(tv, '2026-09-30T12:00:00.000Z');
   const stopped = harness('installment/[id].tsx', { params: { id: 'tv' }, data: { ...withPlans, installmentPlans: [cancelled, nb, phone] } }).render();
-  assert.ok(texts(stopped).includes('Cancelado'));
+  assert.ok(texts(stopped).includes('Sin seguimiento'));
+  assert.equal(find(stopped, 'LifecycleNote').props.detail, 'Las cuotas que faltaban no se registran. Las ya registradas siguen en Movimientos y en tus reportes.');
+  assert.equal(JSON.stringify(texts(stopped)).includes('Cancelad'), false);
   assert.equal(byName(stopped, 'ScheduleRow').map(row => row.props.row.state).join(','), 'recognised,recognised' + ',cancelled'.repeat(10));
   const labels = rowsOf(stopped).map(row => row.split('=')[0]);
   assert.equal(labels.includes('Cuotas futuras'), false);
@@ -426,9 +449,11 @@ test('plan detail: an undone instalment counts nowhere, stays pending and opens 
   assert.equal(stoppedSegments.slice(2).every(style => style.borderColor === '#999' && style.backgroundColor === 'transparent'), true, 'the tertiary ink, never the faint line colour');
   assert.equal(nodes(stoppedProgress).some(node => node.type === 'Money'), false);
   assert.ok(rowsOf(stopped).includes('Restante=$' + NBSP + '1.000.000,00 (1000000,00 pesos)'));
-  assert.ok(rowsOf(stopped).includes('Cancelado=$' + NBSP + '1.000.000,00 (1000000,00 pesos)'));
-  assert.ok(texts(byName(stopped, 'ScheduleRow')[5].rendered!).includes('Cancelada'));
-  assert.equal(nodes(stopped).some(node => node.type === 'ActionButton'), false);
+  assert.ok(rowsOf(stopped).includes('No se registra=$' + NBSP + '1.000.000,00 (1000000,00 pesos)'));
+  assert.ok(texts(byName(stopped, 'ScheduleRow')[5].rendered!).includes('No se registra'));
+  // 24T3 (deliberate change: 24T2 offered nothing on a cancelled plan): the recorded principal is still returnable, and the
+  // stop can be undone; no adelanto (refused on a plan without tracking) and no stop.
+  assert.deepEqual(nodes(stopped).filter(node => node.type === 'ActionButton').map(node => node.props.label), ['Registrar devolución', 'Reactivar plan']);
 });
 
 test('plan detail with interest: the total financed and the interest are their own figures, each instalment says what interest it includes', () => {
@@ -459,6 +484,9 @@ test('plan detail with interest: the total financed and the interest are their o
 test('plan detail: a plan that recorded nothing can be deleted after a confirmation; the screen holds its back gesture while writing and closes once', async () => {
   let release: () => void = () => {};
   const view = harness('installment/[id].tsx', { params: { id: 'nb' }, data: withPlans, remove: () => new Promise<void>(resolve => { release = resolve; }) });
+  // 24T3: nothing recorded yet, so it is deleted, never stopped (A16); a devolución or an adelanto may still be recorded.
+  assert.deepEqual(nodes(view.render()).filter(node => node.type === 'ActionButton').map(node => node.props.label),
+    ['Registrar devolución', 'Registrar adelanto de cuotas', 'Eliminar plan']);
   const button = find(view.render(), 'ActionButton', 'Eliminar plan');
   assert.equal(JSON.stringify([button.props.secondary, button.props.tone, button.props.icon]), JSON.stringify([true, 'expense', 'trash-outline']));
   button.props.onPress();
@@ -472,8 +500,10 @@ test('plan detail: a plan that recorded nothing can be deleted after a confirmat
   // While the write is in flight: no back gesture, no native back, the button busy.
   const writing = view.render();
   const options = nodes(writing).find(node => node.type === 'Stack.Screen')!.props.options;
-  assert.equal(JSON.stringify([options.gestureEnabled, options.headerBackVisible, find(writing, 'ActionButton').props.busy]), JSON.stringify([false, false, true]));
-  find(writing, 'ActionButton').props.onPress();
+  // 24T3: the other actions wait for it (disabled), the deletion's own button is the busy one.
+  assert.equal(JSON.stringify([options.gestureEnabled, options.headerBackVisible, find(writing, 'ActionButton', 'Eliminar plan').props.busy]), JSON.stringify([false, false, true]));
+  assert.equal(find(writing, 'ActionButton', 'Registrar devolución').props.disabled, true);
+  find(writing, 'ActionButton', 'Eliminar plan').props.onPress();
   assert.equal(view.alerts.length, 1, 'a second tap while writing asks nothing and writes nothing');
   release();
   await settle();
@@ -487,8 +517,8 @@ test('plan detail: a plan that recorded nothing can be deleted after a confirmat
   assert.equal(find(harness('installment/[id].tsx', { params: { id: 'nb' }, data: deleted }).render(), 'EmptyState').props.title, 'No encontramos este plan de cuotas');
   assert.equal(find(harness('installment/[id].tsx', { params: { id: 'missing' } }).render(), 'EmptyState').props.title, 'No encontramos este plan de cuotas');
   // Nothing recorded yet is what makes it deletable: the card detail lists it until then.
-  assert.equal(installmentPresentation.planSummary(nb, withPlans.records).deletable, true);
-  assert.equal(installmentPresentation.planSummary(tv, withPlans.records).deletable, false);
+  assert.equal(installmentPresentation.planSummary(nb, withPlans.records, withPlans.purchaseOperations ?? []).deletable, true);
+  assert.equal(installmentPresentation.planSummary(tv, withPlans.records, withPlans.purchaseOperations ?? []).deletable, false);
 });
 
 test('plan detail: a failed deletion keeps the plan and the error; Reintentar sends the same deletion again without asking twice', async () => {
@@ -524,6 +554,441 @@ test('plan detail in English: the same figures and calendar words', () => {
   const deletable = harness('installment/[id].tsx', { params: { id: 'nb' }, data: withPlans, locale: 'en-US' });
   find(deletable.render(), 'ActionButton', 'Delete plan').props.onPress();
   assert.equal(deletable.alerts[0].title, 'Delete this installment plan?');
+});
+
+// ---- 24T3: the plan's actions by state, its figures and Calendario with devoluciones and adelantos ----------------------
+
+const opNow = '2026-10-01T12:00:00.000Z';
+const money$ = (text: string) => text.replace(/\$ /g, '$' + NBSP);
+const actionsOf = (root: Node) => nodes(root).filter(node => node.type === 'ActionButton').map(node => node.props.label);
+/** An adelanto of every remaining instalment of `planId`, as the sheet builds it on Oct 1. */
+const payoffOf = (planId: string, financing: domain.PayoffFinancing, id = 'po1') =>
+  domain.newPlanPayoff(withPlans, { id, planId, financing, dateISO: '2026-10-01', todayISO: '2026-10-01', createdAt: opNow });
+
+test('24T3: an adelanto brings the rest forward: «Adelantado», 12 de 12 counted, «Adelantada» rows that open the adelanto, and only a devolución left to offer', () => {
+  const data = { ...withPlans, purchaseOperations: [payoffOf('tv', 'recognised')] };
+  const view = harness('installment/[id].tsx', { params: { id: 'tv' }, data });
+  const root = view.render();
+  assert.ok(texts(root).includes('Adelantado'), 'the plan reads brought forward, never «pagado»');
+  assert.equal(byName(root, 'PlanProgressSummary')[0].rendered!.props.accessibilityLabel, '12 de 12 registradas', 'a brought-forward instalment counts as recorded');
+  const rows = byName(root, 'ScheduleRow');
+  assert.equal(rows.map(row => row.props.row.state).join(','), 'recognised,recognised' + ',settled'.repeat(10));
+  const third = rows[2].rendered!;
+  assert.deepEqual(texts(third), ['Cuota 3 de 12', 'Cierra 28 oct · vence 5 nov', 'Adelantada']);
+  assert.equal(third.props.accessibilityLabel, 'Cuota 3 de 12, 100000,00 pesos, Adelantada, cierra 28 de octubre de 2026, vence 5 de noviembre de 2026');
+  assert.equal(third.props.accessibilityHint, 'Abre el adelanto de cuotas');
+  third.props.onPress();
+  assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/operation/[id]', params: { id: 'po1' } }));
+  const segments = [byName(root, 'PlanBar')[0].rendered!.props.children].flat().map((segment: Node) => Object.assign({}, ...[segment.props.style].flat()));
+  assert.equal(segments.every(style => style.backgroundColor === '#000'), true, 'brought forward is drawn as counted');
+  assert.deepEqual(rowsOf(root).slice(4), ['Ya registrado=$ 1.200.000,00 (1200000,00 pesos)', 'Cuotas adelantadas=$ 1.000.000,00 (1000000,00 pesos)',
+    'Cuotas futuras=$ 0,00 (0,00 pesos)', 'Restante=$ 0,00 (0,00 pesos)',
+    // A26: the adelanto is listed under «Devoluciones y adelantos» too.
+    'Adelanto de cuotas · 1 de octubre de 2026=$ 1.000.000,00 (1000000,00 pesos)'].map(money$));
+  assert.deepEqual(actionsOf(root), ['Registrar devolución'], 'nothing left to bring forward or to stop');
+  assert.equal(/pagad/i.test(JSON.stringify(texts(root))), false);
+  // The card detail's row says the same word.
+  const card = harness('card/[id].tsx', { params: { id: 'card' }, data }).render();
+  const electro = byName(card, 'PlanRow').find(row => row.props.summary.plan.id === 'tv')!.rendered!;
+  assert.equal(electro.props.accessibilityLabel, 'Electro, 12 cuotas, 12 de 12 registradas, Adelantado');
+  // English: "Brought forward", never "paid".
+  const english = harness('installment/[id].tsx', { params: { id: 'tv' }, data, locale: 'en-US' }).render();
+  assert.ok(texts(english).includes('Brought forward'));
+  assert.deepEqual(texts(byName(english, 'ScheduleRow')[2].rendered!), ['Installment 3 of 12', 'Closes Oct 28 · due Nov 5', 'Brought forward']);
+  assert.ok(rowsOf(english).some(row => row.startsWith('Installments brought forward=')));
+  assert.equal(/paid/i.test(JSON.stringify(texts(english))), false);
+});
+
+test('24T3: an adelanto whose interest the issuer did not charge: each row says so, «Interés no cobrado» is its own figure, and the principal figures say principal', () => {
+  const data = { ...withPlans, purchaseOperations: [payoffOf('nb', 'waived', 'po2')] };
+  const root = harness('installment/[id].tsx', { params: { id: 'nb' }, data }).render();
+  const rows = byName(root, 'ScheduleRow');
+  assert.equal(rows.map(row => row.props.row.state).join(','), 'settled,settled,settled');
+  const first = rows[0].rendered!;
+  // Verifier: the row charges what the adelanto recognised ($ 300.000,00 of principal); the interest not charged is said apart,
+  // never inside the amount nor as «Incluye interés» (the card's balance holds $ 300.000,00 for it, not $ 330.000,00).
+  assert.deepEqual(texts(first), ['Cuota 1 de 3', 'Cierra 28 oct · vence 5 nov', 'Interés no cobrado $' + NBSP + '30.000,00', 'Adelantada']);
+  assert.equal(nodes(first).find(node => node.type === 'Money')!.props.minor, 30000000);
+  assert.equal(first.props.accessibilityLabel, 'Cuota 1 de 3, 300000,00 pesos, Adelantada, Interés no cobrado 30000,00 pesos, cierra 28 de octubre de 2026, vence 5 de noviembre de 2026');
+  // Recognised with the principal, the same row includes its interest and says so.
+  const charged = byName(harness('installment/[id].tsx', { params: { id: 'nb' }, data: { ...withPlans, purchaseOperations: [payoffOf('nb', 'recognised', 'po3')] } }).render(), 'ScheduleRow')[0].rendered!;
+  assert.deepEqual(texts(charged), ['Cuota 1 de 3', 'Cierra 28 oct · vence 5 nov', 'Incluye interés $' + NBSP + '30.000,00', 'Adelantada']);
+  assert.equal(nodes(charged).find(node => node.type === 'Money')!.props.minor, 33000000);
+  const facts = rowsOf(root);
+  for (const row of ['Principal registrado=$ 900.000,00 (900000,00 pesos)', 'Principal adelantado=$ 900.000,00 (900000,00 pesos)',
+    'Interés no cobrado=$ 90.000,00 (90000,00 pesos)', 'Principal restante=$ 0,00 (0,00 pesos)'].map(money$)) assert.ok(facts.includes(row), row);
+  assert.equal(facts.some(row => row.startsWith('Interés futuro=')), false, 'no interest is still to come');
+  // An operation names the plan: it is no longer deleted, only returned.
+  assert.deepEqual(actionsOf(root), ['Registrar devolución']);
+});
+
+test('24T3: a devolución lowers the last instalments: the reduced row shows what it charges now and why, the one returned whole reads «Devuelta», both open the devolución', () => {
+  // $ 350.000,00 returned on Oct 1: the $ 200.000,00 recorded comes back to the card, the rest lowers instalments 12 and 11.
+  const refund = domain.newPlanRefund(withPlans, { id: 'rf1', planId: 'tv', amountMinor: 35000000, dateISO: '2026-10-01', todayISO: '2026-10-01', createdAt: opNow });
+  assert.equal(JSON.stringify([refund.creditMinor, refund.reductions]), JSON.stringify([20000000, [{ number: 11, minor: 5000000 }, { number: 12, minor: 10000000 }]]));
+  const view = harness('installment/[id].tsx', { params: { id: 'tv' }, data: { ...withPlans, purchaseOperations: [refund] } });
+  const root = view.render();
+  const rows = byName(root, 'ScheduleRow');
+  assert.equal(rows.map(row => row.props.row.state).join(','), 'recognised,recognised,next' + ',future'.repeat(8) + ',refunded');
+  const eleventh = rows[10].rendered!;
+  assert.deepEqual(texts(eleventh), ['Cuota 11 de 12', 'Cierra 28 jun 2027 · vence 5 jul 2027', 'Reducida por devolución: $' + NBSP + '50.000,00', 'Futura']);
+  assert.equal(nodes(eleventh).find(node => node.type === 'Money')!.props.minor, 5000000, 'what it charges now');
+  assert.equal(eleventh.props.accessibilityLabel, 'Cuota 11 de 12, 50000,00 pesos, Futura, Reducida por devolución: 50000,00 pesos, cierra 28 de junio de 2027, vence 5 de julio de 2027');
+  assert.equal(eleventh.props.accessibilityHint, 'Abre la devolución');
+  eleventh.props.onPress();
+  assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/operation/[id]', params: { id: 'rf1' } }));
+  const twelfth = rows[11].rendered!;
+  assert.deepEqual(texts(twelfth), ['Cuota 12 de 12', 'Cierra 28 jul 2027 · vence 5 ago 2027', 'Devuelta']);
+  const amount = nodes(twelfth).find(node => node.type === 'Money')!.props;
+  assert.equal(JSON.stringify([amount.minor, amount.color]), JSON.stringify([10000000, '#999']), 'its contractual amount, faded beside «Devuelta»');
+  // An instalment still to come with nothing on it opens nothing.
+  assert.equal(rows[3].rendered!.type, 'View');
+  const segments = [byName(root, 'PlanBar')[0].rendered!.props.children].flat().map((segment: Node) => Object.assign({}, ...[segment.props.style].flat()));
+  assert.equal(segments[11].borderStyle, 'dashed', 'returned whole: never recorded');
+  // Two figures, never merged: the credit to the card and the future instalments lowered; the future principal is what is left.
+  assert.deepEqual(rowsOf(root).slice(4), ['Ya registrado=$ 200.000,00 (200000,00 pesos)', 'Cuotas futuras=$ 850.000,00 (850000,00 pesos)',
+    'Devuelto a la tarjeta=$ 200.000,00 (200000,00 pesos)', 'Cuotas reducidas por devolución=$ 150.000,00 (150000,00 pesos)',
+    'Devolución · 1 de octubre de 2026=$ 350.000,00 (350000,00 pesos)'].map(money$));
+  assert.equal(byName(root, 'PlanProgressSummary')[0].rendered!.props.accessibilityLabel, '2 de 12 registradas, 850000,00 pesos restantes, próxima cuota el 28 de octubre de 2026');
+  assert.deepEqual(actionsOf(root), ['Registrar devolución', 'Registrar adelanto de cuotas', 'Dejar de seguir el plan']);
+  const english = harness('installment/[id].tsx', { params: { id: 'tv' }, data: { ...withPlans, purchaseOperations: [refund] }, locale: 'en-US' }).render();
+  assert.deepEqual(texts(byName(english, 'ScheduleRow')[10].rendered!), ['Installment 11 of 12', 'Closes Jun 28, 2027 · due Jul 5, 2027', 'Reduced by a refund: AR$' + NBSP + '50,000.00', 'Upcoming']);
+  assert.ok(texts(byName(english, 'ScheduleRow')[11].rendered!).includes('Refunded'));
+  assert.ok(rowsOf(english).some(row => row.startsWith('Refunded to the card=')));
+  assert.ok(rowsOf(english).some(row => row.startsWith('Installments reduced by refunds=')));
+});
+
+test('24T3 review: a row whose principal a devolución took to zero opens the interest movement it recorded (or undid), never a principal movement that does not exist', () => {
+  // Notebook, 3 × $ 300.000,00 + $ 30.000,00 interest: instalment 1 recorded; on Nov 1 $ 600.000,00 returned: $ 300.000,00 back
+  // to the card, the rest takes instalment 3's principal whole. Through Jan 2 the closings record only its interest.
+  const before: domain.LedgerArchive = { ...withPlans, records: [...withPlans.records, ...recognised(nb, [1])] };
+  const refund = domain.newPlanRefund(before, { id: 'rf-n', planId: 'nb', amountMinor: 60000000, dateISO: '2026-11-01', todayISO: '2026-11-01', createdAt: opNow });
+  assert.equal(JSON.stringify([refund.creditMinor, refund.reductions]), JSON.stringify([30000000, [{ number: 3, minor: 30000000 }]]));
+  const inserts = domain.planCatchUpInserts({ ...before, purchaseOperations: [refund] }, 'nb', '2027-01-02');
+  const data: domain.LedgerArchive = { ...before, records: [...before.records, ...inserts], purchaseOperations: [refund] };
+  const interest3 = domain.installmentEntryId('nb', 3, 'interest');
+  assert.equal(data.records.some(record => record.entry.id === domain.installmentEntryId('nb', 3, 'principal')), false, 'its principal was never recorded');
+  assert.equal(data.records.some(record => record.entry.id === interest3), true);
+  const view = harness('installment/[id].tsx', { params: { id: 'nb' }, data, day: '2027-01-02' });
+  const third = byName(view.render(), 'ScheduleRow')[2];
+  assert.equal(third.props.row.state, 'recognised');
+  assert.equal(third.rendered!.props.accessibilityHint, 'Abre el movimiento de la cuota');
+  third.rendered!.props.onPress();
+  assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/entry/[id]', params: { id: interest3 } }));
+  // Its interest undone: the row reads undone and still opens that movement (to restore it).
+  const undone = { ...data, records: data.records.map(record => record.entry.id === interest3 ? { ...record, voided: true, revision: 1, updatedAt: opNow } : record) };
+  const again = harness('installment/[id].tsx', { params: { id: 'nb' }, data: undone, day: '2027-01-02' });
+  const row = byName(again.render(), 'ScheduleRow')[2];
+  assert.equal(row.props.row.state, 'undone');
+  row.rendered!.props.onPress();
+  assert.equal(JSON.stringify(again.pushed.at(-1)), JSON.stringify({ pathname: '/entry/[id]', params: { id: interest3 } }));
+});
+
+test('24T3 review: «Devoluciones y adelantos» lists every operation of the plan, live and undone, newest first, each opening its own detail (A26)', () => {
+  // Nothing recorded yet: devolución A lowers instalment 3; B then lowers 3 (by the rest) and 2, so rows 2 and 3 open B and
+  // A is reached only from this list; C was undone and is listed to be restored.
+  const a = domain.newPlanRefund(withPlans, { id: 'rf-a', planId: 'nb', amountMinor: 15000000, dateISO: '2026-10-01', todayISO: '2026-10-01', createdAt: opNow });
+  const b = domain.newPlanRefund({ ...withPlans, purchaseOperations: [a] }, { id: 'rf-b', planId: 'nb', amountMinor: 45000000, dateISO: '2026-10-01', todayISO: '2026-10-01',
+    createdAt: '2026-10-01T13:00:00.000Z' });
+  const c = { ...domain.newPlanRefund({ ...withPlans, purchaseOperations: [a, b] }, { id: 'rf-c', planId: 'nb', amountMinor: 1000000, dateISO: '2026-10-01', todayISO: '2026-10-01',
+    createdAt: '2026-10-01T14:00:00.000Z' }), voided: true, revision: 1 };
+  assert.equal(JSON.stringify([a.creditMinor, a.reductions]), JSON.stringify([0, [{ number: 3, minor: 15000000 }]]), 'only reductions: no line in Movimientos');
+  const data = { ...withPlans, purchaseOperations: [a, b, c] };
+  const view = harness('installment/[id].tsx', { params: { id: 'nb' }, data });
+  const root = view.render();
+  assert.deepEqual(byName(root, 'ScheduleRow').slice(1).map(row => row.props.row.operationId), ['rf-b', 'rf-b']);
+  assert.ok(nodes(root).some(node => node.type === 'SectionTitle' && text(node) === 'Devoluciones y adelantos'));
+  const listed = nodes(root).filter(node => node.type === 'DetailRow' && node.props.icon === 'arrow-undo-outline');
+  assert.deepEqual(listed.map(node => node.props.label + '=' + node.props.value + ' (' + node.props.spokenValue + ')'), [
+    'Devolución deshecha · 1 de octubre de 2026=$ 10.000,00 (10000,00 pesos)', 'Devolución · 1 de octubre de 2026=$ 450.000,00 (450000,00 pesos)',
+    'Devolución · 1 de octubre de 2026=$ 150.000,00 (150000,00 pesos)'].map(money$));
+  listed[2].props.onPress();
+  assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/operation/[id]', params: { id: 'rf-a' } }));
+  listed[0].props.onPress();
+  assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/operation/[id]', params: { id: 'rf-c' } }));
+  // An undone adelanto too, with its own glyph.
+  const payoff = { ...payoffOf('tv', 'recognised', 'po-u'), voided: true, revision: 1 };
+  const tvRoot = harness('installment/[id].tsx', { params: { id: 'tv' }, data: { ...withPlans, purchaseOperations: [payoff] } }).render();
+  assert.ok(rowsOf(tvRoot).includes(money$('Adelanto deshecho · 1 de octubre de 2026=$ 1.000.000,00 (1000000,00 pesos)')));
+  assert.equal(nodes(tvRoot).find(node => node.type === 'DetailRow' && node.props.label.startsWith('Adelanto deshecho'))!.props.icon, 'play-forward-circle-outline');
+  // A plan with no operation has no such section; English reads the same list.
+  assert.equal(nodes(harness('installment/[id].tsx', { params: { id: 'tv' }, data: withPlans }).render()).some(node => node.type === 'SectionTitle' && text(node) === 'Devoluciones y adelantos'), false);
+  const english = harness('installment/[id].tsx', { params: { id: 'nb' }, data, locale: 'en-US' }).render();
+  assert.ok(nodes(english).some(node => node.type === 'SectionTitle' && text(node) === 'Refunds and installments brought forward'));
+  assert.deepEqual(nodes(english).filter(node => node.type === 'DetailRow' && node.props.icon === 'arrow-undo-outline').map(node => node.props.label),
+    ['Undone refund · October 1, 2026', 'Refund · October 1, 2026', 'Refund · October 1, 2026']);
+});
+
+test('24T3: a completed plan offers a devolución while something is returnable; returned whole it reads «Devuelto» and offers nothing; a deleted card offers nothing', () => {
+  const completed = harness('installment/[id].tsx', { params: { id: 'ph' }, data: withPlans }).render();
+  assert.ok(texts(completed).includes('Completo'));
+  assert.deepEqual(actionsOf(completed), ['Registrar devolución']);
+  const whole = domain.newPlanRefund(withPlans, { id: 'rf2', planId: 'ph', amountMinor: 2000000, dateISO: '2026-10-01', todayISO: '2026-10-01', createdAt: opNow });
+  const data = { ...withPlans, purchaseOperations: [whole] };
+  const refunded = harness('installment/[id].tsx', { params: { id: 'ph' }, data }).render();
+  assert.ok(texts(refunded).includes('Devuelto'));
+  assert.deepEqual(actionsOf(refunded), [], 'nothing returnable, nothing to bring forward or stop');
+  const row = byName(harness('card/[id].tsx', { params: { id: 'card' }, data }).render(), 'PlanRow').find(item => item.props.summary.plan.id === 'ph')!.rendered!;
+  assert.equal(row.props.accessibilityLabel, 'Teléfono, 2 cuotas, 2 de 2 registradas, Devuelto');
+  // A stopped plan on a card deleted since: its history only reads.
+  const gone = { ...withPlans, installmentPlans: [domain.cancelInstallmentPlan(tv, '2026-09-30T12:00:00.000Z'), nb, phone], cards: [{ ...card, active: false, deleted: true, revision: 1 }, amex] };
+  assert.deepEqual(actionsOf(harness('installment/[id].tsx', { params: { id: 'tv' }, data: gone }).render()), []);
+});
+
+test('24T3: «Dejar de seguir el plan» says what stops, what stays and what it is not; a failed stop is retried unchanged without asking twice and the plan stays on screen', async () => {
+  let attempts = 0;
+  const view = harness('installment/[id].tsx', { params: { id: 'tv' }, data: withPlans, write: async () => { attempts++; if (attempts === 1) throw new Error('No pudimos guardar: disco lleno.'); } });
+  const button = find(view.render(), 'ActionButton', 'Dejar de seguir el plan');
+  assert.equal(JSON.stringify([button.props.secondary, button.props.tone, button.props.icon]), JSON.stringify([true, 'expense', 'stop-circle-outline']));
+  button.props.onPress();
+  const alert = view.alerts[0];
+  assert.equal(alert.title, '¿Dejar de seguir este plan?');
+  assert.equal(alert.message, 'Las cuotas que faltan ($' + NBSP + '1.000.000,00) dejan de registrarse. Las ya registradas siguen en Movimientos. No es una devolución ni un pago: '
+    + 'si devolviste la compra, usá Registrar devolución; si adelantaste las cuotas, Registrar adelanto de cuotas.');
+  assert.equal(alert.buttons.map((item: { text: string; style?: string }) => item.text + ':' + item.style).join(','), 'Cancelar:cancel,Dejar de seguir:destructive');
+  assert.equal(view.writes.length, 0, 'asking writes nothing');
+  alert.buttons[1].onPress();
+  assert.deepEqual(view.writes.map(item => [item.action, JSON.stringify(item.arg)]), [['stop', JSON.stringify({ planId: 'tv', expectedRevision: 0 })]]);
+  await settle();
+  const failed = view.render();
+  assert.equal(find(failed, 'ErrorMessage').props.message, 'No pudimos guardar: disco lleno.');
+  assert.equal(find(failed, 'ActionButton', 'Registrar devolución').props.disabled, true, 'nothing else starts while the outcome is unknown');
+  find(failed, 'ActionButton', 'Reintentar cambio').props.onPress();
+  assert.equal(view.alerts.length, 1, 'the retry asks nothing new');
+  await settle();
+  assert.deepEqual(view.writes.map(item => JSON.stringify(item.arg)), [JSON.stringify({ planId: 'tv', expectedRevision: 0 }), JSON.stringify({ planId: 'tv', expectedRevision: 0 })],
+    'the same stop, with the revision the person saw');
+  assert.equal(JSON.stringify([view.backs(), view.haptics()]), JSON.stringify([0, 1]), 'a stopped plan stays on screen');
+  assert.equal(nodes(view.render()).some(node => node.type === 'ErrorMessage' && node.props.message), false);
+});
+
+test('24T3: a stop storage refuses before writing (the plan changed) releases it: the screen reads the plan again and the next tap asks again', async () => {
+  const view = harness('installment/[id].tsx', { params: { id: 'tv' }, data: withPlans,
+    write: async () => { throw new Error('El plan de cuotas cambió desde que lo abriste. Volvé a revisarlo.'); } });
+  find(view.render(), 'ActionButton', 'Dejar de seguir el plan').props.onPress();
+  view.alerts[0].buttons[1].onPress();
+  await settle();
+  const refused = view.render();
+  assert.equal(find(refused, 'ErrorMessage').props.message, 'El plan de cuotas cambió desde que lo abriste. Volvé a revisarlo.');
+  assert.equal(find(refused, 'ActionButton', 'Registrar devolución').props.disabled, false);
+  find(refused, 'ActionButton', 'Dejar de seguir el plan').props.onPress();
+  assert.equal(view.alerts.length, 2, 'released: asked again');
+  // In English the message is the catalogue's.
+  const english = harness('installment/[id].tsx', { params: { id: 'tv' }, data: withPlans, locale: 'en-US' });
+  find(english.render(), 'ActionButton', 'Stop tracking the plan').props.onPress();
+  assert.equal(english.alerts[0].title, 'Stop tracking this plan?');
+  assert.match(english.alerts[0].message, /^The remaining installments \(AR\$.1,000,000\.00\) stop being recorded\. .* It isn’t a refund or a payment: /);
+  assert.equal(english.alerts[0].buttons[1].text, 'Stop tracking');
+});
+
+test('24T3: a stop whose outcome was unknown and that the ledger later shows done needs no retry: the screen reads the stopped plan', async () => {
+  const view = harness('installment/[id].tsx', { params: { id: 'tv' }, data: withPlans, write: async () => { throw new Error('No pudimos guardar: disco lleno.'); } });
+  find(view.render(), 'ActionButton', 'Dejar de seguir el plan').props.onPress();
+  view.alerts[0].buttons[1].onPress();
+  await settle();
+  assert.ok(find(view.render(), 'ActionButton', 'Reintentar cambio'));
+  // It had committed: the next read brings the stopped plan, one revision on.
+  view.setData({ ...withPlans, installmentPlans: [domain.cancelInstallmentPlan(tv, '2026-10-01T12:00:00.000Z'), nb, phone] });
+  view.render();
+  const root = view.render();
+  assert.deepEqual(actionsOf(root), ['Registrar devolución', 'Reactivar plan']);
+  assert.equal(find(root, 'ActionButton', 'Registrar devolución').props.disabled, false);
+  assert.equal(nodes(root).some(node => node.type === 'ErrorMessage' && node.props.message), false);
+});
+
+test('24T3: stopping after a closing the app has not recorded yet says the closed instalment is recorded first (M3)', () => {
+  // Oct 29: instalment 3 closed on Oct 28; storage records it before the stop, and the alert says so.
+  const view = harness('installment/[id].tsx', { params: { id: 'tv' }, data: withPlans, day: '2026-10-29' });
+  find(view.render(), 'ActionButton', 'Dejar de seguir el plan').props.onPress();
+  assert.equal(view.alerts[0].message.split('. Las ya registradas')[0],
+    'Antes se registra la cuota 3, que ya cerró ($' + NBSP + '100.000,00). Las cuotas que faltan ($' + NBSP + '900.000,00) dejan de registrarse');
+});
+
+test('24T3: «Reactivar plan» names the closings recorded now, on their own dates, and sends the revision it showed', async () => {
+  const stopped = { ...withPlans, installmentPlans: [domain.cancelInstallmentPlan(tv, '2026-09-30T12:00:00.000Z'), nb, phone] };
+  const view = harness('installment/[id].tsx', { params: { id: 'tv' }, data: stopped, day: '2026-12-01' });
+  const button = find(view.render(), 'ActionButton', 'Reactivar plan');
+  assert.equal(JSON.stringify([button.props.secondary, button.props.tone, button.props.icon]), JSON.stringify([true, undefined, 'play-circle-outline']));
+  button.props.onPress();
+  const alert = view.alerts[0];
+  assert.equal(alert.title, '¿Reactivar este plan?');
+  assert.equal(alert.message, 'Sus cuotas vuelven a registrarse cuando cierra cada resumen. Las cuotas 3–4 cerraron mientras no se seguía: se registran ahora por $'
+    + NBSP + '200.000,00, con la fecha de sus cierres (28 oct 2026 a 28 nov 2026).');
+  assert.equal(alert.buttons.map((item: { text: string; style?: string }) => item.text + ':' + item.style).join(','), 'Cancelar:cancel,Reactivar:undefined');
+  alert.buttons[1].onPress();
+  await settle();
+  assert.deepEqual(view.writes.map(item => [item.action, JSON.stringify(item.arg)]), [['reactivate', JSON.stringify({ planId: 'tv', expectedRevision: 1 })]]);
+  assert.equal(view.haptics(), 1);
+  // Nothing closed in between: the alert says only that it follows again.
+  const calm = harness('installment/[id].tsx', { params: { id: 'tv' }, data: stopped });
+  find(calm.render(), 'ActionButton', 'Reactivar plan').props.onPress();
+  assert.equal(calm.alerts[0].message, 'Sus cuotas vuelven a registrarse cuando cierra cada resumen.');
+  const english = harness('installment/[id].tsx', { params: { id: 'tv' }, data: stopped, day: '2026-12-01', locale: 'en-US' });
+  const englishRoot = english.render();
+  assert.deepEqual(actionsOf(englishRoot), ['Record refund', 'Reactivate plan']);
+  assert.ok(texts(englishRoot).includes('Not tracked'));
+  find(englishRoot, 'ActionButton', 'Reactivate plan').props.onPress();
+  assert.equal(english.alerts[0].message, 'Its installments are recorded again as each statement closes. Installments 3–4 closed while the plan wasn’t tracked: '
+    + 'they’re recorded now for AR$' + NBSP + '200,000.00, dated on their closings (Oct 28, 2026 to Nov 28, 2026).');
+});
+
+// ---- 24T3: «Registrar adelanto de cuotas» (/plan-payoff/[id]) -----------------------------------------------------------
+
+test('24T3 adelanto: the sheet lists what is brought forward, bounds the date, says what is recorded and what is not, and Save echoes the amount', () => {
+  const view = harness('plan-payoff/[id].tsx', { params: { id: 'tv' }, data: withPlans });
+  const root = view.render();
+  const options = nodes(root).find(node => node.type === 'Stack.Screen')!.props.options;
+  assert.equal(JSON.stringify([options.title, options.gestureEnabled]), JSON.stringify(['Registrar adelanto de cuotas', true]));
+  assert.equal(options.headerLeft().props.label, 'Cerrar');
+  assert.ok(texts(root).includes('Cuotas que faltaban' + NBSP + '·' + NBSP + 'ARS'));
+  assert.equal(find(root, 'Money').props.minor, 100000000, 'the hero is what Save records');
+  assert.deepEqual(rowsOf(root), ['Cuotas=3–12', 'Importe=$ 1.000.000,00 (1000000,00 pesos)'].map(money$));
+  assert.equal(nodes(root).some(node => node.type === 'CheckRow'), false, 'no financing: no choice to make');
+  const date = find(root, 'DateField').props;
+  assert.equal(JSON.stringify([date.label, domain.todayKey(date.value), domain.todayKey(date.minimumDate), domain.todayKey(date.maximumDate)]),
+    JSON.stringify(['Fecha del adelanto', '2026-10-01', '2026-09-28', '2026-10-01']), 'between the last recorded closing and today (A6)');
+  const sentence = nodes(root).find(node => node.type === 'AppText' && text(node).startsWith('FinanzApp registra'))!;
+  assert.equal(text(sentence), 'FinanzApp registra con fecha 1 oct 2026 las cuotas que faltaban ($' + NBSP + '1.000.000,00) en el saldo pendiente de la tarjeta. '
+    + 'El pago a la tarjeta se registra aparte, con Pagar tarjeta.');
+  assert.equal(sentence.props.accessibilityLabel, 'FinanzApp registra con fecha 1 de octubre de 2026 las cuotas que faltaban (1000000,00 pesos) en el saldo pendiente de la tarjeta. '
+    + 'El pago a la tarjeta se registra aparte, con Pagar tarjeta.');
+  const save = find(root, 'ActionButton');
+  assert.equal(JSON.stringify([save.props.label, save.props.spokenLabel, save.props.disabled]),
+    JSON.stringify(['Registrar adelanto' + NBSP + '·' + NBSP + '$' + NBSP + '1.000.000,00', 'Registrar adelanto, 1000000,00 pesos', false]));
+  assert.equal(view.writes.length, 0, 'opening the sheet writes nothing');
+  assert.equal(/pagad/i.test(JSON.stringify(texts(root))), false);
+});
+
+test('24T3 adelanto: with future interest the person chooses, with nothing preselected; the hero, the echo and the adelanto follow the choice', async () => {
+  const view = harness('plan-payoff/[id].tsx', { params: { id: 'nb' }, data: withPlans });
+  let root = view.render();
+  assert.deepEqual(rowsOf(root), ['Cuotas=1–3', 'Principal de las cuotas=$ 900.000,00 (900000,00 pesos)', 'Interés=$ 90.000,00 (90000,00 pesos)'].map(money$));
+  const section = nodes(root).find(node => node.type === 'SectionTitle' && node.props.children === 'Intereses y cargos futuros')!;
+  assert.equal(section.props.caption, 'Elegí qué pasó con ellos. Un cargo por adelantar se registra aparte, como un gasto de la tarjeta.');
+  const choices = nodes(root).filter(node => node.type === 'CheckRow');
+  assert.deepEqual(choices.map(node => [node.props.title, node.props.subtitle, node.props.selected]), [
+    ['Los registro ahora', 'Se suman al adelanto, con la misma fecha.', false], ['El emisor no los cobró', 'No se registran; el plan los muestra como no cobrados.', false]]);
+  assert.equal(find(root, 'Money').props.minor, 90000000, 'before the choice, only the principal is sure to be recorded');
+  assert.equal(JSON.stringify([find(root, 'ActionButton').props.label, find(root, 'ActionButton').props.disabled]), JSON.stringify(['Registrar adelanto', true]));
+  assert.equal(domain.todayKey(find(root, 'DateField').props.minimumDate), '2026-09-20', 'nothing recorded yet: the purchase date');
+  choices[0].props.onPress();
+  root = view.render();
+  assert.equal(find(root, 'Money').props.minor, 99000000);
+  assert.equal(find(root, 'ActionButton').props.spokenLabel, 'Registrar adelanto, 990000,00 pesos');
+  nodes(root).filter(node => node.type === 'CheckRow')[1].props.onPress();
+  root = view.render();
+  assert.deepEqual(nodes(root).filter(node => node.type === 'CheckRow').map(node => node.props.selected), [false, true]);
+  assert.equal(find(root, 'ActionButton').props.label, 'Registrar adelanto' + NBSP + '·' + NBSP + '$' + NBSP + '900.000,00');
+  find(root, 'ActionButton').props.onPress();
+  await settle();
+  const sent = view.writes[0].arg as domain.PlanPayoff;
+  assert.equal(JSON.stringify([view.writes[0].action, sent.id, sent.financing, sent.dateISO, sent.amountMinor, sent.covered.length]),
+    JSON.stringify(['payoff', 'op-1', 'waived', '2026-10-01', 90000000, 6]), 'the financing rows stay in it, recorded as not charged');
+});
+
+test('24T3 adelanto: a write with an unknown outcome is retried unchanged; recorded, the sheet offers «Pagar tarjeta» prefilled with what the card owes now', async () => {
+  let attempts = 0;
+  const view = harness('plan-payoff/[id].tsx', { params: { id: 'tv' }, data: withPlans, write: async () => { attempts++; if (attempts === 1) throw new Error('No pudimos guardar: disco lleno.'); } });
+  find(view.render(), 'ActionButton').props.onPress();
+  await settle();
+  let root = view.render();
+  assert.equal(find(root, 'ErrorMessage').props.message, 'No pudimos guardar: disco lleno.');
+  assert.ok(texts(root).includes('Conservamos el envío: Reintentar nunca registra el adelanto dos veces. Para cambiarlo, cerrá y revisá primero el plan.'));
+  assert.equal(find(root, 'DateField').props.disabled, true, 'frozen: nothing changes under the retry');
+  find(root, 'ActionButton', 'Reintentar guardado').props.onPress();
+  await settle();
+  assert.equal(view.writes.length, 2);
+  assert.equal(view.writes[1].arg, view.writes[0].arg, 'the same adelanto, the same id');
+  assert.equal(view.haptics(), 1);
+  // The provider refreshed: the card now owes the instalments brought forward ($ 120.000,00 + $ 1.000.000,00).
+  view.setData({ ...withPlans, purchaseOperations: [view.writes[0].arg as domain.PlanPayoff] });
+  root = view.render();
+  assert.ok(texts(root).includes('Adelanto registrado'));
+  assert.ok(texts(root).includes('Las cuotas que faltaban ya están en el saldo pendiente de Visa Gold. Cuando pagues la tarjeta, registralo con Pagar tarjeta.'));
+  assert.deepEqual(actionsOf(root), ['Pagar tarjeta', 'Listo']);
+  find(root, 'ActionButton', 'Pagar tarjeta').props.onPress();
+  assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/new-transfer', params: { toAccountId: 'card-acc', maxAmountMinor: '112000000' } }));
+  find(root, 'ActionButton', 'Listo').props.onPress();
+  assert.equal(view.backs(), 1);
+});
+
+test('24T3 adelanto: one whose outcome was unknown and that the ledger later holds is recorded: no retry, the next step is offered', async () => {
+  const view = harness('plan-payoff/[id].tsx', { params: { id: 'tv' }, data: withPlans, write: async () => { throw new Error('No pudimos guardar: disco lleno.'); } });
+  find(view.render(), 'ActionButton').props.onPress();
+  await settle();
+  assert.ok(find(view.render(), 'ActionButton', 'Reintentar guardado'));
+  view.setData({ ...withPlans, purchaseOperations: [view.writes[0].arg as domain.PlanPayoff] });
+  view.render();
+  const root = view.render();
+  assert.ok(texts(root).includes('Adelanto registrado'));
+  assert.deepEqual(actionsOf(root), ['Pagar tarjeta', 'Listo']);
+  assert.equal(view.writes.length, 1, 'nothing sent again');
+});
+
+test('24T3 adelanto: a refusal storage gave before writing (the instalments changed) releases the draft: the sheet previews again and Save rebuilds it with the same id', async () => {
+  const view = harness('plan-payoff/[id].tsx', { params: { id: 'tv' }, data: withPlans, write: async () => { throw new Error(domain.OPERATION_CHANGED_MESSAGE); } });
+  find(view.render(), 'ActionButton').props.onPress();
+  await settle();
+  // Meanwhile a devolución recorded elsewhere lowered instalment 12 by $ 50.000,00 (the provider read the ledger again).
+  const refund = domain.newPlanRefund(withPlans, { id: 'rf3', planId: 'tv', amountMinor: 25000000, dateISO: '2026-10-01', todayISO: '2026-10-01', createdAt: opNow });
+  view.setData({ ...withPlans, purchaseOperations: [refund] });
+  const root = view.render();
+  assert.equal(find(root, 'ErrorMessage').props.message, 'Las cuotas cambiaron desde que abriste el formulario; revisá.');
+  assert.equal(find(root, 'DateField').props.disabled, false);
+  assert.deepEqual(rowsOf(root), ['Cuotas=3–12', 'Importe=$ 950.000,00 (950000,00 pesos)'].map(money$));
+  const save = find(root, 'ActionButton');
+  assert.equal(save.props.label, 'Registrar adelanto' + NBSP + '·' + NBSP + '$' + NBSP + '950.000,00');
+  save.props.onPress();
+  await settle();
+  const [first, second] = view.writes.map(item => item.arg as domain.PlanPayoff);
+  assert.equal(JSON.stringify([first.id, second.id, first.amountMinor, second.amountMinor, second.covered.at(-1)]),
+    JSON.stringify(['op-1', 'op-1', 100000000, 95000000, { number: 12, component: 'principal', minor: 5000000 }]));
+});
+
+test('24T3 adelanto (verifier): a day below the plan\'s floor (a statement closed while the sheet stayed open) moves up to the floor; the sheet never turns into «No hay cuotas»', async () => {
+  // Oct 29: instalment 3 closed on Oct 28 and the app has not recorded it yet; storage will, before the adelanto (A8).
+  const view = harness('plan-payoff/[id].tsx', { params: { id: 'tv' }, data: withPlans, day: '2026-10-29' });
+  let root = view.render();
+  assert.equal(domain.todayKey(find(root, 'DateField').props.minimumDate), '2026-10-28', 'the floor is the closing the catch-up records');
+  // The day the sheet held from before that closing (or a wheel value below the bound): the sheet shows and sends the floor.
+  find(root, 'DateField').props.onChange(new Date('2026-10-20T12:00:00'));
+  root = view.render();
+  assert.equal(nodes(root).some(node => node.type === 'EmptyState'), false);
+  assert.equal(domain.todayKey(find(root, 'DateField').props.value), '2026-10-28');
+  assert.ok(rowsOf(root).includes('Cuotas=4–12'));
+  find(root, 'ActionButton').props.onPress();
+  await settle();
+  const sent = view.writes[0].arg as domain.PlanPayoff;
+  assert.equal(JSON.stringify([sent.dateISO, sent.covered[0].number]), JSON.stringify(['2026-10-28', 4]));
+  // What it sends is exactly what storage computes on its caught-up archive (A13).
+  const caught = { ...withPlans, records: [...withPlans.records, ...domain.planCatchUpInserts(withPlans, 'tv', '2026-10-29')] };
+  const expected = domain.newPlanPayoff(caught, { id: sent.id, planId: 'tv', financing: 'recognised', dateISO: '2026-10-28', todayISO: '2026-10-29', createdAt: sent.createdAt });
+  assert.equal(JSON.stringify(sent), JSON.stringify(expected));
+});
+
+test('24T3 adelanto: undone instalments stay pending and the sheet says so; a plan without tracking has nothing to bring forward', () => {
+  const [one, two] = recognised(tv, [1, 2]);
+  const undone = { ...two, voided: true, revision: 1, updatedAt: '2026-09-29T12:00:00.000Z' };
+  const root = harness('plan-payoff/[id].tsx', { params: { id: 'tv' }, data: { ...withPlans, records: [one, undone, ...recognised(phone, [1, 2])] } }).render();
+  assert.equal(find(root, 'LifecycleNote').props.detail, 'La cuota 2 está deshecha: no se adelanta y sigue pendiente en el plan.');
+  assert.equal(find(root, 'LifecycleNote').props.tone, 'warning');
+  assert.ok(rowsOf(root).includes('Cuotas=3–12'));
+  const stopped = { ...withPlans, installmentPlans: [domain.cancelInstallmentPlan(tv, '2026-09-30T12:00:00.000Z'), nb, phone] };
+  const empty = find(harness('plan-payoff/[id].tsx', { params: { id: 'tv' }, data: stopped }).render(), 'EmptyState');
+  assert.equal(JSON.stringify([empty.props.title, empty.props.detail]), JSON.stringify(['No hay cuotas para adelantar', 'Este plan no se sigue. Reactivalo primero.']));
+  assert.equal(find(harness('plan-payoff/[id].tsx', { params: { id: 'missing' } }).render(), 'EmptyState').props.title, 'No encontramos este plan de cuotas');
+});
+
+test('24T3 adelanto in English: the same sheet, "Brought forward" words, the choice and the sentence', () => {
+  const root = harness('plan-payoff/[id].tsx', { params: { id: 'nb' }, data: withPlans, locale: 'en-US' }).render();
+  assert.equal(nodes(root).find(node => node.type === 'Stack.Screen')!.props.options.title, 'Record installments brought forward');
+  assert.deepEqual(rowsOf(root).map(row => row.split('=')[0]), ['Installments', 'Installments’ principal', 'Interest']);
+  assert.deepEqual(nodes(root).filter(node => node.type === 'CheckRow').map(node => node.props.title), ['Record them now', 'The issuer didn’t charge them']);
+  const sentence = nodes(root).find(node => node.type === 'AppText' && text(node).startsWith('FinanzApp records'))!;
+  assert.equal(text(sentence), 'FinanzApp records the remaining installments (AR$' + NBSP + '900,000.00) on Oct 1, 2026 in the card’s outstanding balance. '
+    + 'The payment to the card is recorded separately, with Pay card.');
+  assert.equal(find(root, 'ActionButton').props.label, 'Record installments');
+  assert.equal(/paid/i.test(JSON.stringify(texts(root))), false);
 });
 
 // ---- The movement an instalment recorded ------------------------------------------------------------------------------

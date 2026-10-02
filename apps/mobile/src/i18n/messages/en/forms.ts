@@ -26,6 +26,7 @@ export const forms: Pick<Messages, 'entryForm' | 'transferForm'> = {
     optionBalance: 'balance {amount}',
     budgetExceeded: 'Budget over by {amount}',
     budgetUsed: '{spent} of {total} this month',
+    budgetRefunds: '{total} left this month · refunds exceed what was spent',
     cardNote: 'Counts as an expense once and adds to the card’s outstanding balance. The statement payment is recorded from Cards.',
     correctionNote: 'You are correcting the original transaction. No new expense or income is recorded.',
     retryNote: 'We kept this submission so a retry cannot duplicate it. To change the details, close and check Activity first.',

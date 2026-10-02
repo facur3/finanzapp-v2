@@ -1,11 +1,23 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-01 (Producto 24UX6E on its branch: more financial destinations in Forest, presentation and
+Updated: 2026-10-02 (Producto 24T3 on its branch, PR #76, with two late review fixes: the devolución date wheel's
+bounds before local noon, and a cash account's month reading «Devoluciones netas este mes» when devoluciones exceed its
+purchases; plus documentation-only notes on the dock, the Tarjetas root and 25D's FinanceKit rules; after the owner's
+review, the devolución-versus-bank-reintegro help, a card deletion dialog that archives right there, and 25A2 (Wallet
+Shortcut Capture) placed after 25A. The delivery:
+refunds («devoluciones»), early payoff («adelanto de cuotas») and the instalment plan lifecycle, as purchase operations: append-only records projected into the ledger as derived lines,
+never an income and never a second expense; a devolución counts in its own month and the purchase's category, a plan
+devolución reverses recognised principal first and then lowers the last instalments, an adelanto recognises every
+remaining instalment once on its own date with the card payment a separate transfer, «Dejar de seguir el plan» records
+what already closed first and «Reactivar plan» undoes it, and a card holding a credit is archived, never deleted (owner
+decisions B1–B3, 2026-10-01); SQLite schema 14 and backup v14; Reportes, Presupuestos, Inicio and the Assistant's
+evidence net devoluciones without negative slices or claims; plus the carry-in of Reportes' «Categorías | Día a día»
+switch at 15/20 with no shrink-to-fit; device QA pending, no EAS build. Producto 24UX6E merged as PR #75, merge commit d30b77f: more financial destinations in Forest, presentation and
 lifecycle polish plus bug fixes; Cuentas, Presupuestos, Recurrentes, Deudas y cobros and Categorías with flat summaries
 on the canvas, one shared lifecycle note, colour marking state rather than direction or identity and no chevron on rows
 that open a modal editor; the Más utilities audited, with two bug fixes (the pinned chooser card, Movimientos deshechos
 without a day net); no domain, storage, schema (13), backup (v13), FX or native change; the broad Forest visual lane
-closes with it; device QA pending, no EAS build. Producto 24UX6D merged as PR #74, merge commit 8f758ad: Cards in Forest and final Home/Reports polish, presentation only;
+closes with it; device QA pending. Producto 24UX6D merged as PR #74, merge commit 8f758ad: Cards in Forest and final Home/Reports polish, presentation only;
 Tarjetas, the card detail and the plan detail consolidated in Forest (one card always in front, 44 pt strips from the
 fifth card, the balance and facts flat on the canvas, the plan's progress as «3 de 12 registradas»), plus two approved
 carry-ins: Reportes Categorías with the period total in the donut's centre and no «Gastado» KPI, and Inicio's
@@ -28,7 +40,7 @@ Producto 24UX6A merged as PR #70, merge commit ef24bb6
 (2026-10-01): the Forest foundation, four icon-only tabs and a separate «+» in one dock, the capture hub, the Assistant as
 a root-stack screen, Inicio's financial field, Más → Apariencia; owner decisions in decision 005 (2026-09-30); device QA
 still pending. The UX lane 24UX6A → 24UX6B → 24UX6C → 24UX6C2 → 24UX6D → 24UX6E (more financial destinations in
-Forest; on its branch, the lane's last pass) is layered on the product order. Producto 24T2 merged as
+Forest; merged as PR #75, the lane's last pass; the lane is closed) is layered on the product order. Producto 24T2 merged as
 PR #69, merge commit 8951f6c: schema 13, backup v13, the purchase in cuotas, the card's statement calendar and the
 Tarjetas deck, verified by the owner on an iPhone 14 Pro with a fresh development build). Read [decision 001](decisions/001-native-mobile.md),
 [decision 002](decisions/002-spending-first.md),
@@ -99,14 +111,20 @@ history file keeps the evidence of when and why.
   a card's balance, no debit-card ledger, the 24T instalment rules, «Saldo pendiente» never «Deuda»
   in copy) are recorded in decision 003 and pinned by `packages/domain/card-invariants.test.ts`.
 - **A purchase in instalments is one purchase and one finite plan** (decision 003, rule 7, revised
-  2026-09-28), never a recurring rule and never the full price as an expense up front: each principal
+  2026-09-28, amended 2026-10-01 by 24T3), never a recurring rule and never the full price as an expense up front
+  on the purchase date: each principal
   instalment is recognised in its own period (their exact sum is the principal; the parent purchase
   never adds it again); interest, fees and financing taxes are separate; the card's balance due holds
   only the instalments already on a statement, the future ones are separate commitments; paying the
   statement stays a transfer. Refunds and early payments tie to the purchase/plan and never duplicate
-  an expense. Archiving a card keeps every plan payable; deleting it is refused with a balance due
-  **or** any pending plan. How plans affect the issuer's available credit is an open gate, decided
-  before that calculation exists. Design and delivery: Producto 24T below.
+  an expense (24T3, owner decisions 2026-10-01): a devolución is never an income, counts in its own month and the
+  purchase's category and credits the purchase's account; on a plan it reverses recognised principal first and then
+  lowers the last instalments; an adelanto de cuotas recognises every remaining instalment once, on its own date, and
+  the card payment stays a separate transfer; nothing is ever «pagada». Archiving a card keeps every plan payable;
+  deleting it is refused with a balance due, a credit in the holder's favour (24T3) **or** a pending plan (a completed,
+  stopped, fully refunded or brought-forward plan is not pending). How plans affect the issuer's available credit is an
+  open gate, decided before that calculation exists; until then a card with a pending plan has no computed available
+  credit. Design and delivery: Producto 24T and «Producto 24T3» below.
 - **Deleting a personal debt or receivable never strands a balance** (25B2 close, 2026-09-28): with a
   balance left and a payment or collection already recorded it is settled or closed, not deleted;
   closing hides it from pending and keeps balance, history and Reabrir (it is not a payment or a
@@ -139,7 +157,7 @@ history file keeps the evidence of when and why.
   synthetic fixtures live only in tests; the repository is public and carries no financial
   backups, screenshots with real data, tokens, signing keys or bank credentials.
 - **Durable local writes, drafts kept on failure, never a reset on error.** SQLite is the ledger
-  (schema 13; a backup takes the lowest version its content needs, up to v13, and v1–v13 import); a
+  (schema 14; a backup takes the lowest version its content needs, up to v14, and v1–v14 import); a
   write is confirmed only after it landed; deleting a recurring rule, a debt tracker, an account or a
   card keeps its row as a deletion record and never touches the movements it produced (24UX4, 25B2);
   edits are audited and undoable; future sync needs operation IDs, revisions, tombstones,
@@ -176,17 +194,37 @@ history file keeps the evidence of when and why.
 
 ## 1. Implemented (current state)
 
-What exists in code on `master` as of Producto 24UX6D (PR #74, merge commit 8f758ad), after 24UX6C2 (PR #73, merge
+What exists in code on `master` as of Producto 24UX6E (PR #75, merge commit d30b77f), after 24UX6D (PR #74, merge
+commit 8f758ad), 24UX6C2 (PR #73, merge
 commit 5c73813), 24UX6C (PR #72, merge
 commit c673be6), 24UX6B (PR #71, merge
 commit ecfd1dc), 24UX6A (PR #70, merged 2026-10-01, merge commit ef24bb6), 24T2 (PR #69, merge commit 8951f6c), 24T1C
-(PR #68), 24T1 (PR #67) and 25B3 (PR #66), plus Producto 24UX6E on its branch. Per area,
+(PR #68), 24T1 (PR #67) and 25B3 (PR #66), plus Producto 24T3 on its branch. Per area,
 without test inventories (those are in apps/mobile/README.md and the history
 file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_REGIONS`,
 `LEDGER_CURRENCIES`): what a build offers, verified on Linux; nothing is distributed to people yet
 (§4).
 
-- **More financial destinations in Forest (24UX6E, on its branch; device QA pending).** Presentation and lifecycle
+- **Refunds, early payoff and the instalment lifecycle (24T3, on its branch; device QA pending).** Purchase operations
+  (`packages/domain/operations.ts`): a **devolución** (a purchase returned in whole or in part) and an **adelanto de
+  cuotas** (the remaining instalments of a plan brought forward), each an append-only record with a form UUID, a
+  revision and an undone flag, stored in their own table and **projected** by `snapshotFromArchive` into the ledger as
+  derived lines that every reader already sums; nothing stored before 24T3 is rewritten. A devolución is never an
+  income: an ordinary purchase's (cash, card, a recurring occurrence) credits the purchase's own account, counts in its
+  own month and in the purchase's category, and is capped at the price; a plan's reverses principal already recorded
+  first (one credit line on the card) and lowers the last instalments with the rest (never spending); financing is
+  untouched. An adelanto recognises every remaining instalment once, on its date, on the card's balance due (future
+  interest «Los registro ahora» or «El emisor no los cobró», the person's explicit choice); the payment is the separate
+  «Pagar tarjeta» transfer and nothing reads «pagada». «Dejar de seguir el plan» (was the unused «Cancelar plan»)
+  records the instalments whose statement already closed before it stops (bug M3 fixed); «Reactivar plan» undoes it.
+  A card holding a credit is archived, never deleted (B3); a completed, stopped, refunded or brought-forward plan no
+  longer blocks deleting its card. Entry points: «Registrar devolución» on a purchase's detail and on the plan detail,
+  «Registrar adelanto de cuotas» on the plan detail, `/operation/[id]` with Deshacer, Movimientos deshechos with
+  Restaurar. SQLite schema 14, backup v14. Reportes, Presupuestos, Inicio and the Assistant's evidence net devoluciones
+  in their month without drawing a negative slice or bar or sending a negative fact. Carry-in: Reportes' «Categorías |
+  Día a día» switch at 15/20, no shrink-to-fit. The version line reads «FinanzApp 0.1.0 (24T3)». Details in «Producto
+  24T3» (§3).
+- **More financial destinations in Forest (24UX6E, PR #75, merge commit d30b77f; device QA pending).** Presentation and lifecycle
   polish plus the bugs found on the way; no domain, storage, schema (13), backup (v13), FX or native change; Inicio,
   Reportes and Tarjetas unchanged (Tarjetas only got the post-delete navigation fix). Shared: one `LifecycleNote`
   (`src/ui/components.tsx`, the shape of Tarjetas' `CardLifecycleNote`: a secondary glyph, an optional title, one
@@ -214,7 +252,7 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   errors); an untouched save of a historical category recolouring it everywhere; a closed debt drawn overdue; the debt
   edit form's stale name; the forecast cut at 375 pt; an account balance shrunk instead of stacked; edit modals with no
   close button when there is nothing to edit; «Eliminar cuenta» / «Eliminar tarjeta» now `dismissTo` the list. The
-  version line reads «FinanzApp 0.1.0 (24UX6E)». Details in «Producto 24UX6E» (§3).
+  version line read «FinanzApp 0.1.0 (24UX6E)» (24T3 since). Details in «Producto 24UX6E» (§3).
 - **Cards in Forest and final Home/Reports polish (24UX6D, PR #74, merge commit 8f758ad; device QA pending).** Presentation only: no
   card accounting, payment, cycle, date, instalment recognition, committed principal, available-credit gate, lifecycle,
   ledger, schema (13), backup (v13), FX or native change. **Reportes Categorías:** no «Gastado · ARS» KPI, big amount
@@ -289,6 +327,11 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   «Este ciclo») and the archived cards under Archivadas; the card detail with its plans; the plan detail with its
   calendar; instalment movements with «Cuota 3 de 12», a link to the plan and an edit limited to merchant and category.
   Details and checks in «Producto 24T2» (§3); its screens restyled in Forest by 24UX6D (above), every figure unchanged.
+  Since 24T3 the plan detail offers, each only when storage would accept it, «Registrar devolución», «Registrar adelanto
+  de cuotas» and «Dejar de seguir el plan» (or «Eliminar plan» while nothing was recorded, never both), «Reactivar
+  plan» on a stopped plan; its figures add what was brought forward, not charged, returned to the card and reduced by a
+  devolución; its calendar adds «Adelantada», «No se cobró», «Devuelta» and «Reducida por devolución», and «Cancelada»
+  became «No se registra» (the plan «Sin seguimiento»).
 - **Instalment engine (24T1, PR #67; its screens since 24T2, above).** `packages/domain/installments.ts`: an `InstallmentPlan` per
   financed purchase (one purchase, one finite plan, never a `RecurringRule`), owned by a card, in the card's currency, with
   explicit financing components and an exact schedule written once (statement closing and due date per instalment,
@@ -303,7 +346,13 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   refused with a pending plan (`assertCardDeletable`, storage and the dialog); archiving keeps everything running; a plan
   is deleted only without history, cancelled otherwise; no save changes price, count or dates. SQLite 12 (two additive
   tables), backup v12 as soon as a plan exists (v1–v12 import). `LedgerProvider` exposes `addInstallmentPlan`,
-  `cancelInstallmentPlan`, `removeInstallmentPlan`; since 24T2 the purchase form creates plans (above).
+  `cancelInstallmentPlan`, `removeInstallmentPlan`; since 24T2 the purchase form creates plans (above). Since 24T3 one
+  `effectiveShares` reads every share with its devoluciones and adelantos (scheduled, recognised, undone, settled,
+  waived, refunded, cancelled); a plan is pending while a share is scheduled or undone; every plan write runs the plan's
+  catch-up in its own transaction (`planCatchUpInserts`); `cancelInstallmentPlan` records closed shares first and takes
+  the revision the screen showed, `reactivateInstallmentPlan` undoes a stop, `addRefund`, `addPayoff`,
+  `voidOperation` and `restoreOperation` write the operations; a plan with any operation (undone included) is never
+  deleted.
 - **Detail hierarchy (25B3).** Two corrections of hierarchy before instalments, no redesign: the
   account detail no longer prints «Saldo inicial / Opening balance» as a row (`openingMinor` is unchanged in storage,
   backups, migrations and every balance; the recorded balance still starts from it; nothing replaced the row; since
@@ -344,7 +393,7 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   hub; the Assistant is a root-stack screen opened from the hub; Más is the grouped hub (Finanzas / App y datos:
   Cuentas, Tarjetas, Presupuestos, Recurrentes, Deudas y cobros, Categorías, Idioma, Región, Apariencia, backup, the
   Assistant's data note; since 24UX6C each group under a small caps label); a Más version line («FinanzApp 0.1.0
-  (24UX6E)»; the material and locale diagnostics only in a
+  (24T3)»; the material and locale diagnostics only in a
   development build). The dock stays in the layout (never absolute over the content). Liquid Glass (tinted pine on the
   dock's pill) on the dock, the account detail's movement pills and the Assistant composer only in a development build
   on iOS 26 with the API present and without Reduce Transparency; opaque material otherwise (solid pine with a hairline
@@ -373,8 +422,16 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   Ingresa en as stacked selection rows; the date wheel in a compact bottom sheet on iOS (24B6;
   its entrance is corrected in 24UX1); edit, undo, contextual account correction and recovery
   (since 24UX6E Movimientos deshechos shows no day net);
-  a draft kept when a save fails; historical card incomes still editable.
-- **Ledger and storage.** SQLite schema 13 (24T2: `card_cycle_dates`, a card's exact statement dates; 12 (24T1):
+  a draft kept when a save fails; historical card incomes still editable. Since 24T3 a purchase's detail offers
+  «Registrar devolución» (`/new-refund`, a reviewed modal with «Total disponible», the date and a preview of exactly
+  what is recorded) and lists its devoluciones under «Devuelto $ X de $ Y»; Movimientos shows a devolución as
+  «Devolución · comercio», unsigned in ink with its own glyph, and an adelanto as «Adelanto de cuotas · comercio», both
+  under Todos and Gastos (never Ingresos), searchable by their kind word and opening `/operation/[id]` (read-only, with
+  Deshacer); Movimientos deshechos lists undone ones under «Devoluciones y adelantos» with Restaurar; a purchase with
+  devoluciones cannot be undone first, and its edit keeps it an expense on its account, at least what was returned and
+  dated no later than the first devolución; the income preset «Reembolsos» points to «Registrar devolución».
+- **Ledger and storage.** SQLite schema 14 (24T3: `purchase_operations`, the devoluciones and adelantos, and
+  `operation_changes`, the receipts of their undo and restore; 13 (24T2): `card_cycle_dates`, a card's exact statement dates; 12 (24T1):
   `installment_plans` and `installments`; 11 (25B2): the account
   tombstone and the card flag; 10 (24UX4): a `deleted` flag on recurring rules
   and debt profiles; schema 9 added `currency_units`), durable writes, audited
@@ -385,8 +442,8 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   four digits, limit, closing and due days; counterparty, direction, due date), card rules
   (24B6). A backup takes the lowest version its content needs: v8 (ARS/USD only), v9 (another currency),
   v10 (24UX4: a deleted rule or debt), v11 (25B2: a deleted account or card), v12 (24T1: an instalment
-  plan), v13 (24T2: an exact statement date); v1–v13 import; an older build refuses a newer file unchanged; a failed
-  restore rolls back.
+  plan), v13 (24T2: an exact statement date), v14 (24T3: a devolución or an adelanto, an undone one included); v1–v14
+  import; an older build refuses a newer file unchanged; a failed restore rolls back.
 - **Commitments.** Purchases in instalments since 24T1 (the engine above; since 24T2 the purchase form, the plan detail
   and the card's figures). Weekly/monthly/yearly recurring rules with next occurrence, pause, edit,
   per-occurrence identity (scheduled is not paid; retries cannot duplicate); debts and
@@ -407,7 +464,13 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   account or card reads «Cuenta eliminada» / «Tarjeta eliminada» on its row and detail, amber «Hoy» / «Mañana» marks an
   expense only, and the 30-day forecast is flat with «Gastos» on its own line; a debt's tile and the totals are neutral,
   only its state words take a tone (overdue; due within three days for a debt I owe), and a closed debt is never drawn
-  as overdue (its detail shows a «Deuda cerrada» note).
+  as overdue (its detail shows a «Deuda cerrada» note). 24T3 (Tarjetas and plans): a card devolución lowers the card's
+  balance due and can leave a credit («a favor»), which blocks deleting the card (archive it); the cycle's
+  «devoluciones» adds devolución lines to the legacy card incomes, an adelanto's principal counts as one purchase of
+  the cycle and its financing as financing; «Cuotas futuras» and pending plans read the effective shares (a reduced,
+  brought-forward, not-charged or stopped share is not committed), so a plan that is no longer pending stops hiding
+  the available credit; no screen of Tarjetas or the card detail was redesigned. Debts are untouched: a devolución is
+  never a debt payment or collection.
 - **Merchant identity (24UX2).** `packages/domain/merchants.ts`: normalized merchant keys, a
   curated catalogue of 35 unambiguous brands matched only by exact alias, never a category; the
   typed name is never rewritten; bare common words (Apple, Steam, Adobe, Despegar) stay
@@ -423,7 +486,15 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   missing-history guards; one display mode and currency shared by Inicio and Reportes
   (`finanzapp.displayMode`, `finanzapp.displayCurrency`, outside the ledger and backups): since 24C1 a
   consolidated total converted in the view (each movement at its own date's rate) or one currency on
-  its own; charts, categories, merchants, budgets and comparisons add up to the same total.
+  its own; charts, categories, merchants, budgets and comparisons add up to the same total. Since 24T3 a devolución
+  nets in its own month and category everywhere spending is summed, so a category, a day, a month or a budget can be
+  zero or below: counts are purchases only (`isPurchaseLine`; a devolución is not a purchase, an adelanto is one), the
+  donut draws positive categories only around the exact net and lists the others last as «Sin gasto neto», a period
+  with no positive category gets a quiet sentence instead of a donut, the month bars clamp at zero and say the net in
+  text, no growth or percentage is claimed against a previous period at zero or below, rankings drop merchants that net
+  to zero or less, «Tu mayor gasto» nets a purchase's devoluciones; Presupuestos keeps the exact negative Gastado and
+  clamps Disponible at the limit with «Las devoluciones superan lo gastado» (Inicio's Gastado says the same under the
+  number); the method notes say devoluciones count in their month and category.
 - **Assistant.** The conversational screen (Producto 21/22): composer (its microphone removed in 24UX6C until
   dictation exists in 25A), streaming-ready event client over the authenticated integration client, draft
   cards with explicit Confirmar, clarification chips, evidence rows and links from cited facts,
@@ -436,7 +507,9 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   root-stack screen (`app/assistant.tsx`) pushed from the capture hub, not a tab; its conversation lives in one
   in-memory session per app process (`src/assistant/session.ts`: leaving the screen keeps it and lets a running answer
   land, New chat or closing the app clears it, nothing is persisted), and the hub offers «Continuar» only with the
-  person's real last words. It still writes only a confirmed draft.
+  person's real last words. It still writes only a confirmed draft. Since 24T3 its local evidence sends purchases and
+  categories gross plus one positive «Devoluciones» fact (`spendingFacts`), never a negative number; it proposes no
+  devolución or adelanto (25A).
 - **Internationalization.** Spanish and English released; 234 of the 257 catalogue regions
   released (Argentina and the United States since 23.1C2, the rest in 24R2B); language and region chosen independently ("Según el dispositivo" or one value), both
   reactive without restart; every screen through modular catalogues with `i18n:check`,
@@ -474,7 +547,8 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   a development preview; the Assistant stays ARS/USD (contract v1). Since 24C1: reference rates from
   Frankfurter v2 in a separate SQLite cache (`finanzapp-rates-v1.sqlite`), exact conversion in
   `packages/domain/fx.ts`, consolidated views on Inicio, Reportes, their drill-downs and Presupuestos;
-  nothing stored converts; purchases paid from an account in another currency are 24C2.
+  nothing stored converts; purchases paid from an account in another currency are 24C2. Since 24T3 a devolución and
+  an adelanto convert in a consolidated view at their own date's rate like any movement (docs/currency.md §2.11).
 - **Motion and material.** `src/ui/motion.tsx` (strong ease-out, named durations, value
   crossfades, reflow, haptic helpers), press feedback, segmented control, category washes,
   the card deck on the UI thread (24T2; the carousel before it), Reduce Motion everywhere (rules in §6).
@@ -492,7 +566,22 @@ it was checked in). Metro from the branch on the installed FinanzApp Dev build s
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
-- **24UX6E — More financial destinations in Forest (none done; no EAS build):** the checklist section Producto 24UX6E:
+- **24T3 — Refunds, early payoff and installment lifecycle (none done; no EAS build; a targeted pass that must pass
+  before this PR merges):** the checklist section Producto 24T3: the schema 14 upgrade over the owner's data with a
+  backup first; a cash devolución partial and full; a card purchase's devolución lowering the balance due; a plan
+  devolución before and after a closing and the lowered last instalments; an over-refund refused; an adelanto with and
+  without interest (both financing choices) and then Pagar tarjeta; «Dejar de seguir el plan» and «Reactivar plan»;
+  deleting a card blocked by a credit, a balance due and a pending plan (one dialog naming each, «Archivar tarjeta»
+  right there; an archived card says it already is), then allowed; the «Devolución de compra» note and its help (a bank
+  reintegro is an income); a devolución dated today before noon; «Devoluciones netas este mes» on an account; undo and
+  restore of a devolución and an
+  adelanto; the Movimientos rows and Movimientos deshechos; Reportes with a category below zero and the «Categorías | Día
+  a día» labels at 375 pt in Spanish and English at the default, large and AX text sizes; Deudas unchanged (a devolución
+  never appears as a payment or collection); VoiceOver on the new screens; light and dark. The earlier 24UX6A–24UX6E
+  items below stay pending for the full pre-TestFlight pass; this targeted pass is also the final device QA of
+  instalments that 24T1 and 24T2 left to 24T3 (Tarjetas and Deudas on the iPhone). Metro on the installed development
+  build; no native dependency added.
+- **24UX6E — More financial destinations in Forest (merged as PR #75; none done; no EAS build):** the checklist section Producto 24UX6E:
   Cuentas with one and several accounts, large positive and negative balances, several currencies (the section header
   in ink with its total, stacking at large text, one VoiceOver header), long names, the flat detail block at 40 pt, a
   deleted account's note; «Eliminar cuenta» and «Eliminar tarjeta» returning to their list with Atrás and the tab bar
@@ -579,7 +668,7 @@ item unless a section says a new native build is needed. The checklist sections 
 - **24T1 — the instalment engine:** nothing visible; the checklist section Producto 24T1 (a backup before the schema 12
   upgrade of FinanzApp Dev's data, the app opening on the same figures, a regression spot-check of a card purchase and
   payment). The device gates of instalments belong to 24T2 (the purchase form, the figures) and 24T3 (Tarjetas and
-  Deudas on the iPhone).
+  Deudas on the iPhone; the checklist section Producto 24T3, above).
 - **25B3 — detail hierarchy polish:** the checklist section Producto 25B3 (the account detail without the opening
   balance row and with the same balance; the recurring detail from Inicio, Recurrentes and a recorded movement; Editar
   from the header; Pausar/Reanudar keeping the screen, Eliminar going back; the Revisar state; VoiceOver reading each
@@ -662,30 +751,40 @@ merged as PR #73, merge commit 5c7381391a8531473f0948f632dcf1c988864408; device 
 (Cards in Forest plus two approved micro-polish carry-ins, Reportes' category composition with the total in the donut's
 centre and Inicio's budget progress rows, refined by the owner to the general and category budgets needing attention,
 two rows at most; merged as PR #74, merge commit 8f758ad65226eda27b88f32da22a8c9766a35bad; device QA pending), then
-**24UX6E — More financial destinations in Forest** (this PR: Cuentas,
+**24UX6E — More financial destinations in Forest** (Cuentas,
 Presupuestos, Recurrentes, Deudas y cobros and Categorías brought to the Forest hierarchy and quality of Inicio,
 Reportes and Tarjetas; presentation and lifecycle polish only unless an actual bug is found, their domain and storage
-semantics preserved; Más' utility destinations audited, not redesigned; on its branch; device QA pending), the last
-pass of the UX lane: after it the broad Forest visual lane is closed unless physical-device evidence finds a specific
-regression. After the UX lane **24T3** (refunds, early
-payoff, cancellation adjustments and the final device QA of instalments) remains next before 25A, per the binding
-order, unless a new dependency is discovered; then the later roadmap below. The earlier
+semantics preserved; Más' utility destinations audited, not redesigned; merged as PR #75, merge commit
+d30b77f25bcb38bff8f5593b82a95ccc20213c55; device QA pending), the last pass of the UX lane: the broad Forest visual lane
+(24UX6A–24UX6E) is closed unless physical-device evidence finds a specific regression. **24T3 — Refunds, early payoff
+and installment lifecycle** (devoluciones, the adelanto de cuotas, «Dejar de seguir» / «Reactivar», the card deletion
+rules, schema 14 and backup v14, the readers that net devoluciones, and the targeted device QA of instalments; owner
+decisions B1–B3 of 2026-10-01; «Producto 24T3» below) is this PR. Then, in order: **25A** (the real Assistant,
+including devolución drafts), **25A2** (Wallet Shortcut Capture: the person's own Shortcuts Wallet automation → an
+explicit card mapping → a draft; no FinanceKit; placed by the owner on 2026-10-02), **25C** (budgets with rollover, goals, CSV and productivity, with Movimientos' advanced
+filters: account, category, period and custom period, type, search, clear/reset states and saved searches), **25C2**,
+**25D**, **25E**, **25F** and **26**. The app-wide «Ocultar importes» control stays recorded for future privacy work
+beside 25D («Later note recorded in 24UX6C»), not scheduled. The first opening is implemented (25B) and is not
+reopened. No paywall before 25F; no TestFlight or App Store submission before 26. The earlier
 plan, as reconciled by 24T1C: 24T1 left 12 of the 13 card-invariant `it.todo`
 as tests (the remaining one, the foreign-currency plan record, belongs to 24C2); then 24T2 and **24T3**: **Producto 24T** ships in three focused PRs: 24T1 (domain, schema, backup and instalment
 mathematics; merged), 24T2 (the card purchase with the simple financing UX, the exact current-cycle dates, statements,
 current-versus-future balances and the Tarjetas direction, all recorded under 24T below and in «Producto 24T1C»),
 24T3 (refunds, early payments, lifecycle and the final device QA).
 
-The binding order is **24UX6A → 24UX6B → 24UX6C → 24UX6C2 → 24UX6D → 24UX6E → 24T3 → 25A → 25C → 25C2 → 25D → 25E → 25F → 26** (launch; 24T2 merged as PR #69; 24UX6A–24UX6D merged as PRs #70–#74). Every dependency points
+The binding order is **24UX6A → 24UX6B → 24UX6C → 24UX6C2 → 24UX6D → 24UX6E → 24T3 → 25A → 25A2 → 25C → 25C2 → 25D → 25E → 25F → 26** (launch; 25A2 placed by the owner on 2026-10-02; 24T2 merged as PR #69; 24UX6A–24UX6E merged as PRs #70–#75). Every dependency points
 backwards in it; the scope that would need a later or optional delivery is split out explicitly (24T1C, 2026-09-28):
 
 - **24C2 is optional** and blocks nothing in this order. 25A's core works on what the ledger already represents; only
   its foreign-purchase subflow (original currency different from the billing or paying currency) stays gated and
   unavailable until 24C2 exists. If the owner schedules 24C2 before 25A, 25A consumes it; if not, 25A is a complete
   delivery without that subflow. The instalment `it.todo` for a foreign-currency plan waits for 24C2 the same way.
+- **25A2 right after 25A** (owner, 2026-10-02): Wallet / Shortcuts capture does not wait for FinanceKit. It needs only
+  25A's draft and review infrastructure (the capture path, the review tray, the pairing token) and the person's own
+  Shortcuts automation; FinanceKit stays a later, optional research gate under 25D.
 - **25D before 25E** ships only what works on the device or over the existing capture path (Face ID and privacy,
-  local notifications, App Intents / Shortcuts / Siri / Spotlight, Wallet automation → draft, widgets, Apple Watch,
-  the FinanceKit research gate). Remote push (APNs) that needs a backend or sync, and any Sign in with Apple tied to
+  local notifications, the broader App Intents / Siri / Spotlight, widgets, Apple Watch, the FinanceKit research gate;
+  the Wallet automation → draft path moved to 25A2). Remote push (APNs) that needs a backend or sync, and any Sign in with Apple tied to
   25E's account/sync, are **deferred to 25E** or a follow-up after it; 25D neither implements them nor depends on 25E.
 - **24R3** is required only before a launch in the regions that need it (the native-digit regions); it blocks no
   delivery in this order and the owner places it.
@@ -695,12 +794,11 @@ backwards in it; the scope that would need a later or optional delivery is split
   24UX6D refinement; 24UX6D restyled the Tarjetas screens that 24T3 also touches). Delivered: 24UX6A (PR #70), 24UX6B (PR #71),
   24UX6C (PR #72), 24UX6C2 (PR #73, merge commit 5c7381391a8531473f0948f632dcf1c988864408, a small polish of Inicio's
   activity and Reportes' donut); 24UX6D (PR #74, merge commit 8f758ad65226eda27b88f32da22a8c9766a35bad, Cards in Forest plus two approved
-  micro-polish carry-ins: Reportes' category composition and Inicio's budget progress rows); **24UX6E — More financial
-  destinations in Forest** (Cuentas, Presupuestos, Recurrentes, Deudas y cobros and Categorías) is this PR, the lane's
-  last pass; after it the broad Forest visual lane is closed unless device evidence finds a specific regression (presentation and
+  micro-polish carry-ins: Reportes' category composition and Inicio's budget progress rows); 24UX6E (PR #75, merge commit d30b77f25bcb38bff8f5593b82a95ccc20213c55, more financial
+  destinations in Forest: Cuentas, Presupuestos, Recurrentes, Deudas y cobros and Categorías), the lane's last pass; the
+  broad Forest visual lane is closed unless device evidence finds a specific regression (presentation and
   lifecycle polish only unless an actual bug is found, preserving their domain and storage semantics; the Más utility
-  destinations are audited, not redesigned). After the UX lane, **24T3 remains next before 25A** unless a new dependency is
-  discovered, and none of this moves anything in the product order above. None of them removes, reorders or re-scopes 24T3, 25A, 25C/25C2, 25D, 25E/25F, 26 or any other planned item; the approved decisions of each are in
+  destinations are audited, not redesigned). **24T3 is this PR** and **25A** follows it, and none of this moves anything in the product order above. None of them removes, reorders or re-scopes 24T3, 25A, 25C/25C2, 25D, 25E/25F, 26 or any other planned item; the approved decisions of each are in
   «Producto 24UX6B», «Producto 24UX6C», «Producto 24UX6D» and «Producto 24UX6E» below, so they are not asked again.
   Movimientos' approved filters (account, category, period and custom period, beside the existing type filter and
   search, with clear/reset states for the new filters) belong to 25C's productivity and search scope with its saved
@@ -1337,9 +1435,45 @@ the owner authorises it; no EAS build or store submission without the owner.
   owner sets up. **Not a dependency:** 24C2 (optional). Its foreign-purchase subflow is enabled only if 24C2 has
   merged; otherwise 25A ships complete without it (24T1C, 2026-09-28).
 
+### Producto 25A2 — Wallet Shortcut Capture
+
+Planned (placed by the owner on 2026-10-02, right after 25A; documentation only, nothing implemented). A focused
+delivery that pulls the Wallet capture forward from 25D: it needs 25A's drafts and review tray, not FinanceKit.
+
+- **Path.** The person's own iOS Shortcuts personal automation on a Wallet transaction («Transacción» / "Transaction")
+  → a FinanzApp App Intent → a **draft / review item**. No FinanceKit entitlement is needed for this path. The person
+  sets it up once (FinanzApp explains the steps; it cannot create the automation for them).
+- **Explicit mapping.** One Wallet payment card / pass → one FinanzApp destination, chosen by the person and editable:
+  a FinanzApp **credit card**, or a FinanzApp **normal account** for a debit card. Preferred over any fuzzy match by
+  card name; a currency or a name never identifies the destination. Without a mapping the draft asks for it.
+- **Input.** Whatever Wallet supplies, when present: amount, merchant, the card / payment-method identity, currency
+  where available, and the capture date and time from the device as appropriate. Nothing absent is invented.
+- **Draft, never a silent write.** Every capture creates a draft the person reviews and confirms; the ledger is never
+  written on its own. Repeated deliveries are deduplicated.
+- **Credit-card mapping.** A purchase draft on that FinanzApp card, presented as «Una vez» by default; the person may
+  change it to cuotas before confirming. An instalment plan or count is **never inferred** from a Wallet transaction
+  unless exact instalment facts are actually supplied by a trusted source. The current card and instalment validators
+  bind (decision 003; `card-invariants.test.ts`).
+- **Debit / normal-account mapping.** An expense draft on the mapped account (no independent debit-card ledger).
+- **Merchant.** The Wallet-provided merchant is kept when present (normalised as in docs/merchant-identity.md); a
+  missing or poor merchant stays editable.
+- **Category.** May be suggested from the merchant, the person's rules or the Assistant; the person can correct it
+  before confirming; FinanzApp never claims Wallet supplied a FinanzApp category.
+- **Missing data.** Amount, merchant or card fields may occasionally be absent or unusable: the capture stays an
+  incomplete draft in the review flow, never dropped and never filled with invented data.
+- **No claims.** Not that every Apple Pay / Wallet transaction is captured; not that Apple Watch behaves the same as
+  the iPhone until verified on a device; not that online or non-contactless transactions are captured; not that every
+  bank, card or region supports the trigger.
+- **Manual capture stays the core**, offline and complete without any of this.
+- **Gates.** Device evidence on an iPhone and, separately, on an Apple Watch payment; a denied or missing automation;
+  repeated and late deliveries; the mapping for a credit card and for a debit card; an incomplete capture.
+- **Depends on.** 25A (draft and review infrastructure, the capture path and the pairing token). **Not a dependency:**
+  FinanceKit (a later, optional research gate in 25D) and 25D itself.
+
 ### Producto 24T — instalments and complete cards
 
-Split into 24T1 (merged, PR #67: the engine, see its own section below), 24T2 and 24T3. The accounting contract below is
+Split into 24T1 (merged, PR #67: the engine, see its own section below), 24T2 (merged, PR #69) and 24T3 (this PR,
+«Producto 24T3» below). The accounting contract below is
 decided (decision 003, rule 7, revised 2026-09-28) and implemented by 24T1 in the domain, the storage and the backup;
 nothing of it is on a screen yet.
 
@@ -1373,6 +1507,10 @@ nothing of it is on a screen yet.
   partial refund keeps the rest; an early payment reduces the obligation and creates no new expense.
   Refunds of any purchase (card or cash) lower the category in the refund's month, and the card's balance
   when paid by card, never an income; the link survives edits, undo and backups.
+  *(→ 24T3, owner decisions 2026-10-01, decision 003 rule 7: an early payment creates no new expense because it
+  recognises, once and on its own date, the instalments not yet recorded, on the card's balance due; the card payment is
+  a separate transfer (B1). A plan refund lowers the category and the card's balance only for the principal already
+  recorded by then; the rest lowers the last instalments, which were never spending (B2). Details in «Producto 24T3».)*
 - **Foreign currency (24T + 24C2).** The model distinguishes the purchase's original currency, the
   currency the card bills in, the paying account's currency, the exact amount debited and the exact amount
   credited, and the rate and fees with provenance. A cross-currency transfer is never modelled as a
@@ -1406,14 +1544,19 @@ nothing of it is on a screen yet.
   - **24T3 — refunds, early payments, lifecycle and final device QA.** Refunds and early payoff as above,
     cancellations and adjustments without a second expense, the deletion block for pending plans, Tarjetas
     and Deudas on the iPhone. Optional reminders for closings, due dates and instalments belong to 25D's
-    local notifications and never claim a bank did or did not receive a payment.
+    local notifications and never claim a bank did or did not receive a payment. **Implemented on its branch (this
+    PR); see «Producto 24T3» below.** Delivered as devoluciones, the full adelanto de cuotas and «Dejar de seguir» /
+    «Reactivar»; no «adjustment» operation exists (none was needed), and a partial advance of N instalments is
+    deferred.
 - **Rules.** Never duplicate an expense through a recurring rule; scheduled is not paid; the principal is
   recognised once in total, instalment by instalment.
 - **Out of scope.** Bank statements, disputes, freezing a card, FCI redemptions.
-- **Gates.** Domain tests first (24T1): cent distribution, cycle assignment, early payment against later
-  instalments, refund against a partly recognised plan, the sum of recognised principal equal to the total;
-  schema and backup versions with a rollback test; the available-credit decision; Tarjetas and Deudas on
-  the iPhone (24T3).
+- **Gates.** Domain tests first, each with the delivery that brings its operation: cent distribution, cycle
+  assignment and the sum of recognised principal equal to the total (24T1); early payment against later instalments
+  and refund against a partly recognised plan (24T3: `packages/domain/operations.test.ts`, the property walk
+  `operations.property.test.ts` and card-invariants 7d; 24T1 had deferred them with the operation itself); schema and
+  backup versions with a rollback test (24T1, 24T2, 24T3); the available-credit decision (still open); Tarjetas and
+  Deudas on the iPhone (24T3, checklist section Producto 24T3).
 - **Depends on.** 25B2 merged; 24C1 for the rates of international instalments and 24C2's purchase record
   for them.
 
@@ -2691,7 +2834,7 @@ nothing of it is on a screen yet.
   `check` OK; `export:ios` OK (a JS bundle, not an Xcode build). Root `npm test` 415 passed, 1 todo; `npm run
   check:repo` OK (384 files). No EAS, no device run.
 
-### Producto 24UX6E — More financial destinations in Forest (this PR)
+### Producto 24UX6E — More financial destinations in Forest (PR #75, merged)
 
 *(Re-scoped by the owner on 2026-10-01 in the 24UX6D refinement; it was «Accounts, Recurring and Debts in Forest».)*
 
@@ -2904,7 +3047,7 @@ nothing of it is on a screen yet.
   with a non-breaking space («60 % utilizado»), the account's expenses unsigned, the forecast labels («Gastos · ARS»,
   Ingresos hidden at 0), the notes without «Pausado: », the debt detail without Tipo/Estado, the archived category's
   spoken kind.
-- **Status.** Implemented on its branch; not merged. Device QA pending: nothing was checked on an iPhone (checklist
+- **Status.** Merged (PR #75, merge commit d30b77f25bcb38bff8f5593b82a95ccc20213c55). Device QA pending: nothing was checked on an iPhone (checklist
   section Producto 24UX6E; the list in §2). No EAS build; no native dependency added; schema 13 and backup v13
   unchanged.
 - **Gates.** 2026-10-01, local. `apps/mobile`: typecheck OK; `node --experimental-strip-types --test tests/*.node.ts`
@@ -2922,8 +3065,297 @@ nothing of it is on a screen yet.
     the storage rules check;
   - `ROW_CHEVRON`'s comment named a debt row as a user; only AccountRow draws that chevron.
 - **After 24UX6E.** The broad Forest visual lane (24UX6A–24UX6E) is **closed**: a further visual pass needs
-  physical-device evidence of a specific regression, not a general restyle. The next product delivery remains **24T3**,
+  physical-device evidence of a specific regression, not a general restyle. The next product delivery remains **24T3**
+  («Producto 24T3», below),
   then **25A**; Movimientos' advanced filters remain in **25C**; 25C2, 25D, 25E, 25F and 26 are unchanged.
+
+### Producto 24T3 — Refunds, early payoff and installment lifecycle (this PR)
+
+- **Goal.** The last delivery of Producto 24T: a purchase returned in whole or in part (a **devolución**), the
+  remaining instalments of a plan brought forward (an **adelanto de cuotas**), what stopping a plan means and how it is
+  undone, and the deletion rules of plans and cards, each without a second expense, an income or a «pagada»; plus the
+  final device QA of instalments (Tarjetas and Deudas on the iPhone).
+- **Scope.** Branch `feat/producto-24t3-refunds-payoff-lifecycle` from master d30b77f (24UX6E merged as PR #75).
+  Planned from eight audits (entries, storage, cards, reports, docs, UI, the segmented control, gaps), a written data-flow
+  design, six adversarial critiques (accounting, persistence, regressions, retry and undo, the state machine, UI and
+  accessibility) and a synthesis of thirty binding amendments (A1–A30); three questions went to the owner (B1–B3).
+  Implemented in lanes, each followed by an adversarial verifier: the domain, storage, the domain readers, the plan and
+  cards screens, the refund and operation screens, the reader screens. Commits: 9fa4bf3 (the Reportes carry-in),
+  3cbdd1d (domain), 718e898 (storage and domain readers), ec4a996 (UI). Not in scope: a Tarjetas redesign, Movimientos'
+  filters (25C), notifications, the Assistant's drafts (25A).
+- **Owner decisions (2026-10-01, asked in session; recorded in decision 003, rule 7).**
+  - **B1, adelanto.** An early payoff recognises the shares not yet recorded on the payoff's own effective date, once;
+    the payment to the card stays a separate transfer. (The alternative, the next closing on or after the payoff, was
+    declined.)
+  - **B2, plan devolución.** A refund of a plan reverses the principal already recorded first and lowers the tail with
+    the rest, from the last instalment backwards. (A per-refund choice between a statement credit and lower instalments
+    was declined.)
+  - **B3, card with a credit.** `assertCardDeletable` also refuses a card holding a credit in the holder's favour
+    («Tiene saldo a favor; archivala.»); this amends 003's single deletion rule, which stays in one place.
+- **Data model (`packages/domain/operations.ts`, exported from the domain index).** A `PurchaseOperation` is one of:
+  - `EntryRefund` (`kind: 'refund'`, `target: { entryId }`): a devolución of an ordinary expense (cash, a card purchase
+    without instalments, a recurring occurrence); `accountId` is the purchase's account at creation; `amountMinor > 0`.
+  - `PlanRefund` (`kind: 'refund'`, `target: { planId }`): a devolución of a plan's principal; `accountId` is the card's
+    hidden account; `amountMinor = creditMinor + Σ reductions`; `creditMinor ≥ 0` reverses recorded principal now;
+    `reductions` (`{ number, minor }`, frozen) lower future principal shares.
+  - `PlanPayoff` (`kind: 'payoff'`, `target: { planId }`): `financing: 'recognised' | 'waived'` and `covered` (`{ number,
+    component, minor }`, frozen: every unrecorded share at creation, financing rows kept even when waived so the waiver is
+    auditable); `amountMinor` = Σ covered principal.
+  - Every operation carries `id`, `currency` (the target's, never converted), `dateISO` (its effective date: the month it
+    counts in), `voided` (undone by the person, restorable), `createdAt`, `revision` and `updatedAt`. Ids are form UUIDs
+    frozen in the draft (`[A-Za-z0-9-]`, at most 97 characters, no `_`), disjoint from movement, transfer and plan ids.
+  - **Projection.** `snapshotFromArchive` adds one derived line per live operation to `snapshot.entries`, after the
+    records and in a deterministic order; nothing is stored as a movement (`validateEntry` refuses a line carrying
+    `refund` or `payoff`, `PROJECTED_ENTRY_MESSAGE`). A devolución line has the operation's id, `kind: 'expense'` and a
+    **negative** amount (a contra-expense: balances add it back, spending sums net it, it never reaches income) with
+    `refund: { operationId, targetEntryId | targetPlanId }`; its merchant and category are read through the link, so an
+    edit of the purchase's category moves it. An adelanto projects one positive line per component with a recognised
+    covered amount, ids `<op>_p`, `_i`, `_f`, `_t`, `payoff: { operationId, planId, component }`, in that component's
+    category. `isPurchaseLine` is the one count predicate (a devolución line is not a purchase; an adelanto counts once,
+    through its principal line).
+  - **Why not a new movement kind or stored refund entries:** every reader that splits expense and income would
+    misclassify a new kind, and a stored movement plus an operation row would be two sources of truth for one fact.
+- **Schema 14, backup v14.** SQLite 14 adds `purchase_operations` (one STRICT row per operation: exactly one target,
+  account, currency, amount, `creditMinor` only on a plan devolución, the frozen `detailJSON` read by one strict parser
+  shared with the backup, the date, `voided`, revision and dates; CHECKs on kind, target, amounts and revision 0;
+  foreign keys `ON DELETE RESTRICT`) and `operation_changes` (the receipts of undo and restore, idempotent by change id),
+  `IF NOT EXISTS`, `user_version = 14` last; a schema 13 file opens with both tables empty (no operation is fabricated for
+  old data) and an older build refuses a schema 14 file unchanged. Backup v14 = v13 plus `purchaseOperations`; the
+  lowest-version rule writes v14 as soon as any operation exists, an undone one included, always with the
+  `installmentPlans` and `cardCycleDates` arrays (possibly empty). v1–v14 import; a v15 file is refused with «versiones 1
+  a 14». Import stays additive by id, operations inserted after the movements and plans they reference; the same id
+  with other content, revision or undone state is a conflict, and an operation that does not fit this device's plans
+  refuses the whole import («La copia tiene devoluciones o adelantos que no encajan con las cuotas de este dispositivo.
+  No se importó nada.»). Operations count toward the 25 000-movement budget (an adelanto as four) with their own cap
+  (`MAX_BACKUP_OPERATIONS`). The legacy v1 export refuses a ledger with a live devolución or adelanto (a projected line). A devolución or an adelanto never
+  touches a plan row, so it never makes an older backup conflict; a stop or a reactivation bumps the plan's revision
+  (a stop already did).
+- **Devolución of an ordinary purchase.** The target is a live stored expense that is not an instalment share, a
+  projected line or on a debt's account. It credits the purchase's own account (an archived card is accepted, a
+  deleted account or card refused: «La cuenta de esta compra fue eliminada.»); purchase date ≤ its date ≤ today; Σ live
+  devoluciones ≤ the purchase's amount (BigInt), an over-refund refused («La devolución supera lo que queda por devolver
+  de esta compra.»). Link integrity is checked in `validateArchive`, so every edit, undo, restore and import is checked
+  in one place: while a purchase has live devoluciones it cannot be undone, lowered below what was returned, turned into
+  an income, moved to another account or currency, or dated after its first devolución.
+- **Devolución of a plan: the allocation rule (B2).** After the plan's catch-up, `creditMinor = min(R, principal
+  recorded or brought forward − Σ earlier credits)`; the rest lowers future principal from the last instalment
+  backwards, each share to zero before the previous one is touched (at most one share is partly reduced by a single
+  devolución). The credit is one line on the card in the category of the latest live recorded principal share, else
+  the plan's (A30, read time); a reduced share is recorded at its effective amount (schedule − live reductions) and a
+  share reduced to zero is «Devuelta» with no movement. Financing is untouched (refunding interest is deferred); the cap
+  is the price only («el interés no se devuelve desde acá»). On a stopped plan only the recorded principal can be
+  returned. **Invariants** (property-tested, A1): per component, recognised + settled + scheduled + Σ live reductions +
+  undone + cancelled + waived (financing only) = the component's total; Σ live devoluciones = Σ credit + Σ reductions;
+  with nothing undone or cancelled, recognised + settled − Σ credit + scheduled = principal − Σ devoluciones. Guards: Σ
+  live credit ≤ recorded + brought-forward principal, every recorded principal share equals its effective amount
+  (undone records included), reductions never exceed a share.
+- **Date rule for plan operations (A6).** The floor is the latest of the purchase date, the closing of the last recorded
+  share and the date of a live adelanto; floor ≤ date ≤ today. Today is checked at creation only (a clock change never
+  makes the file unreadable); the floor is an archive invariant. A backdated operation therefore never reaches a closed
+  statement.
+- **Adelanto de cuotas (B1).** In one transaction: the plan's catch-up, then every unrecorded share with an effective
+  amount above zero is covered (an undone share stays undone and pending, and the sheet says so). The covered principal
+  and, with «Los registro ahora», the covered financing are recognised once, on the adelanto's date, on the card's
+  balance due, each in its component's category; with «El emisor no los cobró» the financing is recorded as not
+  charged (state `waived`, «No se cobró»), neither recognised nor pending. The choice has no default: Save stays off
+  until the person picks one. The date must fall before the closing of every covered share. An adelanto with no
+  principal left is refused and points to «Dejar de seguir». Materialization skips covered shares, so each share is
+  recognised once, by its movement or by the adelanto, never both; `installmentState` adds `settled` («Adelantada»,
+  counted as recognised) and `waived`. One live adelanto per share. The card payment is the ordinary «Pagar tarjeta»
+  transfer, recorded apart: nothing is inferred and nothing reads «pagada». Refused on a stopped or deleted plan, a
+  deleted card, or with nothing left to bring forward.
+- **Undo and restore.** Undo toggles `voided` (revision + 1, an `operation_changes` receipt; a retry with the same change
+  id is a no-op) and validates after the plan's catch-up in the same transaction: undoing an adelanto leaves its shares
+  unrecorded again and records at once those whose closing passed, on their own closing dates; the confirmation names
+  them and warns «Este adelanto no podrá restaurarse» when that follows. A restore re-checks every rule but the date and
+  the allocation (`assertOperationApplicable`); a restore that would double a share, exceed a cap or contradict an
+  instalment recorded since is refused with a sentence that names the cause. Undo and restore are refused on a deleted
+  account or card, and for an adelanto or a devolución with reductions on a stopped plan («Este plan no se sigue.
+  Reactivalo primero.»). The detail and Movimientos deshechos offer the action only when that dry run passes, and give
+  the reason otherwise.
+- **«Dejar de seguir el plan», «Reactivar plan» and deletion.** Stopping (domain state still `cancelled`, the screen «Sin
+  seguimiento») keeps every recorded share and stops recording the rest («No se registra»); it is not a devolución, a
+  payment or a waiver, and the alert says so and points to «Registrar devolución» and «Registrar adelanto de cuotas». It
+  is refused when nothing is left to record. «Reactivar plan» sets `cancelledAt` back to null (the one transition
+  `validateInstallmentPlanChange` now allows: one revision on, not deleted; installments.test.ts changed deliberately)
+  and records at once, on their own closing dates, the shares that closed meanwhile (the alert names them); allowed on
+  an archived card, refused on a deleted one. Both take the revision the screen showed (a stale view is refused; a
+  retry after a commit whose refresh failed is a no-op) and storage's `todayKey()` (the provider passed a UTC timestamp
+  before). A plan is deleted only with no recorded share **and no operation**, an undone one included (A16); stop and
+  delete are never offered together. A completed, stopped, fully refunded or brought-forward plan is not pending, so it
+  never blocks deleting its card; a plan whose principal is all returned while financing is still scheduled stays
+  pending, and the devolución preview offers «Dejar de seguir el plan».
+- **Bug fixed (M3).** Stopping a plan did not run its catch-up: a share whose statement had closed but was not yet
+  recorded was silently left unrecorded for ever. Storage now records the closed shares first, in the same transaction,
+  and the alert says so («Antes se registra la cuota 3, que ya cerró ($ X)»). No screen offered the stop before 24T3;
+  a plan stopped that way (an import or a test file) recovers the missed closings with «Reactivar plan».
+- **Effects.**
+  - *Card balance:* a devolución line on the card lowers the balance due and can leave a credit («a favor»); an
+    adelanto raises the balance due by what it recognises, paid with «Pagar tarjeta» (capped at the balance). The cycle's
+    «devoluciones» includes devolución lines beside the legacy card incomes, an adelanto's principal is one purchase of
+    the cycle and its financing is financing (`cardStatementActivity`, A19).
+  - *Commitments:* `cardCommittedMinor` / `cardCommittedFinancingMinor`, `pendingInstallmentPlans` and
+    `cardAvailableLimitMinor` read the effective shares (`operations` is a required argument everywhere, so the compiler
+    found every caller); a plan that is no longer pending stops hiding the available credit (the «con un plan
+    pendiente» wording of decision 003).
+  - *Reports:* a devolución nets in its own month and category; counts are purchases; the donut draws positive
+    categories only around the exact net (the centre stays the net) and lists categories at zero or below last as «Sin
+    gasto neto», never inside «Otras»; a period with no positive category shows the compact total and «Sin gasto neto
+    en este período: las devoluciones igualan o superan lo gastado.»; month bars clamp at zero, VoiceOver says «sin
+    gasto neto» and a caption gives a negative month's exact net; recorded months are those with a purchase; the change
+    row, the comparison's percentage and the growth insight are dropped when the previous period nets to zero or less;
+    rankings net by merchant and drop rows at zero or below; «Tu mayor gasto» is the purchase net of its devoluciones up
+    to the period's end; drill-downs list every line and count «N gastos · N devoluciones»; `dailyAverageMinor` returns 0
+    for a net at or below zero (golden changed deliberately).
+  - *Budgets:* spent nets devoluciones and can be negative; the ratio clamps at 0; Presupuestos shows Disponible at the
+    limit with «Las devoluciones superan lo gastado» and keeps Gastado exact; `unbudgetedSpentMinor` clamps at 0.
+  - *Home:* Gastado is the exact net; below zero a quiet «Las devoluciones superan lo gastado» line appears under it;
+    devolución and adelanto rows appear in the recent activity like any movement.
+  - *FX:* projected lines convert at their own date in consolidated views, keep their metadata and count toward the
+    period's completeness (docs/currency.md §2.11); a currency whose period holds only devoluciones keeps its subtotal
+    when a rate is missing.
+  - *Assistant:* the evidence sends purchases and categories gross plus one positive «Devoluciones» fact
+    (`spendingFacts`), named in the interface language; the income count is unchanged; contract v1 unchanged.
+  - *Deudas:* nothing changes; a devolución is never a payment or a collection.
+- **UI entry points.** A purchase's detail (`app/entry/[id].tsx`): «Registrar devolución» when the domain's dry run
+  passes, a «Devoluciones» section with «Devuelto $ X de $ Y» and one row per devolución, and an undo blocked before its
+  alert while devoluciones are live («Ver devoluciones»). The plan detail (`app/installment/[id].tsx`): actions by state
+  (above), the new figures and schedule states, returned and brought-forward rows opening their operation.
+  `/new-refund?entryId=` or `?planId=` (modal): the purchase on top, «Total disponible», the date bounded by the rule, a
+  live preview built by the same domain function storage runs («Se acreditan $ X en … con fecha … y se restan de … en …
+  No es un ingreso.», the lowered instalments, «El interés de esas cuotas sigue como estaba.»), Save echoing the amount.
+  `/plan-payoff/[id]` (modal): the covered instalments by component, the financing choice, the date, «FinanzApp
+  registra con fecha … las cuotas que faltaban … en el saldo pendiente de la tarjeta. El pago a la tarjeta se registra
+  aparte, con Pagar tarjeta.», then «Pagar tarjeta» (the transfer form on the card, capped at its balance) or «Listo».
+  `/operation/[id]` (push): read-only, the link to the purchase or plan, «Qué registra», Deshacer / Restaurar with a
+  confirmation. Movimientos deshechos: «Devoluciones y adelantos», a devolución made only of reductions included. Every
+  form keeps its id frozen: an unknown outcome keeps the draft for «Reintentar» (the same operation, never twice), a
+  refusal storage decided before writing releases it (`releasesDraft`), a stale preview is refused («Las cuotas
+  cambiaron desde que abriste el formulario; revisá.», also when the purchase moved account) and previewed again.
+- **Reportes carry-in (commit 9fa4bf3).** Reportes' «Categorías | Día a día» uses a `prominent` variant of `Choices`:
+  15/20 labels, semibold chosen and medium other, 40 pt segments in a 44 pt track, Dynamic Type up to 1.3× and no
+  shrink-to-fit (on iOS's new architecture its floor is 4 pt, not `minimumFontScale`); thumb, colours, haptic and
+  VoiceOver unchanged; every other `Choices` caller unchanged (`PROMINENT_SEGMENT`, `src/ui/geometry.ts`).
+- **Copy and marker.** «Devolución» (never «Reembolso», the income preset, which now carries a hint towards «Registrar
+  devolución»; its English name became «Reimbursements»), «Registrar devolución», «Registrar adelanto de cuotas»,
+  «Dejar de seguir el plan», «Reactivar plan», «Sin seguimiento», «No se registra», «Adelantada» / "Brought forward",
+  «No se cobró», «Devuelta», «Reducida por devolución»; previews say «con fecha …», never «ahora»; never «pagada» or
+  "paid". New catalogues `operations` (es/en); new or changed keys in `installments`, `errors` (an `operations` group,
+  the reworded `PLAN_CHANGE_MESSAGE` and `INSTALLMENT_ENTRY_MESSAGE`, which no longer promise an «ajuste», and the
+  plan messages saying «Dejá de seguirlo»), `reports`, `budgets`, `home`, `assistant`, `display` (the consolidated
+  method note) and `backup` («v1 a v14»); the English lock re-accepted. The release marker reads «FinanzApp 0.1.0
+  (24T3)».
+- **What did not change.** No stored movement, plan, schedule or transfer is rewritten; legacy card incomes stay as
+  they are (still in «devoluciones»); stored amounts stay strictly positive; the purchase in cuotas, the card's
+  statement calendar, the payment transfer, debts, recurring rules and their catch-up, the available-credit gate (still
+  open), the FX provider and cache, the Assistant's contract, the Reportes composition apart from the negative-net
+  guards, Tarjetas' and the card detail's screens (compile fixes only), native code and dependencies.
+- **Deferred (recorded, not scheduled).** A partial advance of N instalments; refunding or waiving financing outside an
+  adelanto (an explicit financing adjustment); choosing a credit account other than the purchase's; a devolución on a
+  deleted account or card; migrating legacy card incomes into devoluciones; the issuer's available-credit rule (an owner
+  gate); devolución drafts from the Assistant (25A); the «Pagar tarjeta» amount prefill after an adelanto (the transfer
+  form prefills an amount only for debts today, so the card is set and the amount capped, not filled).
+- **Open items from the lanes (not fixed here).**
+  - *(Fixed 2026-10-02 after a Codex review, below.)* «Tu mayor gasto» netted a purchase's own devoluciones but not a
+    plan's credit against its instalment or adelanto lines.
+  - When a category's spelling differs across lines, the Assistant's label (latest line) and Reportes' (first line) can
+    differ; an Assistant category row (gross) opens a drill-down whose header is net.
+  - Reportes' frozen budget row reads «−$ X de $ Y · 0 %» for a negative spent; budgeted + unbudgeted no longer equals
+    the total once unbudgeted is clamped; the MonthBars scale can read «escala de 0 a $ 0» when every month nets at or
+    below zero; «Solo días con gastos registrados» also covers days with only devoluciones; spoken negatives start with
+    a capital «Menos»; the timeline (not mounted) says «0 gastos registrados» for a span of devoluciones only.
+  - Movimientos deshechos and a stopped plan's reactivation run a full archive validation per row or render (fine for a
+    few; profile on a device with many).
+  - «Ver devoluciones» opens the newest devolución only; the not-found operation screen is titled «Devolución» for an
+    adelanto id too; after a refusal that releases a change, the reason can show twice (error and blocked note).
+  - Retries: two form ids are two devoluciones within the cap; a retry after the operation was undone elsewhere answers
+    «Esta operación ya existe con otros datos» (A12) and keeps the sheet frozen, so it has to be closed; closing a form
+    after an unknown outcome and reopening it creates a new id (as the entry form does).
+  - `activity.tsx` does not pass localized operation words to the search (Spanish and English are built in); the key
+    `spendingDetail.count` is unused; `planCaughtUp` / `payoffFigures` duplicate `caughtUp` / `payoffParts`;
+    `isPlanWriteRefusal` matches storage's stale-revision text from the es catalogue (no domain constant).
+  - Accepted by design: undoing a devolución or an adelanto, or reactivating, records past closings on their own past
+    dates (C9); a plan with only undone shares left cannot be stopped and stays pending; a plan with any operation is
+    never deleted.
+- **Tests.** Domain (vitest): `operations.test.ts` (43: creation, allocation, caps, dates, undo/restore matrices,
+  backup v14 and a timing check of 50 plans × 480 shares with 5 000 movements), `operations.property.test.ts` (18: a
+  random walk of 60 seeds × 70 steps over refunds, adelantos with both financing choices, undo/restore of operations and
+  instalments, stops, reactivations, payments, edits, catch-ups and v14 round trips, recomputing the A1 identities,
+  states, figures, balances and caps from raw rows after every step, plus 17 targeted scenarios from the critiques),
+  `card-invariants.test.ts` 7d (4 positive tests: a card devolución, a plan devolución, an adelanto, a card with a
+  credit), and the readers' tests (`spending-report`, `month-summary`, `spending-overview`, `budgets`, `report-trend`,
+  `report-insights`, `fx`). Mobile (node): `operations-storage.node.ts` (21: the migration from a real v13 file
+  including an interrupted step and a v15 probe, CHECK and foreign-key refusals, create / retry / conflict, stale
+  previews, rollbacks, M3 with the 21:30 UTC−3 case, reactivation, backup v14 and imports), `refund-routes.node.ts`
+  (18: the refund form, the operation detail, the purchase detail, the edit locks, Movimientos deshechos), new cases in
+  `installment-routes`, `plan-presentation`, `card-figures`, `ui-rows` (the rows and the prominent switch),
+  `report-routes`, `spending-chart`, `spending-home`, `budgets-routes`, `assistant`. Deliberate expectation changes:
+  reactivation now accepted (`installments.test.ts`), the newer-version probe at v15 with «versiones 1 a 14», `dailyAverageMinor(-1)`
+  returns 0, an active plan with history offers three actions and a stopped one reads «Sin seguimiento» / «No se
+  registra», the instalment components' figures gain the new fields with their 24T1 values unchanged.
+- **Status.** Implemented on its branch; not merged. Device QA pending: nothing was checked on an iPhone (checklist
+  section Producto 24T3, which must pass before the merge; the list in §2). No EAS build; no native dependency added;
+  SQLite schema 14 and backup v14.
+- **Gates.** 2026-10-02, local. `apps/mobile`: typecheck OK; `node --experimental-strip-types --test tests/*.node.ts`
+  1200 passed, 0 failed (real SQLite included); `i18n:check -- --strict` 0 errors, 0 stale (English lock accepted);
+  `currency:verify` OK; `regions:verify` OK; `check` OK; `export:ios` OK (a JS bundle, not an Xcode build). Root `npm
+  test` 506 passed, 1 todo; `npm run check:repo` OK (397 files). No EAS, no device run. Re-run after the late review
+  fixes (2026-10-02, local): typecheck OK; `test:storage` 1202 passed, 0 failed; `i18n:check -- --strict` 0 errors, 0
+  stale (English lock re-accepted for the two new keys); `currency:verify`, `regions:verify`, `check` and `export:ios`
+  OK; root `npm test` 506 passed, 1 todo; `check:repo` OK (397 files).
+- **Review.** The design was critiqued before any code (six lenses; 30 amendments, three owner decisions). The domain
+  core was verified independently with a random-walk property test (about 105,000 steps in one run) asserting the
+  principal identities, single recognition and balances after every step; storage, readers and each UI lane had their
+  own verifier. Before the push an adversarial review ran over six lenses (accounting, the instalment state machine,
+  persistence, retry/undo, UI and accessibility, regressions) with two skeptics per finding: 13 confirmed (10 distinct)
+  and 9 refuted. All are fixed, each with a regression test checked to fail without the fix: budget lines on the
+  movement detail and the expense form clamp like Presupuestos when devoluciones exceed what was spent; a refused undo
+  releases the movement detail (and an undo storage would refuse is explained before the confirmation, with «Ver
+  devolución»); a Calendario row whose principal a devolución took to zero opens the movement that exists (or the
+  operation); the plan detail lists its devoluciones and adelantos (a devolución made only of reductions was otherwise
+  unreachable); deleting a card checks the credit rule before the destructive confirmation (archived wording
+  included); a backup whose only new rows are operations is offered; Más' «Movimientos deshechos» counts undone
+  operations; the devolución undo copy says only that devolución returns and uses the singular for one instalment.
+- **Late review (2026-10-02, two Codex threads after the handoff).** Both fixed on this PR, each with a regression test
+  that fails without the fix. (1) `app/new-refund.tsx`: the date wheel's upper bound was `new Date()` and its lower
+  bound the purchase's day at noon, so before local noon a purchase made today (or a plan whose floor is today) gave
+  `minimumDate > maximumDate` and a first value outside them; every day on the form is now a local calendar day at
+  12:00 (`useCurrentDay()`, as «Registrar adelanto de cuotas»): first value, upper and lower bounds. The domain's date
+  rules are unchanged (a day before the purchase is still refused). Test: `refund-routes.node.ts` at 00:01, 08:00,
+  11:59, 12:00, 12:01, 18:30 and 23:59, run under four time zones. (2) `app/account/[id].tsx`: devoluciones are
+  negative expense lines, so a cash account's month could net below zero under «Gastos este mes»; the presentation
+  (`accountMonthFacts` / `monthSpending` in `src/ui/presentation.ts`) now reads «Devoluciones netas este mes» ("Net
+  refunds this month") with the excess, unsigned in ink, and VoiceOver hears «… las devoluciones superan lo gastado en
+  …» as one element; its sums are exact (BigInt, so a running total that negative lines bring back into range is never
+  misread). Nothing in the ledger, the balance, Reportes or Presupuestos changes; zero and above stay «Gastos
+  este mes». Test: `polish-routes.node.ts` (spending above, equal to and below the devoluciones, the balance against
+  `accountBalanceMinor`, the projected line, English, VoiceOver, a card account's redirect). B1–B3 unchanged. Also
+  recorded, no code: the dock stays in the layout (not an overlay; mobile-design «El dock»), the Tarjetas root is not
+  redesigned (a density-versus-deck evaluation is in the 24T3 checklist), and 25D's FinanceKit / external-transaction
+  rules are reconciled below.
+- **Owner review (2026-10-02, product clarity; accounting unchanged).** (1) A devolución de compra is not a bank
+  reintegro: «Registrar devolución» shows one note under the purchase («Devolución de compra: el comercio te devuelve
+  toda o parte de esta compra.») with the contextual help (`FieldNote` + `InfoButton`): «Usá esta opción cuando un
+  comercio te devuelve total o parcialmente una compra. Si recibiste un reintegro, cashback o promoción bancaria en una
+  cuenta, registralo como ingreso en esa cuenta.» (English: "Purchase refund…"). The income preset «Reembolsos» hint
+  now also says a bank reintegro, cashback or promoción is recorded there, as income. A copy test pins that the
+  operations catalogue names «reintegro» / «reembolso» / «cashback» only in those two places. (2) Deleting a card a
+  real amount still holds: one dialog names every fact that holds it (saldo pendiente, saldo a favor, cuotas pendientes,
+  combined when more than one), says what archiving keeps, and offers «Archivar tarjeta» right there (preferred), plus
+  «Pagar» for a balance due; an archived card is told it already is. `assertCardDeletable` (B3) is unchanged, nothing is
+  zeroed, and a card with nothing recorded is still deleted after the usual confirmation. Tests: `refund-routes`,
+  `lifecycle-actions`, `card-form-cycle` (the real flow from Editar tarjeta). Gates re-run (2026-10-02, local):
+  typecheck OK; `test:storage` 1206 passed, 0 failed; `i18n:check -- --strict` 0 errors, 0 stale (English lock
+  accepted); `currency:verify`, `regions:verify`, `check`, `export:ios` OK; root `npm test` 506 passed, 1 todo;
+  `check:repo` OK. No EAS, no device run. (3) Roadmap: **25A2 — Wallet Shortcut
+  Capture** after 25A; the order is 24T3 → 25A → 25A2 → 25C → 25C2 → 25D → 25E → 25F → 26.
+- **Codex review of f818ec5 (2026-10-02).** «Tu mayor gasto» (`spendingInsights`, `packages/domain/report-trend.ts`)
+  now nets a plan devolución: its line credits the plan (`targetPlanId`), so each principal line of the plan (an
+  instalment's or an adelanto's) counts at most the plan's recognised principal left after its credits dated up to the
+  period's end (B2: the credit reverses principal already recognised; a later instalment still recorded stays real
+  spending). A fully refunded $ 900 instalment is no longer named over an unrelated $ 400 purchase. B2 and the refund
+  amounts are unchanged. Test: `report-trend.test.ts` (Codex's case, before the devolución's date, partial, a credit
+  from an earlier month, an adelanto, another plan's credit), checked to fail without the fix.
 
 ### Later notes recorded in 24UX6A (future; document only, not scheduled)
 
@@ -3029,8 +3461,9 @@ docs/merchant-identity.md.
 Documentation only until it starts (scope revised 2026-09-28); nothing here is implemented. Every
 permission is requested only when the person enables the feature that needs it, never at launch. **25D ships
 before 25E** and so contains only what works on the device or over the existing capture path: Face ID and
-privacy, local notifications, App Intents / Shortcuts / Siri / Spotlight, Wallet automation → draft, widgets,
-Apple Watch and the FinanceKit research gate. Remote push that needs a backend or sync and any Sign in with Apple
+privacy, local notifications, the broader App Intents / Shortcuts / Siri / Spotlight, widgets, Apple Watch and the
+FinanceKit research gate. The Wallet automation → draft path moved to **25A2** (owner, 2026-10-02); the two Wallet
+bullets below stay as its background and are bound by 25A2's contract. Remote push that needs a backend or sync and any Sign in with Apple
 tied to 25E's account are deferred to 25E or a follow-up after it (24T1C, 2026-09-28).
 
 - **Security and privacy.**
@@ -3094,13 +3527,15 @@ tied to 25E's account are deferred to 25E or a follow-up after it (24T1C, 2026-0
 - **App Intents, App Shortcuts, Siri and Spotlight:** "registrar un gasto" (a draft) and "¿cuánto gasté
   este mes?" (a read), each ending in a draft or a read, never a silent write; **Action Button** where it
   is useful (the quick capture).
-- **Apple Pay / Wallet transaction automation:** a Shortcuts personal automation on a Wallet transaction
+- **Apple Pay / Wallet transaction automation (→ moved to 25A2, 2026-10-02):** a Shortcuts personal automation on a Wallet transaction
   → an App Intent → a FinanzApp **draft**. It uses only the merchant, amount, currency and payment method
   the trigger actually supplies; missing fields stay missing (never guessed); repeated deliveries are
   deduplicated; offline catch-up and cancellation are verified; no claim to read Wallet history and no
   bank execution. **Tested separately on iPhone and on Apple Watch** (a payment made with the Watch):
-  the two triggers are never assumed to behave the same.
-- **Wallet card → FinanzApp account mapping (recorded 2026-09-28 in 24T1C).** FinanzApp is never limited to
+  the two triggers are never assumed to behave the same. Ordinary Apple Pay / PassKit APIs let an app take or offer a
+  payment; they do **not** let FinanzApp passively observe every Apple Pay purchase the person makes (reconciled
+  2026-10-02 in 24T3).
+- **Wallet card → FinanzApp account mapping (recorded 2026-09-28 in 24T1C; → delivered by 25A2).** FinanzApp is never limited to
   one account per currency, and a currency alone never identifies an account or a card. The design: a Wallet
   card's transaction automation → a mapping the person selected → a FinanzApp account or card id → a draft. A
   Shortcuts automation can be set up per concrete Wallet card, and its setup lets the person associate that
@@ -3119,15 +3554,29 @@ tied to 25E's account are deferred to 25E or a follow-up after it (24T1C, 2026-0
 - **Apple Watch (explicit future surface):** a focused capture and read experience, a WidgetKit
   complication / Smart Stack widget and App Intents; **not** a full replica of the iPhone app.
 - **Sign in with Apple — deferred to 25E or later, not part of 25D**, when an account exists; never required for the local core.
-- **FinanceKit:** a future research gate (entitlement, Apple's approval, the institutions and regions it
-  actually covers, what data it gives), not a dependency of the core and not a categorical claim about any
-  region or card; any use is read-only, consented and produces drafts.
+- **FinanceKit and external financial transactions (reconciled 2026-10-02 in 24T3; documentation only, no
+  entitlement or code).** FinanceKit is the future research and integration gate for financial accounts and
+  transactions the person authorizes, only where Apple makes that data available and grants FinanzApp the required
+  entitlement (Apple's approval, the institutions and regions it actually covers, what data it gives): never a
+  dependency of the core, and never a claim that every card, bank, region or Apple Pay transaction is available.
+  - **Draft first.** Any external financial transaction (FinanceKit, a Wallet automation, a future bank) enters
+    FinanzApp as a draft / review item; it is never a silent ledger write and is recorded only on the person's
+    confirmation.
+  - **Card mapping.** The strongest mapping is explicit and approved by the person: an external financial account
+    identifier → one FinanzApp card (or account), chosen once and editable; never inferred from a currency or a name.
+  - **Prefill, not decide.** Merchant, amount, date and institution metadata, when supplied, may prefill the draft;
+    a category may be suggested but goes through the existing confirmation; anything missing stays missing.
+  - **Instalments are never assumed.** An Apple or other external transaction is not assumed to carry an instalment
+    count or schedule. A FinanzApp instalment plan is created only when the exact instalment facts are actually
+    provided or the person explicitly confirms them; otherwise the draft is an ordinary purchase the person can turn
+    into a plan.
+  - **Manual local tracking stays the core and the fallback**, offline and complete without any of this.
 - **Out of scope.** Any bank credential; bank execution; reading arbitrary Wallet history.
 - **Gates.** Signed development build evidence per integration (a JS bundle is not device evidence);
   denied-permission paths; the private-content default checked on the Lock Screen and the app switcher;
-  the Wallet trigger on iPhone and Watch separately; notifications across a time-zone change and a
-  restart.
-- **Depends on.** 25A for the capture path (tray and pairing token); 24T for instalment and card reminders; 25C2
+  notifications across a time-zone change and a restart. (The Wallet trigger on iPhone and Watch separately is a gate
+  of 25A2, which owns Wallet capture since 2026-10-02.)
+- **Depends on.** 25A for the capture path (tray and pairing token; Wallet capture itself is 25A2); 24T for instalment and card reminders; 25C2
   for the widgets' commitments. **Not a dependency:** 25E (remote push and Sign in with Apple move there) and 24C2
   (optional).
 

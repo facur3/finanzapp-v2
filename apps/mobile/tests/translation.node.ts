@@ -223,7 +223,8 @@ test('account kinds are named in the interface language; the Spanish default is 
 });
 
 test('English fits where Spanish fits: segment, tab, quick-action, button and header labels stay within their room', () => {
-  // Segments share a row (Choices shrinks to 80 % at most); quick-action captions sit under a glyph, and the dock's
+  // Segments share a row (Choices' default asks for an 80 % shrink floor, but iOS's new architecture ignores
+  // `minimumFontScale` and floors at 4 pt, so a segment label must fit its room; 24T3); quick-action captions sit under a glyph, and the dock's
   // icon-only tabs show their names in the Large Content Viewer; buttons, the capture hub's titles and rows, and
   // headers are one line on a 320 pt iPhone SE at the default text size.
   const budgets: [string[], number][] = [

@@ -11,6 +11,7 @@ import * as materialPolicy from '../src/ui/material-policy.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 import * as localeOptions from '../src/ui/locale-options.ts';
+import * as operationPresentation from '../src/ui/operation-presentation.ts';
 import { createLocaleStore } from '../src/i18n/store.ts';
 import type { AppLocale, ReleasedSets } from '../src/i18n/locale.ts';
 function localeStore(released?: ReleasedSets) {
@@ -93,6 +94,10 @@ function harness(file: string, data: domain.LedgerArchive = archive, released?: 
     '../src/ui/material-policy': materialPolicy, '../../src/ui/material-policy': materialPolicy,
     '../src/ui/choice-screen': { ChoiceScreen: 'ChoiceScreen' },
     '../src/ui/entry-list': { EntryList: 'EntryList' },
+    // 24T3: Movimientos deshechos also lists undone devoluciones and adelantos (their restore flow runs for real in
+    // tests/refund-routes.node.ts); here the rows only need the pure projection and an idle action hook.
+    '../src/ui/operation-presentation': operationPresentation,
+    '../src/ui/operation-actions': { useOperationChange: () => ({ busyId: null, error: null, pending: null, check: () => ({ ok: true, inserts: [] }), ask: () => {} }) },
   };
   const module = { exports: {} as { default?: () => Node } };
   // A development build unless a test says otherwise (24UX5: the diagnostics line exists only there).
@@ -142,7 +147,7 @@ test('Más groups permanent navigation into Finanzas and App y datos, with live 
   assert.equal(value('Apariencia'), 'Sistema', '24UX6A: the default follows the device');
   assert.equal(nodes(root).some(node => node.type === 'ActionButton'), false);
   const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
-  assert.match(texts, /FinanzApp 0\.1\.0 \(24UX6E\)/, 'the version line, like the About line of an iOS app');
+  assert.match(texts, /FinanzApp 0\.1\.0 \(24T3\)/, 'the version line, like the About line of an iOS app');
   assert.match(texts, /Material opaco \(Expo Go\)/, 'a development build says which control material this session draws, so a tester can confirm the mode');
   assert.doesNotMatch(texts, /Piloto nativo|Producto 24/, '24UX5: no project vocabulary on the settings screen');
   assert.equal(value('Categorías'), 'Gastos e ingresos');
@@ -225,6 +230,16 @@ test('Más empty ledger shows honest placeholders instead of zero counts', () =>
   assert.equal(value('Movimientos deshechos'), 'Ninguno');
 });
 
+test('24T3: Más counts an undone devolución among the undone movements (the screen it opens lists and restores it)', () => {
+  const ledger: domain.LedgerArchive = { accounts: [cash], records: entries.map(domain.initialRecord) };
+  const refund = domain.newEntryRefund(ledger, { id: 'r1', entryId: 'e1', amountMinor: 1000, dateISO: '2026-09-15', todayISO: '2026-09-20', createdAt: '2026-09-15T12:00:00.000Z' });
+  const undoneRefund = domain.makeOperationChange('undo', refund, 'void', '2026-09-16T12:00:00.000Z').after;
+  const value = (data: domain.LedgerArchive) => rows(harness('(tabs)/settings.tsx', data).render()).find(row => row.props.title === 'Movimientos deshechos')!.props.subtitle;
+  assert.equal(value({ ...ledger, purchaseOperations: [undoneRefund] }), '1 recuperable', 'never «Ninguno» over a list that holds it');
+  assert.equal(value({ ...ledger, purchaseOperations: [refund] }), 'Ninguno', 'a live devolución is not undone');
+  assert.equal(value({ ...archive, purchaseOperations: [undoneRefund] }), '2 recuperables');
+});
+
 test('the backup screen keeps export and import together and links the review flow', () => {
   const view = harness('backup.tsx');
   const root = view.render();
@@ -295,7 +310,7 @@ test('23.1B2 English Más: every row, count, note and the diagnostic footer are 
   for (const row of rows(root)) row.props.onPress();
   assert.equal(view.pushed.join(','), '/accounts,/cards,/budgets,/recurring,/debts,/categories,/backup,/undone-entries,/language,/region,/appearance');
   const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
-  assert.match(texts, /FinanzApp 0\.1\.0 \(24UX6E\)/);
+  assert.match(texts, /FinanzApp 0\.1\.0 \(24T3\)/);
   assert.match(texts, /Opaque material \(Expo Go\) · Language: default/);
   assert.match(texts, /saved only on this device and work offline/);
   assert.doesNotMatch(texts, /Material opaco|Idioma|Región|sincronización/);
@@ -343,7 +358,7 @@ test('24UX5: a preview or store build shows the version and the local-storage no
   for (const locale of [null, 'en-AR'] as const) {
     const root = harness('(tabs)/settings.tsx', archive, undefined, locale, undefined, false).render();
     const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
-    assert.match(texts, /FinanzApp 0\.1\.0 \(24UX6E\)/);
+    assert.match(texts, /FinanzApp 0\.1\.0 \(24T3\)/);
     assert.doesNotMatch(texts, /Material|material|Idioma:|Language:/, 'no material or locale diagnostics outside a development build');
     assert.match(texts, locale ? /saved only on this device/ : /se guardan solo en este dispositivo/, 'privacy and storage information stays');
   }

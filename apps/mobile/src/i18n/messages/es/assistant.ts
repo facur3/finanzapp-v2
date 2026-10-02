@@ -63,6 +63,8 @@ export const assistant = {
     evidence: {
       expenses: 'Gastos registrados',
       income: 'Ingresos registrados',
+      /** 24T3: the period's devoluciones (never income). */
+      refunds: 'Devoluciones',
       /** A row cited only for the previous period: "Restaurantes (mes anterior)". */
       previousMonth: '{label} (mes anterior)',
       /** VoiceOver for a difference that grew against the previous month (the screen shows "+$ 42.500,00"): "42500,00 pesos más". */

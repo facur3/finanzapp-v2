@@ -1,5 +1,106 @@
 # Physical iPhone acceptance checklist
 
+## Producto 24T3 — must pass before this PR merges
+
+**Not done yet: no EAS build was made and the iPhone was not touched. Nothing below is device-verified.** This is a
+short, targeted pass for devoluciones, the adelanto de cuotas and the plan lifecycle, and the final device QA of
+instalments (Tarjetas and Deudas on the iPhone). The earlier sections 24UX6A–24UX6E stay unchecked as they are: they
+belong to the later full pass before the first TestFlight, not to this merge. Metro from this branch (`npm run
+start:dev-client -- --clear`) on the installed FinanzApp Dev build; JavaScript only, no native dependency.
+**The ledger moves to schema 14 (two new empty tables) and an older build refuses the file unchanged: export a backup
+first** (Más → Copia de seguridad). Use your own small test data (a test cash account, a test card, two or three test
+purchases and one test plan); never seed movements, and undo or delete the test data afterwards. Record the iPhone
+model, iOS version, theme, language and text size with each result. Design: [mobile-design.md](mobile-design.md)
+(«Producto 24T3 — Devoluciones, adelanto de cuotas y ciclo de vida del plan»); rule: [decision 003](decisions/003-five-tabs-and-cards.md),
+rule 7.
+
+- [ ] **Upgrade.** With the backup exported, open the app over your data: Inicio, Movimientos, Tarjetas, Presupuestos
+  and Reportes show the same figures as before; force-quit and reopen: nothing migrates twice. The Más footer reads
+  «FinanzApp 0.1.0 (24T3)».
+- [ ] **Cash devolución, partial then full.** On a cash purchase's detail, «Registrar devolución»: the preview says
+  the account, the date, the category, the month and «No es un ingreso»; save a part: the account's balance rises by
+  it, the purchase reads «Devuelto $ X de $ Y», Movimientos shows «Devolución · comercio» unsigned in ink with its own
+  glyph, under Gastos and Todos and never under Ingresos. Then «Total disponible» and save the rest: «No queda nada por
+  devolver» afterwards.
+- [ ] **Card purchase devolución.** On a card purchase without instalments: the card's «Saldo pendiente» drops by the
+  devolución and the cycle line counts it under «devoluciones», not as a purchase. A devolución after the card was paid
+  leaves the card «a favor».
+- [ ] **Plan devolución before and after a closing.** On a test plan with nothing recorded yet, a partial devolución:
+  the preview says the last instalments go down and no credit goes to the card; the calendar shows them «Devuelta» or
+  «Reducida por devolución: $ X». On a plan with recorded instalments, a devolución returns that part to the card first
+  (the balance drops, «Devuelto a la tarjeta») and only the rest lowers the last instalments.
+- [ ] **Devolución dated today, before noon (review fix).** Before 12:00, on a cash purchase made today, «Registrar
+  devolución»: the date row reads today, the wheel opens on today and cannot go before the purchase or after today; save
+  it: dated today. On an older purchase, the wheel still reaches the purchase's own day.
+- [ ] **Account detail with net refunds (review fix).** On a test cash account, a devolución this month of a purchase
+  from an earlier month that exceeds this month's purchases: the fact reads «Devoluciones netas este mes» with the
+  excess, unsigned and in ink (never «Gastos este mes» with a minus, never green); VoiceOver reads «Devoluciones netas
+  este mes: las devoluciones superan lo gastado en …»; the recorded balance rose by the devolución. In English: «Net
+  refunds this month». With spending equal to the devoluciones: «Gastos este mes» $ 0.
+- [ ] **Over-refund refused.** Typing more than «Total disponible» keeps Guardar off with the domain's sentence;
+  nothing is written.
+- [ ] **Adelanto without interest.** On a plan without interest, «Registrar adelanto de cuotas»: the covered
+  instalments, the date bounded, the sentence that the payment is recorded apart; save: the card's balance due rises by
+  the remaining price on that date, the calendar reads «Adelantada» (never «pagada»), the plan reads «Adelantado»,
+  Movimientos shows «Adelanto de cuotas · comercio». «Pagar tarjeta» on the success state opens the payment to that card,
+  capped at its balance (the amount is not prefilled); pay it: a transfer, no second expense.
+- [ ] **Adelanto with interest, both choices.** On a plan with interest, Guardar stays off until a choice is made. «Los
+  registro ahora»: the interest is recognised with the price, in its own category. Undo it, then «El emisor no los
+  cobró»: only the price is recognised and the plan shows «Interés no cobrado»; a row never shows more than the balance
+  holds.
+- [ ] **Dejar de seguir and Reactivar.** On an active plan with history, «Dejar de seguir el plan»: the alert says what
+  stops, that it is not a devolución or a payment, and first names an instalment that already closed if there is one;
+  after it the plan reads «Sin seguimiento» with its note and «No se registra», and the recorded instalments stay.
+  «Reactivar plan»: the plan is active again; if a closing passed while it was not tracked, the alert names those
+  instalments and they are recorded once, on their own closing dates.
+- [ ] **Deleting a card (owner review).** On a test card with a credit («a favor»), Eliminar tarjeta shows, before any
+  destructive confirmation, «Todavía no se puede eliminar» with «Esta tarjeta todavía tiene saldo a favor de $ X. Podés
+  archivarla para sacarla de tus tarjetas activas sin perder el saldo ni el historial.» and **Cancelar · Archivar
+  tarjeta**; Archivar tarjeta archives it at once (it leaves the active cards, appears under Archivadas with the same
+  balance and history). The same with a balance due (plus «Pagar»), with a pending plan, and with two of them at once
+  (both named). An archived card says it already is and offers no archive. A test card created by mistake with nothing
+  recorded is deleted after «¿Eliminar esta tarjeta?». After the plan is completed, stopped, fully returned or brought
+  forward and the balance is zero, the card can be deleted. A plan with any devolución or adelanto never offers
+  «Eliminar plan».
+- [ ] **Devolución de compra versus a bank reintegro (owner review).** «Registrar devolución» shows the one-line note
+  «Devolución de compra: …» under the purchase; its ⓘ explains that a reintegro, cashback or bank promotion is an
+  income in the account that received it. In English: "Purchase refund: …". The note wraps at AX sizes; VoiceOver reads
+  the note and the ⓘ as «Más información sobre devolución de compra». Choosing the income category «Reembolsos» says a
+  bank reintegro is recorded there, as income.
+- [ ] **Undo and restore.** From a devolución's detail, «Deshacer devolución»: it leaves the balances, reports and the
+  purchase's «Devuelto»; Movimientos deshechos lists it under «Devoluciones y adelantos» with Restaurar; restore it: it
+  is back once. The same for an adelanto: its confirmation names the instalments recorded on their closings and says
+  when it cannot be restored. A purchase with a live devolución cannot be undone (the alert offers «Ver devoluciones»)
+  and its edit cannot lower it below what was returned.
+- [ ] **Movimientos.** Search «devolución» and «adelanto»; each row opens `/operation`, read-only, with its links to the
+  purchase or plan and the account or card; back returns to the list.
+- [ ] **Reportes with a category below zero.** A devolución in a later month than its purchase: that month's category
+  reads «Sin gasto neto», listed last and not drawn in the donut; the centre shows the exact net; the bar sits at zero
+  with the caption giving the net; a month with only devoluciones shows the quiet sentence instead of a donut;
+  Presupuestos keeps Gastado exact and Disponible at the limit with «Las devoluciones superan lo gastado»; Inicio's
+  Gastado shows the same line under the number.
+- [ ] **The Reportes switch.** «Categorías | Día a día» at 375 pt (SE / 13 mini) in Spanish and English, at Text Size
+  S, L and XXXL: the labels at the subhead size, never shrunk or cut, the chosen one semibold; the thumb, the haptic
+  and VoiceOver as before.
+- [ ] **Deudas unchanged.** A devolución never appears in Deudas y cobros as a payment or a collection; debt balances
+  and totals are the same as before.
+- [ ] **VoiceOver** on «Registrar devolución», «Registrar adelanto de cuotas», the operation detail, the plan detail's
+  actions and alerts and the new calendar rows: the kind word first («Devolución», «Adelanto de cuotas»), amounts and
+  dates in words, ranges such as «Cuotas 3–12» read sensibly, every action reachable.
+- [ ] **Light and dark** on every new screen; text at AX sizes stacks without cutting a figure; the last button clears
+  the home indicator.
+- [ ] **Dock (no change; confirm only).** The pine pill and the «+» sit in the layout on the screen's canvas above the
+  home indicator, not as a floating overlay (kept deliberately: no last row hides behind them, keyboard and safe areas
+  stay deterministic, the mounted-tab black-screen mitigation is untouched). Confirm the last row of every root still
+  scrolls clear of it.
+- [ ] **Tarjetas density (evaluate only; no redesign in 24T3).** With 24T3 verified, note whether the Tarjetas root
+  feels dense next to a more deck-focused, Wallet-inspired composition (the full movements and facts mainly after
+  opening a card). The 24UX6D rule stays: one card is always in front and selected and drives the snapshot, tapping
+  another card selects it, tapping the front card opens its detail; no «choose a card first» state.
+
+Record: date, iPhone model, iOS version, build, language, and every result above (a failure with a screenshot of your
+own test data only, never of real financial data).
+
 ## Producto 24UX6E — More financial destinations in Forest
 
 **Not done in 24UX6E: no EAS build was made and the iPhone was not touched. Every item below is pending.**

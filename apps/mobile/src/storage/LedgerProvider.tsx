@@ -1,17 +1,17 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
-import { PLAN_CALENDAR_MESSAGE, snapshotFromArchive, todayKey, type Account, type Entry, type EntryChange, type LedgerArchive, type LedgerSnapshot,
+import { OPERATION_STATE_MESSAGE, PLAN_CALENDAR_MESSAGE, snapshotFromArchive, todayKey, type Account, type Entry, type EntryChange, type LedgerArchive, type LedgerSnapshot,
   type AccountChange, type Transfer, type TransferChange, type RecurringRule, type MonthlyBudget,
   type CreditCardProfile, type PersonalDebtProfile, type AccountAppearance, type CategoryDefinition, type InstallmentPlan,
-  type CardCycleDates, type CardCycleIntent } from '@finanzapp/domain';
+  type CardCycleDates, type CardCycleIntent, type EntryRefund, type OperationChange, type PlanPayoff, type PlanRefund } from '@finanzapp/domain';
 import type { CurrencyGate } from '@finanzapp/domain';
 import { currencyGateForBuild } from './currency-gate';
 import { changeEntry, createAccount, createEntry, deleteAccount, deleteCreditCard, importArchive, readArchive, changeAccount,
   createTransfer, changeTransfer, saveRecurringRule, processRecurring, saveMonthlyBudget,
   createCreditCard, saveCreditCard, createPersonalDebt, savePersonalDebt, deletePersonalDebt, saveAccountAppearance, saveCategoryDefinition,
-  cancelInstallmentPlan, deleteInstallmentPlan, catchUpInstallments,
+  cancelInstallmentPlan, deleteInstallmentPlan, catchUpInstallments, changePurchaseOperation, reactivateInstallmentPlan,
   type LedgerDatabase } from './database';
-import { openLedger, refreshLedger, savePurchasePlan, sessionWarning } from './ledger-session';
+import { openLedger, refreshLedger, savePurchaseOperation, savePurchasePlan, sessionWarning } from './ledger-session';
 import { openLedgerDatabase } from './nativeDatabase';
 
 declare const __DEV__: boolean | undefined;
@@ -51,9 +51,23 @@ type LedgerContextValue = {
   removeDebt: (debtId: string) => Promise<void>;
   /** Producto 24T1: a purchase in instalments (the plan only; its instalments are recognised as their statements close). */
   addInstallmentPlan: (plan: InstallmentPlan) => Promise<void>;
-  cancelInstallmentPlan: (planId: string) => Promise<void>;
-  /** Only a plan that recorded nothing; one with history is cancelled. */
+  /** «Dejar de seguir el plan» (24T3: the plan's catch-up through today runs first, in the same commit). `expectedRevision`
+   * is the plan's revision the screen showed: a retry of the committed stop is a no-op, another revision is refused. */
+  cancelInstallmentPlan: (planId: string, expectedRevision: number) => Promise<void>;
+  /** 24T3 «Reactivar plan»: the stop undone; instalments whose statements closed meanwhile are recorded on their own dates. */
+  reactivateInstallmentPlan: (planId: string, expectedRevision: number) => Promise<void>;
+  /** Only a plan that recorded nothing and has no devolución or adelanto; one with history is stopped. */
   removeInstallmentPlan: (planId: string) => Promise<void>;
+  /** 24T3: a devolución as the form previewed it (`newEntryRefund` / `newPlanRefund`, its id frozen in the draft). Storage
+   * recomputes the allocation after the plan's catch-up and refuses a different one (`OPERATION_CHANGED_MESSAGE`; the view
+   * is read again so the form can preview once more); a retry with the same id and inputs is a no-op. */
+  addRefund: (refund: EntryRefund | PlanRefund) => Promise<void>;
+  /** 24T3: an adelanto de cuotas as the form previewed it (`newPlanPayoff`), with the same contract as `addRefund`. */
+  addPayoff: (payoff: PlanPayoff) => Promise<void>;
+  /** 24T3: undo of a devolución or an adelanto (`makeOperationChange(id, operation, 'void', now)`, the change frozen for retries). */
+  voidOperation: (change: OperationChange) => Promise<void>;
+  /** 24T3: restore of an undone devolución or adelanto (`makeOperationChange(id, operation, 'restore', now)`). */
+  restoreOperation: (change: OperationChange) => Promise<void>;
   restoreBackup: (incoming: LedgerArchive, baseline: string) => Promise<void>;
 };
 const LedgerContext = createContext<LedgerContextValue | null>(null);
@@ -128,6 +142,23 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     }
   }), [enqueue]);
 
+  /** 24T3: a refused operation or plan lifecycle write left the view possibly stale (another revision, a statement that
+   * closed since the preview): the archive is read again before the refusal reaches the screen, so it previews from the
+   * stored state. Nothing was written; a failed re-read leaves the refusal as it was. The instalment catch-up (the one the
+   * foreground runs, idempotent) goes first: the refused write rolled back its own catch-up, and a view that still lacks a
+   * statement that closed would offer the same refused action again (a stop with nothing left once that share is recorded). */
+  const rereadOnRefusal = (work: (db: LedgerDatabase) => Promise<void>) => mutate(async db => {
+    try { await work(db); } catch (cause) {
+      try { await catchUpInstallments(db, todayKey()); } catch { /* Best effort: the foreground retries it and says so. */ }
+      try { const fresh = await readArchive(db); if (mounted.current) setArchive(fresh); } catch { /* The refusal stands either way. */ }
+      throw cause;
+    }
+  });
+  const changeOperation = (change: OperationChange, action: OperationChange['action']) => rereadOnRefusal(db => {
+    if (change.action !== action) throw new Error(OPERATION_STATE_MESSAGE);
+    return changePurchaseOperation(db, change, todayKey());
+  });
+
   return <LedgerContext.Provider value={{
     gate: BUILD_CURRENCY_GATE, snapshot, archive, error,
     retry: () => setAttempt(value => value + 1),
@@ -163,8 +194,14 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
         throw cause;
       }
     }),
-    cancelInstallmentPlan: planId => mutate(db => cancelInstallmentPlan(db, planId, new Date().toISOString())),
+    // 24T3 (A14): the catch-up runs through the device's day (`todayKey()`), never a UTC timestamp's date.
+    cancelInstallmentPlan: (planId, expectedRevision) => rereadOnRefusal(db => cancelInstallmentPlan(db, planId, expectedRevision, todayKey(), new Date().toISOString())),
+    reactivateInstallmentPlan: (planId, expectedRevision) => rereadOnRefusal(db => reactivateInstallmentPlan(db, planId, expectedRevision, todayKey(), new Date().toISOString())),
     removeInstallmentPlan: planId => mutate(db => deleteInstallmentPlan(db, planId, new Date().toISOString())),
+    addRefund: refund => rereadOnRefusal(db => savePurchaseOperation(db, refund, todayKey())),
+    addPayoff: payoff => rereadOnRefusal(db => savePurchaseOperation(db, payoff, todayKey())),
+    voidOperation: change => changeOperation(change, 'void'),
+    restoreOperation: change => changeOperation(change, 'restore'),
     restoreBackup: (incoming, baseline) => mutate(async db => {
       await importArchive(db, incoming, baseline);
       await processRecurring(db, todayKey());
