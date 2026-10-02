@@ -26,7 +26,7 @@ import { activityDateLabel, historyCurrencies } from '../../src/ui/presentation'
 import { changePercent, earliestRecordedMonth, insightsBesideRanking, promoteChosen, reportPeriodLabel, reportSelection, requestedReportMonth, shiftReportMonth, spendingShare } from '../../src/ui/report-presentation';
 import { CategoryLegendRow } from '../../src/ui/spending-chart';
 import { space, useCurrentDay, usePalette, useReduceMotion } from '../../src/ui/theme';
-import { useDockClearance } from '../../src/ui/dock-clearance';
+import { useDockInset } from '../../src/ui/dock-clearance';
 
 /** Reportes answers "¿a dónde fue mi plata?" for one month and one currency. Every number is recorded spending in that
  * currency; nothing is estimated.
@@ -62,7 +62,7 @@ export default function ReportsScreen() {
   const params = useLocalSearchParams<{ currency?: string | string[]; month?: string | string[] }>();
   const { snapshot, archive, gate } = useLedger();
   const p = usePalette();
-  const clearance = useDockClearance();
+  const dock = useDockInset();
   const { t, locale, formatMonthTitle, formatDayMonth, formatNumericDate, currencyName, moneyText, spokenMoney, spokenPercent, speechLanguage } = useI18n();
   const day = useCurrentDay();
   const { width: windowWidth, fontScale } = useWindowDimensions();
@@ -206,9 +206,11 @@ export default function ReportsScreen() {
 
   return <Animated.FlatList<CategorySpending | DailySpending> ref={list} data={shown} keyExtractor={item => 'key' in item ? item.key : item.dateISO}
     itemLayoutAnimation={reorder ? rowReorder : undefined}
+    // 25UX1 review: the chosen row's cell is layered above the others, so it travels over the rows it passes.
+    CellRendererComponentStyle={({ item }: { item: CategorySpending | DailySpending }) => 'key' in item && item.key === chosenKey ? { zIndex: 1 } : undefined}
     style={{ flex: 1, backgroundColor: p.background }}
-    // 25UX1: the root runs under the floating dock; its last row ends the dock's height higher (`useDockClearance`).
-    contentContainerStyle={{ padding: space.xl, paddingBottom: 48 + clearance, flexGrow: 1 }} scrollIndicatorInsets={{ bottom: clearance }}
+    // 25UX1: the root runs under the floating dock; its last row ends the dock's height higher (`useDockInset`).
+    contentContainerStyle={{ padding: space.xl, paddingBottom: 48 + dock.extraPadding, flexGrow: 1 }} contentInset={dock.inset} scrollIndicatorInsets={dock.inset}
     contentInsetAdjustmentBehavior="never" removeClippedSubviews={false}
     initialNumToRender={10} maxToRenderPerBatch={10} windowSize={7}
     ListHeaderComponent={<View style={{ gap: space.xxl, paddingBottom: space.m }}>

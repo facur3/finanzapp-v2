@@ -3616,8 +3616,9 @@ nothing of it is on a screen yet.
   reachable: `dockClearance(bottomInset)` = the air under the dock + 60 + 8 (88 pt with a 34 pt inset), and
   `useDockClearance()` returns it inside a scene of the tab navigator (its bar-height context) and 0 anywhere else, so a
   pushed screen, a modal or the hub keep their padding. `Screen` and `EntryList` (Más, Movimientos) and Inicio and
-  Reportes add it to their bottom padding and their scroll indicator and, inside the tabs, let the system add nothing
-  (`never`). Unchanged: the dock's geometry and accessibility, the capture hub, the navigator's options (the black-screen
+  Reportes take it through `useDockInset`: on iOS as the scroller's `contentInset` and indicator inset (React Native
+  restores it after any keyboard as max(keyboard, inset), and UIKit keeps a VoiceOver focus inside it), elsewhere as
+  bottom padding; inside the tabs the system adds nothing (`never`). Unchanged: the dock's geometry and accessibility, the capture hub, the navigator's options (the black-screen
   mitigation), Reduce Transparency, keyboard handling.
 - **Tarjetas.** Idle on entry, even with one card: the deck in its stored order with the last card whole, a quiet line,
   no card's figures. A first tap on any card selects it (the deck's 260 ms move; at once with Reduce Motion) and shows
@@ -3644,10 +3645,11 @@ nothing of it is on a screen yet.
 - **Gates.** 2026-10-02, local, Linux. Root `npm test` 590 passed, 1 todo; `check:repo` OK. `apps/mobile`: `typecheck` OK;
   `test:storage` 1238 passed, 0 failed; `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0/0 (English
   accepted for the new strings); `check` OK; `export:ios` OK. No EAS build, no iPhone. An adversarial review in eleven
-  lenses (two skeptics per finding) confirmed: the snapshot and idle line sharing one Reflow (fixed: keyed); and, open
-  for the next pass, the scroll indicator of Movimientos and Más losing the dock clearance after any keyboard (RN resets
-  it from `contentInset`; content padding unaffected), a Reportes row travelling beneath the rows it passes, and the
-  device risk of a VoiceOver double-tap on a row under the dock landing on the dock.
+  lenses (two skeptics per finding) confirmed four, all fixed: the snapshot and idle line sharing one Reflow (keyed, so
+  the fade plays); the scroll indicator of Movimientos and Más losing the dock clearance after any keyboard (the
+  clearance is now the iOS `contentInset`, which React Native restores); a Reportes row travelling beneath the rows it
+  passes (its cell is layered above, `CellRendererComponentStyle`); and the risk of a VoiceOver double-tap on a row under
+  the dock landing on the dock (mitigated by the same inset; to confirm on the iPhone).
 
 ### Later notes recorded in 24UX6A (future; document only, not scheduled)
 

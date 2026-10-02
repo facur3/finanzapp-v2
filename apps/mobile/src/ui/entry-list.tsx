@@ -5,7 +5,7 @@ import { AppText, MovementRow, type RowContext } from './components';
 import { useI18n } from '../i18n/provider';
 import { activityDateLabel, dayNetMinor, groupActivity, mergeActivity, type ActivityItem } from './presentation';
 import { useCurrentDay, usePalette } from './theme';
-import { useDockClearance } from './dock-clearance';
+import { useDockInset } from './dock-clearance';
 
 export function EntryList({ entries, transfers, accounts, accountId, header, empty, footer, context, dayNet = true }: {
   entries: Entry[]; transfers?: Transfer[]; accounts: Account[]; accountId?: string; header?: ReactNode; empty?: ReactNode;
@@ -20,12 +20,12 @@ export function EntryList({ entries, transfers, accounts, accountId, header, emp
   const { t, locale, moneyText, spokenAmount } = useI18n();
   const sections = useMemo(() => groupActivity(mergeActivity(entries, transfers)), [entries, transfers]);
   // 25UX1: Movimientos runs under the floating dock (see `Screen`); a pushed list keeps its padding (clearance 0).
-  const clearance = useDockClearance();
+  const dock = useDockInset();
   return <SectionList<ActivityItem, { dateISO: string; data: ActivityItem[] }> sections={sections} keyExtractor={item => item.key}
     style={{ flex: 1, backgroundColor: p.background }}
-    contentContainerStyle={{ padding: 20, paddingBottom: 40 + clearance, flexGrow: 1 }}
-    scrollIndicatorInsets={clearance ? { bottom: clearance } : undefined}
-    contentInsetAdjustmentBehavior={clearance ? 'never' : 'automatic'} automaticallyAdjustKeyboardInsets
+    contentContainerStyle={{ padding: 20, paddingBottom: 40 + dock.extraPadding, flexGrow: 1 }}
+    contentInset={dock.inset} scrollIndicatorInsets={dock.inset}
+    contentInsetAdjustmentBehavior={dock.inset || dock.extraPadding ? 'never' : 'automatic'} automaticallyAdjustKeyboardInsets
     keyboardDismissMode="interactive" keyboardShouldPersistTaps="handled"
     stickySectionHeadersEnabled={false} removeClippedSubviews={false}
     initialNumToRender={12} maxToRenderPerBatch={12} windowSize={7}

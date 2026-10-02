@@ -236,13 +236,14 @@ test('25UX1: the roots clear the floating dock by its exact height, inside the t
   const source = readFileSync(new URL('../src/ui/dock-clearance.ts', import.meta.url), 'utf8');
   assert.match(source, /BottomTabBarHeightContext/, 'a scene of the tab navigator is what has a clearance');
   assert.match(source, /inTabs \? dockClearance\(insets\.bottom\) : 0/, 'a pushed screen, a modal or the hub keeps 0');
-  // Every tab root ends its content the clearance higher and shows its scroll indicator above the dock.
+  // 25UX1 review: on iOS the clearance is the scroller's contentInset (React Native restores it after any keyboard, as
+  // max(keyboard, contentInset), and VoiceOver keeps a focus inside it); elsewhere it is bottom padding.
+  assert.match(source, /Platform\.OS === 'ios' \? \{ extraPadding: 0, inset: \{ bottom: clearance \} \} : \{ extraPadding: clearance, inset: undefined \}/);
+  assert.match(source, /if \(!clearance\) return \{ extraPadding: 0, inset: undefined \}/, 'off the tabs: nothing');
   const read = (path: string) => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
-  assert.match(read('app/(tabs)/index.tsx'), /paddingBottom: 48 \+ clearance/);
-  assert.match(read('app/(tabs)/reports.tsx'), /paddingBottom: 48 \+ clearance/);
-  assert.match(read('src/ui/entry-list.tsx'), /paddingBottom: 40 \+ clearance/, 'Movimientos (and every pushed list, with 0)');
-  assert.match(read('src/ui/components.tsx'), /paddingBottom: styles\.content\.paddingBottom \+ clearance/, 'Más (and every pushed Screen, with 0)');
   for (const path of ['app/(tabs)/index.tsx', 'app/(tabs)/reports.tsx', 'src/ui/entry-list.tsx', 'src/ui/components.tsx']) {
-    assert.match(read(path), /scrollIndicatorInsets=\{(clearance \? )?\{ bottom: clearance \}/, path + ': the indicator stops above the dock');
+    const code = read(path);
+    assert.match(code, /contentInset=\{dock\.inset\} scrollIndicatorInsets=\{dock\.inset\}/, path + ': the inset and the indicator stop above the dock');
+    assert.match(code, /dock\.extraPadding/, path + ': the padding fallback');
   }
 });

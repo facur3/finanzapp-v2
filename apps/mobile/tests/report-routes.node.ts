@@ -109,7 +109,7 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
     '../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) },
     '../src/ui/quick-actions': { QuickActions: 'QuickActions', AssistantEntry: 'AssistantEntry' },
     'react-native-reanimated': { __esModule: true, default: { FlatList: 'FlatList' } },
-    '../src/ui/dock-clearance': { useDockClearance: () => 0 },
+    '../src/ui/dock-clearance': { useDockInset: () => ({ extraPadding: 0, inset: undefined }) },
     '../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', rowReorder: 'rowReorder', selectionHaptic: () => {}, impactHaptic: () => {}, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
     '../src/ui/theme': { useCurrentDay: () => '2026-09-12', useReduceMotion: () => reduced, space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
       usePalette: () => ({ background: '#F5F6F8', surface: '#FFFFFF', primary: '#2557D6', primaryFill: '#2557D6', onPrimary: '#fff', text: '#000', secondary: '#666', tertiary: '#999', line: '#ddd', inset: '#eee', expense: '#c00', warning: '#a60', isDark: false }) },
@@ -1181,6 +1181,10 @@ test('25UX1: a chosen category is listed first while chosen (its rank unchanged)
   assert.equal(rowChoices(root), 'categoria 4:true,categoria 0:false,categoria 1:false,categoria 2:false,categoria 3:false', 'still the one chosen row');
   assert.equal(root.props.itemLayoutAnimation, 'rowReorder', 'the rows travel to their new places (the app\'s data move)');
   assert.equal(slicesOf(root), donutOrder, 'the donut, its slices and its VoiceOver steps keep the canonical order');
+  // 25UX1 review: the chosen row's cell is layered above the others, so it travels over the rows it passes.
+  const layer = root.props.CellRendererComponentStyle;
+  assert.equal(JSON.stringify(layer({ item: root.props.data[0], index: 0 })), '{"zIndex":1}');
+  assert.equal(layer({ item: root.props.data[1], index: 1 }), undefined);
   const rising = find(root.props.renderItem({ item: root.props.data[0], index: 0 }), 'CategoryLegendRow');
   assert.equal(rising.props.category.amountMinor, 100, 'its own exact amount: shown first, never re-ranked');
   // A render with nothing changed moves nothing.
