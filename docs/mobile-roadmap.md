@@ -1,7 +1,9 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-01 (Producto 24T3 on its branch: refunds («devoluciones»), early payoff («adelanto de cuotas») and
-the instalment plan lifecycle, as purchase operations: append-only records projected into the ledger as derived lines,
+Updated: 2026-10-02 (Producto 24T3 on its branch, PR #76, with two late review fixes: the devolución date wheel's
+bounds before local noon, and a cash account's month reading «Devoluciones netas este mes» when devoluciones exceed its
+purchases; plus documentation-only notes on the dock, the Tarjetas root and 25D's FinanceKit rules. The delivery:
+refunds («devoluciones»), early payoff («adelanto de cuotas») and the instalment plan lifecycle, as purchase operations: append-only records projected into the ledger as derived lines,
 never an income and never a second expense; a devolución counts in its own month and the purchase's category, a plan
 devolución reverses recognised principal first and then lowers the last instalments, an adelanto recognises every
 remaining instalment once on its own date with the card payment a separate transfer, «Dejar de seguir el plan» records
@@ -3253,7 +3255,10 @@ nothing of it is on a screen yet.
 - **Gates.** 2026-10-02, local. `apps/mobile`: typecheck OK; `node --experimental-strip-types --test tests/*.node.ts`
   1200 passed, 0 failed (real SQLite included); `i18n:check -- --strict` 0 errors, 0 stale (English lock accepted);
   `currency:verify` OK; `regions:verify` OK; `check` OK; `export:ios` OK (a JS bundle, not an Xcode build). Root `npm
-  test` 506 passed, 1 todo; `npm run check:repo` OK (397 files). No EAS, no device run.
+  test` 506 passed, 1 todo; `npm run check:repo` OK (397 files). No EAS, no device run. Re-run after the late review
+  fixes (2026-10-02, local): typecheck OK; `test:storage` 1202 passed, 0 failed; `i18n:check -- --strict` 0 errors, 0
+  stale (English lock re-accepted for the two new keys); `currency:verify`, `regions:verify`, `check` and `export:ios`
+  OK; root `npm test` 506 passed, 1 todo; `check:repo` OK (397 files).
 - **Review.** The design was critiqued before any code (six lenses; 30 amendments, three owner decisions). The domain
   core was verified independently with a random-walk property test (about 105,000 steps in one run) asserting the
   principal identities, single recognition and balances after every step; storage, readers and each UI lane had their
@@ -3267,6 +3272,23 @@ nothing of it is on a screen yet.
   unreachable); deleting a card checks the credit rule before the destructive confirmation (archived wording
   included); a backup whose only new rows are operations is offered; Más' «Movimientos deshechos» counts undone
   operations; the devolución undo copy says only that devolución returns and uses the singular for one instalment.
+- **Late review (2026-10-02, two Codex threads after the handoff).** Both fixed on this PR, each with a regression test
+  that fails without the fix. (1) `app/new-refund.tsx`: the date wheel's upper bound was `new Date()` and its lower
+  bound the purchase's day at noon, so before local noon a purchase made today (or a plan whose floor is today) gave
+  `minimumDate > maximumDate` and a first value outside them; every day on the form is now a local calendar day at
+  12:00 (`useCurrentDay()`, as «Registrar adelanto de cuotas»): first value, upper and lower bounds. The domain's date
+  rules are unchanged (a day before the purchase is still refused). Test: `refund-routes.node.ts` at 00:01, 08:00,
+  11:59, 12:00, 12:01, 18:30 and 23:59, run under four time zones. (2) `app/account/[id].tsx`: devoluciones are
+  negative expense lines, so a cash account's month could net below zero under «Gastos este mes»; the presentation
+  (`accountMonthFacts` / `monthSpending` in `src/ui/presentation.ts`) now reads «Devoluciones netas este mes» ("Net
+  refunds this month") with the excess, unsigned in ink, and VoiceOver hears «… las devoluciones superan lo gastado en
+  …» as one element; its sums are exact (BigInt, so a running total that negative lines bring back into range is never
+  misread). Nothing in the ledger, the balance, Reportes or Presupuestos changes; zero and above stay «Gastos
+  este mes». Test: `polish-routes.node.ts` (spending above, equal to and below the devoluciones, the balance against
+  `accountBalanceMinor`, the projected line, English, VoiceOver, a card account's redirect). B1–B3 unchanged. Also
+  recorded, no code: the dock stays in the layout (not an overlay; mobile-design «El dock»), the Tarjetas root is not
+  redesigned (a density-versus-deck evaluation is in the 24T3 checklist), and 25D's FinanceKit / external-transaction
+  rules are reconciled below.
 
 ### Later notes recorded in 24UX6A (future; document only, not scheduled)
 
@@ -3442,7 +3464,9 @@ tied to 25E's account are deferred to 25E or a follow-up after it (24T1C, 2026-0
   the trigger actually supplies; missing fields stay missing (never guessed); repeated deliveries are
   deduplicated; offline catch-up and cancellation are verified; no claim to read Wallet history and no
   bank execution. **Tested separately on iPhone and on Apple Watch** (a payment made with the Watch):
-  the two triggers are never assumed to behave the same.
+  the two triggers are never assumed to behave the same. Ordinary Apple Pay / PassKit APIs let an app take or offer a
+  payment; they do **not** let FinanzApp passively observe every Apple Pay purchase the person makes (reconciled
+  2026-10-02 in 24T3).
 - **Wallet card → FinanzApp account mapping (recorded 2026-09-28 in 24T1C).** FinanzApp is never limited to
   one account per currency, and a currency alone never identifies an account or a card. The design: a Wallet
   card's transaction automation → a mapping the person selected → a FinanzApp account or card id → a draft. A
@@ -3462,9 +3486,23 @@ tied to 25E's account are deferred to 25E or a follow-up after it (24T1C, 2026-0
 - **Apple Watch (explicit future surface):** a focused capture and read experience, a WidgetKit
   complication / Smart Stack widget and App Intents; **not** a full replica of the iPhone app.
 - **Sign in with Apple — deferred to 25E or later, not part of 25D**, when an account exists; never required for the local core.
-- **FinanceKit:** a future research gate (entitlement, Apple's approval, the institutions and regions it
-  actually covers, what data it gives), not a dependency of the core and not a categorical claim about any
-  region or card; any use is read-only, consented and produces drafts.
+- **FinanceKit and external financial transactions (reconciled 2026-10-02 in 24T3; documentation only, no
+  entitlement or code).** FinanceKit is the future research and integration gate for financial accounts and
+  transactions the person authorizes, only where Apple makes that data available and grants FinanzApp the required
+  entitlement (Apple's approval, the institutions and regions it actually covers, what data it gives): never a
+  dependency of the core, and never a claim that every card, bank, region or Apple Pay transaction is available.
+  - **Draft first.** Any external financial transaction (FinanceKit, a Wallet automation, a future bank) enters
+    FinanzApp as a draft / review item; it is never a silent ledger write and is recorded only on the person's
+    confirmation.
+  - **Card mapping.** The strongest mapping is explicit and approved by the person: an external financial account
+    identifier → one FinanzApp card (or account), chosen once and editable; never inferred from a currency or a name.
+  - **Prefill, not decide.** Merchant, amount, date and institution metadata, when supplied, may prefill the draft;
+    a category may be suggested but goes through the existing confirmation; anything missing stays missing.
+  - **Instalments are never assumed.** An Apple or other external transaction is not assumed to carry an instalment
+    count or schedule. A FinanzApp instalment plan is created only when the exact instalment facts are actually
+    provided or the person explicitly confirms them; otherwise the draft is an ordinary purchase the person can turn
+    into a plan.
+  - **Manual local tracking stays the core and the fallback**, offline and complete without any of this.
 - **Out of scope.** Any bank credential; bank execution; reading arbitrary Wallet history.
 - **Gates.** Signed development build evidence per integration (a JS bundle is not device evidence);
   denied-permission paths; the private-content default checked on the Lock Screen and the app switcher;

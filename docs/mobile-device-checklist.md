@@ -29,6 +29,14 @@ rule 7.
   the preview says the last instalments go down and no credit goes to the card; the calendar shows them «Devuelta» or
   «Reducida por devolución: $ X». On a plan with recorded instalments, a devolución returns that part to the card first
   (the balance drops, «Devuelto a la tarjeta») and only the rest lowers the last instalments.
+- [ ] **Devolución dated today, before noon (review fix).** Before 12:00, on a cash purchase made today, «Registrar
+  devolución»: the date row reads today, the wheel opens on today and cannot go before the purchase or after today; save
+  it: dated today. On an older purchase, the wheel still reaches the purchase's own day.
+- [ ] **Account detail with net refunds (review fix).** On a test cash account, a devolución this month of a purchase
+  from an earlier month that exceeds this month's purchases: the fact reads «Devoluciones netas este mes» with the
+  excess, unsigned and in ink (never «Gastos este mes» with a minus, never green); VoiceOver reads «Devoluciones netas
+  este mes: las devoluciones superan lo gastado en …»; the recorded balance rose by the devolución. In English: «Net
+  refunds this month». With spending equal to the devoluciones: «Gastos este mes» $ 0.
 - [ ] **Over-refund refused.** Typing more than «Total disponible» keeps Guardar off with the domain's sentence;
   nothing is written.
 - [ ] **Adelanto without interest.** On a plan without interest, «Registrar adelanto de cuotas»: the covered
@@ -71,6 +79,14 @@ rule 7.
   dates in words, ranges such as «Cuotas 3–12» read sensibly, every action reachable.
 - [ ] **Light and dark** on every new screen; text at AX sizes stacks without cutting a figure; the last button clears
   the home indicator.
+- [ ] **Dock (no change; confirm only).** The pine pill and the «+» sit in the layout on the screen's canvas above the
+  home indicator, not as a floating overlay (kept deliberately: no last row hides behind them, keyboard and safe areas
+  stay deterministic, the mounted-tab black-screen mitigation is untouched). Confirm the last row of every root still
+  scrolls clear of it.
+- [ ] **Tarjetas density (evaluate only; no redesign in 24T3).** With 24T3 verified, note whether the Tarjetas root
+  feels dense next to a more deck-focused, Wallet-inspired composition (the full movements and facts mainly after
+  opening a card). The 24UX6D rule stays: one card is always in front and selected and drives the snapshot, tapping
+  another card selects it, tapping the front card opens its detail; no «choose a card first» state.
 
 Record: date, iPhone model, iOS version, build, language, and every result above (a failure with a screenshot of your
 own test data only, never of real financial data).

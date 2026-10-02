@@ -98,7 +98,10 @@ regions and data are checked against Apple's current documentation when that wor
 starts, never assumed from an earlier reading and never stated as a categorical
 claim about a country or a card (revised 2026-09-28, Producto 24T1C; the scope is
 in the roadmap's 25D). Writing Swift does not bypass entitlements or regional
-restrictions.
+restrictions. Reconciled 2026-10-02 (24T3, documentation only): ordinary Apple Pay /
+PassKit APIs do not let FinanzApp observe every Apple Pay purchase; any external
+transaction arrives as a draft, maps to a card only through a mapping the person
+approved, and never implies an instalment plan the person did not confirm (25D).
 
 ## Acceptance / reconsideration gate
 

@@ -531,7 +531,11 @@ siguen la misma familia (valores en `palette.ts`).
   menos de 10): descansa en la parte alta del área del indicador de inicio, sin tocarlo; 10 pt en un iPhone sin
   indicador. A 375 pt cada pestaña tiene unos 65 pt de ancho; a 393 pt, unos 70.
 - **En el layout, nunca encima.** El dock es una fila sobre el lienzo de la pantalla: cada pantalla termina arriba de
-  él, y el desplazamiento, el teclado, las áreas seguras y la última fila funcionan como antes.
+  él, y el desplazamiento, el teclado, las áreas seguras y la última fila funcionan como antes. *(Confirmado
+  2026-10-02, en la revisión de 24T3: la píldora y el «+» se ven sobre una franja del lienzo con el área segura, y no se
+  convierten en una capa absoluta flotante. Así ninguna última fila queda debajo del dock, el teclado y el área segura
+  siguen siendo deterministas y se conserva la estrategia de pestañas montadas contra las pantallas negras de
+  `src/ui/navigation.ts`.)*
 - **Solo íconos a la vista, nunca para la accesibilidad.** Glifo de 24 pt en `dockInk`; la pestaña elegida lleva el
   glifo relleno en `dockActiveInk` sobre una cápsula `dockActive`: dos señales, nunca solo el color. Cada pestaña es un
   blanco de 48 pt de alto y de unos 65 pt de ancho a 375 pt (unos 70 a 393 pt). En iOS, VoiceOver dice «Inicio, pestaña, 1 de
@@ -877,7 +881,9 @@ plan y el estado «Cancelada».
   el monto no baja de lo devuelto y la fecha no pasa de la primera devolución, con una nota que lo explica.
 - **Registrar devolución** (`/new-refund`, modal). Arriba la compra (precio, comercio, cuenta o tarjeta con su glifo,
   fecha, «Ya devuelto» si algo se devolvió); el importe con el atajo «Total disponible» (en un plan, «Hasta $ X: el
-  precio; el interés no se devuelve desde acá»); la fecha entre la compra (en un plan, su piso) y hoy; «Qué se registra»,
+  precio; el interés no se devuelve desde acá»); la fecha entre la compra (en un plan, su piso) y hoy, cada día a las
+  12:00 locales como en el adelanto (revisión: antes de mediodía, una compra de hoy daba un mínimo posterior al máximo);
+  «Qué se registra»,
   la vista previa calculada por la misma función que guarda («Se acreditan $ X en Banco con fecha … y se restan de Ropa en
   octubre. No es un ingreso.»; en un plan, lo que vuelve a la tarjeta, «Las cuotas 11 a 12 bajan $ Y en total y no se
   registran por esa parte.» y «El interés de esas cuotas sigue como estaba.»; si no queda precio pero sigue el interés,
@@ -943,6 +949,12 @@ cero o debajo. Nunca se dibuja un número negativo como si fuera gasto:
 - **Inicio y Presupuestos.** Gastado muestra el neto exacto; debajo de cero, una línea callada «Las devoluciones superan
   lo gastado», fuera del bloque del número. En Presupuestos, Gastado queda exacto y Disponible no pasa del límite, con
   la misma frase; un sublímite dice «Quedan $ Y de $ Y · las devoluciones superan lo gastado».
+- **Detalle de una cuenta** (revisión). «Gastos este mes» es el neto de sus líneas de gasto, devoluciones incluidas; en
+  cero o encima se muestra igual que siempre. Debajo de cero, el mismo dato se lee **«Devoluciones netas este mes»**
+  ("Net refunds this month") con el exceso sin signo, en tinta: las palabras llevan el sentido, no un color ni un
+  «−», y nunca es un ingreso. VoiceOver lo lee como un elemento: «Devoluciones netas este mes: las devoluciones
+  superan lo gastado en …». El saldo, el libro y Reportes/Presupuestos no cambian; una tarjeta sigue en su propio
+  detalle, que no tiene ese dato.
 - Las notas de método de Reportes (moneda sola y consolidado) dicen que las devoluciones restan en su mes y su
   categoría.
 
@@ -965,7 +977,9 @@ Todo, en la sección «Producto 24T3» de docs/mobile-device-checklist.md: la ac
 devoluciones en efectivo, con tarjeta y de un plan antes y después de un cierre, el tope, adelantos con y sin interés y
 Pagar tarjeta, dejar de seguir y reactivar, eliminar una tarjeta con saldo a favor o con un plan pendiente, deshacer y
 restaurar, las filas, Reportes con una categoría debajo de cero y el selector a 375 pt en los dos idiomas con texto
-chico, grande y AX, VoiceOver en las pantallas nuevas, claro y oscuro.
+chico, grande y AX, VoiceOver en las pantallas nuevas, claro y oscuro; la fecha de una devolución dada antes de
+mediodía, «Devoluciones netas este mes» en el detalle de una cuenta y, solo como evaluación, la densidad de la raíz de
+Tarjetas.
 
 ## Producto 24UX6E — Más destinos financieros en Forest
 
@@ -2733,7 +2747,10 @@ color propio.
   pendiente, y permitido después; deshacer y restaurar una devolución y un adelanto; las filas de Movimientos y
   Movimientos deshechos; Reportes con una categoría debajo de cero y las etiquetas del selector «Categorías | Día a
   día» a 375 pt en español e inglés con texto chico, grande y XXXL; Deudas sin cambios (una devolución nunca aparece
-  como pago o cobro); VoiceOver en las pantallas nuevas; claro y oscuro. Lista en docs/mobile-device-checklist.md.
+  como pago o cobro); VoiceOver en las pantallas nuevas; claro y oscuro; la fecha de una devolución de una compra de
+  hoy antes de mediodía; «Devoluciones netas este mes» en el detalle de una cuenta; la densidad de la raíz de Tarjetas
+  frente a una composición más de mazo, al estilo Wallet (solo evaluar, sin rediseño en 24T3). Lista en
+  docs/mobile-device-checklist.md.
 
 - Producto 24UX6E (sin build de EAS, nada revisado todavía): Cuentas con una y varias cuentas, saldos grandes
   positivos y negativos, varias monedas, la cabecera de moneda en tinta con su total (apilada con texto grande, un solo
