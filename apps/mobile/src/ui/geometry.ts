@@ -3,6 +3,10 @@
 
 export const SEGMENT_PADDING = 2;
 export const SEGMENT_GAP = 2;
+/** 24T3 carry-in: Reportes' analysis switch («Categorías | Día a día»), the screen's main control, reads at the subhead
+ * size (15/20, Inicio's switch size), never shrinks to fit (on iOS's new architecture the shrink's floor is 4 pt, not
+ * `minimumFontScale`) and follows Dynamic Type up to 1.3×; its segments are 40 pt, so the track is 44 pt. */
+export const PROMINENT_SEGMENT = { fontSize: 15, lineHeight: 20, maxScale: 1.3, minHeight: 40 } as const;
 
 /** Geometry of a segmented control's sliding thumb: equal segments inside the padded track. */
 export function segmentLayout(trackWidth: number, count: number, index: number): { width: number; offset: number } {

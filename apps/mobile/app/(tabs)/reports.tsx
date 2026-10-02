@@ -215,7 +215,7 @@ export default function ReportsScreen() {
         {/* The month's analysis: categories first, or day by day. 24UX6D: no KPI above it; the total is the donut's centre
             in Categorías and one compact line in Día a día. */}
         <View style={{ gap: space.l }}>
-          <Choices value={tab} onChange={goToTab} options={[{ value: 'categories', label: t('reports.viewCategories') }, { value: 'days', label: t('reports.viewDays') }]} />
+          <Choices prominent value={tab} onChange={goToTab} options={[{ value: 'categories', label: t('reports.viewCategories') }, { value: 'days', label: t('reports.viewDays') }]} />
           {/* Día a día has no donut: the period's total as a compact analytical line, never the old hero. The label is
               secondary and the exact amount 20 pt semibold beside it; when the two do not share the line the amount wraps
               under the label (whole, never truncated). VoiceOver hears it once, in spoken numbers. */}

@@ -286,6 +286,11 @@ test('23.1B2: Reportes in English changes only words; amounts, user data and rou
   const es = routeHarness('(tabs)/reports.tsx', params);
   const en = routeHarness('(tabs)/reports.tsx', params, snapshot, { locale: 'en-AR' });
   const root = en.render(), words = texts(root);
+  // 24T3 carry-in: the analysis switch is the prominent variant, its words in English.
+  const control = find(root, 'Choices');
+  assert.equal(control.props.prominent, true);
+  assert.equal(control.props.options.map((option: { label: string }) => option.label).join(','), 'Categories,Day by day');
+  assert.equal(find(es.render(), 'Choices').props.options.map((option: { label: string }) => option.label).join(','), 'Categorías,Día a día');
   find(root, 'IconButton', 'Previous month');
   find(root, 'IconButton', 'Next month');
   assert.ok(words.includes('August 2026'));
