@@ -99,6 +99,9 @@ npm run check:repo    # repository hygiene (below)
   history of every delivery.
 - [docs/mobile-design.md](docs/mobile-design.md): the visual and motion direction;
   [docs/merchant-identity.md](docs/merchant-identity.md): merchants, brand marks and recurring history.
+- [docs/competitive-landscape.md](docs/competitive-landscape.md): the competitive capability map, the feature-gap map and the
+  research gates (Mercado Pago, bank connections, WhatsApp, shared expenses), discovery only; [docs/brand-brief.md](docs/brand-brief.md):
+  the public name and identity brief («FinanzApp» is the working name; no name chosen, no palette change).
 - [docs/mobile-device-checklist.md](docs/mobile-device-checklist.md): what only an iPhone can verify.
 - [docs/i18n.md](docs/i18n.md) and [docs/currency.md](docs/currency.md): languages, regions,
   currencies, the multi-currency engine and the consolidated views.

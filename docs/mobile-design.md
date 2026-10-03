@@ -848,6 +848,20 @@ barras de Día a día y una cabecera fija sólida. Siguen permitidos para una pa
 vinculante del roadmap no cambia: la próxima entrega de producto es 24T3; 24UX6C (Movimientos y Más) y 24UX6D
 (Tarjetas) siguen a 24UX6B en el carril UX, y su lugar frente a 24T3 lo decide el dueño (ver `docs/mobile-roadmap.md`).
 
+## Producto 25DISC1 — descubrimiento competitivo y brief de marca (sin cambios visuales)
+
+Solo documentación, en su rama `feat/producto-25disc1-competitive-brand-discovery` desde master d0a0be8 (25OPS1
+mergeada como PR #81). Ninguna pantalla, paleta, ícono ni texto de la app cambia. Dos documentos nuevos:
+[competitive-landscape.md](competitive-landscape.md) (la matriz de capacidades frente a Kesef, MonAi, Copilot, Monarch,
+YNAB, Wallet, Piggy, Finy, Splitwise y MoneyCoach, leída de fuentes primarias el 2026-10-02; el mapa de brechas; las
+decisiones y compuertas de investigación: Mercado Pago, conexiones bancarias, WhatsApp, gastos compartidos, períodos
+de cobro) y [brand-brief.md](brand-brief.md) (el nombre público y la identidad original: «FinanzApp» es solo el nombre
+de trabajo; criterios y flujo de nombres; el brief de exploración visual con tres o cuatro territorios genuinamente
+distintos, Forest puede ser uno evolucionado; ningún nombre elegido, ninguna paleta cambiada en código). Para esta
+guía valen dos cosas: la composición de Inicio, Reportes, Tarjetas, Más y la captura queda congelada mientras se
+exploran identidades (la exploración cambia identidad, no composición), y ninguna capacidad se suma a Inicio por
+paridad con un competidor. Nada que revisar en el iPhone.
+
 ## Producto 25OPS1 — la última fila sobre el dock
 
 Seguimiento de 25UX1, en su rama `feat/producto-25ops1-production-launch-plan`. Ningún cambio visual: el dock, su
