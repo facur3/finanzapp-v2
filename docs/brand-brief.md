@@ -210,6 +210,28 @@ A board per territory (PNG or a Figma file the owner can open), a token sheet pe
 licence status of every typeface or asset, and a statement that nothing was traced or copied from another product. The
 designer or agent names the references consulted (as this brief names §5) and shows the distance from them.
 
+### 4.7 Owner feedback after the second exploration (2026-10-03)
+
+Recorded as decisions; the exploration boards are not copied into the repository (there is no asset workflow for them).
+
+- **Structure is frozen; the open question is colour and brand identity.** The current Forest product structure is the
+  selected structural baseline. Brand exploration is **not** permission for another broad UI redesign. Preserved:
+  rounded iOS surfaces, the current navigation, Inicio's composition, Reportes' hierarchy, the Wallet-style Tarjetas
+  interaction, the floating dock and the current information-density principles.
+- **Inicio stays as it is.** Its hierarchy (the amount, Gastado / Disponible → upcoming commitments → recent activity)
+  is sufficient and the product deliberately removed visual noise. **No** month arc, month progress line, «Día X de Y»,
+  spending-pace visualisation or additional month chart is added to Inicio. The Alba / month-pattern exploration was
+  useful research; nothing from it is selected for Inicio. Spending pace or month progress may be reconsidered later
+  inside Reportes, the calendar or a future insight surface if it gives a clear financial decision benefit; it does not
+  return to Inicio because it looked good on a concept board.
+- **Palettes: research, not a selection.** Pino / Forest remains a strong baseline. Pino + albaricoque is a promising
+  evolution (a restrained second tone, the product unchanged). Zafiro + arena is the strongest genuinely different
+  challenger and stays in the final comparison. Grafito + categorías and Petróleo + oro arena are not preferred. **No
+  palette is selected**; a final, broader palette-only exploration runs outside this PR, and no palette is implemented
+  until the owner chooses one.
+- **Naming.** «FinanzApp» is only the internal working name. No name from the Claude Design shortlist is approved, and
+  none is promoted to the roadmap or the product configuration before the availability and conflict screening of §3.
+
 ## 5. What the identity must stay away from
 
 The current identities of the products the owner named, described at a high level for differentiation only, from the

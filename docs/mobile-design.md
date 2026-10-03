@@ -862,6 +862,16 @@ guía valen dos cosas: la composición de Inicio, Reportes, Tarjetas, Más y la 
 exploran identidades (la exploración cambia identidad, no composición), y ninguna capacidad se suma a Inicio por
 paridad con un competidor. Nada que revisar en el iPhone.
 
+**Decisión del dueño tras la segunda exploración de marca (2026-10-03).** La estructura Forest actual es la base
+elegida (superficies iOS redondeadas, navegación, composición de Inicio, jerarquía de Reportes, interacción tipo
+Wallet de Tarjetas, dock flotante, densidad de información); la exploración de marca no autoriza otro rediseño
+amplio, y la pregunta abierta es color e identidad, no layout. **Inicio queda congelado: no se le agrega arco del
+mes, línea de progreso del mes, «Día X de Y», ritmo de gasto ni otro gráfico mensual**; su jerarquía (importe,
+Gastado / Disponible → próximos compromisos → actividad reciente) alcanza. El ritmo de gasto o el avance del mes
+puede reconsiderarse más adelante en Reportes, el calendario o una superficie de análisis si aporta una decisión
+financiera clara, nunca por verse bien en un tablero. Ninguna paleta está elegida (detalle en
+[brand-brief.md §4.7](brand-brief.md)).
+
 ## Producto 25OPS1 — la última fila sobre el dock
 
 Seguimiento de 25UX1, en su rama `feat/producto-25ops1-production-launch-plan`. Ningún cambio visual: el dock, su

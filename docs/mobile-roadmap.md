@@ -3902,6 +3902,13 @@ nothing of it is on a screen yet.
   access, content pillars, the vertical-video guideline, organic before paid, the launch sequence, retention and
   referral experiments, the funnel and its metrics, the App Store connection). No account, budget, campaign or app
   change.
+- **Owner feedback, second brand exploration (2026-10-03, same PR; decisions, no code).** Details in
+  [brand-brief.md §4.7](brand-brief.md). Forest's structure is the frozen baseline and the open question is colour and
+  identity only; Inicio gets no month arc, progress line, «Día X de Y», spending-pace or extra month chart (pace may be
+  reconsidered in Reportes, the calendar or a future insight surface); the second exploration is research: Pino and
+  Pino + albaricoque promising, Zafiro + arena the strongest different challenger, Grafito + categorías and
+  Petróleo + oro arena not preferred, no palette selected, a final palette-only exploration happens outside this PR and
+  nothing is implemented until the owner chooses; no shortlist name is approved and «FinanzApp» stays the working name.
 - **Open owner decisions.** Landscape §12.4, brand-brief §6 and go-to-market §12.
 - **Device QA.** Nothing to check on the iPhone.
 - **Status.** This PR; not merged.
