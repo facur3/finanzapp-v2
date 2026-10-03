@@ -1,7 +1,9 @@
 # FinanzApp mobile: living roadmap
 
 Updated: 2026-10-03 (Producto 25DISC1 on its branch, documentation only: the competitive capability map and gap map,
-[competitive-landscape.md](competitive-landscape.md), and the brand identity brief, [brand-brief.md](brand-brief.md);
+[competitive-landscape.md](competitive-landscape.md) with its durable per-claim evidence record
+[competitive-evidence.md](competitive-evidence.md) and capability decision register (§12.5), the brand identity brief,
+[brand-brief.md](brand-brief.md), and the acquisition and retention plan, [go-to-market.md](go-to-market.md);
 research of 2026-10-02 on ten products, Mercado Pago's developer documentation, LatAm aggregators and Argentina's open
 finance; no app change; the version line still reads «FinanzApp 0.1.0 (25OPS1)». Producto 25OPS1 merged as PR #81,
 merge commit d0a0be8: the production and launch plan,
@@ -243,7 +245,9 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   decisions for capabilities the roadmap had not considered, and the research gates for Mercado Pago (a consumer wallet
   feed cannot be confirmed from the official documentation), bank connections (nothing compliant reaches Argentina
   today), WhatsApp capture and shared expenses. [brand-brief.md](brand-brief.md): «FinanzApp» is the working name
-  only; naming criteria and workflow; the visual exploration brief. No app, palette, identifier, integration, provider,
+  only; naming criteria and workflow; the visual exploration brief. [go-to-market.md](go-to-market.md): positioning,
+  social channels, content and video, the organic-to-paid loop, retention experiments (streaks only as a measured
+  experiment) and the funnel, planning only. No app, palette, identifier, integration, provider,
   schema (14), backup (v14) or review-store change; the version line still reads «FinanzApp 0.1.0 (25OPS1)».
 - **The last row above the dock, and the production plan (25OPS1, PR #81, merge commit d0a0be8; device QA pending for the dock
   correction).** §3, «Producto 25OPS1». The dock clearance of a tab root is now bottom padding of the scroller's content
@@ -3886,7 +3890,19 @@ nothing of it is on a screen yet.
   the naming workflow (ideation → shortlist → App Store AR and global search → web → domains → handles → trademark and
   confusing-similarity screening → owner selection → only then rename) and the exploration brief (three or four
   genuinely distinct territories, Forest allowed as one evolved option); no name chosen, no palette change in code.
-- **Open owner decisions.** Landscape §12.4 and brand-brief §6.
+- **Follow-up (2026-10-03, same PR).** The four review findings fixed against their sources: the naming workflow
+  table's five columns; the matrix's evidence made durable in [competitive-evidence.md](competitive-evidence.md) (every
+  audited capability per product, the second reader's corrections, a one-line paraphrase and the public URL; it
+  replaces the session-only research record, and a cross-check against it corrected three more cells: Monarch's
+  categories, Copilot's subscriptions and subscriptions report); Kesef's and MoneyCoach's «Account required» cells
+  (neither needs an account for the core); MonAi removed from the lifetime-price evidence. Added: the capability
+  decision register (landscape §12.5: one status, one home and a priority tier, CORE / LAUNCH, LAUNCH CANDIDATE,
+  POST-LAUNCH, RESEARCH or EXPERIMENT, for every capability surfaced; parity is not the launch plan) and
+  [go-to-market.md](go-to-market.md) (positioning, the social brand system, the Instagram account type and Meta
+  access, content pillars, the vertical-video guideline, organic before paid, the launch sequence, retention and
+  referral experiments, the funnel and its metrics, the App Store connection). No account, budget, campaign or app
+  change.
+- **Open owner decisions.** Landscape §12.4, brand-brief §6 and go-to-market §12.
 - **Device QA.** Nothing to check on the iPhone.
 - **Status.** This PR; not merged.
 - **Gates.** 2026-10-03, local, Linux. Root `npm test` 590 passed, 1 todo; `check:repo` OK. `apps/mobile`: `typecheck`
@@ -4195,7 +4211,8 @@ or marketing asset.
 
 ### Marketing, App Store Optimization, Instagram, advertising materials and conversion tests
 
-Production detail (25OPS1): [app-store-launch.md](app-store-launch.md) §7–§10 and §14.
+Production detail (25OPS1): [app-store-launch.md](app-store-launch.md) §7–§10 and §14. Acquisition and retention plan
+(25DISC1): [go-to-market.md](go-to-market.md), planning only (no account, budget or campaign).
 
 Only after real users exist (TestFlight or the App Store): demonstration videos from real screens
 with clearly marked fixture data, testimonials only from real, consenting users.

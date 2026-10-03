@@ -14,6 +14,8 @@ public asset. The labels are those of [production-plan.md](production-plan.md) (
 - The competitive context (who the product is compared with, which visual territories are crowded) is in
   [competitive-landscape.md](competitive-landscape.md) §10. Nothing there is copied: the landscape says what to stay
   away from, never what to borrow.
+- How the identity is carried into social channels, video and the launch sequence is
+  [go-to-market.md](go-to-market.md) §3–§6 and §10; handles are chosen only after the naming workflow (§3, steps F and H).
 - Sequencing: this work belongs to **Producto 26** (the definitive identity), before any public metadata, landing page
   or marketing asset, and after 25F only if the owner keeps that order ([production-plan.md §13](production-plan.md#13-roadmap-mapping):
   25F's sandbox purchases need the app record, so the identity decision may be needed before 25F's sandbox gate). The
@@ -75,8 +77,8 @@ chooses, and the record says why.
 renamed before step I. Each step produces a written record; the record is kept with the gate (a future
 `docs/brand-naming-log.md`, created when the workflow starts, never in this document).
 
-| Step | What | Output | Gate |
-| --- | --- | --- | --- |
+| Step | Name | Description | Output | Gate |
+| --- | --- | --- | --- | --- |
 | A | Broad ideation | At least 100 candidates across several routes: coined words; Spanish and Latin roots about order, clarity, calm, rhythm and the everyday (never about wealth, growth or banking); words for light, paper, notebooks, pockets and days; short invented words with open vowels; a few bilingual words that are identical in Spanish and English. Each with its route and a one-line rationale. No candidate is checked yet. | The long list | None |
 | B | First cut and shortlist | N1–N9 applied to the long list; at most 12 survive, each with its pronunciation written in Spanish and English, its best and worst reading (N5) and a quick note on how a wordmark could look (N11). | The shortlist | The owner removes anything they dislike before the checks, so no effort goes into a name they would never choose |
 | C | App Store search | For each shortlist name: the Argentina and the United States storefronts (and Mexico, Spain, Brazil if cheap), searched as the exact word and as its obvious misspellings; any app with the same or a close name is recorded with its category, developer and whether it is finance. A finance app with a close name eliminates the candidate; a non-finance app with the exact name is an owner call. | A table per name | Eliminations |

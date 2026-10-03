@@ -66,7 +66,7 @@ is monthly or annual.
 
 Each group below is one table: the capability, FinanzApp's label and phase, then one cell per competitor. Notes after
 each table record the mechanism where it matters (how a thing works, not only that it exists), the invariant that binds
-FinanzApp's version, and what the verification changed. Verification re-read the sources of 10 of the 10 products and changed or added 107 cells and notes; the per-capability evidence with URLs is in the research record of this delivery (the workflow transcript under the session's `subagents/workflows/wf_40338914-281`), not reproduced here; §13 lists every source read.
+FinanzApp's version, and what the verification changed. Verification re-read the sources of 10 of the 10 products and changed or added 107 cells and notes; the per-capability evidence (status after verification, a one-line paraphrase of the source and its URL) is the durable record [competitive-evidence.md](competitive-evidence.md), which a future contributor uses to trace any cell; §13 lists every source read.
 
 ### 2.1 Limits of this research
 
@@ -120,7 +120,7 @@ Notes.
 
 | Capability | FinanzApp | Kesef | MonAi | Copilot | Monarch | YNAB | Wallet | Piggy | Finy | Splitwise | MoneyCoach |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Categories | **IMPLEMENTED** | ● | ● | ● | ◐ | ● | ● | ● | ● | ● | ● |
+| Categories | **IMPLEMENTED** | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
 | Custom categories | **IMPLEMENTED** | ● | ● | ● | ● | ● | ◐ | ● | ● | ? | ● |
 | Tags | **ACTIVE ROADMAP** · 25C | ● | ● | ● | ● | ◐ | ● | ? | ? | ○ | ● |
 | Subcategories | **POST-LAUNCH** (§6) | ○ | ? | ◐ | ◐ | ◐ | ● | ? | ? | ? | ● |
@@ -148,7 +148,7 @@ Notes.
 | Refunds (devoluciones) | **IMPLEMENTED** | ? | ? | ◐ | ◐ | ● | ◐ | ? | ? | ◐ | ● |
 | Early instalment payoff | **IMPLEMENTED** (full payoff; a partial advance is recorded as deferred) | ○ | ? | ○ | ○ | ? | ○ | ● | ? | ○ | ○ |
 | Recurring expenses | **IMPLEMENTED** | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
-| Subscriptions | **IMPLEMENTED** (as recurring rules) · **LAUNCH CANDIDATE** 25C2 (subscriptions view, §6) | ◐ | ◐ | ◐ | ● | ◐ | ◐ | ● | ◐ | ○ | ● |
+| Subscriptions | **IMPLEMENTED** (as recurring rules) · **LAUNCH CANDIDATE** 25C2 (subscriptions view, §6) | ◐ | ◐ | ● | ● | ◐ | ◐ | ● | ◐ | ○ | ● |
 | Debts and receivables | **IMPLEMENTED** | ◐ | ? | ◐ | ◐ | ◐ | ◐ | ◐ | ◐ | ● | ◐ |
 | Several currencies | **IMPLEMENTED** | ● | ● | ○ | ○ | ○ | ● | ● | ● | ● | ● |
 | FX semantics (stored original vs converted; rate) | **IMPLEMENTED** (original currency kept; conversion only in views, at each movement's own date) · 24C2 optional | ● | ◐ | ○ | ○ | ○ | ◐ | ◐ | ◐ | ◐ | ◐ |
@@ -192,7 +192,7 @@ Notes.
 | Trends | **IMPLEMENTED** (six months) | ◐ | ◐ | ● | ● | ● | ● | ◐ | ● | ◐ | ● |
 | Comparisons | **IMPLEMENTED** (month vs previous) | ● | ◐ | ● | ◐ | ◐ | ● | ● | ● | ? | ● |
 | By merchant | **IMPLEMENTED** (top five) · 25C2 | ○ | ? | ◐ | ● | ◐ | ? | ◐ | ? | ○ | ● |
-| Subscriptions report | **LAUNCH CANDIDATE** · 25C2 (§6) | ◐ | ? | ● | ◐ | ○ | ◐ | ● | ? | ○ | ● |
+| Subscriptions report | **LAUNCH CANDIDATE** · 25C2 (§6) | ◐ | ? | ◐ | ◐ | ○ | ◐ | ● | ? | ○ | ● |
 | Calendar report | **ACTIVE ROADMAP** · 25C2 | ○ | ? | ? | ◐ | ○ | ◐ | ? | ? | ○ | ● |
 | Custom ranges | **ACTIVE ROADMAP** · 25C | ? | ● | ◐ | ● | ● | ● | ? | ● | ○ | ● |
 | AI reports | **ACTIVE ROADMAP** · 25A (grounded, §8) | ◐ | ● | ◐ | ● | ○ | ◐ | ◐ | ● | ○ | ◐ |
@@ -251,7 +251,7 @@ Notes.
 | Capability | FinanzApp | Kesef | MonAi | Copilot | Monarch | YNAB | Wallet | Piggy | Finy | Splitwise | MoneyCoach |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Local-first | **IMPLEMENTED** | ● | ◐ | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ◐ |
-| Account required | **IMPLEMENTED** (none; never for the local core) | ● | ◐ | ● | ● | ● | ● | ● | ● | ● | ● |
+| Account required | **IMPLEMENTED** (none; never for the local core) | ○ | ◐ | ● | ● | ● | ● | ● | ● | ● | ○ |
 | Cloud sync | **ACTIVE ROADMAP** · 25E (owner decision whether) | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
 | iCloud / CloudKit | **RESEARCH GATE** · 26 (backup inclusion), 25E (CloudKit as a sync engine, §6) | ○ | ● | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ● |
 | Face ID | **ACTIVE ROADMAP** · 25D | ● | ● | ● | ? | ● | ● | ● | ● | ◐ | ● |
@@ -719,7 +719,7 @@ Nothing here changes the binding order (roadmap §3): 25A → 25A2 → 25C → 2
 | **25C2** | calendar; merchant and subscription intelligence | Kept (calendar, rules, suggested recurring detection, marks). Added as a candidate: a subscriptions view over the recurring rules and the detected candidates (§6). |
 | **25D** | Face ID; hide amounts; notifications; widgets; Quick Actions; broader Apple integration | Kept. Hide amounts stays «beside 25D, placement open» as the owner recorded; Quick Actions added as a candidate (§6). |
 | **25E / the integration gate** | Mercado Pago; optional bank and cloud integrations; optional WhatsApp capture; sync | Kept: Mercado Pago (§7), bank connections (§11), WhatsApp (§8.3) are research gates placed here, each an owner decision; sync as written. |
-| **25F** | subscription and paywall | Kept. Added: the lifetime price as an owner decision with the evidence of §3 (Kesef, MonAi's family tier, Wallet, MoneyCoach and Finy sell one; it sits badly with per-request AI cost). |
+| **25F** | subscription and paywall | Kept. Added: the lifetime price as an owner decision with the evidence of §3 (Kesef, Wallet, MoneyCoach and Finy sell one; MonAi does not; it sits badly with per-request AI cost). |
 | **26** | final brand implementation; public name; icon and identity; landing; ASO and launch | Kept; the brand brief defines the work (brand-brief.md); the naming workflow may start earlier because it needs no code. |
 | **Post-launch** | shared groups if not promoted earlier; investments and net worth; other large expansions | Kept: groups, invitations and household (§9.3), investments and net worth (§11.3), Android, subcategories, attachments, Excel, amortising loans and assets (§6). |
 
@@ -765,6 +765,65 @@ Nothing here changes the binding order (roadmap §3): 25A → 25A2 → 25C → 2
 | A lifetime price, and whether it excludes or caps AI | §6 |
 | When the naming workflow starts, who runs the visual exploration, whether Forest is one territory | brand-brief.md §6 |
 | Whether Mercado Pago's app, Ualá and the other incumbents get their own feature audit | §2.1 |
+
+### 12.5 Capability decision register
+
+**Parity is not the launch plan.** A capability a competitor ships is evidence of demand, never a reason to build it
+before launch, and nothing here is added to Inicio to match the field (§12.3, item 6; decision 005). The launch rests on
+what already differentiates FinanzApp: the trustworthy financial domain, cards with statements and instalments,
+commitments, the local-first manual core with no account, Apple-native capture and the controlled Assistant. Everything
+else waits for its phase, its gate or its evidence.
+
+One status (the labels at the top of this document) and one home per capability. The priority tier is this document's
+suggestion for the owner, not a decision:
+
+- **CORE / LAUNCH**: implemented, or scheduled before 26 in the binding order; the launch depends on it.
+- **LAUNCH CANDIDATE**: worth deciding before 26; launches without it if the owner says so.
+- **POST-LAUNCH**: after 26, revisited with evidence from real people.
+- **RESEARCH**: an open question (platform, legal, provider or device) that is answered before any build.
+- **EXPERIMENT**: built only as a measured test with a stated success criterion, after launch and with the consent
+  rules of launch §7; never promoted to the roadmap without its evidence ([go-to-market.md](go-to-market.md) §8).
+
+| Group | Capability | Status | Home | Priority |
+| --- | --- | --- | --- | --- |
+| Capture / AI | Voice as an Assistant input (always ending in drafts the person confirms) | ACTIVE ROADMAP | 25A, last slice (§8.1) | CORE / LAUNCH |
+| Capture / AI | Several drafts from one voice or text message | LAUNCH CANDIDATE | 25A contract v2 decision (§8.1) | LAUNCH CANDIDATE |
+| Capture / AI | Grounded AI reports (the READ class, cited facts only) | ACTIVE ROADMAP | 25A (§8.2) | CORE / LAUNCH |
+| Capture / AI | WhatsApp capture (optional cloud producer of drafts) | RESEARCH GATE | 25E (§8.3) | RESEARCH |
+| Data portability | Robust CSV import (previewed drafts, rules that only pre-fill) | ACTIVE ROADMAP | 25C | CORE / LAUNCH |
+| Data portability | CSV export, never behind a paywall | LAUNCH CANDIDATE | 25C beside the import (§6) | LAUNCH CANDIDATE |
+| Data portability | Excel-friendly export (the CSV in the region's separators and an encoding Excel opens directly) | LAUNCH CANDIDATE | 25C, part of the CSV export | LAUNCH CANDIDATE |
+| Data portability | XLSX and further formats | POST-LAUNCH | Only on demand (§6) | POST-LAUNCH |
+| Organisation | Tags (never replacing the category) | ACTIVE ROADMAP | 25C | CORE / LAUNCH |
+| Organisation | Advanced search (saved searches; notes searchable) | ACTIVE ROADMAP | 25C (today's search is IMPLEMENTED) | CORE / LAUNCH |
+| Organisation | Advanced filters (account, category, period, custom period) | ACTIVE ROADMAP | 25C | CORE / LAUNCH |
+| Organisation | Notes on expenses and incomes | ACTIVE ROADMAP | 25C | CORE / LAUNCH |
+| Organisation | Attachments and receipts | POST-LAUNCH | §6; a photo → draft Shortcut first | POST-LAUNCH |
+| Planning | Configurable reporting and pay cycles | LAUNCH CANDIDATE | 25C (§6) | LAUNCH CANDIDATE |
+| Planning | Financial calendar | ACTIVE ROADMAP | 25C2 (production-plan §10) | CORE / LAUNCH |
+| Planning | Subscription intelligence (suggested recurring detection) | ACTIVE ROADMAP | 25C2 | CORE / LAUNCH |
+| Planning | Subscriptions view over the recurring rules | LAUNCH CANDIDATE | 25C2 (§6) | LAUNCH CANDIDATE |
+| Planning | Savings goals (progress from recorded movements, no simulated returns) | ACTIVE ROADMAP | 25C | CORE / LAUNCH |
+| Planning | Rollover budgets (explicit, reversible) | ACTIVE ROADMAP | 25C | CORE / LAUNCH |
+| Platform | Widgets (Home and Lock Screen, amounts hidden by default) | ACTIVE ROADMAP | 25D | CORE / LAUNCH |
+| Platform | Quick Actions | LAUNCH CANDIDATE | 25D (§6) | LAUNCH CANDIDATE |
+| Platform | Apple Watch (focused capture and read, never a replica) | ACTIVE ROADMAP | 25D, «explicit future surface» | RESEARCH (a separate native target; feasibility and device evidence first) |
+| Platform | Face ID | ACTIVE ROADMAP | 25D | CORE / LAUNCH |
+| Platform | Hide amounts | LAUNCH CANDIDATE | Beside 25D, placement open | LAUNCH CANDIDATE |
+| Integrations | Apple Wallet capture through the person's Shortcuts automation | ACTIVE ROADMAP | 25A2 | CORE / LAUNCH |
+| Integrations | Live Activity / Dynamic Island review | RESEARCH GATE | 25A2 proof of concept (production-plan §8.3) | RESEARCH |
+| Integrations | Mercado Pago Consumer Sync | RESEARCH GATE | 25E (§7); the person's own export through the 25C importer meanwhile | RESEARCH |
+| Integrations | Generic bank sync | RESEARCH GATE | 25E (§11.1) | RESEARCH |
+| Integrations | Cloud sync and its engine (Supabase, or an Apple-specific alternative such as CloudKit) | ACTIVE ROADMAP (whether) · RESEARCH GATE (engine) | 25E, its own owner decision (§6) | RESEARCH |
+| Social finance | Local expense splitting with own-share accounting (receivables, settlements, placeholder people) | LAUNCH CANDIDATE | Proposed for 25C (§9.3, §12.2) | LAUNCH CANDIDATE |
+| Social finance | Groups and households | POST-LAUNCH | §9.3 | POST-LAUNCH |
+| Social finance | Participant invitations | POST-LAUNCH | §9.3; needs 25E's identity | POST-LAUNCH |
+| Social finance | Debt simplification across a group | POST-LAUNCH | §9.3 | POST-LAUNCH |
+| Growth | End-of-day and bill / card reminders (local, opt-in, off by default) | ACTIVE ROADMAP | 25D (production-plan §8) | CORE / LAUNCH |
+| Growth | Streaks and check-ins (calmer form: «Semana al día») | POST-LAUNCH | [go-to-market.md](go-to-market.md) §8.2 | EXPERIMENT |
+| Growth | Referrals and invitations | POST-LAUNCH | [go-to-market.md](go-to-market.md) §9 | EXPERIMENT |
+| Growth | Lifecycle summaries (weekly summary, monthly close) | POST-LAUNCH | [go-to-market.md](go-to-market.md) §8.1 | EXPERIMENT |
+| Future | Investments and net worth | POST-LAUNCH | §11.3; decision 002; only if the owner explicitly promotes them | POST-LAUNCH |
 
 ## 13. Sources
 
