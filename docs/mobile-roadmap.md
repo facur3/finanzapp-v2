@@ -3908,7 +3908,10 @@ nothing of it is on a screen yet.
 - **Gates.** 2026-10-03, local, Linux. Root `npm test` 590 passed, 1 todo; `check:repo` OK. `apps/mobile`: `typecheck`
   OK; `test:storage` 1247 passed, 0 failed; `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0 errors,
   0 stale (no app string changed); `check` OK; `export:ios` OK. No EAS build, no iPhone, no remote migration, no
-  provider or network call from the app or the server (the research read public web pages only).
+  provider or network call from the app or the server (the research read public web pages only). Follow-up, 2026-10-03,
+  local, Linux, same results: root `npm test` 590 passed, 1 todo; `check:repo` OK; `typecheck` OK; `test:storage` 1247
+  passed, 0 failed; `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0 errors, 0 stale; `check` OK;
+  `export:ios` OK. No account, handle, ad account or campaign created.
 
 ### Later notes recorded in 24UX6A (future; document only, not scheduled)
 
