@@ -9,6 +9,7 @@ import { bindLocale } from '../src/i18n/bind.ts';
 import type { AppLocale } from '../src/i18n/locale.ts';
 import * as dockGeometry from '../src/ui/dock-geometry.ts';
 import * as presentation from '../src/ui/presentation.ts';
+import { lightPalette } from '../src/ui/palette.ts';
 let locale: AppLocale = 'es-AR';
 const i18nProvider = { useI18n: () => bindLocale(locale) };
 
@@ -17,10 +18,7 @@ const i18nProvider = { useI18n: () => bindLocale(locale) };
 // dock geometry and the currency helpers are the real pure modules. The hub's card itself (rise, Reduce Motion fade,
 // VoiceOver modality and escape, the dismissal timing) is BottomSheet's, pinned in tests/date-field.node.ts. How the «+»,
 // the hub and the first-choice hold feel on an iPhone remain device acceptance items.
-const palette = { isDark: false, background: '#F0F3F1', surface: '#FFFFFF', inset: '#E6EBE8', text: '#0F1A16', secondary: '#45564E', tertiary: '#586961',
-  line: '#DCE3DF', primary: '#1D5647', primaryFill: '#1D4F42', onPrimary: '#FFFFFF', primarySoft: '#E1ECE7', expense: '#B3432E', income: '#1F7A4F',
-  transfer: '#2D6476', incomeSoft: '#E2F1E8', transferSoft: '#E2EDF1', warning: '#9A5B00', hero: '#14362D', heroInk: '#EEF5F1', heroSecondary: '#A8C4B9', heroControl: '#26493F', heroThumb: '#F4F8F6',
-  heroThumbInk: '#14362D', accent: '#9FD8C1', onAccent: '#0F2A22', dock: '#1B3C33', dockInk: '#B5C9C1', dockActive: '#3C6356', dockActiveInk: '#FFFFFF' };
+const palette = { ...lightPalette, isDark: false };
 
 // Synthetic fixtures only: a live ARS and USD account and a deleted EUR one (its history stays in the view's scope,
 // but no new movement can be recorded in it).
@@ -147,7 +145,7 @@ test('24UX6A: tapping «+» opens the hub floating above the dock, with a light 
   }
 });
 
-test('24UX6A: the Assistant first and largest on the pine field, then Gasto, Ingreso and Transferencia with what each covers', () => {
+test('24UX6A: the Assistant first and largest on the brand field, then Gasto, Ingreso and Transferencia with what each covers', () => {
   const { render, exports } = harness();
   assert.equal(exports.CAPTURE_CHOICES.join(','), 'assistant,expense,income,transfer');
   render().plus.props.onPress();
@@ -157,11 +155,12 @@ test('24UX6A: the Assistant first and largest on the pine field, then Gasto, Ing
   assert.equal(tile.props.accessibilityRole, 'button');
   assert.equal(tile.props.accessibilityLabel, 'Asistente, Decilo con tus palabras o preguntá lo que quieras');
   assert.equal(tile.props.accessibilityHint, undefined);
-  assert.equal(tile.props.style[1].backgroundColor, palette.hero, 'visually primary: the hero\'s pine field');
+  assert.equal(tile.props.style[1].backgroundColor, palette.hero, 'visually primary: the hero\'s field');
   assert.equal(texts(tile).join(' | '), 'Asistente | Decilo con tus palabras o preguntá lo que quieras');
-  const spark = flatten(tile).find(node => node.type === 'View' && node.props.style?.[1]?.backgroundColor === palette.accent);
-  assert.ok(spark, 'an accent circle');
-  assert.deepEqual([spark.props.children.props.name, spark.props.children.props.color], ['sparkles', palette.onAccent]);
+  // 25VIS1: the field is lime, so the circle is the field's ink thumb with a lime glyph; an accent circle would vanish on it.
+  const spark = flatten(tile).find(node => node.type === 'View' && node.props.style?.[1]?.backgroundColor === palette.heroThumb);
+  assert.ok(spark, 'an ink circle on the field');
+  assert.deepEqual([spark.props.children.props.name, spark.props.children.props.color], ['sparkles', palette.heroThumbInk]);
   assert.ok(flatten(tile).filter(node => node.type === 'AppText' || node.type === 'Ionicons').every(node => node.props.accessible === false), 'the tile speaks once');
   assert.equal(rowsView.props.style[1].backgroundColor, palette.surface);
   assert.equal(rows.length, 3, 'three movement rows');

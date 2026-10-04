@@ -109,7 +109,7 @@ export function Surface({ children, style, grouped = false }: { children: ReactN
 }
 
 /** A section heading with an optional text action on the right. `quiet` (Inicio, 24UX3) draws the action at footnote
- * size with a small chevron in the `link` ink (the Forest brand text since 24UX6A): a visible, 44 pt tappable link
+ * size with a small chevron in the `link` ink (the brand text: olive-lime in light, soft lime in dark since 25VIS1): a visible, 44 pt tappable link
  * that reads as navigation without competing with the financial field. Elsewhere the action is the brand primary. */
 export function SectionTitle({ children, action, onAction, caption, captionLabel, quiet = false }: {
   /** `captionLabel`: what VoiceOver reads for the caption when it holds an amount (its spoken twin). */
@@ -166,9 +166,9 @@ export function PressFeedback({ children, style, containerStyle, feedback = 'sca
   </Pressable></Animated.View>;
 }
 
-/** The one filled call to action on a screen is the brand primary with white
- * text. Secondary actions stay ink on the inset fill, so a screen has at most
- * one blue button; a semantic tone (a transfer, an income) still wins.
+/** The one filled call to action on a screen is the brand fill (Electric Lime
+ * since 25VIS1) with ink on it. Secondary actions stay ink on the inset fill, so
+ * a screen has at most one lime button; a semantic tone (a transfer, an income) still wins.
  * `spokenLabel` is the label for VoiceOver when it carries an amount ("Guardar
  * gasto, 1234,50 pesos", built with the spoken formatters); the button shows
  * `label` unchanged. */
@@ -417,8 +417,8 @@ function Choice({ label, spokenLabel, selected, disabled, onPress, compact = fal
 export function Choices<T extends string>({ value, options, onChange, disabled, compact = false, onField = false, prominent = false }: {
   /** An option's `spokenLabel` is what VoiceOver reads when its short label is not a sentence (a date written out). */
   value: T; options: { value: T; label: string; spokenLabel?: string }[]; onChange: (value: T) => void; disabled?: boolean; compact?: boolean;
-  /** 24UX6A, Inicio's Gastado | Disponible on the pine field: a capsule track in the field's control fill, a near-white
-   * capsule thumb with pine text for the chosen value and the field's secondary ink for the other. Same slide and haptic. */
+  /** 24UX6A, Inicio's Gastado | Disponible on the field: a capsule track in the field's control fill, the field's
+   * thumb (ink, lime text since 25VIS1) for the chosen value and the field's secondary ink for the other. Same slide and haptic. */
   onField?: boolean;
   /** 24T3 carry-in, Reportes' «Categorías | Día a día» only: the screen's main switch at the subhead size (semibold chosen,
    * medium other), a 44 pt track and no shrink-to-fit (`PROMINENT_SEGMENT`). Same thumb, colours, slide and haptic. */
@@ -466,7 +466,7 @@ export function GlyphTile({ icon, tone = 'neutral', large = false, size, color }
  * one line of guidance, never a full-screen illustration. */
 export function EmptyState({ title, detail, action, icon = 'wallet-outline' }: { title: string; detail: string; action?: ReactNode; icon?: IconName }) {
   const p = usePalette();
-  // 24UX6C: the glyph on a tint of the pine brand (the neutral inset tile nearly vanished on the surface, in dark above all).
+  // 24UX6C: the glyph on a tint of the brand text (the neutral inset tile nearly vanished on the surface, in dark above all).
   return <Surface style={{ gap: 12, paddingVertical: 22 }}>
     <GlyphTile icon={icon} size={44} color={p.primary} />
     <AppText accessibilityRole="header" variant="title3">{title}</AppText>

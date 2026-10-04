@@ -44,7 +44,7 @@ export function FieldButton({ icon, label, onPress }: { icon: IconName; label: s
  * hero's size, followed by one quiet line and the info button with the reason. Never a partial sum, never a zero. */
 export function CurrencyParts({ parts, line, detail, onField = false }: {
   parts: readonly { currency: Currency; minor: number }[]; line: string; detail: string;
-  /** On Inicio's pine field (24UX6A): the field's ink and secondary ink instead of the canvas's. */
+  /** On Inicio's field (24UX6A): the field's ink and secondary ink instead of the canvas's. */
   onField?: boolean;
 }) {
   const p = usePalette();

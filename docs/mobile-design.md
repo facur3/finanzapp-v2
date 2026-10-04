@@ -2,8 +2,10 @@
 
 Interfaz 17 · 21 de septiembre de 2026; estado al 2 de octubre de 2026: el carril Forest (24UX6A–24UX6E) y 24T3
 mergeados, 25A-01 y 25A-02 mergeadas (PR #77, #78, #79) sin cambios visuales, 25UX1 mergeada (PR #80: dock, Tarjetas y
-Reportes: interacción) y 25OPS1 en su rama (la última fila sobre el dock; el resto es documentación). Implementado en código; revisión visual y
-gestual en iPhone pendiente. [Alcance del producto](decisions/002-spending-first.md) ·
+Reportes: interacción), 25OPS1 mergeada (PR #81; la última fila sobre el dock, confirmada por el dueño en el iPhone el
+2026-10-03), 25DISC1 mergeada (PR #82, solo documentación) y **25VIS1 (PR #83, sin mergear): Electric Lime, la paleta
+actual del producto**, aceptada por el dueño en el iPhone el 2026-10-03 («Producto 25VIS1»). El resto de la revisión
+visual y gestual en iPhone sigue pendiente. [Alcance del producto](decisions/002-spending-first.md) ·
 [Navegación y tarjetas](decisions/003-five-tabs-and-cards.md).
 
 > **Desde 24UX6A (decisión 005, 2026-09-30).** La paleta es **Forest** (pino, no cobalto), la app tiene **cuatro
@@ -13,6 +15,10 @@ gestual en iPhone pendiente. [Alcance del producto](decisions/002-spending-first
 > el coral como color del gasto común, las etiquetas visibles de la barra) quedan como registro y llevan la marca
 > «Reemplazado por la decisión 005». La parte de navegación de la decisión 003 (cinco pestañas) también queda
 > reemplazada por la 005; sus reglas de tarjetas siguen.
+>
+> **Desde 25VIS1 (2026-10-03, aceptada por el dueño en el iPhone).** Los colores de Forest se reemplazan por **Electric Lime** con los mismos
+> nombres de tokens (`src/ui/palette.ts`); la estructura de la decisión 005 no cambia. Lo vigente de color está en
+> «Producto 25VIS1»; donde abajo se lee «pino», «salvia» o un hex de Forest, vale como registro.
 
 ## Referencias y criterio propio
 
@@ -26,8 +32,8 @@ mapas de comercios, estados bancarios ni acciones que la app no ejecuta.
 ## Sistema
 
 > **Reemplazado por la decisión 005 (2026-09-30):** los valores de color, el primario cobalto y la semántica de los
-> tres párrafos siguientes dejaron de regir; los tokens vigentes son los de Forest («Producto 24UX6A → Forest: la
-> paleta»). Se conservan como registro de Interfaz 17 a 24UX5.
+> tres párrafos siguientes dejaron de regir; los tokens vigentes fueron los de Forest («Producto 24UX6A → Forest: la
+> paleta») y, desde 25VIS1, son los de Electric Lime («Producto 25VIS1»). Se conservan como registro de Interfaz 17 a 24UX5.
 
 **Color.** Tinta sobre fondo. Claro: fondo #F2F2F6, superficie #FFFFFF, tinta
 #0A0A0C, secundario #66686F, terciario #84868D, relleno #EEEEF3 (24UX1: secundario y
@@ -848,6 +854,96 @@ barras de Día a día y una cabecera fija sólida. Siguen permitidos para una pa
 vinculante del roadmap no cambia: la próxima entrega de producto es 24T3; 24UX6C (Movimientos y Más) y 24UX6D
 (Tarjetas) siguen a 24UX6B en el carril UX, y su lugar frente a 24T3 lo decide el dueño (ver `docs/mobile-roadmap.md`).
 
+## Producto 25VIS1 — Electric Lime, la paleta actual (sin rediseño)
+
+En su rama `feat/producto-25vis1-electric-lime-palette` desde master 227942c (25DISC1 mergeada como PR #82; PR #83, sin
+mergear). Empezó como una prueba de color sobre el producto existente; **el dueño la revisó en su iPhone, en claro y
+oscuro, el 2026-10-03 y la conserva como la paleta actual del producto**, tal como está implementada y sin más ajustes
+estéticos (ninguno de los conceptos PDF anteriores). Es la dirección visual elegida del producto, no un nombre, logo ni
+identidad de marca pública terminados: la compuerta de nombre, marca registrada y similitud confusa sigue pendiente
+([brand-brief.md](brand-brief.md) §3). Ninguna pantalla, layout, navegación,
+información de Inicio, comportamiento de Tarjetas o Reportes, dominio, almacenamiento, esquema (14) ni backup (v14)
+cambia. Inspirada en la exploración de Claude Design preferida por el dueño, no copiada: la estructura sigue siendo la
+de Forest y la decisión 005.
+
+**Arquitectura.** Un solo archivo de tokens, `apps/mobile/src/ui/palette.ts` (`lightPalette`, `darkPalette`), leído
+por `usePalette()`. Forest se reemplazó token por token con **los mismos nombres**: no hay una segunda paleta ni tokens
+Forest muertos; los valores de Forest quedan en el historial (master 227942c). Se
+suman dos tokens: `toggle` (el riel de un interruptor encendido; la lima se tragaría la perilla blanca) y
+`heroStatusBar` (el estilo de la barra de estado sobre el campo de Inicio: oscuro, porque la lima es clara). No hay
+selector de tema ni cambio de tema en tiempo de ejecución; un futuro sistema de temas reemplazaría este archivo, nada
+más. Los colores de categorías (`category-color.ts`, `@finanzapp/domain` appearance) y las caras de tarjeta
+(`card-faces.ts`) son familias aparte y no se tocan.
+
+**La paleta.**
+
+| Token | Claro | Oscuro | Uso |
+| --- | --- | --- | --- |
+| `background` | #F1F2EE | #0B0C0A | Lienzo: blanco mineral; casi negro neutro, no #000 |
+| `surface` / `inset` / `elevated` | #FFFFFF / #E8E9E4 / #FFFFFF | #1A1C19 / #232622 / #2F322C | Grupos, campos, segmento elegido |
+| `text` / `secondary` / `tertiary` / `line` | #131411 / #4A4D46 / #5E625A / #DFE0DA | #F1F3EC / #AAADA5 / #9A9D95 / #2A2D28 | Tinta grafito neutra |
+| `primaryFill` / `onPrimary` | #C6F12E / #131411 | #C6F12E / #131411 | El botón lleno: lima con tinta |
+| `primary` = `link` | #4A6100 | #C9E76B | La marca como texto: oliva-lima profundo en claro (7,0:1), lima suavizada en oscuro |
+| `primarySoft` | #EEF5D6 | #20260F | Un susurro de marca (chip elegido del Asistente) |
+| `toggle` | #4A6100 | #5C7A06 | Interruptor encendido, perilla blanca visible |
+| `hero` / `heroInk` / `heroSecondary` | #C6F12E / #131411 / #3B4A12 | #B8E02A / #131411 / #3A4318 | El campo de Inicio y su tinta |
+| `heroControl` / `heroThumb` / `heroThumbInk` | #A9D01B / #131411 / #C6F12E | #9FC51C / #131411 / #B8E02A | Chip de alcance, botón de cuentas, segmento elegido (cápsula de tinta, texto lima) |
+| `accent` / `onAccent` | #C6F12E / #131411 | #C6F12E / #131411 | El «+» del dock y el círculo del Asistente |
+| `dock` / `dockInk` / `dockActive` / `dockActiveInk` | #1D1F1B / #A9ADA3 / #3A3D37 / #FFFFFF | #20221E / #A9ADA3 / #3D403A / #FFFFFF | Dock grafito |
+| `income` / `expense` / `warning` / `transfer` | #1F7A4F / #B3432E / #9A5B00 / #48606F | #5CCB93 / #EE8A72 / #E8A94A / #A3B5C4 | Semántica |
+| `swipeDestructive` / `swipeNeutral` / `swipeAccent` | #B3432E / #5D6159 / #4A6100 | #B8412D / #50544D / #4E6600 | Acciones de deslizar, texto blanco |
+
+La lima de partida de la exploración, #C6F12E (≈73°), se conserva literal: con tinta encima da 14,1:1 y se queda del
+lado amarillo de un verde brillante (el #9FE870 de referencia está en ≈97°). En oscuro el campo de Inicio baja un
+escalón (#B8E02A) para no encandilar en una superficie grande; el «+» y los botones conservan la lima plena.
+
+**Dónde va la lima.** El campo financiero de Inicio (y su rebote superior); el «+» del dock; el botón lleno de cada
+pantalla (Guardar, Empezar; siempre con tinta); la tarjeta del Asistente en el hub (lima, con su círculo de tinta y
+chispa lima, porque un círculo lima desaparecería sobre la lima); el círculo del Asistente vacío y su botón de enviar.
+Como texto de marca (oliva-lima en claro, lima suave en oscuro): Cancelar / Listo de las hojas, «Ver todos», las
+marcas de selección, el mes elegido en las barras de Evolución, la flecha atrás del encabezado.
+
+**Dónde no va, a propósito.** El dock (grafito; solo el «+» es lima); **Próximos compromisos**, que queda en la misma
+superficie neutra que Actividad reciente, sin lavado verde ni lima (lo fija un test); los colores de categorías, la dona
+y su selección; las caras de tarjeta; los lienzos y superficies; el ingreso, el éxito, la alerta, lo vencido y lo
+destructivo.
+
+**Semántica, separada de la marca.** Un gasto es tinta (sin signo); un ingreso, el verde semántico con «+», a más de
+60° de la lima y de otra luminosidad; una transferencia, pizarra neutra (≈203°, poca saturación); por vencer, ámbar;
+vencido, destructivo o excedido, el rojo de alerta. La lima nunca significa éxito, ingreso, alerta ni error, y el color
+nunca es la única señal (signo, palabra, glifo o cápsula acompañan). Los tests (`tests/theme.node.ts`) fijan la
+ventana de tono de la marca (68–82°), la distancia de cada tono semántico a ella, la neutralidad de lienzos, tinta y
+dock, el contraste de la tinta sobre cada campo lima y el de la perilla del interruptor.
+
+**Oscuro.** Lienzo casi negro neutro (#0B0C0A, no negro aplastado) con superficies en escalones visibles; la lima
+como campo y acento deliberados, no como texto por todas partes (el texto de marca es una lima suavizada); siempre
+tinta, nunca blanco, sobre la lima.
+
+**Dock.** Píldora grafito en ambos temas (su tinte de vidrio y su relleno sólido con Reduce Transparency), la pestaña
+elegida en una cápsula más clara con el glifo blanco relleno, el «+» lima con «+» de tinta y su borde fino de tinta
+sobre el lienzo claro. Geometría, franja, paso de toques, teclado, área segura y la mitigación de pantallas negras no
+cambian.
+
+**Marca, no Wise.** Electric Lime es una dirección de color, no una imitación de Wise: no se reproduce su pareja verde
+brillante + verde bosque como sistema de marca, su logo, su tipografía, sus íconos, sus motivos de monedas globales,
+sus textos ni sus composiciones. La revisión final de nombre, logo, marca registrada y similitud confusa sigue en la
+compuerta de identidad de marca existente ([brand-brief.md](brand-brief.md)); esto no es una opinión legal.
+
+**Temas a futuro (solo documentado).** Paquetes de tema opcionales (por ejemplo Forest, Lime, Sapphire) quedan solo como
+un candidato documentado para después del lanzamiento si el producto quiere personalización: no se prometen para el lanzamiento
+ni forman parte de la monetización actual, y no hay selector. Cada tema multiplica la QA visual y de accesibilidad, y
+el lanzamiento necesita una identidad por defecto reconocible.
+
+**Veredicto del dueño (2026-10-03, iPhone físico, claro y oscuro): se queda.** Quedan como están el campo lima de
+Inicio; la cápsula de tinta con texto lima del segmento elegido `Gastado | Disponible` (no pasa a blanco) y el segmento
+no elegido; la jerarquía del importe (dígitos en tinta, símbolo de moneda y centavos como están); Próximos compromisos
+neutro como Actividad reciente; el dock grafito y el «+» lima; colores de categorías, caras de tarjeta, el verde del
+ingreso y la pizarra de la transferencia; los encabezados de fecha («Ayer · 2 oct»); las superficies clara y oscura.
+
+**Pendiente en el iPhone:** los puntos de la lista que el dueño no informó uno por uno (Reduce Transparency, el cambio
+de la barra de estado al desplazar, el botón lleno sobre una hoja blanca, interruptores, formularios, Reportes, el
+Asistente, VoiceOver, texto grande; docs/mobile-device-checklist.md, «Producto 25VIS1»).
+
 ## Producto 25DISC1 — descubrimiento competitivo y brief de marca (sin cambios visuales)
 
 Solo documentación, en su rama `feat/producto-25disc1-competitive-brand-discovery` desde master d0a0be8 (25OPS1
@@ -888,7 +984,9 @@ detrás de la píldora y, tras un rebote, volvía a meterse debajo.
   tiene un número propio, y una pantalla apilada, un modal o el hub siguen en 0.
 - **El indicador de scroll** termina arriba del dock (iOS); se vuelve a afirmar después de cada teclado.
 - **Pendiente en el iPhone:** todo lo anterior, VoiceOver en una lista larga y texto grande (lista en
-  docs/mobile-device-checklist.md, «Producto 25OPS1»).
+  docs/mobile-device-checklist.md, «Producto 25OPS1»). *(Pasada del dueño del 2026-10-03: las raíces ya bajan lo
+  suficiente y el contenido final queda visible arriba de la píldora, sin volver a meterse debajo. El indicador, el
+  teclado, VoiceOver y el texto grande no se informaron y siguen abiertos.)*
 
 ## Producto 25UX1 — interacción del dock, Tarjetas y Reportes
 
@@ -2869,7 +2967,15 @@ color propio.
 
 ## Pendiente de revisión en iPhone
 
-- Producto 25OPS1 (en su rama; sin build de EAS, nada revisado): la última fila de Inicio, Reportes, Más y Movimientos
+- Producto 25VIS1 (PR #83, sin mergear; sin build de EAS; el dueño conservó la paleta en el iPhone el 2026-10-03, el
+  resto sin revisar punto por punto): la paleta Electric Lime en claro y oscuro: el campo
+  lima de Inicio con tinta y la barra de estado oscura sobre él; Próximos compromisos neutro como Actividad reciente; el
+  dock grafito con el «+» lima, con y sin Reduce Transparency; el hub; un botón lleno sobre una hoja blanca; el texto de
+  marca oliva-lima; ingreso verde, transferencia pizarra, ámbar y rojo distintos de la lima; interruptores; categorías,
+  dona y tarjetas sin cambios. La lista exacta está en docs/mobile-device-checklist.md
+  («Producto 25VIS1»).
+- Producto 25OPS1 (mergeada como PR #81; el dueño confirmó el 2026-10-03 que el contenido final queda arriba de la
+  píldora; el resto sin revisar): la última fila de Inicio, Reportes, Más y Movimientos
   descansa arriba de la píldora al final del scroll, también después de un rebote, de un teclado y de un rato de uso; el
   indicador de scroll termina arriba del dock; VoiceOver en una lista larga; texto grande. La lista exacta está en
   docs/mobile-device-checklist.md («Producto 25OPS1»).
