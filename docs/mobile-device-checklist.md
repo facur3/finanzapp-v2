@@ -1,9 +1,54 @@
 # Physical iPhone acceptance checklist
 
-## Producto 25OPS1 — the last row above the dock (follow-up to 25UX1; merged as PR #81; not tested)
+## Producto 25VIS1 — Electric Lime palette trial (on its branch; not tested)
 
-**Not tested yet: this correction has not been on an iPhone.** It is the one open item of 25UX1's dock checklist (the
-owner's pass of 2026-10-02, below). Metro from this branch (`npm run start:dev-client -- --clear`) on the installed
+**Not tested yet.** A colour-token trial on the existing product: no layout, navigation, content or financial change.
+Metro from this branch (`npm run start:dev-client -- --clear`) on the installed FinanzApp Dev build; JavaScript only, no
+native dependency, no EAS build. Record the iPhone model, iOS version, theme and text size with the result, and the
+owner's verdict on the palette itself (keep, adjust, or revert to Forest). Use your own test data; never seed movements.
+Rules: `apps/mobile/src/ui/palette.ts`; design: mobile-design.md, «Producto 25VIS1»; decision 005, «Enmienda 2026-10-03 —
+Producto 25VIS1».
+
+- [ ] **Inicio, light and dark:** the financial field is Electric Lime with ink text (month, number, Gastado |
+      Disponible, the scope chip and the accounts button all legible); the chosen segment is an ink capsule with lime
+      text; the status bar's clock and battery are **dark** over the field in both themes and turn to the scheme's own
+      after scrolling past it. Dark mode: the field is a step dimmer and does not glare; the overscroll above it is lime.
+- [ ] **Próximos compromisos** sits on the same neutral surface as Actividad reciente (no lime, no green wash); only each
+      row's mark keeps its category colour; «Hoy» / «Mañana» stay amber.
+- [ ] **Dock:** a graphite pill in light and dark, the selected tab a lighter capsule with a filled white glyph; the
+      «+» beside it is lime with an ink «+», and it holds its edge on the light canvas. Same size and place as before;
+      content passes behind; taps beside the pill reach the content.
+- [ ] **Reduce Transparency on, then off:** the pill is solid graphite with a hairline; off, the glass is tinted
+      graphite, not green.
+- [ ] **Capture hub:** the Asistente tile is lime with ink text and an ink circle with a lime sparkle; Gasto, Ingreso and
+      Transferencia tiles unchanged (income green, transfer slate).
+- [ ] **A filled button** (Guardar on a new expense, Empezar on an empty Inicio): lime with ink text. In light on a
+      white sheet, note whether its edge is distinct enough (its luminance is close to white; the label carries the
+      contrast).
+- [ ] **Brand text** (Cancelar / Listo on a sheet, «Ver todos», checkmarks in a chooser, a header's back button): a
+      deep olive-lime in light, a soft lime in dark; note if it reads as khaki or as a warning.
+- [ ] **Semantics:** an income amount is green with «+» and clearly not the lime; a transfer is slate; a budget at 90 %
+      is amber, an exceeded one the red alert tone with its glyph; an expense is ink. Nothing lime means success.
+- [ ] **Switches** (a card's edit form, «Todos los meses»; a purchase in instalments): on is a deep olive-lime track with a visible white knob, in both themes.
+- [ ] **Reportes:** category colours and the donut unchanged; the shown month's bar in «Evolución» is the brand tone,
+      the others grey.
+- [ ] **Tarjetas:** every card keeps its own face colour; nothing turns lime.
+- [ ] **Assistant:** the empty state's circle is lime with an ink sparkle; the send button lime with an ink arrow.
+- [ ] **Dark mode in general:** the canvas is a near-black (not pure black), surfaces and groups are visible steps above
+      it, the dock separates from it.
+- [ ] **VoiceOver:** nothing new is announced; the selected tab is still spoken as selected (the state never relies on
+      colour).
+
+## Producto 25OPS1 — the last row above the dock (follow-up to 25UX1; merged as PR #81; owner's pass 2026-10-03, the core fix confirmed)
+
+**Owner's pass (2026-10-03, physical iPhone, FinanzApp Dev build; model, iOS version, theme and text size not
+recorded).** Confirmed by the owner: the tab roots now scroll far enough that the final content stays visible above
+the floating pill at the end of the scroll, instead of springing back underneath it. That closes the one failed item of
+25UX1's pass (below). Reported in these general terms, not item by item: the boxes below stay unticked, and the scroll
+indicator's end, the keyboard checks, the check after long use, VoiceOver, large text and an iPhone without a home
+indicator were not reported and remain open.
+
+It was the one open item of 25UX1's dock checklist (the owner's pass of 2026-10-02, below). Metro from this branch (`npm run start:dev-client -- --clear`) on the installed
 FinanzApp Dev build; JavaScript only, no native dependency, no EAS build. Start from a cold launch (quit FinanzApp from
 the app switcher first). Record the iPhone model, iOS version, theme and text size with the result. Use your own test
 data; never seed movements. The rest of 25OPS1 is documentation (`docs/production-plan.md`, `docs/app-store-launch.md`)
@@ -55,7 +100,7 @@ recorded).** Confirmed by the owner: the dock draws no rectangular footer or bac
 **Failed:** at the end of the scroll the last content does not settle above the dock: on Inicio the last recent
 movement stays partly behind the pill, on Reportes lower content such as «Comparar con el mes anterior» stays behind
 it, on Más the diagnostics and version text stays behind it; an overscroll shows it, and on release it springs back
-under the dock. Corrected in Producto 25OPS1 (section above), not yet tested on the iPhone. The boxes below stay
+under the dock. Corrected in Producto 25OPS1 and confirmed on the owner's iPhone on 2026-10-03 (section above). The boxes below stay
 unticked: the pass was reported in these general terms, not item by item (Reduce Transparency, VoiceOver, landscape,
 the six-card deck and Reduce Motion were not reported), so no individual line is marked done from it.
 

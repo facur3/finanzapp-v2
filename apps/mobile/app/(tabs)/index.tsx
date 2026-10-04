@@ -33,7 +33,7 @@ const FIELD_RADIUS = 32;
  * stops: the financial field, then what is due soon, then what was recorded this month. Every other list and every
  * analysis keeps its own place (Movimientos, Reportes, Presupuestos, Más); recording is the dock's «+».
  *
- * The financial field is one pine object that meets the top edge (B of the Forest handoff, owner-refined):
+ * The financial field is one brand-coloured object (lime since 25VIS1) that meets the top edge (B of the Forest handoff, owner-refined):
  *   1. the current month on the left, a label (not a control: it opens nothing; past months are Reportes'), and the
  *      accounts shortcut on the right;
  *   2. only when the ledger holds more than one currency (the 25B2 rule), the display scope chip («Total · ARS» / «Solo
@@ -96,11 +96,11 @@ export default function HomeScreen() {
   const recent = useMemo(() => snapshot ? homeRecent(snapshot.entries, snapshot.transfers ?? [], snapshot.accounts, period,
     account => inView({ mode, currency }, account), recentRowLimit(upcoming.length > 0)) : [], [snapshot, period, mode, currency, upcoming.length]);
 
-  // The status bar over the field: light while the field is under it, the scheme's own otherwise.
+  // The status bar over the field: the field's own (dark on the lime) while it is under it, the scheme's own otherwise.
   const fieldHeight = useRef(0);
   const scrolled = useRef(false);
   const focused = useRef(false);
-  const barStyle = useCallback(() => setStatusBarStyle(focused.current && !scrolled.current ? 'light' : p.isDark ? 'light' : 'dark', true), [p.isDark]);
+  const barStyle = useCallback(() => setStatusBarStyle(focused.current && !scrolled.current ? p.heroStatusBar : p.isDark ? 'light' : 'dark', true), [p.isDark, p.heroStatusBar]);
   useFocusEffect(useCallback(() => {
     focused.current = true;
     barStyle();

@@ -20,7 +20,7 @@ export default function TabsLayout() {
   // an interrupted opacity animation or a native detach/reattach.
   // Stack pushes and modal gestures still use the native navigator above us.
   // Sections switch instantly (no slide, no fade: the mounted-tab mitigation); a selection tick confirms the change
-  // without delaying it. The dock (`FloatingTabBar`) draws the four tabs icon-only on a pine pill and the «+» beside it;
+  // without delaying it. The dock (`FloatingTabBar`) draws the four tabs icon-only on a graphite pill and the «+» beside it;
   // since 25UX1 it floats over the roots, which keep their last row clear of it (`useDockClearance`).
   return <Tabs {...tabHostOptions} tabBar={props => <FloatingTabBar {...props} />}
     screenListeners={({ navigation }) => ({ tabPress: () => { if (!navigation.isFocused()) selectionHaptic(); } })}

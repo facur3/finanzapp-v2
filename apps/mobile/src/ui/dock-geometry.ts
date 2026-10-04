@@ -1,7 +1,7 @@
 /** The dock's geometry (Producto 24UX6A, decision 005), shared by the dock itself (`FloatingTabBar`) and the capture
  * hub, which draws its close control exactly where the «+» sits. Pure numbers, so Node tests read them directly.
  *
- * The dock is one object in two parts: the pine pill with the four tabs and, 10 pt to its right, the 60 pt «+». Both are
+ * The dock is one object in two parts: the graphite pill with the four tabs and, 10 pt to its right, the 60 pt «+». Both are
  * 60 pt tall, 16 pt from the screen's sides (plus the landscape sensor inset) and lifted into the upper part of the home
  * indicator's safe area. At 375 pt the pill's inner width leaves each tab about 65 pt; at 393 pt about 70 pt: every tab keeps a full
  * target. 25UX1 (owner, 2026-10-02): the dock floats over the tab roots with nothing painted behind it; the roots run to

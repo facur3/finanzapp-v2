@@ -56,7 +56,7 @@ export function CurrencySwitch({ value, currencies, onChange, disabled = false, 
 export function DisplayCurrencyButton({ mode, currency, held, gate, onMode, onCurrency, compact = true, onField = false }: {
   mode: DisplayMode; currency: Currency; held: readonly Currency[]; gate: CurrencyGate;
   onMode: (mode: DisplayMode) => void; onCurrency: (currency: Currency) => void; compact?: boolean;
-  /** 24UX6A, on Inicio's pine field: the field's control fill and ink, a 44 pt target. */
+  /** 24UX6A, on Inicio's field: the field's control fill and ink, a 44 pt target. */
   onField?: boolean;
 }) {
   const p = usePalette();

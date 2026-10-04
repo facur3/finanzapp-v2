@@ -225,7 +225,7 @@ test('24UX6A: Inicio shows the current month only, scoped to the currency, with 
   assert.deepEqual(nodes(root).filter(n => n.type === 'EntryRow').map(n => n.props.entry.id).join(), 'usd', 'the month\'s activity follows the currency shown');
 });
 
-test('24UX6A, 24UX6C: the pine field comes first: the month and the accounts, the scope (two currencies), the number, Gastado | Disponible; then the sections', () => {
+test('24UX6A, 24UX6C: the brand field comes first: the month and the accounts, the scope (two currencies), the number, Gastado | Disponible; then the sections', () => {
   const view = routeHarness('(tabs)/index.tsx', {}, homeData, { recurring: [dueRule()] });
   const root = view.render();
   assert.equal(root.type, 'ScrollView', 'Inicio scrolls on its own, with no navigation header');
@@ -233,7 +233,7 @@ test('24UX6A, 24UX6C: the pine field comes first: the month and the accounts, th
   const field = fieldOf(root);
   assert.equal(nodes(root).find(n => n.type === 'View' && n.props.style?.backgroundColor === lightPalette.hero && typeof n.props.onLayout === 'function'), field);
   assert.deepEqual([field.props.style.backgroundColor, field.props.style.paddingTop, field.props.style.borderBottomLeftRadius, field.props.style.borderBottomRightRadius],
-    [lightPalette.hero, INSETS.top + 12, 32, 32], 'pine, under the status bar plus 12 pt, 32 pt bottom corners');
+    [lightPalette.hero, INSETS.top + 12, 32, 32], 'the brand field, under the status bar plus 12 pt, 32 pt bottom corners');
   // The field's own order.
   const inField = nodes(field).map(n => n.type === 'AppText' && n.props.accessibilityRole === 'header' ? 'month' : n.type === 'AppText' && SUBLINE.test(textOf(n)) ? 'subline' : n.type)
     .filter(type => ['month', 'FieldButton', 'DisplayCurrencyButton', 'MetricHelp', 'Money', 'CurrencyParts', 'subline', 'Choices'].includes(type));
@@ -411,33 +411,35 @@ test('24UX6A: the number is the field\'s ink at 46 pt, and the secondary ink whe
   } finally { dark = false; }
 });
 
-test('24UX6A: the status bar is light over the field, the scheme\'s own after scrolling past it or when another screen is in front', () => {
+test('24UX6A: the status bar is the field\'s own over it (dark on the lime since 25VIS1), the scheme\'s own after scrolling past it or when another screen is in front', () => {
   const view = routeHarness('(tabs)/index.tsx', {}, homeData);
   let root = view.render();
-  assert.equal(view.statusBar.join(), 'light', 'focused at the top: light content over the pine field');
+  assert.equal(view.statusBar.join(), 'dark', 'focused at the top: dark content over the lime field');
   fieldOf(root).props.onLayout({ nativeEvent: { layout: { height: 320 } } });
   root.props.onScroll({ nativeEvent: { contentOffset: { y: 100 } } });
-  assert.equal(view.statusBar.join(), 'light', 'still over the field: nothing changes');
+  assert.equal(view.statusBar.join(), 'dark', 'still over the field: nothing changes');
   root.props.onScroll({ nativeEvent: { contentOffset: { y: 320 - INSETS.top + 1 } } });
   assert.equal(view.statusBar.at(-1), 'dark', 'past the field in light: dark text on the light canvas');
   root = view.render();
   root.props.onScroll({ nativeEvent: { contentOffset: { y: 0 } } });
-  assert.equal(view.statusBar.at(-1), 'light', 'back over the field');
+  assert.equal(view.statusBar.at(-1), 'dark', 'back over the field');
   view.blur();
   assert.equal(view.statusBar.at(-1), 'dark', 'another screen in front: the light scheme\'s own');
   const count = view.statusBar.length;
   root.props.onScroll({ nativeEvent: { contentOffset: { y: 5 } } });
   assert.equal(view.statusBar.length, count, 'no change while still over the field');
   view.focus();
-  assert.equal(view.statusBar.at(-1), 'light', 'focused again at the top');
+  assert.equal(view.statusBar.at(-1), 'dark', 'focused again at the top');
   dark = true;
   try {
     const night = routeHarness('(tabs)/index.tsx', {}, homeData);
     const nightRoot = night.render();
-    assert.equal(night.statusBar.at(-1), 'light');
+    assert.equal(night.statusBar.at(-1), 'dark', 'dark scheme, at the top: the lime field still wants dark content');
     fieldOf(nightRoot).props.onLayout({ nativeEvent: { layout: { height: 320 } } });
     nightRoot.props.onScroll({ nativeEvent: { contentOffset: { y: 600 } } });
-    assert.equal(night.statusBar.at(-1), 'light', 'dark scheme: its own style is light too');
+    assert.equal(night.statusBar.at(-1), 'light', 'dark scheme past the field: its own light content on the near-black');
+    nightRoot.props.onScroll({ nativeEvent: { contentOffset: { y: 0 } } });
+    assert.equal(night.statusBar.at(-1), 'dark', 'back over the field');
     night.blur();
     assert.equal(night.statusBar.at(-1), 'light');
   } finally { dark = false; }
@@ -637,6 +639,9 @@ test('24UX6A: commitments without activity show only the commitments; with neith
   assert.equal(nodes(root).some(n => n.type === 'EmptyState'), false, 'no quiet line under commitments');
   const surface = nodes(root).find(n => n.type === 'Surface' && nodes(n).some(child => child.type === 'UpcomingRecurringRow'))!;
   assert.equal(surface.props.grouped, true);
+  // 25VIS1 (owner): future content is not brand content. The commitments' surface is the same neutral grouped surface as
+  // Actividad reciente's, with no tint of its own (no lime, no wash); only each row's mark keeps its category identity.
+  assert.equal(JSON.stringify(surface.props.style ?? {}).includes('backgroundColor'), false, 'no tinted fill on the commitments');
   nodes(root).find(n => n.type === 'SectionTitle' && n.props.children === 'Próximos compromisos')!.props.onAction();
   assert.equal(view.pushed.at(-1), '/recurring');
   // Neither: the quiet line, no action (the dock's «+» and the Assistant are the actions).
