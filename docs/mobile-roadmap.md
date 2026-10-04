@@ -1,6 +1,6 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-03 (Producto 25VIS1 on its branch: the Electric Lime palette trial, colour tokens only on the existing
+Updated: 2026-10-03 (Producto 25VIS1, PR #83, unmerged: Electric Lime, accepted by the owner on the iPhone as the current product palette, colour tokens only on the existing
 product (`apps/mobile/src/ui/palette.ts`), no layout, navigation, financial, schema (14) or backup (v14) change; the
 version line reads «FinanzApp 0.1.0 (25VIS1)»; the owner's iPhone pass of 25OPS1 recorded (the last content now rests
 above the dock). Producto 25DISC1 merged as PR #82, merge commit 227942c, documentation only: the competitive capability map and gap map,
@@ -235,20 +235,23 @@ commit 5c73813), 24UX6C (PR #72, merge
 commit c673be6), 24UX6B (PR #71, merge
 commit ecfd1dc), 24UX6A (PR #70, merged 2026-10-01, merge commit ef24bb6), 24T2 (PR #69, merge commit 8951f6c), 24T1C
 (PR #68), 24T1 (PR #67) and 25B3 (PR #66), then Producto 25A-01 (PR #77, merge commit a4202bc) and 25A-02 (PR #78 and its follow-up PR #79, merge commit
-a1bd181), 25UX1 (PR #80, merge commit d45eca6), and 25OPS1 (PR #81, merge commit d0a0be8), and 25DISC1 (PR #82, merge commit 227942c, documentation only); Producto 25VIS1 (the Electric Lime palette trial) on its branch. Per area,
+a1bd181), 25UX1 (PR #80, merge commit d45eca6), and 25OPS1 (PR #81, merge commit d0a0be8), and 25DISC1 (PR #82, merge commit 227942c, documentation only); Producto 25VIS1 (Electric Lime, the accepted current palette) as PR #83, unmerged. Per area,
 without test inventories (those are in apps/mobile/README.md and the history
 file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_REGIONS`,
 `LEDGER_CURRENCIES`): what a build offers, verified on Linux; nothing is distributed to people yet
 (§4).
 
-- **Electric Lime palette trial (25VIS1, on its branch; device QA pending; the owner decides keep, adjust or revert).**
+- **Electric Lime, the current product palette (25VIS1, PR #83, unmerged; the owner kept it after the iPhone review of
+  2026-10-03; the rest of its device checklist open).** Electric Lime is the selected product visual direction; it is
+  not a finished public name, logo or brand identity, whose naming, trademark and confusing-similarity gate stays
+  future work (brand-brief.md §3, app-store-launch.md §9.4).
   §3, «Producto 25VIS1». The Forest colour tokens are replaced, under the same names, by an Electric Lime direction
   (#C6F12E, hue 68–82°) paired with neutral ink, graphite, a mineral off-white canvas and a near-black (not #000) dark
   canvas. Lime is Inicio's financial field (ink on it; the status bar over it now dark), the dock's «+», the filled call
   to action and the hub's Assistant tile; brand text is a deep olive-lime in light and a soft lime in dark. The dock is
   graphite; Próximos compromisos stays as neutral as Actividad reciente; category colours, card faces and every
   layout are unchanged; income keeps its own green, a transfer becomes a neutral slate. Two tokens added (`toggle`,
-  `heroStatusBar`); no theme selector. Decision 005, «Enmienda 2026-10-03 — Producto 25VIS1» (on trial). The version
+  `heroStatusBar`); no theme selector. Decision 005, «Enmienda 2026-10-03 — Producto 25VIS1» (accepted). The version
   line reads «FinanzApp 0.1.0 (25VIS1)».
 - **Competitive capability and brand discovery (25DISC1, PR #82, merge commit 227942c; documentation only; nothing to
   check on the iPhone).** §3, «Producto 25DISC1». [competitive-landscape.md](competitive-landscape.md): ten products audited from
@@ -667,11 +670,12 @@ it was checked in). Metro from `master` (or a delivery's branch) on the installe
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
-- **25VIS1 — Electric Lime palette trial (on its branch; not tested; no EAS build):** the checklist section Producto
+- **25VIS1 — Electric Lime palette (PR #83, unmerged; no EAS build; owner's verdict 2026-10-03 on the iPhone, light and
+  dark: keep it as the current palette, as implemented; the items below not reported one by one stay open):** the checklist section Producto
   25VIS1: Inicio's lime field with ink and a dark status bar over it, light and dark; Próximos compromisos neutral like
   Actividad reciente; the graphite dock with the lime «+», with and without Reduce Transparency; the hub; a filled
   button on a white sheet; olive-lime brand text; income green, transfer slate, amber and red apart from the lime;
-  switches; categories, the donut and card faces unchanged; VoiceOver; and the owner's verdict on the palette.
+  switches; categories, the donut and card faces unchanged; VoiceOver.
 - **25DISC1 — Competitive capability and brand discovery (merged as PR #82): nothing to check on the iPhone.** Documentation only.
 - **25OPS1 — the last row above the dock (merged as PR #81, merge commit d0a0be8; owner's pass 2026-10-03: the roots
   scroll far enough that the final content stays above the pill instead of springing back under it; reported in
@@ -875,8 +879,8 @@ owner-observed problems, no financial change) merged as PR #80 (merge commit d45
 launch plan, documentation, plus the dock's last-row clearance found on the owner's iPhone pass) merged as PR #81
 (merge commit d0a0be8) and changed no order; **25DISC1** (competitive capability and brand discovery,
 [competitive-landscape.md](competitive-landscape.md) and [brand-brief.md](brand-brief.md), documentation only) merged
-as PR #82 (merge commit 227942c) and changes no order either; **25VIS1** (the Electric Lime palette trial, colour tokens
-only, «Producto 25VIS1» below) is this PR, for the owner to judge on the iPhone, and changes no order (its suggested priority changes are owner decisions listed under «Producto 25DISC1»
+as PR #82 (merge commit 227942c) and changes no order either; **25VIS1** (Electric Lime, colour tokens only, «Producto
+25VIS1» below) is this PR, accepted by the owner on the iPhone as the current product palette, and changes no order (its suggested priority changes are owner decisions listed under «Producto 25DISC1»
 below, none applied); then 25A-03 (the «Para revisar» tray)
 and the rest of 25A, with no paid provider call before its own approved slice. **25A2** (Wallet Shortcut Capture) still
 follows the review-tray foundation: it may begin once 25A-03 has merged, without waiting for 25A's cloud, paid, live or
@@ -3941,11 +3945,19 @@ nothing of it is on a screen yet.
   passed, 0 failed; `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0 errors, 0 stale; `check` OK;
   `export:ios` OK. No account, handle, ad account or campaign created.
 
-### Producto 25VIS1 — Electric Lime palette trial (this PR)
+### Producto 25VIS1 — Electric Lime palette, accepted as the current palette (this PR)
 
 - **Goal.** One production-quality Electric Lime colour direction on the existing product, so the owner can judge it
-  on the real iPhone. Inspired by the owner's preferred Claude Design exploration, not copied from it. A trial: the
-  owner keeps, adjusts or reverts it to Forest.
+  on the real iPhone. Inspired by the owner's preferred Claude Design exploration, not copied from it. Started as a
+  trial; the owner kept it (below).
+- **Owner's verdict (2026-10-03, physical iPhone, light and dark).** Keep Electric Lime as the current product palette,
+  as implemented, with no further aesthetic change (no tweak from the earlier PDF concepts): the lime field, the ink
+  selected segment with lime text, the amount's hierarchy, the neutral Próximos compromisos, the graphite dock and lime
+  «+», category colours, card faces, income green, transfer slate, the date headings and the surfaces all stay. It is
+  the selected product visual direction, **not** a finished public name, logo or brand identity: the naming,
+  trademark and confusing-similarity gate (brand-brief.md §3, app-store-launch.md §9.4) stays future work. Recorded in
+  the checklist; the checklist's individual items (Reduce Transparency, forms, VoiceOver and the rest) were not
+  reported and stay open.
 - **Scope.** Branch `feat/producto-25vis1-electric-lime-palette` from master 227942c (25DISC1 merged as PR #82). Colour
   tokens only: no screen, layout, navigation, Inicio information, Tarjetas or Reportes behaviour, domain, storage,
   schema (14), backup (v14), dependency, name or identifier change; no theme picker; no EAS build.
@@ -3966,15 +3978,21 @@ nothing of it is on a screen yet.
   `spending-home`: the status bar is dark over the lime field in both schemes; the commitments' surface carries no
   fill. `capture-hub`: uses the real light palette; the Assistant circle. A slightly darker dark `tertiary` keeps the
   idle month bars at 3:1.
-- **Future themes (document only).** Optional theme packs (Forest, Lime, Sapphire) are recorded as a possible
-  post-launch experiment, not promised for launch, not part of the monetisation, no selector (brand-brief §4.8): each
+- **Future themes (document only).** Optional theme packs (Forest, Lime, Sapphire) remain only a documented
+  post-launch candidate, not a launch commitment, not part of the monetisation, no selector (brand-brief §4.8): each
   theme multiplies visual and accessibility QA, and the launch needs one recognisable identity. The Wise
   differentiation note and the reminder that naming, logo and similarity screening stay in launch §9.4 are in
   brand-brief §4.8.
 - **25OPS1 device record.** The owner's pass of 2026-10-03 is recorded in the checklist: the final content stays above
   the pill; the other 25OPS1 items were not reported and stay open.
 - **Device QA.** The checklist section «Producto 25VIS1».
-- **Status.** This PR; not merged.
+- **Status.** This PR; not merged. Follow-up commit (documentation and one code comment, no behaviour change): the
+  owner's verdict recorded in the roadmap, mobile-design.md, decision 005, brand-brief §4.8, both READMEs and the
+  checklist; the Home screen's comment corrected (the status bar is dark over the lime field in both schemes, as
+  implemented). No token, component, domain, storage, schema, backup or native dependency changed.
+  Its gates (2026-10-03, local, Linux): root `npm test` 590 passed, 1 todo; `check:repo` OK; `apps/mobile` `typecheck`
+  OK, `test:storage` 1259 passed, 0 failed, `i18n:check -- --strict` 0 errors, 0 stale, `check` OK (`currency:verify`,
+  `regions:verify` and `export:ios` not re-run: no code path changed).
 - **Gates.** 2026-10-03, local, Linux. Root `npm test` 590 passed, 1 todo; `check:repo` OK. `apps/mobile`: `typecheck`
   OK; `test:storage` 1259 passed, 0 failed; `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0 errors,
   0 stale (no app string changed); `check` OK; `export:ios` OK. No EAS build, no iPhone run by the agent.

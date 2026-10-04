@@ -1,11 +1,23 @@
 # Physical iPhone acceptance checklist
 
-## Producto 25VIS1 — Electric Lime palette trial (on its branch; not tested)
+## Producto 25VIS1 — Electric Lime palette (PR #83, unmerged; owner's palette verdict 2026-10-03: keep)
 
-**Not tested yet.** A colour-token trial on the existing product: no layout, navigation, content or financial change.
+**Owner's palette verdict (2026-10-03, physical iPhone, FinanzApp Dev build from this branch; model, iOS version and
+text size not recorded).** The owner reviewed Electric Lime on the iPhone in light and dark and **keeps it as the current
+product palette**, as implemented, with no further aesthetic change: the lime field on Inicio; the ink capsule with lime
+text for the chosen `Gastado | Disponible` segment (it stays ink, not white) and the unchosen segment as it is; the
+amount's hierarchy (digits in ink, the currency symbol and the cents as implemented); Próximos compromisos neutral like
+Actividad reciente; the graphite dock and the lime «+»; the category colours, card faces, income green and transfer
+slate; the date headings («Ayer · 2 oct», «Anteayer · 1 oct»); the light and dark surfaces. The owner reported that the
+lime with graphite and neutrals works well on the real iPhone in both themes. That is a verdict on the palette as a
+whole, not item by item: the boxes below stay unticked, and Reduce Transparency, the status bar's change on scroll, the
+filled button on a white sheet, the switches, the forms, Reportes, the Assistant, VoiceOver and large text were not
+reported and remain open.
+
+A colour-token change on the existing product: no layout, navigation, content or financial change.
 Metro from this branch (`npm run start:dev-client -- --clear`) on the installed FinanzApp Dev build; JavaScript only, no
 native dependency, no EAS build. Record the iPhone model, iOS version, theme and text size with the result, and the
-owner's verdict on the palette itself (keep, adjust, or revert to Forest). Use your own test data; never seed movements.
+owner's verdict on the palette itself (given above: keep). Use your own test data; never seed movements.
 Rules: `apps/mobile/src/ui/palette.ts`; design: mobile-design.md, «Producto 25VIS1»; decision 005, «Enmienda 2026-10-03 —
 Producto 25VIS1».
 

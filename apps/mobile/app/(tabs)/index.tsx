@@ -57,8 +57,8 @@ const FIELD_RADIUS = 32;
  * own day's reference rate, each balance at today's, with an info button naming the rates; without a rate, each
  * currency's own subtotal with one line saying why, never a partial sum. Rows keep their original amounts.
  *
- * The status bar is light while the field is under it (both themes), and returns to the scheme's own when the field has
- * scrolled away or another screen is in front. */
+ * The status bar is dark while the light Electric Lime field is under it (both themes, `heroStatusBar`), and returns to
+ * the scheme's own when the field has scrolled away or another screen is in front. */
 export default function HomeScreen() {
   const { snapshot, archive, gate } = useLedger();
   const day = useCurrentDay();

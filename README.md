@@ -26,8 +26,9 @@ La app tiene cuatro pestañas (Inicio, Movimientos, Reportes y Más, con Tarjeta
 al lado y fuera de ellas, una acción «+» que abre Registrar: Asistente, Gasto, Ingreso y
 Transferencia. El Asistente es una pantalla que se abre sobre la app, con la conversación en
 memoria mientras la app está abierta. La identidad visual fue Forest, un verde pino sobrio
-([decisión 005](docs/decisions/005-forest-four-tabs-and-capture.md)); desde Producto 25VIS1 se prueba Electric Lime, una
-lima chartreuse con tinta y neutros grafito, solo en los tokens de color (`apps/mobile/src/ui/palette.ts`).
+([decisión 005](docs/decisions/005-forest-four-tabs-and-capture.md)); desde Producto 25VIS1 es Electric Lime, una
+lima chartreuse con tinta y neutros grafito (paleta actual, aceptada por el dueño en el iPhone; no es el nombre ni la
+identidad de marca pública final), solo en los tokens de color (`apps/mobile/src/ui/palette.ts`).
 
 - [Decisión 002: gastos primero, alternativas y alcance](docs/decisions/002-spending-first.md)
 - [Decisión 004: la app nativa es el producto](docs/decisions/004-native-first-and-web-retirement.md)

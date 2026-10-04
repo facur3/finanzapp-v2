@@ -232,11 +232,13 @@ Recorded as decisions; the exploration boards are not copied into the repository
 - **Naming.** «FinanzApp» is only the internal working name. No name from the Claude Design shortlist is approved, and
   none is promoted to the roadmap or the product configuration before the availability and conflict screening of §3.
 
-### 4.8 Electric Lime in the product, as a trial (Producto 25VIS1, 2026-10-03)
+### 4.8 Electric Lime, the current product palette (Producto 25VIS1, 2026-10-03)
 
 After the palette-only exploration the owner preferred an Electric Lime direction and asked to see it on the real
-iPhone. 25VIS1 implements it as a token trial on the existing product (`apps/mobile/src/ui/palette.ts`; mobile-design.md,
-«Producto 25VIS1»); it is **not** a brand selection, a name or a logo, and it can be reverted to Forest.
+iPhone. 25VIS1 implemented it as a token trial on the existing product (`apps/mobile/src/ui/palette.ts`; mobile-design.md,
+«Producto 25VIS1»), and after reviewing it on the iPhone in light and dark (2026-10-03) the owner **kept it as the
+current product palette**, as implemented. It is the selected product visual direction; it is **not** a finished public
+name, logo or brand identity: the naming, trademark and confusing-similarity gate below stays future work.
 
 - **A colour direction, not an imitation of Wise.** The lime is paired with neutral ink, graphite and mineral
   off-white, never with a deep forest green as the brand pair, and sits on the yellow side of a bright green. The
@@ -247,8 +249,8 @@ iPhone. 25VIS1 implements it as a token trial on the existing product (`apps/mob
   confusing-similarity screening stay in the existing brand, naming and identity launch gate (§3 and
   [app-store-launch.md §9.4](app-store-launch.md)); nothing
   here is a legal assessment.
-- **Theme packs later, maybe.** Optional visual themes (for example Forest, Lime, Sapphire) are recorded only as a
-  possible post-launch experiment if the product later wants customisation: not promised for launch, not part of the
+- **Theme packs later, maybe.** Optional visual themes (for example Forest, Lime, Sapphire) remain only a documented
+  post-launch candidate if the product later wants customisation: not a launch commitment, not part of the
   current monetisation, no selector built. Every theme multiplies visual and accessibility QA, and the launch needs one
   recognisable default identity.
 
