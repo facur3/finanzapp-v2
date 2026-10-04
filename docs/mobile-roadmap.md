@@ -1,6 +1,12 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-02 (Producto 25OPS1 on its branch: the production and launch plan,
+Updated: 2026-10-03 (Producto 25DISC1 on its branch, documentation only: the competitive capability map and gap map,
+[competitive-landscape.md](competitive-landscape.md) with its durable per-claim evidence record
+[competitive-evidence.md](competitive-evidence.md) and capability decision register (§12.5), the brand identity brief,
+[brand-brief.md](brand-brief.md), and the acquisition and retention plan, [go-to-market.md](go-to-market.md);
+research of 2026-10-02 on ten products, Mercado Pago's developer documentation, LatAm aggregators and Argentina's open
+finance; no app change; the version line still reads «FinanzApp 0.1.0 (25OPS1)». Producto 25OPS1 merged as PR #81,
+merge commit d0a0be8: the production and launch plan,
 [production-plan.md](production-plan.md) and [app-store-launch.md](app-store-launch.md), documentation only, plus one
 correction found on the owner's iPhone pass of 25UX1: a tab root's last row now rests above the floating dock, the
 clearance being content padding instead of a native scroll inset; no financial, schema (14), backup (v14), review-store,
@@ -226,13 +232,24 @@ commit 5c73813), 24UX6C (PR #72, merge
 commit c673be6), 24UX6B (PR #71, merge
 commit ecfd1dc), 24UX6A (PR #70, merged 2026-10-01, merge commit ef24bb6), 24T2 (PR #69, merge commit 8951f6c), 24T1C
 (PR #68), 24T1 (PR #67) and 25B3 (PR #66), then Producto 25A-01 (PR #77, merge commit a4202bc) and 25A-02 (PR #78 and its follow-up PR #79, merge commit
-a1bd181), 25UX1 (PR #80, merge commit d45eca6), plus Producto 25OPS1 on its branch. Per area,
+a1bd181), 25UX1 (PR #80, merge commit d45eca6), and 25OPS1 (PR #81, merge commit d0a0be8); Producto 25DISC1 (documentation only) on its branch. Per area,
 without test inventories (those are in apps/mobile/README.md and the history
 file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_REGIONS`,
 `LEDGER_CURRENCIES`): what a build offers, verified on Linux; nothing is distributed to people yet
 (§4).
 
-- **The last row above the dock, and the production plan (25OPS1, on its branch; device QA pending for the dock
+- **Competitive capability and brand discovery (25DISC1, on its branch; documentation only; nothing to check on the
+  iPhone).** §3, «Producto 25DISC1». [competitive-landscape.md](competitive-landscape.md): ten products audited from
+  their current App Store listings and official sites on 2026-10-02 and re-checked by a second reader, a capability
+  matrix of ninety-odd rows with every FinanzApp capability classified (IMPLEMENTED only from code), the gap map, the
+  decisions for capabilities the roadmap had not considered, and the research gates for Mercado Pago (a consumer wallet
+  feed cannot be confirmed from the official documentation), bank connections (nothing compliant reaches Argentina
+  today), WhatsApp capture and shared expenses. [brand-brief.md](brand-brief.md): «FinanzApp» is the working name
+  only; naming criteria and workflow; the visual exploration brief. [go-to-market.md](go-to-market.md): positioning,
+  social channels, content and video, the organic-to-paid loop, retention experiments (streaks only as a measured
+  experiment) and the funnel, planning only. No app, palette, identifier, integration, provider,
+  schema (14), backup (v14) or review-store change; the version line still reads «FinanzApp 0.1.0 (25OPS1)».
+- **The last row above the dock, and the production plan (25OPS1, PR #81, merge commit d0a0be8; device QA pending for the dock
   correction).** §3, «Producto 25OPS1». The dock clearance of a tab root is now bottom padding of the scroller's content
   on every platform (`useDockInset` → `extraPadding`, on top of each root's own padding), no longer the native scroll
   view's `contentInset` (25UX1): on the owner's iPhone the last row rested partly behind the pill and sprang back under
@@ -638,7 +655,8 @@ it was checked in). Metro from `master` (or a delivery's branch) on the installe
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
-- **25OPS1 — the last row above the dock (on its branch; not tested; no EAS build):** the checklist section Producto
+- **25DISC1 — Competitive capability and brand discovery (on its branch): nothing to check on the iPhone.** Documentation only.
+- **25OPS1 — the last row above the dock (merged as PR #81, merge commit d0a0be8; not tested; no EAS build):** the checklist section Producto
   25OPS1: on Inicio, Reportes, Más and Movimientos, from a cold launch and again after some use, the last row rests
   fully above the pill at the end of the scroll and stays there after an overscroll; the scroll indicator ends above the
   dock, also after a keyboard; Movimientos' search; a pushed screen keeps its padding; VoiceOver through a long list;
@@ -834,8 +852,11 @@ phase is **25A — the real Assistant**, delivered as focused slices («Producto
 review-draft domain model) merged as PR #77 (merge commit a4202bc); **25A-02** (the durable local review store) merged as PR #78
 with its follow-up PR #79 (merge commit a1bd181); **25UX1** (dock, Cards and Reports interaction polish, three
 owner-observed problems, no financial change) merged as PR #80 (merge commit d45eca6); **25OPS1** (the production and
-launch plan, documentation, plus the dock's last-row clearance found on the owner's iPhone pass) is this PR and changes
-no order; then 25A-03 (the «Para revisar» tray)
+launch plan, documentation, plus the dock's last-row clearance found on the owner's iPhone pass) merged as PR #81
+(merge commit d0a0be8) and changed no order; **25DISC1** (competitive capability and brand discovery,
+[competitive-landscape.md](competitive-landscape.md) and [brand-brief.md](brand-brief.md), documentation only) is this
+PR and changes no order either (its suggested priority changes are owner decisions listed under «Producto 25DISC1»
+below, none applied); then 25A-03 (the «Para revisar» tray)
 and the rest of 25A, with no paid provider call before its own approved slice. **25A2** (Wallet Shortcut Capture) still
 follows the review-tray foundation: it may begin once 25A-03 has merged, without waiting for 25A's cloud, paid, live or
 voice slices. The targeted 24T3 device pass gates 25A-03, 25A-04, 25A-11 and 25A-12 (§2). After 25A: **25C** (with
@@ -3697,7 +3718,7 @@ nothing of it is on a screen yet.
   content padding again; the native inset did not hold on the owner's iPhone and the VoiceOver risk stays open; see
   «Producto 25OPS1».)*
 
-### Producto 25OPS1 — Production & Launch Plan + dock clearance follow-up (this PR)
+### Producto 25OPS1 — Production & Launch Plan + dock clearance follow-up (PR #81)
 
 - **Goal.** Two scopes only. (A) One shared correction found on the owner's physical iPhone pass of 25UX1: at the end of
   the scroll, a tab root's last content did not settle above the floating dock. (B) The production and launch
@@ -3804,7 +3825,7 @@ nothing of it is on a screen yet.
     later.
 - **Device QA.** Pending for A: checklist section «Producto 25OPS1». B has nothing to check on the iPhone. The version
   line reads «FinanzApp 0.1.0 (25OPS1)».
-- **Status.** On its branch; not merged.
+- **Status.** Merged as PR #81 (merge commit d0a0be8, 2026-10-02).
 - **Gates.** 2026-10-02, local, Linux. Root `npm test` 590 passed, 1 todo; `check:repo` OK. `apps/mobile`: `typecheck` OK;
   `test:storage` 1247 passed, 0 failed (new: `tests/dock-clearance.node.ts`, the real hook over a minimal React, the
   geometry, the four scrollers' props; and one rendered assertion each for Inicio, Reportes, `Screen` and `EntryList`);
@@ -3825,6 +3846,79 @@ nothing of it is on a screen yet.
   timeout or crash, never released in a way that could double-spend; the provider's project limit stays the backstop).
   And the brand, naming and identity gate (app-store-launch §9.4) was recorded: the working name is not the assumed
   public brand. Documentation only; no app change.
+
+### Producto 25DISC1 — Competitive capability and brand discovery (this PR)
+
+- **Goal.** Discovery and documentation only: a current competitive capability map
+  ([competitive-landscape.md](competitive-landscape.md)), a feature-gap map with every capability classified
+  (IMPLEMENTED only from code and tests; ACTIVE ROADMAP; LAUNCH CANDIDATE; RESEARCH GATE; POST-LAUNCH; DELIBERATELY
+  EXCLUDED), explicit decisions and research gates for capabilities the roadmap had not considered, and the brand
+  identity brief ([brand-brief.md](brand-brief.md)). Nothing is redesigned, implemented, enabled or renamed.
+- **Scope.** Branch `feat/producto-25disc1-competitive-brand-discovery` from master d0a0be8 (25OPS1 merged as PR #81).
+  No app, UI, palette, identifier, integration, provider, EAS, schema (14), backup (v14) or review-store change; the
+  release marker is not bumped because nothing in the app changed (the version line still reads «FinanzApp 0.1.0
+  (25OPS1)»). Pointers added in README, AGENTS rule 2, docs/mobile-design.md and the checklist heading of 25OPS1.
+- **Research.** Ten products (Kesef, MonAi, Copilot Money, Monarch, YNAB, Wallet by BudgetBakers, plus Piggy, Finy,
+  Splitwise and MoneyCoach for the patterns the six lack) read from their current App Store listings (Argentina and
+  United States storefronts, version history, in-app purchase lists) and official sites on 2026-10-02, each audit
+  re-read by a second, adversarial reader on 2026-10-03 (107 cells and notes corrected or added); the repository
+  inventory checked file by file by a second reader (no classification changed; function and path attributions
+  corrected); Mercado Pago's developer documentation, LatAm aggregators, Argentina's Sistema de Finanzas Abiertas,
+  FinanceKit, the splitting products and the brand identities read from primary pages, with a completeness critic's
+  limits recorded in the landscape's §2.1. No competitor UI, copy or asset copied.
+- **Conclusions that bind nothing but inform the owner.** (1) **Mercado Pago Consumer Sync — RESEARCH GATE**, placed
+  under 25E: a compliant consumer wallet movement feed cannot be confirmed from the official documentation (OAuth is
+  defined as a seller authorising access to seller resources with only read, write and offline-access scopes; no
+  webhook topic covers wallet movements; the reports are seller reconciliation files); Kesef, Piggy and Finy ship it on
+  undocumented behaviour; the person's own «Resumen de cuenta» export through the 25C importer is the compliant
+  stand-in; if official access ever exists the path is authorisation → FinanzApp backend → event or authorised sync →
+  ReviewDraft → review tray → optional alert → Confirmar → ledger, never a token in the bundle or a Shortcut and never
+  a silent write. (2) **Bank connections — RESEARCH GATE** under 25E: every aggregator reaching Argentina is
+  credential-based scraping that the wallets' terms forbid; the open-finance decree has no technical standard; FinanceKit
+  is US and UK only. (3) **Where FinanzApp already exceeds the set:** cards with the eight invariants and exact cycles,
+  instalment plans recognised instalment by instalment with the adelanto, refunds that net in the purchase's month and
+  category, the original-currency ledger with view-only conversion at each movement's dated rate (kept; several
+  competitors freeze or store a converted value), no account for the core, debts moving only by transfers, reports that
+  add up. (4) **Major gaps** and their phases: voice and several drafts from one message (25A), Wallet capture and the
+  Live Activity gate (25A2; MoneyCoach proves the surface), tags, filters, ranges, notes, goals, rollover (25C),
+  calendar and subscription intelligence (25C2), Face ID, hidden amounts, reminders, widgets, Quick Actions, Watch (25D),
+  the local split with the own-share rule (proposed for 25C; groups post-launch), WhatsApp and Mercado Pago (25E gates).
+  (5) **Suggested priority changes, none applied** (landscape §12.3): decide the multi-draft contract before 25A's
+  server lane; promote or defer the local split explicitly; record pay-cycle periods and a subscriptions view as 25C /
+  25C2 candidates; start the naming workflow early; no Mercado Pago or bank connection before 25E and never through
+  credential sharing; Home unchanged. (6) **Brand:** «FinanzApp» is the working name only; the brief fixes criteria,
+  the naming workflow (ideation → shortlist → App Store AR and global search → web → domains → handles → trademark and
+  confusing-similarity screening → owner selection → only then rename) and the exploration brief (three or four
+  genuinely distinct territories, Forest allowed as one evolved option); no name chosen, no palette change in code.
+- **Follow-up (2026-10-03, same PR).** The four review findings fixed against their sources: the naming workflow
+  table's five columns; the matrix's evidence made durable in [competitive-evidence.md](competitive-evidence.md) (every
+  audited capability per product, the second reader's corrections, a one-line paraphrase and the public URL; it
+  replaces the session-only research record, and a cross-check against it corrected three more cells: Monarch's
+  categories, Copilot's subscriptions and subscriptions report); Kesef's and MoneyCoach's «Account required» cells
+  (neither needs an account for the core); MonAi removed from the lifetime-price evidence. Added: the capability
+  decision register (landscape §12.5: one status, one home and a priority tier, CORE / LAUNCH, LAUNCH CANDIDATE,
+  POST-LAUNCH, RESEARCH or EXPERIMENT, for every capability surfaced; parity is not the launch plan) and
+  [go-to-market.md](go-to-market.md) (positioning, the social brand system, the Instagram account type and Meta
+  access, content pillars, the vertical-video guideline, organic before paid, the launch sequence, retention and
+  referral experiments, the funnel and its metrics, the App Store connection). No account, budget, campaign or app
+  change.
+- **Owner feedback, second brand exploration (2026-10-03, same PR; decisions, no code).** Details in
+  [brand-brief.md §4.7](brand-brief.md). Forest's structure is the frozen baseline and the open question is colour and
+  identity only; Inicio gets no month arc, progress line, «Día X de Y», spending-pace or extra month chart (pace may be
+  reconsidered in Reportes, the calendar or a future insight surface); the second exploration is research: Pino and
+  Pino + albaricoque promising, Zafiro + arena the strongest different challenger, Grafito + categorías and
+  Petróleo + oro arena not preferred, no palette selected, a final palette-only exploration happens outside this PR and
+  nothing is implemented until the owner chooses; no shortlist name is approved and «FinanzApp» stays the working name.
+- **Open owner decisions.** Landscape §12.4, brand-brief §6 and go-to-market §12.
+- **Device QA.** Nothing to check on the iPhone.
+- **Status.** This PR; not merged.
+- **Gates.** 2026-10-03, local, Linux. Root `npm test` 590 passed, 1 todo; `check:repo` OK. `apps/mobile`: `typecheck`
+  OK; `test:storage` 1247 passed, 0 failed; `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0 errors,
+  0 stale (no app string changed); `check` OK; `export:ios` OK. No EAS build, no iPhone, no remote migration, no
+  provider or network call from the app or the server (the research read public web pages only). Follow-up, 2026-10-03,
+  local, Linux, same results: root `npm test` 590 passed, 1 todo; `check:repo` OK; `typecheck` OK; `test:storage` 1247
+  passed, 0 failed; `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0 errors, 0 stale; `check` OK;
+  `export:ios` OK. No account, handle, ad account or campaign created.
 
 ### Later notes recorded in 24UX6A (future; document only, not scheduled)
 
@@ -4127,7 +4221,8 @@ or marketing asset.
 
 ### Marketing, App Store Optimization, Instagram, advertising materials and conversion tests
 
-Production detail (25OPS1): [app-store-launch.md](app-store-launch.md) §7–§10 and §14.
+Production detail (25OPS1): [app-store-launch.md](app-store-launch.md) §7–§10 and §14. Acquisition and retention plan
+(25DISC1): [go-to-market.md](go-to-market.md), planning only (no account, budget or campaign).
 
 Only after real users exist (TestFlight or the App Store): demonstration videos from real screens
 with clearly marked fixture data, testimonials only from real, consenting users.

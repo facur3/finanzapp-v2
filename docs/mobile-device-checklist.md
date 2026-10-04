@@ -1,6 +1,6 @@
 # Physical iPhone acceptance checklist
 
-## Producto 25OPS1 — the last row above the dock (follow-up to 25UX1; on its branch; not tested)
+## Producto 25OPS1 — the last row above the dock (follow-up to 25UX1; merged as PR #81; not tested)
 
 **Not tested yet: this correction has not been on an iPhone.** It is the one open item of 25UX1's dock checklist (the
 owner's pass of 2026-10-02, below). Metro from this branch (`npm run start:dev-client -- --clear`) on the installed

@@ -19,6 +19,8 @@ no store listing. No account was created, no agreement signed, no build made and
 - **«FinanzApp» is the internal working name.** It is not assumed to be the final public App Store brand: other
   products use the name, including a personal-finance app already on the App Store (owner's research, 2026-10-02). The
   brand, naming and identity gate is §9.4; every mention of the name in these documents means the working name.
+- **How people find and keep the app** (positioning, social channels, content, the organic-to-paid loop, retention
+  experiments, the funnel) is [go-to-market.md](go-to-market.md); ASO detail stays here (§9), analytics rules here (§7).
 
 **Labels.** Each statement that is more than a description carries one of these:
 

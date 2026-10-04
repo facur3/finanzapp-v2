@@ -14,7 +14,10 @@ is no web version of the product ([decision 004](docs/decisions/004-native-first
    `docs/currency.md`; for language or region read `docs/i18n.md`; for environments, hosting, Supabase,
    the Assistant's capabilities and cost limits, Wallet capture, Live Activities, notifications, privacy,
    subscriptions or anything about TestFlight and the App Store read `docs/production-plan.md` and
-   `docs/app-store-launch.md` (plans and gates, nothing in them is implemented until the roadmap says so).
+   `docs/app-store-launch.md` (plans and gates, nothing in them is implemented until the roadmap says so); before
+   adding a capability because a competitor has it, or touching the public name or identity, read
+   `docs/competitive-landscape.md` and `docs/brand-brief.md` (discovery: classifications, research gates and the
+   naming workflow; «FinanzApp» is the working name, never the assumed public brand).
    Keep their status and next action current. Older handoffs live in `docs/mobile-roadmap-history.md`.
 3. The native app is the product. Never change its bundle identifier, run a database
    migration remotely, make an EAS cloud build, a store submission or a paid subscription
