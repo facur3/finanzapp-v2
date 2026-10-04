@@ -512,6 +512,9 @@ quedaba arriba del dock (corregido por 25OPS1, abajo). La verificación en Linux
 - **La regla semántica sigue:** gasto en tinta, ingreso en su verde (lejos de la lima), alerta ámbar, vencido y
   destructivo en rojo; la transferencia pasa de azul petróleo a **pizarra neutra**. La lima nunca es éxito, ingreso,
   alerta ni error.
+- **Pulido final (2026-10-04, aprobado por el dueño):** el segmento elegido `Gastado | Disponible` de Inicio es un pulgar
+  blanco neutro (el `surface` claro) con texto en tinta, igual en claro y oscuro; la jerarquía del importe (símbolo y
+  centavos más silenciosos) queda igual a propósito.
 - **No cambia:** cuatro pestañas, el dock y su geometría (ahora grafito; solo el «+» es lima), el hub, Inicio y sus
   módulos (Próximos compromisos sigue neutro como Actividad reciente), Reportes, Tarjetas, colores de categorías y caras
   de tarjeta, ni ninguna regla contable.

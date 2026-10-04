@@ -4,8 +4,7 @@
 
 **Owner's palette verdict (2026-10-03, physical iPhone, FinanzApp Dev build from this branch; model, iOS version and
 text size not recorded).** The owner reviewed Electric Lime on the iPhone in light and dark and **keeps it as the current
-product palette**, as implemented, with no further aesthetic change: the lime field on Inicio; the ink capsule with lime
-text for the chosen `Gastado | Disponible` segment (it stays ink, not white) and the unchosen segment as it is; the
+product palette**, as implemented: the lime field on Inicio; the unchosen `Gastado | Disponible` segment as it is; the
 amount's hierarchy (digits in ink, the currency symbol and the cents as implemented); Próximos compromisos neutral like
 Actividad reciente; the graphite dock and the lime «+»; the category colours, card faces, income green and transfer
 slate; the date headings («Ayer · 2 oct», «Anteayer · 1 oct»); the light and dark surfaces. The owner reported that the
@@ -13,6 +12,13 @@ lime with graphite and neutrals works well on the real iPhone in both themes. Th
 whole, not item by item: the boxes below stay unticked, and Reduce Transparency, the status bar's change on scroll, the
 filled button on a white sheet, the switches, the forms, Reportes, the Assistant, VoiceOver and large text were not
 reported and remain open.
+
+**Final polish (owner-approved 2026-10-04, after comparing the iPhone with the palette concept).** Only the chosen
+`Gastado | Disponible` thumb changes: from an ink capsule with lime text to a **neutral white thumb with ink text**
+(`heroThumb` #131411 → #FFFFFF, the existing light `surface`; `heroThumbInk` #C6F12E / #B8E02A → #131411), the same in
+light and dark because the field stays light lime in both. The track, the unchosen label, the size, the slide, the
+haptic and the accessibility state are unchanged. **The amount's hierarchy is unchanged on purpose:** the owner keeps
+the quieter currency symbol and cents. Not yet seen on the iPhone (first item below).
 
 A colour-token change on the existing product: no layout, navigation, content or financial change.
 Metro from this branch (`npm run start:dev-client -- --clear`) on the installed FinanzApp Dev build; JavaScript only, no
@@ -22,8 +28,9 @@ Rules: `apps/mobile/src/ui/palette.ts`; design: mobile-design.md, «Producto 25V
 Producto 25VIS1».
 
 - [ ] **Inicio, light and dark:** the financial field is Electric Lime with ink text (month, number, Gastado |
-      Disponible, the scope chip and the accounts button all legible); the chosen segment is an ink capsule with lime
-      text; the status bar's clock and battery are **dark** over the field in both themes and turn to the scheme's own
+      Disponible, the scope chip and the accounts button all legible); the chosen segment is a white thumb with ink
+      text that stands clear of the lime track (light and dark, after the 2026-10-04 polish), the other label stays
+      the field's secondary ink, and the thumb still slides with the selection tick; the status bar's clock and battery are **dark** over the field in both themes and turn to the scheme's own
       after scrolling past it. Dark mode: the field is a step dimmer and does not glare; the overscroll above it is lime.
 - [ ] **Próximos compromisos** sits on the same neutral surface as Actividad reciente (no lime, no green wash); only each
       row's mark keeps its category colour; «Hoy» / «Mañana» stay amber.

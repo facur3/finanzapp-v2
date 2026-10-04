@@ -157,10 +157,10 @@ test('24UX6A: the Assistant first and largest on the brand field, then Gasto, In
   assert.equal(tile.props.accessibilityHint, undefined);
   assert.equal(tile.props.style[1].backgroundColor, palette.hero, 'visually primary: the hero\'s field');
   assert.equal(texts(tile).join(' | '), 'Asistente | Decilo con tus palabras o preguntá lo que quieras');
-  // 25VIS1: the field is lime, so the circle is the field's ink thumb with a lime glyph; an accent circle would vanish on it.
-  const spark = flatten(tile).find(node => node.type === 'View' && node.props.style?.[1]?.backgroundColor === palette.heroThumb);
+  // 25VIS1: the field is lime, so the circle is the field's ink with a lime glyph; an accent circle would vanish on it.
+  const spark = flatten(tile).find(node => node.type === 'View' && node.props.style?.[1]?.backgroundColor === palette.heroInk);
   assert.ok(spark, 'an ink circle on the field');
-  assert.deepEqual([spark.props.children.props.name, spark.props.children.props.color], ['sparkles', palette.heroThumbInk]);
+  assert.deepEqual([spark.props.children.props.name, spark.props.children.props.color], ['sparkles', palette.hero]);
   assert.ok(flatten(tile).filter(node => node.type === 'AppText' || node.type === 'Ionicons').every(node => node.props.accessible === false), 'the tile speaks once');
   assert.equal(rowsView.props.style[1].backgroundColor, palette.surface);
   assert.equal(rows.length, 3, 'three movement rows');

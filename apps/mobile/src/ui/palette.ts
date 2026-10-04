@@ -54,8 +54,9 @@ export const lightPalette = {
   scrim: 'rgba(0, 0, 0, 0.40)',
   /** Inicio's financial field (the lime hero) and what sits on it: ink (14.1:1), secondary ink (7.4:1), the fill of its
    * compact controls (the scope chip, the accounts button, the segmented track; ink 10.3:1 on it), and the chosen segment
-   * (an ink thumb with lime text, 14.1:1). The field is light in both themes, so the status bar over it is dark. */
-  hero: '#C6F12E', heroInk: '#131411', heroSecondary: '#3B4A12', heroControl: '#A9D01B', heroThumb: '#131411', heroThumbInk: '#C6F12E',
+   * (the light surface's white thumb with ink text, 18.5:1, 1.8:1 against the track). The field is light in both themes, so
+   * the status bar over it is dark and the thumb is the same white in dark. */
+  hero: '#C6F12E', heroInk: '#131411', heroSecondary: '#3B4A12', heroControl: '#A9D01B', heroThumb: '#FFFFFF', heroThumbInk: '#131411',
   heroStatusBar: 'dark' as 'light' | 'dark',
   /** Electric Lime as an accent: the dock's «+» and the Assistant's circle (ink glyph on it, 14.1:1). */
   accent: '#C6F12E', onAccent: '#131411',
@@ -86,7 +87,7 @@ export const darkPalette: typeof lightPalette = {
   shadow: 'rgba(0, 0, 0, 0)',
   scrim: 'rgba(0, 0, 0, 0.60)',
   /** A step below the light field's lime so a large field does not glare on a dark screen; ink on it as in light. */
-  hero: '#B8E02A', heroInk: '#131411', heroSecondary: '#3A4318', heroControl: '#9FC51C', heroThumb: '#131411', heroThumbInk: '#B8E02A',
+  hero: '#B8E02A', heroInk: '#131411', heroSecondary: '#3A4318', heroControl: '#9FC51C', heroThumb: '#FFFFFF', heroThumbInk: '#131411',
   heroStatusBar: 'dark',
   accent: '#C6F12E', onAccent: '#131411',
   dock: '#20221E', dockInk: '#A9ADA3', dockActive: '#3D403A', dockActiveInk: '#FFFFFF',

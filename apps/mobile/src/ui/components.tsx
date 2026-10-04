@@ -418,7 +418,7 @@ export function Choices<T extends string>({ value, options, onChange, disabled, 
   /** An option's `spokenLabel` is what VoiceOver reads when its short label is not a sentence (a date written out). */
   value: T; options: { value: T; label: string; spokenLabel?: string }[]; onChange: (value: T) => void; disabled?: boolean; compact?: boolean;
   /** 24UX6A, Inicio's Gastado | Disponible on the field: a capsule track in the field's control fill, the field's
-   * thumb (ink, lime text since 25VIS1) for the chosen value and the field's secondary ink for the other. Same slide and haptic. */
+   * thumb (white with ink text since 25VIS1) for the chosen value and the field's secondary ink for the other. Same slide and haptic. */
   onField?: boolean;
   /** 24T3 carry-in, Reportes' «Categorías | Día a día» only: the screen's main switch at the subhead size (semibold chosen,
    * medium other), a 44 pt track and no shrink-to-fit (`PROMINENT_SEGMENT`). Same thumb, colours, slide and haptic. */

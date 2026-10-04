@@ -1,6 +1,6 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-03 (Producto 25VIS1, PR #83, unmerged: Electric Lime, accepted by the owner on the iPhone as the current product palette, colour tokens only on the existing
+Updated: 2026-10-04 (Producto 25VIS1, PR #83, unmerged: Electric Lime, accepted by the owner on the iPhone as the current product palette, plus the owner-approved final polish of Inicio's chosen `Gastado | Disponible` thumb (white with ink), colour tokens only on the existing
 product (`apps/mobile/src/ui/palette.ts`), no layout, navigation, financial, schema (14) or backup (v14) change; the
 version line reads «FinanzApp 0.1.0 (25VIS1)»; the owner's iPhone pass of 25OPS1 recorded (the last content now rests
 above the dock). Producto 25DISC1 merged as PR #82, merge commit 227942c, documentation only: the competitive capability map and gap map,
@@ -251,8 +251,9 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   to action and the hub's Assistant tile; brand text is a deep olive-lime in light and a soft lime in dark. The dock is
   graphite; Próximos compromisos stays as neutral as Actividad reciente; category colours, card faces and every
   layout are unchanged; income keeps its own green, a transfer becomes a neutral slate. Two tokens added (`toggle`,
-  `heroStatusBar`); no theme selector. Decision 005, «Enmienda 2026-10-03 — Producto 25VIS1» (accepted). The version
-  line reads «FinanzApp 0.1.0 (25VIS1)».
+  `heroStatusBar`); no theme selector. Final polish (owner-approved 2026-10-04): Inicio's chosen `Gastado | Disponible`
+  thumb is the light surface's white with ink text in both schemes; the amount's hierarchy is unchanged on purpose.
+  Decision 005, «Enmienda 2026-10-03 — Producto 25VIS1» (accepted). The version line reads «FinanzApp 0.1.0 (25VIS1)».
 - **Competitive capability and brand discovery (25DISC1, PR #82, merge commit 227942c; documentation only; nothing to
   check on the iPhone).** §3, «Producto 25DISC1». [competitive-landscape.md](competitive-landscape.md): ten products audited from
   their current App Store listings and official sites on 2026-10-02 and re-checked by a second reader, a capability
@@ -672,7 +673,7 @@ item unless a section says a new native build is needed. The checklist sections 
 
 - **25VIS1 — Electric Lime palette (PR #83, unmerged; no EAS build; owner's verdict 2026-10-03 on the iPhone, light and
   dark: keep it as the current palette, as implemented; the items below not reported one by one stay open):** the checklist section Producto
-  25VIS1: Inicio's lime field with ink and a dark status bar over it, light and dark; Próximos compromisos neutral like
+  25VIS1: the chosen `Gastado | Disponible` thumb, white with ink (2026-10-04 polish), light and dark; Inicio's lime field with ink and a dark status bar over it, light and dark; Próximos compromisos neutral like
   Actividad reciente; the graphite dock with the lime «+», with and without Reduce Transparency; the hub; a filled
   button on a white sheet; olive-lime brand text; income green, transfer slate, amber and red apart from the lime;
   switches; categories, the donut and card faces unchanged; VoiceOver.
@@ -3951,13 +3952,22 @@ nothing of it is on a screen yet.
   on the real iPhone. Inspired by the owner's preferred Claude Design exploration, not copied from it. Started as a
   trial; the owner kept it (below).
 - **Owner's verdict (2026-10-03, physical iPhone, light and dark).** Keep Electric Lime as the current product palette,
-  as implemented, with no further aesthetic change (no tweak from the earlier PDF concepts): the lime field, the ink
-  selected segment with lime text, the amount's hierarchy, the neutral Próximos compromisos, the graphite dock and lime
+  as implemented (no tweak from the earlier PDF concepts): the lime field, the amount's hierarchy, the neutral Próximos compromisos, the graphite dock and lime
   «+», category colours, card faces, income green, transfer slate, the date headings and the surfaces all stay. It is
   the selected product visual direction, **not** a finished public name, logo or brand identity: the naming,
   trademark and confusing-similarity gate (brand-brief.md §3, app-store-launch.md §9.4) stays future work. Recorded in
   the checklist; the checklist's individual items (Reduce Transparency, forms, VoiceOver and the rest) were not
   reported and stay open.
+- **Final polish (owner-approved 2026-10-04, after comparing the iPhone with the palette concept).** Only Inicio's
+  chosen `Gastado | Disponible` thumb: `heroThumb` #131411 → #FFFFFF (the existing light `surface`, in both schemes,
+  since the field stays light lime) and `heroThumbInk` #C6F12E (light) / #B8E02A (dark) → #131411 (the field's ink).
+  Ink on the thumb 18.5:1; thumb against the track 1.8:1 light, 2.0:1 dark. Track, unchosen label, size, slide,
+  haptic and `accessibilityState` unchanged; weight still marks the chosen label. The amount's hierarchy (quieter
+  currency symbol and cents) is kept on purpose. The hub's Assistant circle, which read `heroThumb`/`heroThumbInk`,
+  now reads `heroInk`/`hero`, the same values, so it does not change. Tests: `theme.node.ts` (the thumb is the light
+  surface, ink 7:1 or more on it, 1.5:1 or more against the track, brighter than the field while the track is darker,
+  both palettes); `ui-rows.node.ts` (the on-field control in both palettes: track, white thumb, ink and secondary
+  labels, 600/500 weights, `accessibilityState.selected`); `capture-hub.node.ts` (the circle's new token names).
 - **Scope.** Branch `feat/producto-25vis1-electric-lime-palette` from master 227942c (25DISC1 merged as PR #82). Colour
   tokens only: no screen, layout, navigation, Inicio information, Tarjetas or Reportes behaviour, domain, storage,
   schema (14), backup (v14), dependency, name or identifier change; no theme picker; no EAS build.
@@ -3969,7 +3979,7 @@ nothing of it is on a screen yet.
   `toggle` (#4A6100 / #5C7A06, a switch's on track that keeps the white knob visible) and `heroStatusBar` ('dark':
   the lime field is light in both themes). The full table is in mobile-design.md, «Producto 25VIS1».
 - **Where lime goes / does not.** Inicio's field, the «+», the filled call to action, the hub's Assistant tile (its circle
-  is now the field's ink thumb, since a lime circle vanished on lime), the Assistant's empty-state circle and send
+  is the field's ink with a lime glyph, since a lime circle vanished on lime), the Assistant's empty-state circle and send
   button. Not: the dock (graphite), Próximos compromisos (neutral like Actividad reciente, pinned by a test), category
   colours and the donut, card faces, surfaces, and any semantic state.
 - **Tests.** `tests/theme.node.ts`: the Forest hue test replaced by the lime window (68–82°, vivid fields, ink 7:1 or
@@ -3993,6 +4003,10 @@ nothing of it is on a screen yet.
   Its gates (2026-10-03, local, Linux): root `npm test` 590 passed, 1 todo; `check:repo` OK; `apps/mobile` `typecheck`
   OK, `test:storage` 1259 passed, 0 failed, `i18n:check -- --strict` 0 errors, 0 stale, `check` OK (`currency:verify`,
   `regions:verify` and `export:ios` not re-run: no code path changed).
+  Final-polish commit (2026-10-04, the chosen `Gastado | Disponible` thumb only; local, Linux): root `npm test` 590
+  passed, 1 todo; `check:repo` OK; `apps/mobile` `typecheck` OK, `test:storage` 1260 passed, 0 failed,
+  `i18n:check -- --strict` 0 errors, 0 stale, `check` OK, `currency:verify` OK, `regions:verify` OK, `export:ios` OK.
+  The white thumb is not yet seen on the iPhone.
 - **Gates.** 2026-10-03, local, Linux. Root `npm test` 590 passed, 1 todo; `check:repo` OK. `apps/mobile`: `typecheck`
   OK; `test:storage` 1259 passed, 0 failed; `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0 errors,
   0 stale (no app string changed); `check` OK; `export:ios` OK. No EAS build, no iPhone run by the agent.

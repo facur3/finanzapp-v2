@@ -80,8 +80,13 @@ for (const [name, p] of [['light', lightPalette], ['dark', darkPalette]] as cons
     assert.ok(contrast(p.heroSecondary, p.heroControl) >= 4.5, `heroSecondary on heroControl: ${ratio(p.heroSecondary, p.heroControl)}`);
     // The scope chip and the accounts button: ink on the control fill.
     assert.ok(contrast(p.heroInk, p.heroControl) >= 4.5, `heroInk on heroControl: ${ratio(p.heroInk, p.heroControl)}`);
-    // The chosen segment: lime text on the ink thumb (25VIS1).
+    // The chosen segment (25VIS1 final): ink on the light surface's white thumb, the same in dark (the field stays light).
+    assert.equal(p.heroThumb, lightPalette.surface, 'the thumb is the existing white surface, not a new white');
+    assert.equal(p.heroThumbInk, p.heroInk, 'the chosen label is the field\'s ink');
     assert.ok(contrast(p.heroThumbInk, p.heroThumb) >= 7, `heroThumbInk on heroThumb: ${ratio(p.heroThumbInk, p.heroThumb)}`);
+    // The thumb stands out from the lime track it slides on and from the field around it.
+    assert.ok(contrast(p.heroThumb, p.heroControl) >= 1.5, `the thumb separates from the track: ${ratio(p.heroThumb, p.heroControl)}`);
+    assert.ok(luminance(p.heroThumb) > luminance(p.hero) && luminance(p.hero) > luminance(p.heroControl), 'the thumb is brighter than the field, the track darker');
   });
   test(`${name}: the dock and its «+» read in both themes; the selected capsule separates from the pill (24UX6A)`, () => {
     assert.ok(contrast(p.onAccent, p.accent) >= 4.5, `the «+» glyph on the accent: ${ratio(p.onAccent, p.accent)}`);
@@ -92,7 +97,7 @@ for (const [name, p] of [['light', lightPalette], ['dark', darkPalette]] as cons
   });
   test(`${name}: the brand is Electric Lime, a yellow-chartreuse kept apart from a bright green and from every meaning (25VIS1)`, () => {
     // The lime fields and their text tone sit in 68–82°, on the yellow side of a conventional bright green (#9FE870 is ≈97°).
-    const fields = [['primaryFill', p.primaryFill], ['hero', p.hero], ['accent', p.accent], ['heroThumbInk', p.heroThumbInk]] as const;
+    const fields = [['primaryFill', p.primaryFill], ['hero', p.hero], ['accent', p.accent]] as const;
     const brandText = [['primary', p.primary], ['link', p.link], ['toggle', p.toggle], ['swipeAccent', p.swipeAccent]] as const;
     for (const [token, hex] of [...fields, ...brandText]) {
       const angle = hue(hex);

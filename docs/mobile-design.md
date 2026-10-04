@@ -887,7 +887,7 @@ más. Los colores de categorías (`category-color.ts`, `@finanzapp/domain` appea
 | `primarySoft` | #EEF5D6 | #20260F | Un susurro de marca (chip elegido del Asistente) |
 | `toggle` | #4A6100 | #5C7A06 | Interruptor encendido, perilla blanca visible |
 | `hero` / `heroInk` / `heroSecondary` | #C6F12E / #131411 / #3B4A12 | #B8E02A / #131411 / #3A4318 | El campo de Inicio y su tinta |
-| `heroControl` / `heroThumb` / `heroThumbInk` | #A9D01B / #131411 / #C6F12E | #9FC51C / #131411 / #B8E02A | Chip de alcance, botón de cuentas, segmento elegido (cápsula de tinta, texto lima) |
+| `heroControl` / `heroThumb` / `heroThumbInk` | #A9D01B / #FFFFFF / #131411 | #9FC51C / #FFFFFF / #131411 | Chip de alcance, botón de cuentas, segmento elegido (pulgar blanco, el `surface` claro, con texto en tinta; igual en oscuro) |
 | `accent` / `onAccent` | #C6F12E / #131411 | #C6F12E / #131411 | El «+» del dock y el círculo del Asistente |
 | `dock` / `dockInk` / `dockActive` / `dockActiveInk` | #1D1F1B / #A9ADA3 / #3A3D37 / #FFFFFF | #20221E / #A9ADA3 / #3D403A / #FFFFFF | Dock grafito |
 | `income` / `expense` / `warning` / `transfer` | #1F7A4F / #B3432E / #9A5B00 / #48606F | #5CCB93 / #EE8A72 / #E8A94A / #A3B5C4 | Semántica |
@@ -898,8 +898,8 @@ lado amarillo de un verde brillante (el #9FE870 de referencia está en ≈97°).
 escalón (#B8E02A) para no encandilar en una superficie grande; el «+» y los botones conservan la lima plena.
 
 **Dónde va la lima.** El campo financiero de Inicio (y su rebote superior); el «+» del dock; el botón lleno de cada
-pantalla (Guardar, Empezar; siempre con tinta); la tarjeta del Asistente en el hub (lima, con su círculo de tinta y
-chispa lima, porque un círculo lima desaparecería sobre la lima); el círculo del Asistente vacío y su botón de enviar.
+pantalla (Guardar, Empezar; siempre con tinta); la tarjeta del Asistente en el hub (lima, con su círculo de tinta (`heroInk`) y
+chispa lima (`hero`), porque un círculo lima desaparecería sobre la lima); el círculo del Asistente vacío y su botón de enviar.
 Como texto de marca (oliva-lima en claro, lima suave en oscuro): Cancelar / Listo de las hojas, «Ver todos», las
 marcas de selección, el mes elegido en las barras de Evolución, la flecha atrás del encabezado.
 
@@ -935,12 +935,22 @@ ni forman parte de la monetización actual, y no hay selector. Cada tema multipl
 el lanzamiento necesita una identidad por defecto reconocible.
 
 **Veredicto del dueño (2026-10-03, iPhone físico, claro y oscuro): se queda.** Quedan como están el campo lima de
-Inicio; la cápsula de tinta con texto lima del segmento elegido `Gastado | Disponible` (no pasa a blanco) y el segmento
-no elegido; la jerarquía del importe (dígitos en tinta, símbolo de moneda y centavos como están); Próximos compromisos
+Inicio; el segmento no elegido de `Gastado | Disponible`; la jerarquía del importe (dígitos en tinta, símbolo de moneda y centavos como están); Próximos compromisos
 neutro como Actividad reciente; el dock grafito y el «+» lima; colores de categorías, caras de tarjeta, el verde del
 ingreso y la pizarra de la transferencia; los encabezados de fecha («Ayer · 2 oct»); las superficies clara y oscura.
 
-**Pendiente en el iPhone:** los puntos de la lista que el dueño no informó uno por uno (Reduce Transparency, el cambio
+**Pulido final aprobado por el dueño (2026-10-04, tras comparar el iPhone con el concepto de la paleta).** Solo cambia
+el pulgar del segmento elegido `Gastado | Disponible`: de cápsula de tinta con texto lima a **pulgar blanco neutro con
+texto en tinta** (`heroThumb` #131411 → #FFFFFF, el `surface` claro existente, sin un blanco nuevo; `heroThumbInk`
+#C6F12E / #B8E02A → #131411, la tinta del campo), igual en claro y oscuro porque el campo sigue siendo lima clara en
+ambos. Tinta sobre el pulgar 18,5:1; el pulgar contra la pista lima 1,8:1 en claro y 2,0:1 en oscuro, más claro que el
+campo mientras la pista es más oscura. Pista, segmento no elegido, medidas, deslizamiento, háptica y accesibilidad no
+cambian: la elección se lee también por el pulgar, el peso (semibold / medium) y `accessibilityState.selected`, no solo
+por el color. **La jerarquía del importe queda igual a propósito:** el dueño conserva el símbolo de moneda y los
+centavos más silenciosos, sin oscurecerlos. El círculo del Asistente en el hub, que tomaba `heroThumb` / `heroThumbInk`,
+pasa a `heroInk` / `hero` con los mismos valores, así que no cambia.
+
+**Pendiente en el iPhone:** el pulgar blanco nuevo; los puntos de la lista que el dueño no informó uno por uno (Reduce Transparency, el cambio
 de la barra de estado al desplazar, el botón lleno sobre una hoja blanca, interruptores, formularios, Reportes, el
 Asistente, VoiceOver, texto grande; docs/mobile-device-checklist.md, «Producto 25VIS1»).
 
@@ -2968,7 +2978,8 @@ color propio.
 ## Pendiente de revisión en iPhone
 
 - Producto 25VIS1 (PR #83, sin mergear; sin build de EAS; el dueño conservó la paleta en el iPhone el 2026-10-03, el
-  resto sin revisar punto por punto): la paleta Electric Lime en claro y oscuro: el campo
+  resto sin revisar punto por punto): el pulgar blanco con texto en tinta del segmento elegido `Gastado | Disponible`
+  (pulido final del 2026-10-04), en claro y oscuro; la paleta Electric Lime en claro y oscuro: el campo
   lima de Inicio con tinta y la barra de estado oscura sobre él; Próximos compromisos neutro como Actividad reciente; el
   dock grafito con el «+» lima, con y sin Reduce Transparency; el hub; un botón lleno sobre una hoja blanca; el texto de
   marca oliva-lima; ingreso verde, transferencia pizarra, ámbar y rojo distintos de la lima; interruptores; categorías,
