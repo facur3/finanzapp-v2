@@ -89,6 +89,8 @@ type LedgerContextValue = {
   captureReview: (input: ReviewCapture) => Promise<ReviewItem>;
   /** 25A-04: one item whatever its state (confirmed, dismissed), for a producer that shows it again; null when absent. */
   getReviewItem: (id: string) => Promise<ReviewItem | null>;
+  /** Reads the tray again (reconciling first), in the ledger's queue; a failure keeps the tray shown. */
+  refreshReview: () => Promise<void>;
 };
 const LedgerContext = createContext<LedgerContextValue | null>(null);
 
@@ -269,6 +271,7 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     updateReview: (id, expectedRevision, draft) => reviewOperation(store => store.updateDraft(id, expectedRevision, draft, new Date().toISOString())),
     dismissReview: (id, expectedRevision) => reviewOperation(async store => { await store.dismiss(id, expectedRevision, new Date().toISOString()); }),
     captureReview: input => reviewOperation(async store => (await store.capture(input)).item),
+    refreshReview: () => enqueue(async () => { if (database.current) await loadReview(database.current); }),
     getReviewItem: async id => {
       if (!reviewStore.current) throw new Error('review.unavailable');
       return reviewStore.current.get(id);

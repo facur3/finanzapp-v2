@@ -11,6 +11,7 @@ import { parseInstallmentCount, placementOptions } from '../../src/ui/installmen
 import { accountKindLabel } from '../../src/ui/liability-presentation';
 import { draftFromMinor } from '../../src/ui/money-input';
 import { editedReviewDraft, editorDestinations } from '../../src/ui/review-presentation';
+import { useReviewItem } from '../../src/ui/use-review-item';
 import { space } from '../../src/ui/theme';
 import { useI18n } from '../../src/i18n/provider';
 
@@ -22,9 +23,10 @@ import { useI18n } from '../../src/i18n/provider';
  * the review file only; the detail then says whether the proposal can be confirmed. */
 export default function EditReviewScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { review } = useLedger();
   const { t } = useI18n();
-  const item = review && review !== 'unavailable' && review.writable ? review.items.find(row => row.id === id) : undefined;
+  const { item: found, tray, resolving } = useReviewItem(id);
+  const item = tray?.writable ? found : undefined;
+  if (!item && resolving) return <Screen>{null}</Screen>;
   if (!item) return <Screen><EmptyState icon="file-tray-outline" title={t('review.detail.notFoundTitle')} detail={t('review.detail.notFoundDetail')} /></Screen>;
   return <ReviewEditor key={item.id} item={item} />;
 }

@@ -8,6 +8,7 @@ import type { ReviewItem } from '../../src/storage/review-database';
 import { ActionButton, AppText, DetailRow, EmptyState, ErrorMessage, LifecycleNote, Money, Screen, SectionTitle, Surface } from '../../src/ui/components';
 import { useAccountNameOf, useCategoryLabel } from '../../src/ui/category-hues';
 import { reviewFacts, stateTone, type ReviewFacts } from '../../src/ui/review-presentation';
+import { useReviewItem } from '../../src/ui/use-review-item';
 import { space, usePalette } from '../../src/ui/theme';
 import { useI18n } from '../../src/i18n/provider';
 
@@ -18,23 +19,24 @@ import { useI18n } from '../../src/i18n/provider';
  * write. A confirmed, dismissed or unreadable item is not here: the screen says it is no longer pending. */
 export default function ReviewItemScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { review } = useLedger();
   const { t } = useI18n();
-  const item = review && review !== 'unavailable' ? review.items.find(row => row.id === id) : undefined;
+  // 25A-04: the tray's item, or the store's own when the tray could not be read again (a capture that committed).
+  const { item, resolving, reload } = useReviewItem(id);
   // A proposal this screen just confirmed or dismissed leaves the tray before the screen pops: it is drawn as it was (its
   // actions held) while it leaves, never as «no longer pending». Any other disappearance says so.
   const seen = useRef<ReviewItem | undefined>(undefined);
   const leaving = useRef(false);
   if (item) seen.current = item;
   const shown = item ?? (leaving.current ? seen.current : undefined);
+  if (!shown && resolving) return <Screen>{null}</Screen>;
   if (!shown) return <Screen><EmptyState icon="file-tray-outline" title={t('review.detail.notFoundTitle')} detail={t('review.detail.notFoundDetail')} /></Screen>;
-  return <ReviewDetail item={shown} leaving={leaving} />;
+  return <ReviewDetail item={shown} leaving={leaving} reload={reload} />;
 }
 
 /** The shape of a store call `run` takes (an async step). */
 const idle = async () => {};
 
-function ReviewDetail({ item, leaving }: { item: ReviewItem; leaving: MutableRefObject<boolean> }) {
+function ReviewDetail({ item, leaving, reload }: { item: ReviewItem; leaving: MutableRefObject<boolean>; reload: () => void }) {
   const { archive, review, confirmReview, dismissReview } = useLedger();
   const p = usePalette();
   const { t, formatDate, spokenMoney, moneyText } = useI18n();
@@ -58,6 +60,7 @@ function ReviewDetail({ item, leaving }: { item: ReviewItem; leaving: MutableRef
     setError(null);
     try { await work(); } catch (cause) {
       leaving.current = false;
+      reload(); // A refused change re-reads the item, so the next tap acts on what is stored now.
       setError(cause instanceof Error ? cause.message : 'review.unavailable');
     } finally {
       // Done: the screen is popping and its actions stay held. Refused: everything is offered again.

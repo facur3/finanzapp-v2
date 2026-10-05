@@ -179,7 +179,8 @@ export function AnswerEvidence({ content, onOpen }: { content: AnswerContent; on
 export type ProposalState =
   | { kind: 'preview' | 'capturing' | 'failed' | 'unknown' | 'dismissed' | 'gone' }
   | { kind: 'pending'; item: ReviewItem; conflict: boolean; writable: boolean }
-  | { kind: 'confirmed'; record: 'entry' | 'plan'; writeId: string };
+  /** The recorded item itself: the card draws what was confirmed (edits made in «Para revisar» included). */
+  | { kind: 'confirmed'; item: ReviewItem; record: 'entry' | 'plan' };
 
 /** A financial proposal of the Assistant (25A-04). It is never confirmed here: once captured it is a review item, and the
  * card reads that item (an edit made in «Para revisar» is what it shows) and leads to it with «Revisar», the one place
@@ -193,7 +194,9 @@ export function ProposalCard({ content, state, archive, onReview, onRetry, onOpe
   const p = usePalette();
   const day = useCurrentDay();
   const { t, locale, speechLanguage, formatDate } = useI18n();
-  const draft = state.kind === 'pending' ? state.item.draft : content.capture.draft;
+  // Once the item exists it is the source of truth: pending or confirmed, the card draws the stored draft; the capture's
+  // snapshot only until then.
+  const draft = state.kind === 'pending' || state.kind === 'confirmed' ? state.item.draft : content.capture.draft;
   const categoryName = useCategoryLook(draft.category ?? '', draft.kind ?? 'expense').label;
   if (state.kind === 'dismissed' || state.kind === 'gone') {
     const text = t(state.kind === 'dismissed' ? 'assistant.proposal.dismissed' : 'assistant.proposal.gone');
@@ -244,7 +247,7 @@ export function ProposalCard({ content, state, archive, onReview, onRetry, onOpe
       {(state.kind === 'pending' || state.kind === 'unknown') && <ActionButton label={t('assistant.proposal.review')} icon="file-tray-full-outline" secondary compact
         onPress={() => onReview(content.capture.id)} />}
       {state.kind === 'confirmed' && <ActionButton label={t(state.record === 'plan' ? 'assistant.proposal.viewPlan' : 'assistant.proposal.viewEntry')} secondary compact
-        onPress={() => onOpenRecord(state.record, state.writeId)} />}
+        onPress={() => onOpenRecord(state.record, state.item.writeId)} />}
     </Surface>
   </Appear>;
 }

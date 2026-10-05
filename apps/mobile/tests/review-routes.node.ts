@@ -14,6 +14,8 @@ import * as liabilityPresentation from '../src/ui/liability-presentation.ts';
 import * as moneyInput from '../src/ui/money-input.ts';
 import { lightPalette } from '../src/ui/palette.ts';
 import { REVIEW_ITEM_CHANGED_MESSAGE, type ReviewItem, type ReviewTray } from '../src/storage/review-database.ts';
+import { realModule } from './real-module.ts';
+import { reviewFiles } from './review-sqlite.ts';
 
 // Producto 25A-03 over the actual route modules, native hosts replaced by descriptors: the «Para revisar» tray, a
 // proposal's detail and its editor. The store's transitions themselves run on real SQLite (tests/review-store.node.ts);
@@ -49,6 +51,9 @@ interface Ledger {
   calls: unknown[][];
   confirmResult?: () => Promise<{ recorded: boolean }>;
   updateResult?: () => Promise<unknown>;
+  /** 25A-04: the store's own read of one item (default: the tray's, else none) and the tray reload it may ask for. */
+  getReviewItem?: (id: string) => Promise<ReviewItem | null>;
+  refreshes?: number;
 }
 function harness(file: string, ledger: Ledger, params: Record<string, string> = {}, options: { locale?: AppLocale; dev?: boolean; canGoBack?: boolean } = {}) {
   const source = readFileSync(new URL('../app/' + file, import.meta.url), 'utf8');
@@ -56,7 +61,8 @@ function harness(file: string, ledger: Ledger, params: Record<string, string> = 
   const jsx = (type: unknown, props: Record<string, unknown>) => ({ type, props });
   const state: unknown[] = [];
   const refs: { current: unknown }[] = [];
-  let cursor = 0, refCursor = 0;
+  const effects: { deps: unknown[] | undefined; cleanup: unknown }[] = [];
+  let cursor = 0, refCursor = 0, effectCursor = 0;
   const pushed: unknown[] = [];
   const alerts: { title: string; detail: string; buttons: { text: string; style?: string; onPress?: () => void }[] }[] = [];
   const nav = { back: 0, replaced: [] as unknown[] };
@@ -66,6 +72,9 @@ function harness(file: string, ledger: Ledger, params: Record<string, string> = 
     confirmReview: (...args: unknown[]) => { ledger.calls.push(['confirm', ...args]); return ledger.confirmResult?.() ?? Promise.resolve({ recorded: true }); },
     updateReview: (...args: unknown[]) => { ledger.calls.push(['update', ...args]); return ledger.updateResult?.() ?? Promise.resolve(args[2]); },
     dismissReview: (...args: unknown[]) => { ledger.calls.push(['dismiss', ...args]); return Promise.resolve(); },
+    getReviewItem: (id: string) => ledger.getReviewItem?.(id)
+      ?? Promise.resolve(ledger.review && ledger.review !== 'unavailable' ? ledger.review.items.find(item => item.id === id) ?? null : null),
+    refreshReview: () => { ledger.refreshes = (ledger.refreshes ?? 0) + 1; return Promise.resolve(); },
   });
   const names = ['ActionButton', 'AmountField', 'AppText', 'Choices', 'DetailRow', 'EmptyState', 'ErrorMessage', 'Field', 'GlyphTile', 'IconButton', 'LifecycleNote',
     'Money', 'PressFeedback', 'Screen', 'SectionTitle', 'Surface'];
@@ -80,6 +89,14 @@ function harness(file: string, ledger: Ledger, params: Record<string, string> = 
         return [state[index], (value: unknown) => { state[index] = typeof value === 'function' ? (value as (v: unknown) => unknown)(state[index]) : value; }];
       },
       useRef: (initial: unknown) => { const index = refCursor++; refs[index] ??= { current: initial }; return refs[index]; },
+      // Like React: on mount and again only when a dependency changed, after the previous cleanup.
+      useEffect: (fn: () => unknown, deps?: unknown[]) => {
+        const index = effectCursor++;
+        const cell = effects[index];
+        if (cell && deps && cell.deps && deps.length === cell.deps.length && deps.every((dep, i) => Object.is(dep, cell.deps![i]))) return;
+        if (typeof cell?.cleanup === 'function') (cell.cleanup as () => void)();
+        effects[index] = { deps, cleanup: fn() };
+      },
     },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': { View: 'View', Keyboard: { dismiss: () => {} },
@@ -106,12 +123,17 @@ function harness(file: string, ledger: Ledger, params: Record<string, string> = 
     [prefix + 'src/ui/liability-presentation']: liabilityPresentation,
     [prefix + 'src/ui/money-input']: moneyInput,
   });
-  const module = { exports: {} as { default?: () => Node } };
-  runInNewContext(code, { module, exports: module.exports, Error, Date, Promise, __DEV__: options.dev ?? false, require: (name: string) => {
+  modules['../storage/LedgerProvider'] = { useLedger };
+  const require = function require(name: string) {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected review dependency: ' + name);
     return modules[name];
-  } });
-  return { render: () => { cursor = 0; refCursor = 0; return module.exports.default!(); }, pushed, alerts, nav };
+  };
+  // 25A-04: the real hook that finds an item in the tray or reads it from the store, over this harness's mocks.
+  const reviewItemHook = realModule('src/ui/use-review-item.ts', require);
+  for (const prefix of ['../', '../../']) modules[prefix + 'src/ui/use-review-item'] = reviewItemHook;
+  const module = { exports: {} as { default?: () => Node } };
+  runInNewContext(code, { module, exports: module.exports, Error, Date, Promise, __DEV__: options.dev ?? false, require });
+  return { render: () => { cursor = 0; refCursor = 0; effectCursor = 0; return module.exports.default!(); }, pushed, alerts, nav };
 }
 /** Every node, local components rendered once per element (their hooks run in traversal order, as React would). */
 function nodes(value: any): Node[] {
@@ -233,6 +255,8 @@ test('a proposal this screen confirmed leaves the tray before the pop: it stays 
   const second = harness('review/[id].tsx', elsewhere, { id: other.id });
   second.render();
   elsewhere.review = trayOf([]);
+  assert.equal(all(second.render(), 'EmptyState').length, 0, 'while the store is read, nothing is said yet');
+  await settle();
   assert.equal(all(second.render(), 'EmptyState')[0].props.title, 'Esta propuesta ya no está pendiente');
   // A refusal: the actions come back.
   const refused: Ledger = { review: trayOf([item]), calls: [], confirmResult: () => Promise.reject(new Error(domain.REVIEW_INCOMPLETE_MESSAGE)) };
@@ -334,10 +358,13 @@ test('Descartar asks first, then dismisses at the shown revision; cancelling cha
   assert.equal(view.nav.back, 1);
 });
 
-test('a confirmed, dismissed or unreadable id is not pending: the detail says so and offers nothing', () => {
+test('a confirmed, dismissed or unreadable id is not pending: the detail says so and offers nothing', async () => {
   const kept = itemOf(drafted());
   for (const review of [trayOf([kept]), trayOf([], { unreadable: ['gone'] }), 'unavailable' as const]) {
-    const root = harness('review/[id].tsx', { review, calls: [] }, { id: 'gone' }).render();
+    const view = harness('review/[id].tsx', { review, calls: [] }, { id: 'gone' });
+    view.render();
+    await settle();
+    const root = view.render();
     assert.equal(all(root, 'EmptyState')[0].props.title, 'Esta propuesta ya no está pendiente');
     assert.equal(all(root, 'ActionButton').length, 0);
   }
@@ -467,10 +494,13 @@ test('a stored count shows as chosen, a typed one under «Otra»; an income or a
   assert.ok(domain.reviewGaps(draft, archive as domain.ReviewArchive, today).includes('destination'));
 });
 
-test('the editor only opens a pending item of a writable store', () => {
+test('the editor only opens a pending item of a writable store', async () => {
   const item = itemOf(drafted());
   for (const review of [trayOf([item], { writable: false }), trayOf([]), 'unavailable' as const]) {
-    const root = harness('edit-review/[id].tsx', { review, calls: [] }, { id: item.id }).render();
+    const view = harness('edit-review/[id].tsx', { review, calls: [] }, { id: item.id });
+    view.render();
+    await settle();
+    const root = view.render();
     assert.equal(all(root, 'EmptyState')[0].props.title, 'Esta propuesta ya no está pendiente');
   }
 });
@@ -546,4 +576,47 @@ test('the review editor\'s category picker offers only existing categories, and 
   assert.deepEqual(domain.reviewGaps(saved, archive as domain.ReviewArchive, today), [], 'complete');
   const facts = reviewPresentation.reviewFacts(itemOf(saved), archive as domain.ReviewArchive, { todayISO: today, writable: true, conflicts: [] });
   assert.deepEqual([facts.state, facts.canConfirm], ['ready', true]);
+});
+
+test('25A-04 (Codex review of #85): a capture that committed while the tray could not be read again opens from the store, can be edited and confirmed, and writes once (real SQLite)', async () => {
+  const files = await reviewFiles([bank]);
+  try {
+    const { item: captured } = await files.store.capture({ id: 'item-x', writeId: 'write-x', captureKey: 'assistant:item-x', draft: drafted({ dateISO: null }), at: createdAt });
+    // The tray shown is the one from before the capture: the reload after it failed.
+    const ledger: Ledger = { review: trayOf([]), calls: [], getReviewItem: id => files.store.get(id) };
+    const editor = harness('edit-review/[id].tsx', { ...ledger, calls: [] }, { id: captured.id });
+    editor.render();
+    await settle();
+    let screen = editor.render();
+    assert.equal(all(screen, 'EmptyState').length, 0, 'the editor opens the stored item');
+    const updates: unknown[][] = [];
+    const editing: Ledger = { ...ledger, calls: updates };
+    const edit = harness('edit-review/[id].tsx', editing, { id: captured.id });
+    edit.render();
+    await settle();
+    all(edit.render(), 'DateField')[0].props.onChange(new Date(today + 'T12:00:00'));
+    button(edit.render(), 'Guardar cambios')!.props.onPress();
+    await settle();
+    const [, , revision, draft] = updates[0] as [string, string, number, domain.ReviewDraft];
+    const edited = await files.store.updateDraft(captured.id, revision, JSON.parse(JSON.stringify(draft)), createdAt);
+    assert.equal(edited.draft.dateISO, today);
+    // Revisar from the Assistant: the detail reads the store, asks the tray to reload, and shows the real pending item.
+    const detail: Ledger = { ...ledger, calls: [] };
+    detail.confirmResult = async () => { const result = await files.store.confirm(captured.id, { expectedRevision: edited.revision, todayISO: today, at: createdAt }); return { recorded: result.recorded }; };
+    const view = harness('review/[id].tsx', detail, { id: captured.id });
+    assert.equal(all(view.render(), 'EmptyState').length, 0, 'never «not found» while the store is read');
+    await settle();
+    screen = view.render();
+    assert.equal(all(screen, 'EmptyState').length, 0);
+    assert.ok((detail.refreshes ?? 0) >= 1, 'the tray is asked to reload');
+    const confirm = button(screen, 'Confirmar')!;
+    assert.equal(confirm.props.disabled, false, 'complete and current: confirmable from the store\'s own item');
+    confirm.props.onPress();
+    await settle();
+    assert.deepEqual(detail.calls, [['confirm', captured.id, edited.revision]]);
+    assert.deepEqual(await files.entries(), ['write-x'], 'one movement, under the frozen write id');
+    confirm.props.onPress();
+    await settle();
+    assert.deepEqual(await files.entries(), ['write-x']);
+  } finally { await files.dispose(); }
 });

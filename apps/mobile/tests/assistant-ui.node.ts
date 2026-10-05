@@ -223,7 +223,13 @@ test('25A-04: a proposal card shows what the review item holds, says what it nee
   assert.ok(preview.some(node => node.type === 'AppText' && textOf(node) === 'Vista de prueba: esta propuesta no se guarda ni se puede registrar.'));
   assert.equal(preview.some(node => node.type === 'ActionButton'), false, 'nothing a preview could save or record');
   // Confirmed there: a receipt and the link to what was recorded; dismissed or gone: one quiet line, nothing to press.
-  const confirmed = nodes(ui.render('ProposalCard', { content: proposal(), state: { kind: 'confirmed', record: 'plan', writeId: 'write-1' }, ...handlers }));
+  // Confirmed after an edit in «Para revisar»: the card draws the recorded item, never the capture's snapshot.
+  const recorded = { ...itemOf(reviewDraft({ merchant: 'Kiosco Pepe', amountMinor: 990000, dateISO: '2026-09-19' })), status: 'confirmed' };
+  const confirmed = nodes(ui.render('ProposalCard', { content: proposal(), state: { kind: 'confirmed', item: recorded, record: 'plan' }, ...handlers }));
+  assert.ok(confirmed.some(node => node.props.accessibilityLabel === 'Comercio: Kiosco Pepe'));
+  assert.equal(confirmed.some(node => node.props.accessibilityLabel === 'Comercio: Carrefour'), false);
+  assert.equal(confirmed.find(node => node.type === 'Money')!.props.minor, 990000);
+  assert.ok(confirmed.some(node => node.props.accessibilityLabel === 'Fecha: 19 de septiembre de 2026'));
   assert.ok(confirmed.some(node => node.type === 'AppText' && textOf(node) === 'Registrado desde Para revisar.'));
   assert.deepEqual(confirmed.filter(node => node.type === 'ActionButton').map(node => node.props.label), ['Ver plan']);
   confirmed.find(node => node.type === 'ActionButton')!.props.onPress();
@@ -331,7 +337,7 @@ test('English: every word the Assistant UI says is English; account names, merch
   assert.ok(customLabels.includes('Merchant: Missing'));
   assert.ok(customLabels.includes('Recorded in: Missing'));
   assert.ok(nodes(custom).some(node => node.type === 'AppText' && textOf(node) === '3 details missing: complete them in To review.'));
-  const income = ui.render('ProposalCard', { content: proposal(reviewDraft({ kind: 'income', merchant: 'Sueldo', category: 'Sueldo' })), state: { kind: 'confirmed', record: 'entry', writeId: 'w' }, ...handlers });
+  const income = ui.render('ProposalCard', { content: proposal(reviewDraft({ kind: 'income', merchant: 'Sueldo', category: 'Sueldo' })), state: { kind: 'confirmed', item: { ...itemOf(reviewDraft({ kind: 'income', merchant: 'Sueldo', category: 'Sueldo' })), status: 'confirmed' }, record: 'entry' }, ...handlers });
   assert.ok(nodes(income).some(node => node.props.accessibilityLabel === 'Source: Sueldo'));
   assert.ok(nodes(income).some(node => node.type === 'AppText' && textOf(node) === 'Recorded · Income'));
   assert.deepEqual(nodes(income).filter(node => node.type === 'ActionButton').map(node => node.props.label), ['View transaction']);

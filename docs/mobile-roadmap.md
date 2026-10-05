@@ -4206,9 +4206,15 @@ nothing of it is on a screen yet.
   proposal missing from a tray that could not be read again stays «Revisar» (never shown as gone), and the basis is taken
   from the ledger when the answer arrives, not when the request was sent. Recorded trade-off: an unstated currency or
   date is a gap the person completes in «Para revisar» (the amount is re-entered there when the currency was unstated).
+- **Codex review of #85 (two P2, fixed).** (1) A confirmed card drew the capture's snapshot: the closed state now keeps the
+  stored review item and the card draws its draft, so a proposal edited in «Para revisar» and then confirmed shows
+  exactly what was recorded. (2) A capture that committed while the tray could not be read again showed «Revisar» into
+  a detail that said «not found»: `src/ui/use-review-item.ts` gives the detail and the editor the tray's item or, when
+  the tray lacks it, the store's own (`getReviewItem`), asking the tray to reload (`refreshReview`), and the card shows
+  the stored pending item the same way. The store stays the one source: nothing is copied apart from it.
 - **Status.** This PR; not merged.
 - **Gates.** 2026-10-04, local, Linux. Root `npm test` 590 passed, 1 todo; `check:repo` OK. `apps/mobile`: `typecheck`
-  OK; `test:storage` 1306 passed, 0 failed (real SQLite included); `currency:verify`, `regions:verify` OK;
+  OK; `test:storage` 1308 passed, 0 failed (real SQLite included); `currency:verify`, `regions:verify` OK;
   `i18n:check -- --strict` 0 errors, 0 stale (English lock accepted); `check` OK; `export:ios` OK. No EAS build, no
   remote provider call, no iPhone run by the agent.
 

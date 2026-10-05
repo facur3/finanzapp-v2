@@ -11,6 +11,7 @@ import { conversationSession } from '../src/assistant/session';
 import { monthlyEvidence } from '../src/integrations/evidence';
 import { useI18n } from '../src/i18n/provider';
 import { useLedger } from '../src/storage/LedgerProvider';
+import type { ReviewItem } from '../src/storage/review-database';
 import { AssistantComposer } from '../src/ui/assistant-composer';
 import { AnswerEvidence, AssistantText, ClarificationChoices, ProposalCard, Suggestions, SystemNote, UserMessage, type ProposalState } from '../src/ui/assistant-messages';
 import { AppText, IconButton } from '../src/ui/components';
@@ -45,7 +46,7 @@ const TAB_ROOTS = new Set(['/', '/activity', '/reports', '/settings']);
  * model's answer and the user's words are shown exactly as they arrived. */
 export default function AssistantScreen() {
   const params = useLocalSearchParams<{ currency?: string }>();
-  const { snapshot, archive, review, captureReview, getReviewItem } = useLedger();
+  const { snapshot, archive, review, captureReview, getReviewItem, refreshReview } = useLedger();
   const day = useCurrentDay();
   const p = usePalette();
   const reduced = useReduceMotion();
@@ -144,34 +145,41 @@ export default function AssistantScreen() {
     captureNew();
   }, [dispatch, state.pending, accounts, incomeAccounts, entries, day, t, toContent, captureNew]);
 
-  // A captured proposal that left the pending tray (confirmed or dismissed in «Para revisar», or no longer readable) is
-  // looked up once, so its card says what happened instead of offering it again.
+  // A captured proposal that is not in the tray is read from the store itself. Confirmed or dismissed there, the card
+  // keeps that item (a confirmed card draws what was recorded, edits included) and it is never looked up again. Still
+  // pending (the tray could not be read again after the capture), the card shows the stored item, «Revisar» opens it (the
+  // detail reads the store too) and the tray is asked to reload; it is read again whenever the tray changes. Unreadable
+  // or failing: nothing is kept and the card keeps «Revisar».
   const tray = review && review !== 'unavailable' ? review : null;
-  const [closed, setClosed] = useState<Record<string, ProposalState>>({});
+  const [stored, setStored] = useState<Record<string, ReviewItem | null>>({});
   const captured = state.messages.flatMap(item => item.role === 'assistant' && item.content?.kind === 'proposal' && item.content.status === 'captured' ? [item.content.capture.id] : []);
-  // Each id is looked up once (the provider's functions are new on every render: the lookup is read through a ref, and the
-  // effect runs only when another proposal leaves the tray), so a lookup never re-renders into another lookup.
-  const missing = tray ? captured.filter(id => !tray.items.some(row => row.id === id) && !(id in closed)) : [];
-  const lookup = useRef(getReviewItem);
-  lookup.current = getReviewItem;
+  const settled = (id: string) => stored[id] === null || (!!stored[id] && stored[id]!.status !== 'pending');
+  const missing = tray ? captured.filter(id => !tray.items.some(row => row.id === id) && !settled(id)) : [];
+  // The provider's functions are new on every render: they are read through refs, and the effect runs only when the set of
+  // missing proposals or the tray itself changes, so a lookup never re-renders into another lookup.
+  const lookup = useRef({ getReviewItem, refreshReview });
+  lookup.current = { getReviewItem, refreshReview };
   useEffect(() => {
     let live = true;
     for (const id of missing) {
-      lookup.current(id).then(item => {
-        // Still pending (a tray that could not be read again) or not readable now: nothing is recorded, so the card keeps
-        // offering «Revisar»; only an outcome that cannot change is kept.
-        const next: ProposalState | null = !item ? { kind: 'gone' } : item.status === 'confirmed' && item.receipt
-          ? { kind: 'confirmed', record: item.receipt.type, writeId: item.writeId } : item.status === 'dismissed' ? { kind: 'dismissed' } : null;
-        if (live && next) setClosed(current => ({ ...current, [id]: next }));
+      lookup.current.getReviewItem(id).then(item => {
+        if (!live) return;
+        setStored(current => ({ ...current, [id]: item }));
+        if (item?.status === 'pending') void lookup.current.refreshReview();
       }, () => { /* Unknown: the card keeps «Revisar». */ });
     }
     return () => { live = false; };
-  }, [missing.join(',')]);
+  }, [missing.join(','), tray]);
   const proposalState = (content: ProposalContent): ProposalState => {
     if (content.status !== 'captured') return { kind: content.status };
-    const item = tray?.items.find(row => row.id === content.capture.id);
-    if (item) return { kind: 'pending', item, conflict: tray!.conflicts.includes(item.id), writable: tray!.writable };
-    return closed[content.capture.id] ?? { kind: 'unknown' };
+    const id = content.capture.id;
+    const item = tray?.items.find(row => row.id === id) ?? (stored[id]?.status === 'pending' ? stored[id]! : undefined);
+    if (item) return { kind: 'pending', item, conflict: !!tray?.conflicts.includes(item.id), writable: tray?.writable ?? false };
+    const closed = stored[id];
+    if (closed === null) return { kind: 'gone' };
+    if (closed?.status === 'confirmed' && closed.receipt) return { kind: 'confirmed', item: closed, record: closed.receipt.type };
+    if (closed?.status === 'dismissed') return { kind: 'dismissed' };
+    return { kind: 'unknown' };
   };
 
   const open = useCallback((href: EvidenceLink['href']) => {
