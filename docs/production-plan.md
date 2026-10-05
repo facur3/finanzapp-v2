@@ -5,7 +5,8 @@ security, provider contract and evaluation harness: §4.2, §4.6, §4.7, §5, §
 billing principle §6.6 and the audit cadence §14.1); updated 2026-10-05 in Producto 25A-06 Phase A (the repository
 preflight of the staging activation: the environment identity and binding §2, §4.2, §4.7; the staging host §2.4, §3.4;
 the staging verification and probe scripts §4.4, §4.5; the token precheck §4.6; the live-run gates §5.8; alerts and
-scaling operations §6; the cloud identity §12.2, [decision 006](decisions/006-cloud-identity.md)). The step-by-step
+scaling operations §6; the cloud identity §12.2, [decision 006](decisions/006-cloud-identity.md)); updated 2026-10-05
+with the owner's operational identity (§2.6). The step-by-step
 staging procedure is [ai-staging-runbook.md](ai-staging-runbook.md). Nothing described here is
 implemented unless it is marked **EXISTS TODAY**. No environment was created, no remote migration was run, no EAS build
 was made, no model was evaluated and no paid provider was called to write it.
@@ -233,6 +234,24 @@ staging. Production's own arrangement, and the plan the commercial backend needs
   features off leaves the offline app complete) and the release controls in
   [app-store-launch.md](app-store-launch.md) §11.
 - **Local data.** No server change can require or cause a reset of the local ledger.
+
+### 2.6 Operational identity: who owns the infrastructure
+
+**DECIDED** (owner, 2026-10-05). The repository is public, so this section names roles, never an address.
+
+- **OWNER ACTION, done: one private product-operations Google account.** Its address is deliberately not committed
+  here or anywhere in the repository (AGENTS rule 6); the owner keeps it privately. It owns the infrastructure created from now on: the OpenAI Platform organization and projects (runbook B2),
+  new Supabase resources such as the staging project (runbook B3), and later Vercel admin or team access, domains and
+  DNS, and similar services.
+- **Never public.** It is never published as a support or contact address, never shown in the app, the store listing,
+  the website or a social profile. The public addresses are domain aliases created after the naming gate
+  ([app-store-launch.md](app-store-launch.md) §13.1).
+- **Recovery.** The founder's personal identity is the recovery identity, and a second owner wherever the service
+  supports one, so the product never depends on one login.
+- **Nothing is recreated for it.** The existing GitHub repository, Expo/EAS project, Apple Developer membership and the
+  working Vercel integration stay where they are; they move only if a later, separate reason requires it.
+- **Brand-neutral.** Operational accounts and resource names do not carry a public name and do not wait for one; the
+  naming workflow is never chosen or accelerated for cloud setup ([brand-brief.md](brand-brief.md) §3).
 
 ---
 

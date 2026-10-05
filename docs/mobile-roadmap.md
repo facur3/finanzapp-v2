@@ -1,6 +1,9 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-05 (Producto 25A-06 Phase A, on its branch: AI staging activation, the repository preflight, code and
+Updated: 2026-10-05 (owner decisions on the operational and support identity, documentation only: a private
+product-operations account owns new infrastructure and is never public, public domain aliases only after the naming
+gate, «Ayuda y comentarios» in Más before launch, the Apple seller identity gate; §3, «Producto 26»). Producto 25A-06
+Phase A merged as PR #87, merge commit ce4b4b3: AI staging activation, the repository preflight, code and
 documentation only, no service touched. A fail-closed environment identity (`server/mobile/runtime.js`:
 `MOBILE_ENVIRONMENT=staging`, the only enabled environment, and Vercel's own `VERCEL_ENV=production` on a route, absent
 off Vercel for the scripts); only `sb_publishable_…` / `sb_secret_…` Supabase keys (a legacy JWT or a swapped pair
@@ -1013,10 +1016,10 @@ protocol v2, the provider port with a disabled adapter, money-based reservations
 switch, the evaluation corpus, harness and thresholds. **25A-06 Phase A** (the repository preflight of the staging
 activation: environment identity, key kinds, the database's environment binding, `vercel.json`, the owner's staging
 scripts, the live-evaluation gates, [ai-staging-runbook.md](ai-staging-runbook.md) and
-[decision 006](decisions/006-cloud-identity.md); «Producto 25A-06» below) is **this PR**: CI only, no service touched,
+[decision 006](decisions/006-cloud-identity.md); «Producto 25A-06» below) **merged as PR #87** (merge commit ce4b4b3): CI only, no service touched,
 no secret, no paid call, nothing applied or deployed. The activation order is binding, each step only after the one
 before it passes (the runbook's §0.2):
-1. **25A-06 Phase A** (this PR) → review and merge by the owner (checkpoint A).
+1. **25A-06 Phase A** → reviewed and merged by the owner as PR #87 (checkpoint A, done).
 2. **OWNER creates and configures staging**: remote inventory recorded (B1), the OpenAI staging project, keys and
    limits (B2), the Supabase staging project and its auth settings (B3), `schema.sql` applied and `verify.sql` printing
    `STAGING_VERIFY_OK` (B4), the boundary probe (B5), the Vercel project `finanzapp-api-staging` deployed with AI still
@@ -1030,6 +1033,14 @@ before it passes (the runbook's §0.2):
 **25A2 and production activation are not started.** 25A2 stays a separate decision, allowed in parallel as already
 recorded (its first step is the «Card Network Identity» prerequisite, «Producto 25A2»); production activation is a
 later release decision, and nothing in 25A-06 enables AI on production. Nothing in the binding order below changes.
+
+**Owner decisions, 2026-10-05 (operational and support identity; documentation only, nothing created by an agent).**
+The owner created one private product-operations account; it owns the staging resources of step 2 and later
+infrastructure, its address never enters this public repository and it is never a support contact
+(production-plan.md §2.6). Public support addresses are domain aliases created only after the naming gate, and
+«Ayuda y comentarios» in Más is a pre-launch requirement (app-store-launch.md §13.1; «Producto 26»). The Apple seller
+identity (Individual or an eligible Organization) is decided explicitly before submission, not now (app-store-launch.md
+§12). The public name is never chosen or accelerated for cloud setup (brand-brief.md §6).
 
 **Earlier recommendation (2026-10-02, history):** **24T3 merged as PR #76** (merge commit 399a1fabaa673423b7a155ddb3cb900b5c0103fc):
 SQLite schema 14 and backup v14 are current, and the broad Forest visual lane (24UX6A–24UX6E) is complete. The active
@@ -1786,7 +1797,7 @@ Assistant's capability boundary and model evaluation, monetary safety).
     analytical facts v3.
   - **25A-06 — Staging activation** (the first network slice; owner setup and authorization required; no production
     activation), in two phases with the checkpoints of [ai-staging-runbook.md](ai-staging-runbook.md) §0.2:
-    - **Phase A — the repository preflight** (this PR; code and documentation only, no service touched, no secret, no
+    - **Phase A — the repository preflight** (PR #87, merged; code and documentation only, no service touched, no secret, no
       paid call, no EAS build; «Producto 25A-06» below): the fail-closed environment identity (`MOBILE_ENVIRONMENT=staging`
       with Vercel's `VERCEL_ENV=production`), the current Supabase key kinds only, a project-scoped provider key with its
       project id, the bearer claim precheck, the database's environment binding, `vercel.json` (Previews skipped,
@@ -4690,7 +4701,7 @@ nothing of it is on a screen yet.
   passes every threshold (not a model result). No EAS build, no remote provider call, no schema applied anywhere, no
   iPhone run by the agent.
 
-### Producto 25A-06 — AI Staging Activation, Phase A (this PR)
+### Producto 25A-06 — AI Staging Activation, Phase A (PR #87, merged)
 
 - **Goal.** Prepare the repository so the owner can bring up the Assistant's **staging** backend safely and in order:
   every guard that does not need a credential written and tested first, every owner step written down once, with who
@@ -5188,6 +5199,10 @@ or marketing asset.
   the app does, support and policy pages, the accessibility and performance pass on a TestFlight
   build (an optimised build, not development mode: cold start, memory, dropped frames, VoiceOver,
   large text, Reduce Motion), the release checklist, App Store review; a rollback plan.
+  «Ayuda y comentarios» in Más (report a problem, suggest an improvement, ask a question; technical metadata only,
+  never financial data), a quiet version and build line and no long footer copy; the website's `/support` and
+  `/privacy` with the public support alias (app-store-launch.md §13.1, owner decision 2026-10-05). The Apple seller
+  identity gate, Individual or an eligible Organization, decided explicitly before submission (app-store-launch.md §12).
 - **Rules.** No submission, subscription or charge without the owner's authorisation; Apple's
   acceptance is separate from a submission; no claim of approval before it exists.
 - **Gates.** The release gate of the checklist; every open device gate above closed or
