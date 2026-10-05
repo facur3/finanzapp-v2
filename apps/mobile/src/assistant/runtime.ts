@@ -10,8 +10,9 @@ declare const __DEV__: boolean | undefined;
  * sign-in yet). Fixtures are reachable only from a development bundle started
  * with `EXPO_PUBLIC_ASSISTANT_FIXTURES=1`, so the scripted replies can be seen
  * on the iPhone; a release bundle ignores the flag. Nothing here reads a key:
- * the model key stays on the server. */
-export function assistantForBuild(env: Record<string, string | undefined> = process.env, dev: boolean = typeof __DEV__ !== 'undefined' && __DEV__): AssistantClient {
+ * the model key stays on the server. `newId` makes each request id (the screen passes expo-crypto's `randomUUID`;
+ * this module stays loadable by Node). */
+export function assistantForBuild(env: Record<string, string | undefined> = process.env, dev: boolean = typeof __DEV__ !== 'undefined' && __DEV__, newId?: () => string): AssistantClient {
   if (dev && env.EXPO_PUBLIC_ASSISTANT_FIXTURES === '1') return fixtureAssistant();
-  return assistantForEnvironment(env);
+  return assistantForEnvironment(env, undefined, undefined, newId);
 }

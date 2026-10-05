@@ -11,7 +11,7 @@ import * as presentation from '../src/ui/presentation.ts';
 import * as moneyInput from '../src/ui/money-input.ts';
 import type { AssistantClient, AssistantEvent } from '../src/assistant/client.ts';
 import { disconnectedAssistant } from '../src/assistant/client.ts';
-import { FIXTURE_ANSWER, FIXTURE_DRAFT, FIXTURE_DRAFT_NO_ACCOUNT, FIXTURE_FACTS, fixtureAssistant } from '../src/assistant/fixtures.ts';
+import { FIXTURE_ANSWER, FIXTURE_DRAFT, FIXTURE_DRAFT_NO_ACCOUNT, FIXTURE_FACTS, FIXTURE_OUT_OF_SCOPE, fixtureAssistant } from '../src/assistant/fixtures.ts';
 import * as sessionModule from '../src/assistant/session.ts';
 import * as reviewProposal from '../src/assistant/review-proposal.ts';
 import { loadReviewTray, type ReviewCapture, type ReviewItem, type ReviewStore, type ReviewTray } from '../src/storage/review-database.ts';
@@ -292,6 +292,8 @@ test('the composer is busy while a request is in flight, streaming grows one mes
   assert.equal(scripted.asks[0].action, 'explain', 'a question is explained');
   assert.ok(Array.isArray(scripted.asks[0].facts), 'with on-device evidence');
   assert.equal(scripted.asks[0].currency, 'ARS');
+  assert.equal(scripted.asks[0].region, 'AR', '25A-05: the interface region travels with the ask');
+  assert.equal('version' in scripted.asks[0] || 'requestId' in scripted.asks[0], false, 'the client adds the version and a fresh request id, never the screen');
   assert.equal(scripted.asks[0].todayISO, '2026-09-21');
   assert.equal(scripted.asks[0].text, '¿Por qué gasté más este mes?');
   assert.equal(screen.empty.props.disabled, true, 'suggestions cannot start a second request');
@@ -351,7 +353,7 @@ test('an answer renders its text and evidence rows/links from the cited facts, a
   const view2 = harness({ client: single.client });
   view2.render().empty.props.onPick('¿Cuánto gasté en comida?');
   await tick();
-  single.reply([{ type: 'result', result: { kind: 'answer', draft: null, message: 'En Supermercado llevás $121.200.', factIds: ['current.category.1'] }, facts: FIXTURE_FACTS }]);
+  single.reply([{ type: 'result', result: { type: 'answer', message: 'En Supermercado llevás $121.200.', evidenceIds: ['current.category.1'], navigation: null, proposals: [], clarification: null }, facts: FIXTURE_FACTS }]);
   await settle();
   const links = find([view2.render().items[1]], 'AnswerEvidence')[0].props.content.links;
   assert.deepEqual(links.map((link: any) => link.id), ['category', 'movements']);
@@ -667,21 +669,22 @@ test('25A-04: an archived card is never offered or implied, so a capture never d
   assert.equal(find([view.render().items[1]], 'ClarificationChoices').length, 0);
 });
 
-test('25A-04: an account the model named survives a kind clarification: it is matched again and lends its currency', async () => {
+test('25A-04: an account the model named survives a category clarification: it stays the destination and lends its currency', async () => {
   const scripted = scriptedClient();
   const view = harness({ client: scripted.client });
   view.render().empty.props.onPick('500 en efectivo');
   await tick();
-  scripted.reply([{ type: 'result', result: { kind: 'draft', message: '', factIds: [], draft: { kind: null, amountMinor: 50000, currency: null, merchant: 'Kiosco',
-    category: 'Comida', dateISO: null, paymentMethodRef: 'Efectivo' } }, facts: [] }]);
+  // Protocol v2: a proposal always names its kind, so the gap asked first here is the category.
+  scripted.reply([{ type: 'result', result: { type: 'proposal', message: '', evidenceIds: [], navigation: null, clarification: null, proposals: [{ kind: 'expense',
+    amountMinor: 50000, currency: null, merchant: 'Kiosco', category: null, dateISO: null, paymentMethodRef: 'Efectivo' }] }, facts: [] }]);
   await settle();
   const choices = find([view.render().items[1]], 'ClarificationChoices')[0];
-  assert.equal(choices.props.options.map((option: { id: string }) => option.id).join(','), 'expense,income');
-  choices.props.onChoose(choices.props.options[0], 'Gasto');
+  assert.equal(choices.props.options.map((option: { id: string }) => option.id).join(','), 'Comida,Supermercado');
+  choices.props.onChoose(choices.props.options[0], 'Comida');
   await settle();
   const proposal = find([view.render().items[3]], 'ProposalCard')[0];
   assert.deepEqual([proposal.props.content.capture.draft.destinationId, proposal.props.content.capture.draft.currency], [cash.id, 'ARS'],
-    'named «Efectivo» before the kind was asked: still the destination, and its currency');
+    'named «Efectivo» before the category was asked: still the destination, and its currency');
 });
 
 test('25A-04: New chat, leaving the screen and an app restart never remove a captured proposal (real SQLite)', async () => {
@@ -748,11 +751,27 @@ test('a draft without a payment method asks with the accounts of that currency; 
   const view2 = harness({ client: other.client });
   view2.render().empty.props.onPick('¿Cuánto gasté?');
   await tick();
-  other.reply([{ type: 'result', result: { kind: 'clarification', draft: null, message: '¿Este mes o el año?', factIds: [] }, facts: [] }]);
+  other.reply([{ type: 'result', result: { type: 'clarification', message: '¿Este mes o el año?', evidenceIds: [], navigation: null, proposals: [], clarification: { field: 'period', candidateIds: [] } }, facts: [] }]);
   await settle();
   const item = view2.render().items[1];
   assert.equal(find([item], 'AssistantText')[0].props.text, '¿Este mes o el año?');
   assert.deepEqual(find([item], 'ClarificationChoices')[0].props.options, []);
+});
+
+test('25A-05: an out-of-scope reply is the model\'s words alone, and the region is the interface\'s when the ask is sent', async () => {
+  const scripted = scriptedClient();
+  const view = harness({ client: scripted.client });
+  view.setLocale('en-US');
+  view.render().empty.props.onPick('Escribime un programa en Python');
+  await tick();
+  assert.equal(scripted.asks[0].region, 'US', 'read at send time, after the switch');
+  scripted.reply([{ type: 'result', result: FIXTURE_OUT_OF_SCOPE, facts: FIXTURE_FACTS }]);
+  await settle();
+  const item = view.render().items[1];
+  assert.equal(find([item], 'AssistantText')[0].props.text, FIXTURE_OUT_OF_SCOPE.message, 'shown as it arrived');
+  for (const type of ['AnswerEvidence', 'ClarificationChoices', 'ProposalCard']) assert.equal(find([item], type).length, 0, type);
+  assert.equal(view.review.captures.length, 0, 'nothing captured');
+  assert.equal(view.pushed.length, 0, 'nothing presented');
 });
 
 test('a remote failure keeps the user message, explains, and Reintentar sends the same text again', async () => {
@@ -1091,20 +1110,22 @@ test('a language or region change while the Assistant answers: nothing is re-sen
   await settle();
   screen = view.render();
   assert.equal(scripted.asks.length, 1, 'no second request');
-  const v1 = ['action', 'currency', 'facts', 'text', 'todayISO'];
-  assert.equal(Object.keys(scripted.asks[0]).sort().join(), v1.join(), 'no language or region reaches a v1 request');
+  const v2 = ['action', 'currency', 'facts', 'region', 'text', 'todayISO'];
+  assert.equal(Object.keys(scripted.asks[0]).sort().join(), v2.join(), 'protocol v2 carries the region, never a language');
+  assert.equal(scripted.asks[0].region, 'AR', 'the region when it was sent, not the one chosen while it was answered');
   assert.equal(scripted.asks[0].currency, 'ARS', 'the region never changes the currency asked about');
   assert.equal(screen.messages.map(message => message.id).join(), 'u-1,a-2');
   assert.equal(screen.messages[0].text, '¿Por qué gasté más este mes?', 'the user\'s words keep the language they were sent in');
   assert.equal(find([screen.items[1]], 'AssistantText')[0].props.text, FIXTURE_ANSWER.message, 'the model\'s words are content');
   assert.equal(find([screen.items[1]], 'AssistantText')[0].props.ownWords, false, 'the model\'s prose keeps its own voice');
   assert.equal(find([screen.items[1]], 'AnswerEvidence')[0].props.content.rows[1].amountMinor, 4250000, 'the evidence keeps its numbers');
-  // The next question goes out in the new language with the same v1 keys: the language is never on the wire.
+  // The next question goes out in the new language with the same v2 keys: the language is never on the wire, the new region is.
   view.render().composer.props.onChange('Why did I spend more this month?');
   view.render().composer.props.onSend();
   await tick();
   assert.equal(scripted.asks.length, 2);
-  assert.equal(Object.keys(scripted.asks[1]).sort().join(), v1.join());
+  assert.equal(Object.keys(scripted.asks[1]).sort().join(), v2.join());
+  assert.equal(scripted.asks[1].region, 'US');
   // A fixture failure carries no words: the note is the reason's key, read in the language on screen when shown.
   const failing = harness({ client: fixtureAssistant(0), locale: 'en-US' });
   failing.render().composer.props.onChange('error');

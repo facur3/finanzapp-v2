@@ -39,7 +39,7 @@ test('nothing is invented: an unstated currency, an unchosen account and an empt
   assert.deepEqual([draft.currency, draft.destinationId, draft.merchant, draft.category, draft.purchase], [null, null, null, null, null]);
   assert.deepEqual(domain.reviewGaps(draft, archive, day), ['currency', 'destination', 'merchant', 'category']);
   // What the model said and the screen only completed for the conversation: resolveDraft marks it unstated.
-  const fromModel = resolveDraft({ ...FIXTURE_DRAFT.draft!, currency: null, dateISO: null, paymentMethodRef: null }, [cash], [], 'ARS', '2026-09-20');
+  const fromModel = resolveDraft({ ...FIXTURE_DRAFT.proposals[0], currency: null, dateISO: null, paymentMethodRef: null }, [cash], [], 'ARS', '2026-09-20');
   assert.equal(fromModel.kind, 'draft');
   const mapped = reviewDraftFromAssistant(fromModel.kind === 'draft' ? fromModel.draft : null!, archive, at, day);
   assert.deepEqual([mapped.currency, mapped.destinationId], [null, 'cash'],
@@ -53,13 +53,13 @@ test('nothing is invented: an unstated currency, an unchosen account and an empt
 test('the capture date rule: an Assistant record command with no date happens today (the local day at capture); a stated or resolved date wins', () => {
   // «Gasté 10 mil pesos en el supermercado»: no date → the device's local day at capture, not the conversation's day.
   // No destination named: the one cash account is implied (a named «Visa» would be asked, 25A-04).
-  const fromModel = resolveDraft({ ...FIXTURE_DRAFT.draft!, dateISO: null, paymentMethodRef: null }, [cash], [], 'ARS', '2026-09-20');
+  const fromModel = resolveDraft({ ...FIXTURE_DRAFT.proposals[0], dateISO: null, paymentMethodRef: null }, [cash], [], 'ARS', '2026-09-20');
   const omitted = reviewDraftFromAssistant(fromModel.kind === 'draft' ? fromModel.draft : null!, archive, at, day);
   assert.equal(omitted.dateISO, day, 'captured on 21/09 after a conversation that started on 20/09: today at capture');
   assert.equal(domain.reviewGaps(omitted, archive, day).includes('date'), false, 'an explicit day is stored: no date gap');
   // «Gasté ayer…» (the model resolves «ayer») and «el 2 de octubre…»: the stated day, never replaced.
   for (const stated of ['2026-09-20', '2026-09-02']) {
-    const draft = resolveDraft({ ...FIXTURE_DRAFT.draft!, dateISO: stated, paymentMethodRef: null }, [cash], [], 'ARS', '2026-09-21');
+    const draft = resolveDraft({ ...FIXTURE_DRAFT.proposals[0], dateISO: stated, paymentMethodRef: null }, [cash], [], 'ARS', '2026-09-21');
     assert.equal(reviewDraftFromAssistant(draft.kind === 'draft' ? draft.draft : null!, archive, at, day).dateISO, stated);
   }
   // A stated date after today is kept as stated, and the domain makes it a gap (never recorded in the future).
@@ -72,17 +72,17 @@ test('currency: a stated currency is kept; with none stated, a destination the p
   const usdAccount: Account = { id: 'usd', name: 'Dólares', currency: 'USD', openingMinor: 0, createdAt };
   const withUsd: ReviewArchive = { ...archive, accounts: [cash, cardAccount, usdAccount] };
   // Named («con la Visa»): the card's ARS.
-  const named = resolveDraft({ ...FIXTURE_DRAFT.draft!, currency: null, paymentMethodRef: 'Visa' }, [cash, cardAccount], [], 'ARS', day);
+  const named = resolveDraft({ ...FIXTURE_DRAFT.proposals[0], currency: null, paymentMethodRef: 'Visa' }, [cash, cardAccount], [], 'ARS', day);
   assert.equal(named.kind === 'draft' && named.draft.destinationStated, true);
   assert.equal(reviewDraftFromAssistant(named.kind === 'draft' ? named.draft : null!, archive, at, day).currency, 'ARS');
   // Chosen in a clarification (two accounts fit): that account's currency.
-  const asked = resolveDraft({ ...FIXTURE_DRAFT.draft!, currency: null, paymentMethodRef: null }, [cash, cardAccount], [], 'ARS', day);
+  const asked = resolveDraft({ ...FIXTURE_DRAFT.proposals[0], currency: null, paymentMethodRef: null }, [cash, cardAccount], [], 'ARS', day);
   assert.equal(asked.kind, 'clarification');
   const chosen = completeDraft(asked.kind === 'clarification' ? { draft: asked.partial, field: asked.field } : null!, 'cash', [cash, cardAccount], [], day);
   assert.equal(chosen.content.kind === 'draft' && chosen.content.draft.destinationStated, true);
   assert.equal(reviewDraftFromAssistant(chosen.content.kind === 'draft' ? chosen.content.draft : null!, archive, at, day).currency, 'ARS');
   // Implied (the only account of the screen's currency): no currency, a gap the person completes.
-  const implied = resolveDraft({ ...FIXTURE_DRAFT.draft!, currency: null, paymentMethodRef: null }, [cash], [], 'ARS', day);
+  const implied = resolveDraft({ ...FIXTURE_DRAFT.proposals[0], currency: null, paymentMethodRef: null }, [cash], [], 'ARS', day);
   assert.equal(implied.kind === 'draft' && implied.draft.destinationStated, false);
   assert.equal(reviewDraftFromAssistant(implied.kind === 'draft' ? implied.draft : null!, archive, at, day).currency, null);
   // Stated USD is kept even when the account chosen is in ARS: the mismatch is the domain's gap, never a conversion.

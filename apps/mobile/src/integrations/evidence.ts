@@ -2,14 +2,14 @@ import { spendingComparison, spendingFacts, type Currency, type LedgerSnapshot }
 import type { AssistantFact } from '../../../../packages/integrations/contracts.js';
 
 /** Fact labels are protocol data, not interface copy: they are what the
- * server (and the model) reads, validated by `packages/integrations/contracts.js`,
+ * server (and the model) reads, validated by `packages/integrations/assistant-protocol.js`,
  * and they stay in Spanish whatever the interface language. The app never
  * shows them: an answer's evidence rows are named from the fact id (and, for a
  * category, the stored category name) in the interface language; see
  * `answerContent` in src/assistant/conversation.ts.
- * The v1 request carries no language (the contract rejects unknown keys) and
- * the server answers in Spanish; how the interface language and region will
- * reach the model, and how facts become language-neutral, is docs/i18n.md §11. */
+ * Protocol v2 carries the configured region but no language (it rejects unknown
+ * keys) and the server answers in Spanish; how the interface language will reach
+ * the model, and how facts become language-neutral, is docs/i18n.md §11. */
 export const FACT_LABELS = { expenses: 'Gastos registrados', income: 'Ingresos registrados', refunds: 'Devoluciones', categoryPrefix: 'Categoría de gasto: ' } as const;
 
 /** The stored category name a `*.category.N` fact is about, or null for any other fact.
@@ -23,7 +23,7 @@ export function factCategory(fact: Pick<AssistantFact, 'id' | 'label'>): string 
 
 /** Aggregate on-device; only send this scoped context after explicit consent.
  *
- * 24T3 (A25): every fact is additive and never negative (contract v1 refuses a negative amount). Spending is sent split,
+ * 24T3 (A25): every fact is additive and never negative (the protocol refuses a negative amount). Spending is sent split,
  * never netted: `*.expenses` is the gross of the purchase lines (purchases, instalments, an adelanto's components) with
  * their purchase count, each `*.category.N` that category's gross (only those above zero), and one `*.refunds` fact
  * («Devoluciones») carries the period's devoluciones as a positive amount and their count, only when there are any. The

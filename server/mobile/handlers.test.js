@@ -1,29 +1,38 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createMobileHandler, ApiError } from './handlers.js';
-import { createOpenAIResponder } from './openai.js';
-import { mobileDependencies } from './runtime.js';
-import { validateAssistantRequest, validateCapture, isDate } from '../../packages/integrations/contracts.js';
+import { createMobileHandler, ApiError, telemetryEvent } from './handlers.js';
+import { aiConfig, mobileDependencies, TIMEOUTS_MS, CLIENT_TIMEOUT_MS } from './runtime.js';
+import { PRICING } from './pricing.js';
+import { validateCapture, isDate } from '../../packages/integrations/contracts.js';
 import disabledCapture from '../../api/mobile/captures.js';
+import disabledAssistant from '../../api/mobile/assistant.js';
 
 const draft = { kind: 'expense', amountMinor: 1500000, currency: 'ARS', merchant: 'Fixture', category: 'Supermercado', dateISO: '2026-09-19', paymentMethodRef: null };
 const capture = { version: 1, requestId: 'fixture-event-0001', source: 'shortcut', draft };
-const request = { version: 1, action: 'parse', text: 'Gasté 15 mil en el super', todayISO: '2026-09-19', currency: 'ARS', facts: [] };
-const answer = { kind: 'draft', message: 'Revisá el gasto.', draft, factIds: [] };
+const request = { version: 2, requestId: 'fixture-request-0001', action: 'parse', text: 'Gasté 15 mil en el super', todayISO: '2026-09-19', currency: 'ARS', region: 'AR', facts: [] };
+const proposal = { type: 'proposal', message: 'Revisá el gasto.', evidenceIds: [], navigation: null, proposals: [{ ...draft, merchant: 'Kiosco Secreto', paymentMethodRef: 'Visa Secreta' }], clarification: null };
+const usage = { inputTokens: 3000, cachedInputTokens: 1000, cacheWriteTokens: 0, outputTokens: 400, reasoningTokens: 100 };
 const headers = { authorization: 'Bearer fixture-access-token', 'content-type': 'application/json' };
-function response() { return { code: 0, body: null, headers: {}, status(n) { this.code = n; return this; }, json(body) { this.body = body; return this; }, setHeader(k,v) { this.headers[k] = v; } }; }
-function ports() { return { authenticate: vi.fn(async () => ({ userId: 'owner-from-session' })),
-  receiveCapture: vi.fn(async () => ({ id: 'receipt', duplicate: false })), reserveAIQuota: vi.fn(async () => true), respond: vi.fn(async () => answer) }; }
+const ai = aiConfig({ MOBILE_AI_ENABLED: 'true', MOBILE_AI_PROVIDER: 'openai', MOBILE_AI_MODEL: 'gpt-6-luna', MOBILE_AI_API_KEY: 'fixture-key' });
+function response() { return { code: 0, body: null, headers: {}, status(n) { this.code = n; return this; }, json(body) { this.body = body; return this; }, setHeader(k, v) { this.headers[k] = v; } }; }
+function ports() {
+  return { authenticate: vi.fn(async () => ({ userId: '00000000-0000-4000-8000-000000000001' })),
+    receiveCapture: vi.fn(async () => ({ id: 'receipt', duplicate: false })), ai, log: vi.fn(),
+    reserveAI: vi.fn(async () => ({ id: 'reservation-1' })), settleAI: vi.fn(async () => {}),
+    provider: { respond: vi.fn(async () => ({ output: proposal, usage, model: 'gpt-6-luna-2026-09-01', tier: 'default' })) } };
+}
 async function call(kind, body, deps = ports(), override = {}) { const res = response(); await createMobileHandler(kind, deps)({ method: 'POST', body, headers, ...override }, res); return res; }
 
 describe('cloud integration boundary', () => {
   it('is closed by default and never makes network/model calls', async () => {
     expect(mobileDependencies('capture', {})).toBeNull();
     expect(mobileDependencies('assistant', { MOBILE_INTEGRATIONS_ENABLED: 'true' })).toBeNull();
-    const res = response(); await disabledCapture({ method: 'POST' }, res); expect(res.code).toBe(503);
-    expect(res.headers['Cache-Control']).toBe('no-store');
+    for (const route of [disabledCapture, disabledAssistant]) {
+      const res = response(); await route({ method: 'POST' }, res); expect(res.code).toBe(503);
+      expect(res.headers['Cache-Control']).toBe('no-store');
+    }
   });
   it('requires POST, verified auth, JSON, bounded body and owned scope', async () => {
-    for (const [override, code] of [[{ method: 'GET' },405], [{ headers: {} },401], [{ headers: { ...headers, 'content-type': 'text/plain' } },415]]) {
+    for (const [override, code] of [[{ method: 'GET' }, 405], [{ headers: {} }, 401], [{ headers: { ...headers, 'content-type': 'text/plain' } }, 415]]) {
       expect((await call('capture', capture, ports(), override)).code).toBe(code);
     }
     expect((await call('capture', { ...capture, userId: 'someone-else' })).code).toBe(400);
@@ -37,14 +46,14 @@ describe('cloud integration boundary', () => {
       expect(() => validateCapture({ ...capture, draft: { ...draft, amountMinor } })).toThrow();
     }
     expect(() => validateCapture({ ...capture, draft: { ...draft, currency: 'EUR' } })).toThrow();
-    for (const day of ['2026-13-01','2026-02-30','bad',null]) expect(isDate(day)).toBe(false);
+    for (const day of ['2026-13-01', '2026-02-30', 'bad', null]) expect(isDate(day)).toBe(false);
     expect(isDate('2024-02-29')).toBe(true);
     expect(validateCapture({ ...capture, draft: { ...draft, amountMinor: null } }).draft.amountMinor).toBeNull();
   });
   it('returns only a durable pending receipt, never an expense confirmation', async () => {
     const deps = ports(); const res = await call('capture', capture, deps);
     expect(res.code).toBe(202); expect(res.body.status).toBe('needs_review');
-    expect(deps.receiveCapture.mock.calls[0][0].userId).toBe('owner-from-session');
+    expect(deps.receiveCapture.mock.calls[0][0].userId).toBe('00000000-0000-4000-8000-000000000001');
     deps.receiveCapture.mockResolvedValue({ id: 'receipt', duplicate: true });
     expect((await call('capture', capture, deps)).code).toBe(200);
     deps.receiveCapture.mockRejectedValue(new ApiError(409, 'Conflicto'));
@@ -52,60 +61,205 @@ describe('cloud integration boundary', () => {
     deps.receiveCapture.mockRejectedValue(new Error('secret provider/token text'));
     const failed = await call('capture', capture, deps); expect(failed.code).toBe(503); expect(JSON.stringify(failed.body)).not.toContain('secret');
   });
-  it('reserves durable quota before any model call, even on repeated requests', async () => {
-    const deps = ports(); deps.reserveAIQuota.mockResolvedValue(false);
-    expect((await call('assistant', request, deps)).code).toBe(429); expect(deps.respond).not.toHaveBeenCalled();
-    deps.reserveAIQuota.mockResolvedValue(true);
-    expect((await call('assistant', request, deps)).code).toBe(200);
-    expect(deps.receiveCapture).not.toHaveBeenCalled();
-  });
-  it('refuses a language the v1 contract does not carry before any quota or model call', async () => {
-    // Rollout order (docs/i18n.md §11): a server must accept a language before any app sends one; until then it costs nothing.
+});
+
+describe('assistant route: order, reservation and settlement', () => {
+  it('validates, bounds, reserves the worst case, calls once and settles the actual cost', async () => {
     const deps = ports();
-    for (const extra of [{ locale: { language: 'en', region: 'US' } }, { replyLanguage: 'en-US' }]) {
-      const res = await call('assistant', { ...request, ...extra }, deps);
-      expect(res.code).toBe(400);
-    }
-    expect(deps.reserveAIQuota).not.toHaveBeenCalled();
-    expect(deps.respond).not.toHaveBeenCalled();
+    const res = await call('assistant', request, deps);
+    expect(res.code).toBe(200);
+    expect(res.body.type).toBe('proposal');
+    expect(res.body.proposals[0].paymentMethodRef).toBe('Visa Secreta');
+    const plan = deps.reserveAI.mock.calls[0][1];
+    expect(plan).toMatchObject({ requestId: request.requestId, model: 'openai:gpt-6-luna', outputTokens: ai.maxOutputTokens });
+    expect(Number.isSafeInteger(plan.maxMicroUsd) && plan.maxMicroUsd > 0).toBe(true);
+    expect(plan.inputTokens).toBeLessThanOrEqual(ai.maxInputTokens);
+    expect(deps.provider.respond).toHaveBeenCalledTimes(1);
+    expect(deps.reserveAI.mock.invocationCallOrder[0]).toBeLessThan(deps.provider.respond.mock.invocationCallOrder[0]);
+    const [, id, settlement] = deps.settleAI.mock.calls[0];
+    expect(id).toBe('reservation-1');
+    // 2000 uncached × 0.10 + 1000 cached × 0.01 + 400 output × 0.50 USD per million tokens = 410 µUSD.
+    expect(settlement).toEqual({ state: 'settled', chargedMicroUsd: 410, usage });
+    expect(settlement.chargedMicroUsd).toBeLessThan(plan.maxMicroUsd);
   });
-  it('rejects malformed model output and fabricated evidence or future dates', async () => {
+  it('makes no provider call when the reservation is refused, whatever the reason', async () => {
+    const expected = { disabled: 503, duplicate: 409, rate: 429, busy: 429, user_budget: 429, global_budget: 503, request_too_large: 413, surprising: 503 };
+    for (const [error, code] of Object.entries(expected)) {
+      const deps = ports(); deps.reserveAI.mockResolvedValue({ error });
+      const res = await call('assistant', request, deps);
+      expect(res.code).toBe(code);
+      expect(deps.provider.respond).not.toHaveBeenCalled();
+      expect(deps.settleAI).not.toHaveBeenCalled();
+      expect(deps.log.mock.calls[0][0].category).toBe(error === 'surprising' ? 'reservation_unknown' : error);
+    }
+    const deps = ports(); deps.reserveAI.mockRejectedValue(new Error('database down'));
+    expect((await call('assistant', request, deps)).code).toBe(503);
+    expect(deps.provider.respond).not.toHaveBeenCalled();
+  });
+  it('refuses oversized, malformed or v1 requests before any reservation or provider call', async () => {
     const deps = ports();
-    for (const invalid of [{ ...answer, factIds: ['invented'] }, { ...answer, draft: { ...draft, dateISO: '2026-09-20' } }, { ...answer, draft: { ...draft, amountMinor: 1.5 } }]) {
-      deps.respond.mockResolvedValue(invalid);
-      expect((await call('assistant', request, deps)).code).toBe(502);
+    const facts = Array.from({ length: 60 }, (_, i) => ({ id: 'current.category.' + i, label: 'Categoría de gasto: ' + 'x'.repeat(140), amountMinor: 1, count: 1, startISO: '2026-09-01', endISO: '2026-09-19' }));
+    const huge = { ...request, action: 'explain', text: '¿'.repeat(1999) + '?', facts };
+    const small = { ...deps, ai: aiConfig({ MOBILE_AI_ENABLED: 'true', MOBILE_AI_PROVIDER: 'openai', MOBILE_AI_MODEL: 'gpt-6-luna', MOBILE_AI_API_KEY: 'k', MOBILE_AI_MAX_INPUT_TOKENS: '6000' }) };
+    expect((await call('assistant', huge, small)).code).toBe(413);
+    for (const bad of [{ ...request, version: 1 }, { ...request, region: 'ar' }, { ...request, requestId: 'short' }, { ...request, locale: { language: 'en' } },
+      { ...request, text: 'x'.repeat(2001) }, { ...request, text: 'Gasté 500 \u202Eodnum' }, { ...request, facts: facts.slice(0, 1) }]) {
+      expect((await call('assistant', bad, deps)).code).toBe(400);
     }
-    deps.respond.mockResolvedValue({ kind: 'answer', message: 'Ahorraste', draft: null, factIds: [] });
-    expect((await call('assistant', { ...request, action: 'explain' }, deps)).code).toBe(502);
+    expect(deps.reserveAI).not.toHaveBeenCalled();
+    expect(deps.provider.respond).not.toHaveBeenCalled();
   });
-  it('requires complete fact provenance and returns the provided evidence with answers', async () => {
-    const fact = { id: 'current.expenses', label: 'Gastos registrados', amountMinor: 1500000, count: 1, startISO: '2026-09-01', endISO: '2026-09-19' };
-    const query = { ...request, action: 'explain', facts: [fact] };
-    const deps = ports(); deps.respond.mockResolvedValue({ kind: 'answer', message: 'Hay un gasto registrado.', draft: null, factIds: [fact.id] });
-    expect((await call('assistant', query, deps)).body.evidence).toEqual([fact]);
-    expect(() => validateAssistantRequest({ ...query, facts: [fact, fact] })).toThrow();
+  it('keeps the reservation at its maximum when the cost is unknown, never releasing it', async () => {
+    const cases = [
+      [{ category: 'timeout' }, 502], [{ category: 'network' }, 502], [{ category: 'http' }, 502], [{ category: 'spend_limit' }, 503], [{ category: 'refusal' }, 422],
+    ];
+    for (const [failure, code] of cases) {
+      const deps = ports(); deps.provider.respond.mockRejectedValue(Object.assign(new Error('boom'), failure));
+      const res = await call('assistant', request, deps);
+      expect(res.code).toBe(code);
+      expect(deps.settleAI.mock.calls[0][2]).toEqual({ state: 'unsettled', chargedMicroUsd: null, usage: null });
+      expect(deps.log.mock.calls[0][0].category).toBe('provider_' + failure.category);
+    }
+    // Usage on another tier, another model or inconsistent numbers is not trusted for settlement.
+    for (const served of [{ tier: 'priority' }, { model: 'gpt-5.6-terra' }, { usage: { ...usage, cachedInputTokens: 9999 } }, { usage: null }]) {
+      const deps = ports(); deps.provider.respond.mockResolvedValue({ output: proposal, usage, model: 'gpt-6-luna', tier: 'default', ...served });
+      await call('assistant', request, deps);
+      expect(deps.settleAI.mock.calls[0][2].state).toBe('unsettled');
+    }
   });
-  it('bounds provider calls, disables storage, and handles refusal/incomplete/error without retry', async () => {
-    const fetcher = vi.fn(async () => ({ ok: true, json: async () => ({ status: 'completed', output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify(answer) }] }] }) }));
-    const respond = createOpenAIResponder({ apiKey: 'fixture-key', fetcher });
-    expect(await respond(request)).toEqual(answer);
-    const sent = JSON.parse(fetcher.mock.calls[0][1].body);
-    expect(sent).toMatchObject({ store: false, max_output_tokens: 1800, model: 'gpt-5-mini' });
-    expect(sent.text.format.strict).toBe(true);
-    fetcher.mockResolvedValue({ ok: true, json: async () => ({ status: 'incomplete' }) });
-    await expect(respond(request)).rejects.toMatchObject({ status: 502 });
-    fetcher.mockResolvedValue({ ok: true, json: async () => ({ status: 'completed', output: [{ type: 'message', content: [{ type: 'refusal' }] }] }) });
-    await expect(respond(request)).rejects.toMatchObject({ status: 422 });
-    expect(fetcher).toHaveBeenCalledTimes(3);
+  it('settles a billed failure from its reported usage, and still answers if settlement fails', async () => {
+    const deps = ports();
+    deps.provider.respond.mockRejectedValue(Object.assign(new Error('x'), { category: 'incomplete', usage, model: 'gpt-6-luna', tier: 'default' }));
+    expect((await call('assistant', request, deps)).code).toBe(502);
+    expect(deps.settleAI.mock.calls[0][2]).toMatchObject({ state: 'settled', chargedMicroUsd: 410 });
+    const down = ports(); down.settleAI.mockRejectedValue(new Error('db down'));
+    expect((await call('assistant', request, down)).code).toBe(200);
+    expect(down.log.mock.calls[0][0].settlement).toBe('failed');
   });
-  it('uses the verified session for database access and fails closed on quota outages', async () => {
-    const fetcher = vi.fn(async () => ({ ok: true, json: async () => ({ id: 'verified-owner' }) }));
-    const env = { MOBILE_INTEGRATIONS_ENABLED: 'true', MOBILE_SUPABASE_URL: 'https://example.supabase.co', MOBILE_SUPABASE_PUBLISHABLE_KEY: 'fixture-public' };
-    const deps = mobileDependencies('capture', env, fetcher);
+  it('refuses malicious or invalid model output after settling, and never saves anything', async () => {
+    const explain = { ...request, action: 'explain', facts: [{ id: 'current.expenses', label: 'Gastos registrados', amountMinor: 1500000, count: 1, startISO: '2026-09-01', endISO: '2026-09-19' }] };
+    const answer = { type: 'answer', message: 'Llevás $15.000.', evidenceIds: ['current.expenses'], navigation: null, proposals: [], clarification: null };
+    const p = proposal.proposals[0];
+    const invalid = [
+      [request, { ...proposal, proposals: [p, p] }], // duplicated proposal
+      [request, { ...proposal, proposals: [] }],
+      [request, { ...proposal, proposals: [{ ...p, accountId: 'acct-1' }] }], // a model-created id
+      [request, { ...proposal, proposals: [{ ...p, amountMinor: -5 }] }],
+      [request, { ...proposal, proposals: [{ ...p, amountMinor: 10 ** 15 }] }],
+      [request, { ...proposal, proposals: [{ ...p, amountMinor: 1.5 }] }],
+      [request, { ...proposal, proposals: [{ ...p, currency: 'EUR' }] }],
+      [request, { ...proposal, proposals: [{ ...p, kind: 'transfer' }] }],
+      [request, { ...proposal, proposals: [{ ...p, dateISO: '2026-09-20' }] }], // future
+      [request, { ...proposal, proposals: [{ ...p, merchant: 'x'.repeat(121) }] }],
+      [request, { ...proposal, proposals: [{ ...p, merchant: 'Kiosco\u200b' }] }],
+      [request, { ...proposal, proposals: [{ ...p, merchant: 'https://evil.example' }] }],
+      [request, { ...proposal, message: 'Entrá a www.evil.example para confirmar' }],
+      [request, { ...proposal, message: 'Ejecutá ```rm -rf /```' }],
+      [request, { ...proposal, message: '[confirmar](javascript:alert(1))' }],
+      [request, { ...proposal, message: '' }],
+      [request, { ...proposal, action: 'delete_database' }], // an extra key
+      [request, { ...proposal, type: 'tool_call' }],
+      [request, { ...answer, evidenceIds: [] }], // an answer on parse
+      [explain, { ...answer, evidenceIds: ['invented'] }],
+      [explain, { ...answer, evidenceIds: [] }], // uncited
+      [explain, { ...answer, navigation: { target: 'category', factId: 'current.expenses' } }],
+      [explain, { ...answer, navigation: { target: 'movements', factId: 'previous.expenses' } }],
+      [explain, { ...answer, navigation: { target: 'https://evil', factId: 'current.expenses' } }],
+      [explain, { ...answer, navigation: { target: 'movements', factId: 'current.expenses', url: '/x' } }],
+      [explain, { ...proposal }], // a proposal on a question
+      [explain, { type: 'clarification', message: '¿Qué mes?', evidenceIds: [], navigation: null, proposals: [], clarification: { field: 'period', candidateIds: ['acct-1'] } }],
+      [explain, { type: 'clarification', message: '¿Qué mes?', evidenceIds: [], navigation: null, proposals: [], clarification: { field: 'sql', candidateIds: [] } }],
+      [explain, { type: 'out_of_scope', message: 'No.', evidenceIds: ['current.expenses'], navigation: null, proposals: [], clarification: null }],
+      [request, 'not an object'], [request, null],
+    ];
+    for (const [asked, output] of invalid) {
+      const deps = ports(); deps.provider.respond.mockResolvedValue({ output, usage, model: 'gpt-6-luna', tier: 'default' });
+      const res = await call('assistant', asked, deps);
+      expect(res.code, JSON.stringify(output)).toBe(502);
+      expect(deps.settleAI).toHaveBeenCalledTimes(1); // Billed even though the output is refused.
+      expect(deps.receiveCapture).not.toHaveBeenCalled();
+    }
+    const ok = ports(); ok.provider.respond.mockResolvedValue({ output: { ...answer, navigation: { target: 'movements', factId: 'current.expenses' } }, usage, model: 'gpt-6-luna', tier: 'default' });
+    const res = await call('assistant', explain, ok);
+    expect(res.code).toBe(200);
+    expect(res.body.evidence).toEqual(explain.facts);
+    const scope = ports(); scope.provider.respond.mockResolvedValue({ output: { type: 'out_of_scope', message: 'Solo puedo ayudarte con tus finanzas en FinanzApp.', evidenceIds: [], navigation: null, proposals: [], clarification: null }, usage, model: 'gpt-6-luna', tier: 'default' });
+    expect((await call('assistant', { ...request, text: 'Escribí un script de Python' }, scope)).body).toMatchObject({ type: 'out_of_scope', proposals: [], evidence: [] });
+  });
+  it('logs operational telemetry only: no prompt, merchant, amount, account, prose, key or token', async () => {
+    const deps = ports();
+    deps.provider.respond.mockRejectedValue(Object.assign(new Error('provider said: sk-proj-' + 'a'.repeat(40) + ' Kiosco Secreto'), { category: 'http' }));
+    await call('assistant', { ...request, text: 'Gasté 15 mil en Kiosco Secreto con la Visa Secreta' }, deps);
+    await call('assistant', request, ports());
+    const ok = ports(); await call('assistant', request, ok);
+    for (const sink of [deps.log, ok.log]) {
+      const line = JSON.stringify(sink.mock.calls);
+      for (const leak of ['Kiosco', 'Visa', 'Gasté', '1500000', '15 mil', 'sk-proj', 'fixture-access-token', 'fixture-key', 'Bearer', 'Revisá']) expect(line).not.toContain(leak);
+    }
+    expect(ok.log.mock.calls[0][0]).toMatchObject({ route: 'assistant', status: 200, category: 'ok', model: 'gpt-6-luna', inputTokens: 3000, chargedMicroUsd: 410, requestId: request.requestId });
+    expect(telemetryEvent({ category: 'Gasté 15 mil', userId: 'a b', inputTokens: -1, latencyMs: 1.5, note: 'x' })).toEqual({});
+  });
+});
+
+describe('server configuration fails closed and keeps the model out of code', () => {
+  const env = { MOBILE_AI_ENABLED: 'true', MOBILE_AI_PROVIDER: 'openai', MOBILE_AI_MODEL: 'gpt-6-luna', MOBILE_AI_API_KEY: 'fixture-key' };
+  it('needs every value, an allowlisted provider, a priced model and a bounded effort and caps', () => {
+    expect(aiConfig(env)).toMatchObject({ model: 'gpt-6-luna', reasoningEffort: 'low', serviceTier: 'default', maxOutputTokens: 1500, maxInputTokens: 24000 });
+    expect(aiConfig({ ...env, MOBILE_AI_MODEL: 'gpt-5.6-luna' }).model).toBe('gpt-5.6-luna'); // A model change is configuration.
+    for (const broken of [{ MOBILE_AI_ENABLED: 'false' }, { MOBILE_AI_ENABLED: 'TRUE' }, { MOBILE_AI_PROVIDER: undefined }, { MOBILE_AI_PROVIDER: 'anthropic' },
+      { MOBILE_AI_MODEL: undefined }, { MOBILE_AI_MODEL: 'gpt-5.6-terra' }, { MOBILE_AI_MODEL: 'gpt-6-luna; rm -rf' }, { MOBILE_AI_API_KEY: '' },
+      { MOBILE_AI_REASONING_EFFORT: 'high' }, { MOBILE_AI_REASONING_EFFORT: 'xhigh' }, { MOBILE_AI_MAX_OUTPUT_TOKENS: '100000' },
+      { MOBILE_AI_MAX_INPUT_TOKENS: '999999' }, { MOBILE_AI_MAX_INPUT_TOKENS: '-1' }, { MOBILE_AI_MAX_OUTPUT_TOKENS: '1e3' }]) {
+      expect(aiConfig({ ...env, ...broken }), JSON.stringify(broken)).toBeNull();
+    }
+    expect(Object.keys(PRICING.models)).toContain('openai:gpt-6-luna');
+  });
+  it('disables the assistant route without the AI switch, the integration switch or the server-only secret key', () => {
+    const base = { ...env, MOBILE_INTEGRATIONS_ENABLED: 'true', MOBILE_SUPABASE_URL: 'https://example.supabase.co', MOBILE_SUPABASE_PUBLISHABLE_KEY: 'fixture-public', MOBILE_SUPABASE_SECRET_KEY: 'fixture-secret' };
+    expect(mobileDependencies('assistant', base)).not.toBeNull();
+    for (const off of [{ MOBILE_AI_ENABLED: 'false' }, { MOBILE_INTEGRATIONS_ENABLED: 'false' }, { MOBILE_SUPABASE_SECRET_KEY: '' }, { MOBILE_SUPABASE_URL: 'http://example.supabase.co' }]) {
+      expect(mobileDependencies('assistant', { ...base, ...off })).toBeNull();
+    }
+    // A disabled AI never touches captures, and captures never need the AI.
+    expect(mobileDependencies('capture', { ...base, MOBILE_AI_ENABLED: 'false' })).not.toBeNull();
+  });
+  it('fits the whole handler inside the time the app waits', () => {
+    expect(Object.values(TIMEOUTS_MS).reduce((a, b) => a + b, 0)).toBeLessThan(CLIENT_TIMEOUT_MS);
+  });
+});
+
+describe('Supabase: session verified with the publishable key, privileged calls with the secret key only', () => {
+  const env = { MOBILE_INTEGRATIONS_ENABLED: 'true', MOBILE_SUPABASE_URL: 'https://example.supabase.co', MOBILE_SUPABASE_PUBLISHABLE_KEY: 'fixture-public',
+    MOBILE_SUPABASE_SECRET_KEY: 'fixture-secret', MOBILE_AI_ENABLED: 'true', MOBILE_AI_PROVIDER: 'openai', MOBILE_AI_MODEL: 'gpt-6-luna', MOBILE_AI_API_KEY: 'fixture-key' };
+  const owner = '00000000-0000-4000-8000-000000000001';
+  it('verifies the person, then passes the verified owner to server-only functions without their token', async () => {
+    const fetcher = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ id: owner }) }));
+    const deps = mobileDependencies('assistant', env, fetcher);
     const session = await deps.authenticate(headers.authorization);
-    expect(session.userId).toBe('verified-owner');
-    fetcher.mockResolvedValue({ ok: false, status: 500 });
-    await expect(deps.reserveAIQuota(session)).rejects.toMatchObject({ status: 503 });
-    expect(fetcher.mock.calls[1][1].headers.Authorization).toBe(headers.authorization);
+    expect(session).toEqual({ userId: owner });
+    expect(fetcher.mock.calls[0][1].headers).toEqual({ apikey: 'fixture-public', Authorization: headers.authorization });
+    fetcher.mockResolvedValue({ ok: true, json: async () => ({ id: 'reservation-1' }) });
+    expect(await deps.reserveAI(session, { requestId: request.requestId, model: 'openai:gpt-6-luna', maxMicroUsd: 1750, inputTokens: 8000, outputTokens: 1500 })).toEqual({ id: 'reservation-1' });
+    const [url, init] = fetcher.mock.calls[1];
+    expect(url).toBe('https://example.supabase.co/rest/v1/rpc/mobile_ai_reserve');
+    // The secret key alone: with a user token the call would run as that user, not as the server.
+    expect(init.headers).toEqual({ apikey: 'fixture-secret', 'Content-Type': 'application/json' });
+    expect(JSON.parse(init.body)).toEqual({ p_user_id: owner, p_request_id: request.requestId, p_model: 'openai:gpt-6-luna', p_max_micro_usd: 1750, p_input_tokens: 8000, p_output_tokens: 1500 });
+    fetcher.mockResolvedValue({ ok: true, json: async () => ({ error: 'global_budget' }) });
+    expect(await deps.reserveAI(session, { requestId: request.requestId, model: 'm', maxMicroUsd: 1, inputTokens: 1, outputTokens: 1 })).toEqual({ error: 'global_budget' });
+    fetcher.mockResolvedValue({ ok: true, json: async () => false });
+    await expect(deps.settleAI(session, 'reservation-1', { state: 'unsettled', chargedMicroUsd: null, usage: null })).rejects.toThrow();
+    expect(JSON.parse(fetcher.mock.calls.at(-1)[1].body)).toMatchObject({ p_user_id: owner, p_reservation_id: 'reservation-1', p_state: 'unsettled', p_charged_micro_usd: null });
+  });
+  it('refuses anonymous or malformed users and fails closed on outages', async () => {
+    for (const user of [{ id: owner, is_anonymous: true }, { id: 'not-a-uuid' }, {}]) {
+      const deps = mobileDependencies('capture', env, vi.fn(async () => ({ ok: true, status: 200, json: async () => user })));
+      await expect(deps.authenticate(headers.authorization)).rejects.toMatchObject({ status: 401 });
+    }
+    const fetcher = vi.fn(async () => ({ ok: false, status: 500 }));
+    const deps = mobileDependencies('assistant', env, fetcher);
+    await expect(deps.authenticate(headers.authorization)).rejects.toMatchObject({ status: 503 });
+    await expect(deps.reserveAI({ userId: owner }, { requestId: 'r', model: 'm', maxMicroUsd: 1, inputTokens: 1, outputTokens: 1 })).rejects.toMatchObject({ status: 503 });
+    await expect(deps.receiveCapture({ userId: owner }, validateCapture(capture))).rejects.toMatchObject({ status: 503 });
   });
 });

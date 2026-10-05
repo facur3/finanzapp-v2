@@ -1,5 +1,6 @@
 import { isLegacyCurrency, type Account, type Currency, type Entry, type EntryKind, type LegacyCurrency, type ReviewDraft } from '@finanzapp/domain';
-import type { AssistantFact, AssistantResult, CaptureDraft } from '../../../../packages/integrations/contracts.js';
+import type { AssistantFact, CaptureDraft } from '../../../../packages/integrations/contracts.js';
+import type { AssistantResultV2, ClarificationField, NavigationIntent } from '../../../../packages/integrations/assistant-protocol.js';
 import { factCategory } from '../integrations/evidence.ts';
 import { translator, type MessageKey, type Translate } from '../i18n/messages.ts';
 
@@ -19,7 +20,7 @@ import { translator, type MessageKey, type Translate } from '../i18n/messages.ts
  * (its clarification questions, option labels, notes, evidence names and link
  * labels) is stored as a catalogue key and translated when it is rendered, so
  * a thread already on screen follows a language change. The model's words
- * (`AssistantResult.message`) and the user's words are content: stored and
+ * (`AssistantResultV2.message`) and the user's words are content: stored and
  * shown exactly as they arrived, never translated. */
 
 export type AssistantReason = 'unavailable' | 'session' | 'offline' | 'limit' | 'failed' | 'info';
@@ -218,6 +219,9 @@ export function shouldAutoscroll(offsetY: number, contentHeight: number, viewpor
 const fold = (value: string) => value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 /** Folded words joined by one space, so a name is matched as whole words, never as a fragment of another word. */
 const words = (value: string) => fold(value).split(/[^\p{L}\p{M}\p{N}]+/u).filter(Boolean).join(' ');
+/** 25A-05: the person's words for a means of payment as the model copies them («con la Visa», "my Visa", «en efectivo»),
+ * without a leading preposition and article or possessive, so they are matched against account names like a bare name. */
+const reference = (value: string) => words(value).replace(/^(?:(?:con|with|on|en) )?(?:(?:la|el|los|las|mi|mis|my|the) )?/, '');
 
 /** Categories the user has already recorded for that kind, most used first, as chips for a category clarification. */
 export function categoryOptions(entries: Entry[], kind: EntryKind, limit = 4): ClarificationOption[] {
@@ -232,7 +236,7 @@ export function categoryOptions(entries: Entry[], kind: EntryKind, limit = 4): C
     .map(item => ({ id: item.label, label: item.label, category: kind }));
 }
 
-/** Turn a CaptureDraft (the server contract, every field nullable) into either a
+/** Turn a draft (a protocol v2 proposal, or a parked draft re-read; every field nullable) into either a
  * confirmable draft or the one clarification that blocks it, in this order:
  * kind, amount, account, category. `accounts` are the ones that may carry a
  * posting in the draft's currency. A named payment method matches an account
@@ -253,7 +257,7 @@ export function resolveDraft(draft: CaptureDraft, accounts: Account[], entries: 
   // An income goes to a cash account (24B6): a card is never offered or implied for it.
   const eligible = (draft.kind === 'income' ? incomeAccounts : accounts).filter(account => account.currency === resolvedCurrency);
   // Named but without a letter or digit ("💳") still names something: it matches nothing and is asked.
-  const ref = draft.paymentMethodRef?.trim() ? words(draft.paymentMethodRef) : null;
+  const ref = draft.paymentMethodRef?.trim() ? reference(draft.paymentMethodRef) : null;
   const named = ref ? eligible.filter(account => ` ${words(account.name)} `.includes(` ${ref} `)) : [];
   const accountId = ref !== null ? (named.length === 1 ? named[0].id : null) : eligible.length === 1 ? eligible[0].id : null;
   const destinationStated = named.length === 1;
@@ -271,7 +275,7 @@ export function completeDraft(pending: { draft: Partial<ResolvedDraft>; field: D
   if (pending.field === 'kind') draft.kind = optionId === 'income' ? 'income' : 'expense';
   else if (pending.field === 'paymentMethod') draft.accountId = optionId;
   else if (pending.field === 'category') draft.category = optionId;
-  // Contract v1 only ever parks ARS or USD drafts; the ARS default for a draft without a currency is stage 7's to remove.
+  // Protocol v2 only ever parks ARS or USD drafts; the ARS default for a draft without a currency is stage 7's to remove.
   const currency: LegacyCurrency = isLegacyCurrency(draft.currency) ? draft.currency : 'ARS';
   // A named account is matched again (it was asked about something else first); a chosen one is already fixed below.
   const capture: CaptureDraft = { kind: draft.kind ?? null, amountMinor: draft.amountMinor ?? null, currency, merchant: draft.merchant || null,
@@ -314,12 +318,14 @@ export function evidenceLabel(row: EvidenceRow, t: Translate = translator('es'),
   return row.previousOnly ? t('assistant.evidence.previousMonth', { label }) : label;
 }
 
-/** Rows and links for an answer, from the evidence the answer cites (`factIds`)
+/** Rows and links for an answer, from the evidence the answer cites (`evidenceIds`)
  * and never from its prose. When the same subject is cited for both the current
  * and the previous period the row is the signed difference; otherwise it is
- * the amount. Links open the FinanzApp screens that hold those records. */
-export function answerContent(result: Pick<AssistantResult, 'factIds'>, facts: AssistantFact[], currency: Currency): AnswerContent {
-  const cited = result.factIds.map(id => facts.find(fact => fact.id === id)).filter((fact): fact is AssistantFact => !!fact);
+ * the amount. Links open the FinanzApp screens that hold those records. The
+ * model's navigation intent only moves the link it names first when that link
+ * was derived here from the same cited fact: it never adds a link or a route. */
+export function answerContent(result: { evidenceIds: string[]; navigation?: NavigationIntent | null }, facts: AssistantFact[], currency: Currency): AnswerContent {
+  const cited = result.evidenceIds.map(id => facts.find(fact => fact.id === id)).filter((fact): fact is AssistantFact => !!fact);
   const current = cited.filter(fact => fact.id.startsWith('current.'));
   const previous = cited.filter(fact => fact.id.startsWith('previous.'));
   const rows: EvidenceRow[] = [];
@@ -335,22 +341,47 @@ export function answerContent(result: Pick<AssistantResult, 'factIds'>, facts: A
   const categories = current.filter(fact => factCategory(fact) !== null);
   if (categories.length === 1) links.push({ id: 'category', href: { pathname: '/spending-detail',
     params: { currency, startISO: categories[0].startISO, endISO: categories[0].endISO, category: factCategory(categories[0])! } } });
-  if (cited.some(fact => fact.id.startsWith('budget'))) links.push({ id: 'budget', href: { pathname: '/budgets', params: { currency } } });
+  const budget = cited.find(fact => fact.id.startsWith('budget'));
+  if (budget) links.push({ id: 'budget', href: { pathname: '/budgets', params: { currency } } });
   if (cited.length) links.push({ id: 'movements', href: { pathname: '/activity' } });
+  const intent = result.navigation;
+  const source: Record<EvidenceLinkId, (id: string) => boolean> = { category: id => categories.length === 1 && categories[0].id === id,
+    budget: id => budget?.id === id, movements: id => cited.some(fact => fact.id === id) };
+  const first = intent ? links.findIndex(link => link.id === intent.target && source[link.id](intent.factId)) : -1;
+  if (first > 0) links.unshift(...links.splice(first, 1));
   return { kind: 'answer', rows: rows.slice(0, 5), links, currency };
 }
 
-/** The content for a validated server result. Drafts are resolved locally (a resolved one is turned into a proposal by the
- * screen, which fixes its ids); answers get evidence. */
-export function contentFromResult(result: AssistantResult, facts: AssistantFact[], accounts: Account[], entries: Entry[], currency: Currency, todayISO: string, incomeAccounts: Account[] = accounts):
+/** The protocol's clarification fields the conversation has a field for; the others (currency, date, merchant, period)
+ * are asked in the model's words only. */
+const CLARIFIED: Partial<Record<ClarificationField, DraftField>> = { kind: 'kind', amount: 'amount', category: 'category', destination: 'paymentMethod' };
+
+/** A chip for a fact the device sent, named like its evidence row: the app's word, or the stored category name. */
+function factOption(fact: AssistantFact): ClarificationOption {
+  const subject = factSubject(fact);
+  if (subject.kind === 'category') return { id: fact.id, label: subject.category, category: 'expense' };
+  if (subject.kind === 'other') return { id: fact.id, label: subject.label };
+  return { id: fact.id, labelKey: `assistant.evidence.${subject.kind}` };
+}
+
+/** The content for a validated protocol v2 result. A proposal is resolved locally, exactly as a draft always was (the
+ * person's words for the means of payment against the real local accounts; a resolved one is turned into a proposal by the
+ * screen, which fixes its ids); answers get evidence from the cited local facts; a clarification gets chips only for the
+ * candidates that are facts this device sent; out of scope is the model's words alone. */
+export function contentFromResult(result: AssistantResultV2, facts: AssistantFact[], accounts: Account[], entries: Entry[], currency: Currency, todayISO: string, incomeAccounts: Account[] = accounts):
   { text: string; textKey?: MessageKey; content: AnswerContent | ClarificationContent | ResolvedContent | null; pending: ConversationState['pending'] } {
-  if (result.kind === 'draft' && result.draft) {
-    const resolved = resolveDraft(result.draft, accounts, entries, currency, todayISO, incomeAccounts);
+  const proposal = result.type === 'proposal' ? result.proposals[0] : undefined;
+  if (proposal) {
+    const resolved = resolveDraft(proposal, accounts, entries, currency, todayISO, incomeAccounts);
     if (resolved.kind === 'draft') return { text: result.message, content: { kind: 'draft', draft: resolved.draft }, pending: null };
     return { text: '', textKey: resolved.question, content: { kind: 'clarification', field: resolved.field, options: resolved.options, chosen: null }, pending: { draft: resolved.partial, field: resolved.field } };
   }
-  if (result.kind === 'clarification') return { text: result.message, content: { kind: 'clarification', field: null, options: [], chosen: null }, pending: null };
-  return { text: result.message, content: answerContent(result, facts, currency), pending: null };
+  if (result.type === 'clarification' && result.clarification) {
+    const options = result.clarification.candidateIds.map(id => facts.find(fact => fact.id === id)).filter((fact): fact is AssistantFact => !!fact).map(factOption);
+    return { text: result.message, content: { kind: 'clarification', field: CLARIFIED[result.clarification.field] ?? null, options, chosen: null }, pending: null };
+  }
+  if (result.type === 'answer') return { text: result.message, content: answerContent(result, facts, currency), pending: null };
+  return { text: result.message, content: null, pending: null };
 }
 
 /** The note for each disconnected state, as a catalogue key (stored in the
