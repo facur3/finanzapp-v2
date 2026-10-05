@@ -4,7 +4,9 @@ import { ASSISTANT_INSTRUCTIONS } from '../assistant-prompt.js';
 import { CASES, EVAL_TODAY } from './corpus.js';
 import { buildRequest, fixtureResponder, goldenOutput, requestIdFor, runEval, underivedNumbers } from './harness.js';
 import { THRESHOLDS, checkThresholds } from './thresholds.js';
-import { main } from './run.js';
+import { main, worstCaseMicroUsd } from './run.js';
+import { aiConfig } from '../runtime.js';
+import { PRICING, PRICING_MAX_AGE_DAYS, pricingAgeDays } from '../pricing.js';
 
 const evaluate = outputFor => runEval({ cases: CASES, respond: fixtureResponder(CASES, outputFor ? { outputFor } : {}) });
 const failed = report => checkThresholds(report.metrics).failures.map(item => item.metric);
@@ -220,8 +222,11 @@ describe('eval harness', () => {
 });
 
 describe('eval CLI', () => {
-  const LIVE_CONFIG = { MOBILE_AI_ENABLED: 'true', MOBILE_AI_PROVIDER: 'openai', MOBILE_AI_MODEL: 'gpt-6-luna', MOBILE_AI_API_KEY: 'fixture-not-a-key' };
-  const quiet = () => ({ out: vi.fn(), err: vi.fn() });
+  const LIVE_CONFIG = { MOBILE_ENVIRONMENT: 'staging', MOBILE_AI_ENABLED: 'true', MOBILE_AI_PROVIDER: 'openai', MOBILE_AI_MODEL: 'gpt-6-luna',
+    MOBILE_AI_API_KEY: 'sk-proj-fixture-not-a-key', MOBILE_AI_PROVIDER_PROJECT: 'proj_fixtureOnly01' };
+  const quiet = () => ({ out: vi.fn(), err: vi.fn(), clock: () => PRICING.readOn });
+  const worst = worstCaseMicroUsd(aiConfig(LIVE_CONFIG, { deployed: false }));
+  const LIVE = ['--live', '--approve-micro-usd', String(worst)];
 
   it('runs the fixture and passes', async () => {
     const io = quiet();
@@ -232,10 +237,14 @@ describe('eval CLI', () => {
   });
 
   it('refuses --live without both gates, before any provider is created', async () => {
-    for (const env of [{}, LIVE_CONFIG, { MOBILE_AI_EVAL_LIVE: '1' }, { ...LIVE_CONFIG, MOBILE_AI_EVAL_LIVE: 'true' }, { ...LIVE_CONFIG, MOBILE_AI_EVAL_LIVE: '1', MOBILE_AI_MODEL: 'unpriced' }]) {
+    const armed = { ...LIVE_CONFIG, MOBILE_AI_EVAL_LIVE: '1' };
+    for (const env of [{}, LIVE_CONFIG, { MOBILE_AI_EVAL_LIVE: '1' }, { ...LIVE_CONFIG, MOBILE_AI_EVAL_LIVE: 'true' }, { ...armed, MOBILE_AI_MODEL: 'unpriced' },
+      // Staging only, off Vercel, project-scoped key with its project.
+      { ...armed, MOBILE_ENVIRONMENT: 'production' }, { ...armed, MOBILE_ENVIRONMENT: undefined }, { ...armed, VERCEL_ENV: 'production' },
+      { ...armed, VERCEL_ENV: 'preview' }, { ...armed, MOBILE_AI_API_KEY: 'sk-admin-fixture-not-a-key' }, { ...armed, MOBILE_AI_PROVIDER_PROJECT: undefined }]) {
       const createProvider = vi.fn();
       const io = quiet();
-      expect(await main(['--live'], env, { createProvider, ...io })).toBe(2);
+      expect(await main(LIVE, env, { createProvider, ...io }), JSON.stringify(env)).toBe(2);
       expect(createProvider).not.toHaveBeenCalled();
       expect(io.out).not.toHaveBeenCalled();
     }
@@ -246,8 +255,12 @@ describe('eval CLI', () => {
     const respond = vi.fn(async call => ({ output: goldenOutput(byInput.get(call.input)), usage: null, model: 'gpt-6-luna', tier: 'default' }));
     const createProvider = vi.fn(() => ({ respond }));
     const io = quiet();
-    expect(await main(['--live'], { ...LIVE_CONFIG, MOBILE_AI_EVAL_LIVE: '1' }, { createProvider, ...io })).toBe(0);
+    expect(await main(LIVE, { ...LIVE_CONFIG, MOBILE_AI_EVAL_LIVE: '1' }, { createProvider, ...io })).toBe(0);
     expect(createProvider).toHaveBeenCalledOnce();
+    const report = JSON.parse(io.out.mock.calls[0][0]);
+    expect(report).toMatchObject({ mode: 'live', ranOnUTC: PRICING.readOn, finishedOnUTC: PRICING.readOn, environment: 'staging', providerProject: 'proj_fixtureOnly01',
+      approvedMicroUsd: worst, worstCaseMicroUsd: worst, pricing: { readOn: PRICING.readOn, ageDays: 0 } });
+    expect(report.metrics).toMatchObject({ servedModels: { 'gpt-6-luna': CASES.length }, servedTiers: { default: CASES.length }, estimateExceededCount: 0 });
     expect(respond).toHaveBeenCalledTimes(CASES.length);
     expect(respond.mock.calls[0][0]).toMatchObject({ maxOutputTokens: 1500, reasoningEffort: 'low' });
     expect(io.err.mock.calls[0][0]).toMatch(/WARNING/);
@@ -257,7 +270,50 @@ describe('eval CLI', () => {
     const byInput = new Map(CASES.map(item => [JSON.stringify(modelInput(buildRequest(item))), item]));
     const respond = vi.fn(async call => ({ output: goldenOutput(byInput.get(call.input)), usage: null, model: 'gpt-5.6-luna', tier: 'default' }));
     const io = quiet();
-    expect(await main(['--live'], { ...LIVE_CONFIG, MOBILE_AI_EVAL_LIVE: '1' }, { createProvider: () => ({ respond }), ...io })).toBe(1);
+    expect(await main(LIVE, { ...LIVE_CONFIG, MOBILE_AI_EVAL_LIVE: '1' }, { createProvider: () => ({ respond }), ...io })).toBe(1);
     expect(JSON.parse(io.out.mock.calls[0][0]).verdict.failures.map(item => item.metric)).toContain('servedAsConfiguredRate');
+  });
+
+  it('refuses a live run on a stale price table or without an approved spend covering the worst case', async () => {
+    const env = { ...LIVE_CONFIG, MOBILE_AI_EVAL_LIVE: '1' };
+    const stale = new Date(Date.parse(PRICING.readOn) + (PRICING_MAX_AGE_DAYS + 1) * 86_400_000).toISOString().slice(0, 10);
+    for (const [argv, today] of [[LIVE, stale], [LIVE, '2026-01-01'], [['--live'], PRICING.readOn], [['--live', '--approve-micro-usd', String(worst - 1)], PRICING.readOn],
+      [['--live', '--approve-micro-usd', '1e9'], PRICING.readOn]]) {
+      const createProvider = vi.fn();
+      const io = { ...quiet(), clock: () => today };
+      expect(await main(argv, env, { createProvider, ...io }), argv.join(' ') + ' ' + today).toBe(2);
+      expect(createProvider).not.toHaveBeenCalled();
+    }
+    // The fixture run still works on stale prices, with a warning; the policy binds the paid run and the release.
+    const io = { ...quiet(), clock: () => stale };
+    expect(await main([], {}, io)).toBe(0);
+    expect(io.err.mock.calls.flat().join('')).toMatch(/price table/);
+    expect(pricingAgeDays('2026-10-05', '2026-10-05')).toBe(0);
+    expect(pricingAgeDays('2026-10-04', '2026-10-05')).toBeNull();
+  });
+
+  it('counts a trusted cost above the reservation maximum as estimate_exceeded and fails the bar', async () => {
+    const report = await runEval({ cases: CASES.slice(0, 3), respond: (call, testCase) => ({ output: goldenOutput(testCase), latencyMs: 10, model: 'fixture', tier: 'default',
+      usage: { inputTokens: 500_000, cachedInputTokens: 0, cacheWriteTokens: 0, outputTokens: 10, reasoningTokens: 0 } }) });
+    expect(report.metrics.estimateExceededCount).toBe(3);
+    expect(report.cases.every(item => item.costMicroUsd > item.maxMicroUsd)).toBe(true);
+    expect(checkThresholds(report.metrics).failures.map(item => item.metric)).toContain('estimateExceededCount');
+    expect((await evaluate()).metrics.estimateExceededCount).toBe(0);
+  });
+
+  it('refuses a live run whose corpus exceeds the configured input cap, as the server would answer 413', async () => {
+    const createProvider = vi.fn();
+    expect(await main(LIVE, { ...LIVE_CONFIG, MOBILE_AI_EVAL_LIVE: '1', MOBILE_AI_MAX_INPUT_TOKENS: '6000' }, { createProvider, ...quiet() })).toBe(2);
+    expect(createProvider).not.toHaveBeenCalled();
+  });
+
+  it('settles a provider failure from the configured model as the server does, and keeps an unknown count unknown', async () => {
+    const failure = Object.assign(new Error('incomplete'), { category: 'incomplete', model: 'fixture', tier: 'default',
+      usage: { inputTokens: 500_000, cachedInputTokens: 0, cacheWriteTokens: null, outputTokens: 10, reasoningTokens: 0 } });
+    const report = await runEval({ cases: CASES.slice(0, 2), respond: () => { throw failure; } });
+    expect(report.metrics.estimateExceededCount).toBe(2);
+    expect(report.metrics.servedModels).toEqual({ fixture: 2 });
+    expect(report.metrics.tokens.cacheWriteTokens).toBeNull();
+    expect(report.metrics.tokens.inputTokens).toBe(1_000_000);
   });
 });

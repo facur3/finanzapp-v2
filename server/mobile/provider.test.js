@@ -12,7 +12,8 @@ const output = { type: 'out_of_scope', message: 'Solo finanzas.', evidenceIds: [
 const completed = (extra = {}) => ({ status: 'completed', model: 'gpt-6-luna-2026-09-01', service_tier: 'default',
   output: [{ type: 'reasoning', summary: [] }, { type: 'message', content: [{ type: 'output_text', text: JSON.stringify(output) }] }],
   usage: { input_tokens: 3000, input_tokens_details: { cached_tokens: 1000, cache_write_tokens: 0 }, output_tokens: 400, output_tokens_details: { reasoning_tokens: 100 } }, ...extra });
-const ai = aiConfig({ MOBILE_AI_ENABLED: 'true', MOBILE_AI_PROVIDER: 'openai', MOBILE_AI_MODEL: 'gpt-6-luna', MOBILE_AI_API_KEY: 'fixture-key' });
+const ai = aiConfig({ MOBILE_ENVIRONMENT: 'staging', VERCEL_ENV: 'production', MOBILE_AI_ENABLED: 'true', MOBILE_AI_PROVIDER: 'openai', MOBILE_AI_MODEL: 'gpt-6-luna',
+  MOBILE_AI_API_KEY: 'sk-proj-fixture-only', MOBILE_AI_PROVIDER_PROJECT: 'proj_fixtureOnly01' });
 const luna = PRICING.models['openai:gpt-6-luna'];
 
 describe('OpenAI request: stateless, tool-free, strict and bounded', () => {
@@ -86,8 +87,8 @@ describe('OpenAI response: anything but a completed message is no answer', () =>
     expect(fetcher).toHaveBeenCalledTimes(1);
     const [url, init] = fetcher.mock.calls[0];
     expect(url).toBe(OPENAI_RESPONSES_URL);
-    expect(init.headers.Authorization).toBe('Bearer fixture-key');
-    expect(init.body).not.toContain('fixture-key');
+    expect(init.headers).toEqual({ Authorization: 'Bearer sk-proj-fixture-only', 'OpenAI-Project': 'proj_fixtureOnly01', 'Content-Type': 'application/json' });
+    expect(init.body).not.toContain('sk-proj-fixture-only');
     for (const [reply, category] of [
       [{ ok: false, status: 429, json: async () => ({ error: { code: 'project_spend_limit_exceeded', type: 'insufficient_quota' } }) }, 'spend_limit'],
       [{ ok: false, status: 429, json: async () => ({ error: { type: 'insufficient_quota' } }) }, 'spend_limit'],
@@ -103,7 +104,8 @@ describe('OpenAI response: anything but a completed message is no answer', () =>
     fetcher.mockRejectedValueOnce(new TypeError('fetch failed'));
     await expect(provider.respond(providerRequest(request, ai))).rejects.toMatchObject({ category: 'network' });
     expect(fetcher).toHaveBeenCalledTimes(8);
-    expect(() => createOpenAIProvider({ apiKey: '', model: 'gpt-6-luna', serviceTier: 'default', timeoutMs: 1 })).toThrow();
+    expect(() => createOpenAIProvider({ apiKey: '', project: 'proj_fixtureOnly01', model: 'gpt-6-luna', serviceTier: 'default', timeoutMs: 1 })).toThrow();
+    expect(() => createOpenAIProvider({ apiKey: 'sk-proj-fixture-only', project: '', model: 'gpt-6-luna', serviceTier: 'default', timeoutMs: 1 })).toThrow();
   });
 });
 

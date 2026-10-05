@@ -22,6 +22,10 @@ export const THRESHOLDS = Object.freeze({
   latencyP95Ms: { max: 8000 },
   // 3000 µUSD = 0.003 USD per request at p95; the bound is a sizing guard, the per-person ceilings are in the database.
   costP95MicroUsd: { max: 3000 },
+  // Added in 25A-06 before any real run (a tightening, the 25A-05 audit's follow-up): a trusted cost above the reserved
+  // maximum means the input-token bound or the price table under-reserves, so the database ceilings would not bound
+  // spend. Zero on the adoption run, or the run is investigated, never adopted.
+  estimateExceededCount: { max: 0 },
 });
 
 /** A metric with no applicable case (null) fails: an unmeasured bound is not a pass. */

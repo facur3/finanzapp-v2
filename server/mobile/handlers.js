@@ -31,6 +31,8 @@ const RESERVATION_ERRORS = {
   user_budget: [429, 'Llegaste al límite de uso del asistente por ahora. Podés seguir registrando manualmente.'],
   request_too_large: [413, 'El mensaje es demasiado largo.'],
   global_budget: [503, 'El asistente no está disponible ahora. Podés registrar manualmente.'],
+  // The database belongs to another environment than this deployment: a configuration error, never retried.
+  environment: [503, 'El asistente no está disponible ahora. Podés registrar manualmente.'],
 };
 export function reservationError(code) {
   const [status, message] = RESERVATION_ERRORS[code] ?? [503, 'El asistente no está disponible ahora. Podés registrar manualmente.'];

@@ -13,8 +13,8 @@ is no web version of the product ([decision 004](docs/decisions/004-native-first
    for UI changes read `docs/mobile-design.md`; for money, currencies or FX read
    `docs/currency.md`; for language or region read `docs/i18n.md`; for environments, hosting, Supabase,
    the Assistant's capabilities and cost limits, Wallet capture, Live Activities, notifications, privacy,
-   subscriptions or anything about TestFlight and the App Store read `docs/production-plan.md` and
-   `docs/app-store-launch.md` (plans and gates, nothing in them is implemented until the roadmap says so); before
+   subscriptions or anything about TestFlight and the App Store read `docs/production-plan.md`,
+   `docs/ai-staging-runbook.md` and `docs/app-store-launch.md` (plans and gates, nothing in them is implemented until the roadmap says so); before
    adding a capability because a competitor has it, or touching the public name or identity, read
    `docs/competitive-landscape.md` and `docs/brand-brief.md` (discovery: classifications, research gates and the
    naming workflow; «FinanzApp» is the working name, never the assumed public brand).

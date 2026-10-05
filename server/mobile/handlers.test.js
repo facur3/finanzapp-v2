@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createMobileHandler, ApiError, telemetryEvent } from './handlers.js';
-import { aiConfig, mobileDependencies, TIMEOUTS_MS, CLIENT_TIMEOUT_MS } from './runtime.js';
+import { aiConfig, mobileDependencies, environmentOf, plausibleAccessToken, ENABLED_ENVIRONMENTS, TIMEOUTS_MS, CLIENT_TIMEOUT_MS } from './runtime.js';
 import { PRICING } from './pricing.js';
 import { validateCapture, isDate } from '../../packages/integrations/contracts.js';
 import disabledCapture from '../../api/mobile/captures.js';
@@ -12,7 +12,18 @@ const request = { version: 2, requestId: 'fixture-request-0001', action: 'parse'
 const proposal = { type: 'proposal', message: 'Revisá el gasto.', evidenceIds: [], navigation: null, proposals: [{ ...draft, merchant: 'Kiosco Secreto', paymentMethodRef: 'Visa Secreta' }], clarification: null };
 const usage = { inputTokens: 3000, cachedInputTokens: 1000, cacheWriteTokens: 0, outputTokens: 400, reasoningTokens: 100 };
 const headers = { authorization: 'Bearer fixture-access-token', 'content-type': 'application/json' };
-const ai = aiConfig({ MOBILE_AI_ENABLED: 'true', MOBILE_AI_PROVIDER: 'openai', MOBILE_AI_MODEL: 'gpt-6-luna', MOBILE_AI_API_KEY: 'fixture-key' });
+// Fixture Supabase keys of the current kinds, too short to match the repository's secret scanner (never real keys).
+const PUBLISHABLE = 'sb_publishable_fixtureOnlyNotAKey';
+const SECRET = 'sb_secret_fixtureOnlyNotAKey';
+/** An unsigned token shaped like a Supabase access token of the fixture project (the remote check is faked). */
+function accessToken(claims = {}) {
+  const part = value => Buffer.from(JSON.stringify(value)).toString('base64url');
+  return 'Bearer ' + [part({ alg: 'ES256' }), part({ iss: 'https://example.supabase.co/auth/v1', aud: 'authenticated', role: 'authenticated',
+    sub: '00000000-0000-4000-8000-000000000001', is_anonymous: false, exp: Math.floor(Date.now() / 1000) + 3600, ...claims }), 'c2lnbmF0dXJl'].join('.');
+}
+const STAGING_AI = { MOBILE_ENVIRONMENT: 'staging', VERCEL_ENV: 'production', MOBILE_AI_ENABLED: 'true', MOBILE_AI_PROVIDER: 'openai', MOBILE_AI_MODEL: 'gpt-6-luna',
+  MOBILE_AI_API_KEY: 'sk-proj-fixture-only', MOBILE_AI_PROVIDER_PROJECT: 'proj_fixtureOnly01' };
+const ai = aiConfig(STAGING_AI);
 function response() { return { code: 0, body: null, headers: {}, status(n) { this.code = n; return this; }, json(body) { this.body = body; return this; }, setHeader(k, v) { this.headers[k] = v; } }; }
 function ports() {
   return { authenticate: vi.fn(async () => ({ userId: '00000000-0000-4000-8000-000000000001' })),
@@ -100,7 +111,7 @@ describe('assistant route: order, reservation and settlement', () => {
     const deps = ports();
     const facts = Array.from({ length: 60 }, (_, i) => ({ id: 'current.category.' + i, label: 'Categoría de gasto: ' + 'x'.repeat(140), amountMinor: 1, count: 1, startISO: '2026-09-01', endISO: '2026-09-19' }));
     const huge = { ...request, action: 'explain', text: '¿'.repeat(1999) + '?', facts };
-    const small = { ...deps, ai: aiConfig({ MOBILE_AI_ENABLED: 'true', MOBILE_AI_PROVIDER: 'openai', MOBILE_AI_MODEL: 'gpt-6-luna', MOBILE_AI_API_KEY: 'k', MOBILE_AI_MAX_INPUT_TOKENS: '6000' }) };
+    const small = { ...deps, ai: aiConfig({ ...STAGING_AI, MOBILE_AI_MAX_INPUT_TOKENS: '6000' }) };
     expect((await call('assistant', huge, small)).code).toBe(413);
     for (const bad of [{ ...request, version: 1 }, { ...request, region: 'ar' }, { ...request, requestId: 'short' }, { ...request, locale: { language: 'en' } },
       { ...request, text: 'x'.repeat(2001) }, { ...request, text: 'Gasté 500 \u202Eodnum' }, { ...request, facts: facts.slice(0, 1) }]) {
@@ -202,7 +213,7 @@ describe('assistant route: order, reservation and settlement', () => {
 });
 
 describe('server configuration fails closed and keeps the model out of code', () => {
-  const env = { MOBILE_AI_ENABLED: 'true', MOBILE_AI_PROVIDER: 'openai', MOBILE_AI_MODEL: 'gpt-6-luna', MOBILE_AI_API_KEY: 'fixture-key' };
+  const env = STAGING_AI;
   it('needs every value, an allowlisted provider, a priced model and a bounded effort and caps', () => {
     expect(aiConfig(env)).toMatchObject({ model: 'gpt-6-luna', reasoningEffort: 'low', serviceTier: 'default', maxOutputTokens: 1500, maxInputTokens: 32000 });
     expect(aiConfig({ ...env, MOBILE_AI_MODEL: 'gpt-5.6-luna' }).model).toBe('gpt-5.6-luna'); // A model change is configuration.
@@ -215,7 +226,7 @@ describe('server configuration fails closed and keeps the model out of code', ()
     expect(Object.keys(PRICING.models)).toContain('openai:gpt-6-luna');
   });
   it('disables the assistant route without the AI switch, the integration switch or the server-only secret key', () => {
-    const base = { ...env, MOBILE_INTEGRATIONS_ENABLED: 'true', MOBILE_SUPABASE_URL: 'https://example.supabase.co', MOBILE_SUPABASE_PUBLISHABLE_KEY: 'fixture-public', MOBILE_SUPABASE_SECRET_KEY: 'fixture-secret' };
+    const base = { ...env, MOBILE_INTEGRATIONS_ENABLED: 'true', MOBILE_SUPABASE_URL: 'https://example.supabase.co', MOBILE_SUPABASE_PUBLISHABLE_KEY: PUBLISHABLE, MOBILE_SUPABASE_SECRET_KEY: SECRET };
     expect(mobileDependencies('assistant', base)).not.toBeNull();
     for (const off of [{ MOBILE_AI_ENABLED: 'false' }, { MOBILE_INTEGRATIONS_ENABLED: 'false' }, { MOBILE_SUPABASE_SECRET_KEY: '' }, { MOBILE_SUPABASE_URL: 'http://example.supabase.co' }]) {
       expect(mobileDependencies('assistant', { ...base, ...off })).toBeNull();
@@ -229,22 +240,23 @@ describe('server configuration fails closed and keeps the model out of code', ()
 });
 
 describe('Supabase: session verified with the publishable key, privileged calls with the secret key only', () => {
-  const env = { MOBILE_INTEGRATIONS_ENABLED: 'true', MOBILE_SUPABASE_URL: 'https://example.supabase.co', MOBILE_SUPABASE_PUBLISHABLE_KEY: 'fixture-public',
-    MOBILE_SUPABASE_SECRET_KEY: 'fixture-secret', MOBILE_AI_ENABLED: 'true', MOBILE_AI_PROVIDER: 'openai', MOBILE_AI_MODEL: 'gpt-6-luna', MOBILE_AI_API_KEY: 'fixture-key' };
+  const env = { ...STAGING_AI, MOBILE_INTEGRATIONS_ENABLED: 'true', MOBILE_SUPABASE_URL: 'https://example.supabase.co', MOBILE_SUPABASE_PUBLISHABLE_KEY: PUBLISHABLE,
+    MOBILE_SUPABASE_SECRET_KEY: SECRET };
   const owner = '00000000-0000-4000-8000-000000000001';
   it('verifies the person, then passes the verified owner to server-only functions without their token', async () => {
     const fetcher = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ id: owner }) }));
     const deps = mobileDependencies('assistant', env, fetcher);
-    const session = await deps.authenticate(headers.authorization);
+    const session = await deps.authenticate(accessToken());
     expect(session).toEqual({ userId: owner });
-    expect(fetcher.mock.calls[0][1].headers).toEqual({ apikey: 'fixture-public', Authorization: headers.authorization });
+    expect(fetcher.mock.calls[0][1].headers).toEqual({ apikey: PUBLISHABLE, Authorization: accessToken() });
     fetcher.mockResolvedValue({ ok: true, json: async () => ({ id: 'reservation-1' }) });
     expect(await deps.reserveAI(session, { requestId: request.requestId, model: 'openai:gpt-6-luna', maxMicroUsd: 1750, inputTokens: 8000, outputTokens: 1500 })).toEqual({ id: 'reservation-1' });
     const [url, init] = fetcher.mock.calls[1];
     expect(url).toBe('https://example.supabase.co/rest/v1/rpc/mobile_ai_reserve');
     // The secret key alone: with a user token the call would run as that user, not as the server.
-    expect(init.headers).toEqual({ apikey: 'fixture-secret', 'Content-Type': 'application/json' });
-    expect(JSON.parse(init.body)).toEqual({ p_user_id: owner, p_request_id: request.requestId, p_model: 'openai:gpt-6-luna', p_max_micro_usd: 1750, p_input_tokens: 8000, p_output_tokens: 1500 });
+    expect(init.headers).toEqual({ apikey: SECRET, 'Content-Type': 'application/json' });
+    expect(JSON.parse(init.body)).toEqual({ p_user_id: owner, p_request_id: request.requestId, p_model: 'openai:gpt-6-luna', p_max_micro_usd: 1750, p_input_tokens: 8000,
+      p_output_tokens: 1500, p_environment: 'staging' });
     fetcher.mockResolvedValue({ ok: true, json: async () => ({ error: 'global_budget' }) });
     expect(await deps.reserveAI(session, { requestId: request.requestId, model: 'm', maxMicroUsd: 1, inputTokens: 1, outputTokens: 1 })).toEqual({ error: 'global_budget' });
     fetcher.mockResolvedValue({ ok: true, json: async () => false });
@@ -254,12 +266,78 @@ describe('Supabase: session verified with the publishable key, privileged calls 
   it('refuses anonymous or malformed users and fails closed on outages', async () => {
     for (const user of [{ id: owner, is_anonymous: true }, { id: 'not-a-uuid' }, {}]) {
       const deps = mobileDependencies('capture', env, vi.fn(async () => ({ ok: true, status: 200, json: async () => user })));
-      await expect(deps.authenticate(headers.authorization)).rejects.toMatchObject({ status: 401 });
+      await expect(deps.authenticate(accessToken())).rejects.toMatchObject({ status: 401 });
     }
     const fetcher = vi.fn(async () => ({ ok: false, status: 500 }));
     const deps = mobileDependencies('assistant', env, fetcher);
-    await expect(deps.authenticate(headers.authorization)).rejects.toMatchObject({ status: 503 });
+    await expect(deps.authenticate(accessToken())).rejects.toMatchObject({ status: 503 });
     await expect(deps.reserveAI({ userId: owner }, { requestId: 'r', model: 'm', maxMicroUsd: 1, inputTokens: 1, outputTokens: 1 })).rejects.toMatchObject({ status: 503 });
     await expect(deps.receiveCapture({ userId: owner }, validateCapture(capture))).rejects.toMatchObject({ status: 503 });
+  });
+});
+
+describe('environment identity and key kinds fail closed (25A-06)', () => {
+  const env = { ...STAGING_AI, MOBILE_INTEGRATIONS_ENABLED: 'true', MOBILE_SUPABASE_URL: 'https://example.supabase.co', MOBILE_SUPABASE_PUBLISHABLE_KEY: PUBLISHABLE,
+    MOBILE_SUPABASE_SECRET_KEY: SECRET };
+  it('runs only as staging in a Production-scoped Vercel deployment; never preview, development, production or unnamed', () => {
+    expect(ENABLED_ENVIRONMENTS).toEqual(['staging']);
+    expect(environmentOf(env)).toBe('staging');
+    for (const off of [{ VERCEL_ENV: 'preview' }, { VERCEL_ENV: 'development' }, { VERCEL_ENV: undefined }, { MOBILE_ENVIRONMENT: 'production' },
+      { MOBILE_ENVIRONMENT: 'development' }, { MOBILE_ENVIRONMENT: 'preview' }, { MOBILE_ENVIRONMENT: 'Staging' }, { MOBILE_ENVIRONMENT: undefined }]) {
+      expect(environmentOf({ ...env, ...off }), JSON.stringify(off)).toBeNull();
+      expect(mobileDependencies('capture', { ...env, ...off }), JSON.stringify(off)).toBeNull();
+      expect(mobileDependencies('assistant', { ...env, ...off }), JSON.stringify(off)).toBeNull();
+    }
+    // Off Vercel (the evaluation and probe scripts) VERCEL_ENV must be absent.
+    expect(environmentOf({ MOBILE_ENVIRONMENT: 'staging' }, { deployed: false })).toBe('staging');
+    expect(environmentOf({ MOBILE_ENVIRONMENT: 'staging', VERCEL_ENV: 'preview' }, { deployed: false })).toBeNull();
+    expect(aiConfig({ ...STAGING_AI, VERCEL_ENV: undefined }, { deployed: false }).environment).toBe('staging');
+  });
+  it('accepts only the current Supabase key kinds, in the right slots', () => {
+    const legacy = 'eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIn0.fixture';
+    for (const keys of [{ MOBILE_SUPABASE_PUBLISHABLE_KEY: legacy }, { MOBILE_SUPABASE_SECRET_KEY: legacy },
+      { MOBILE_SUPABASE_PUBLISHABLE_KEY: SECRET, MOBILE_SUPABASE_SECRET_KEY: PUBLISHABLE }, { MOBILE_SUPABASE_SECRET_KEY: SECRET.slice(0, 15) }]) {
+      expect(mobileDependencies('capture', { ...env, ...keys }), JSON.stringify(keys)).toBeNull();
+    }
+  });
+  it('accepts only a project-scoped provider key together with its project id', () => {
+    for (const key of ['sk-fixture-legacy-user-key', 'sk-admin-fixture-only', 'fixture-key', '', 'sk-proj-short']) {
+      expect(aiConfig({ ...STAGING_AI, MOBILE_AI_API_KEY: key }), key).toBeNull();
+    }
+    expect(aiConfig({ ...STAGING_AI, MOBILE_AI_API_KEY: 'sk-svcacct-fixture-only' })).not.toBeNull();
+    for (const project of [undefined, '', 'proj_', 'org_fixtureOnly01', 'proj_fixture only']) expect(aiConfig({ ...STAGING_AI, MOBILE_AI_PROVIDER_PROJECT: project })).toBeNull();
+  });
+  it('rejects malformed, expired, anonymous and other projects\' tokens without a network call', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const issuer = 'https://example.supabase.co/auth/v1';
+    expect(plausibleAccessToken(accessToken(), issuer, now)).toBe(true);
+    for (const token of ['Bearer fixture-access-token', 'Bearer a.b', 'Bearer a.b.c.d', 'Bearer !!.@@.##', accessToken().replace('Bearer ', ''), 'Bearer x.' + 'e30' + '.y',
+      accessToken({ exp: now - 1 }), accessToken({ exp: String(now + 60) }), accessToken({ is_anonymous: true }), accessToken({ iss: 'https://other.supabase.co/auth/v1' }),
+      accessToken({ aud: 'anon' }), accessToken({ role: 'anon' }), accessToken({ role: 'service_role' }), accessToken({ sub: undefined }), undefined, null]) {
+      expect(plausibleAccessToken(token, issuer, now), String(token)).toBe(false);
+    }
+    const fetcher = vi.fn();
+    const deps = mobileDependencies('assistant', env, fetcher);
+    for (const token of [headers.authorization, accessToken({ is_anonymous: true }), accessToken({ exp: now - 1 })]) {
+      await expect(deps.authenticate(token)).rejects.toMatchObject({ status: 401 });
+    }
+    expect(fetcher).not.toHaveBeenCalled();
+    // A plausible token still meets Supabase, which decides (a signature or a signed-out session fails there).
+    fetcher.mockResolvedValue({ ok: false, status: 403 });
+    await expect(deps.authenticate(accessToken())).rejects.toMatchObject({ status: 401 });
+    expect(fetcher).toHaveBeenCalledOnce();
+  });
+  it('names its environment on every privileged call and fails closed when the database is another one', async () => {
+    const fetcher = vi.fn(async () => ({ ok: true, json: async () => ({ error: 'environment' }) }));
+    const deps = mobileDependencies('assistant', env, fetcher);
+    const session = { userId: '00000000-0000-4000-8000-000000000001' };
+    await expect(deps.receiveCapture(session, validateCapture(capture))).rejects.toMatchObject({ status: 503, category: 'environment' });
+    expect(JSON.parse(fetcher.mock.calls[0][1].body).p_environment).toBe('staging');
+    expect(await deps.reserveAI(session, { requestId: request.requestId, model: 'm', maxMicroUsd: 1, inputTokens: 1, outputTokens: 1 })).toEqual({ error: 'environment' });
+    const ports_ = ports(); ports_.reserveAI.mockResolvedValue({ error: 'environment' });
+    const res = await call('assistant', request, ports_);
+    expect(res.code).toBe(503);
+    expect(ports_.provider.respond).not.toHaveBeenCalled();
+    expect(ports_.log.mock.calls[0][0].category).toBe('environment');
   });
 });
