@@ -7,16 +7,16 @@ import { conversationSession, createConversationSession, lastUserWords } from '.
 // Producto 24UX6A: the Assistant's conversation lives in an in-memory app session (src/assistant/session.ts), not in the
 // screen, so leaving the root-stack screen and coming back finds it. Pure: Node drives it directly, with the real reducer.
 // Synthetic fixtures only.
-// The writes map's job (a failed confirm retries the same Entry id) is a behaviour of the screen, pinned in
-// tests/assistant-routes.node.ts, where randomUUID returns a fresh id on every call.
+// 25A-04: the session holds no write: a proposal is captured into the review store, which keeps it (its frozen ids make a
+// retry idempotent; tests/assistant-review.node.ts on real SQLite and tests/assistant-routes.node.ts for the screen).
 
-test('a new session is empty and idle, with nothing writing, no request and no write to retry', () => {
+test('a new session is empty and idle, with no request, no capture in flight and nothing it could write', () => {
   const session = createConversationSession();
   const state = session.getState();
   assert.equal(state.conversation, emptyConversation);
-  assert.equal(state.writing, null);
   assert.equal(session.request.current, null);
-  assert.equal(session.writes.size, 0);
+  assert.equal(session.capturing.size, 0);
+  assert.deepEqual(Object.keys(session).sort(), ['capturing', 'dispatch', 'getState', 'request', 'reset', 'subscribe']);
   assert.equal(lastUserWords(state.conversation), null);
 });
 
@@ -63,23 +63,6 @@ test('no notification and the same state object when an action changes nothing (
   session.dispatch({ type: 'compose', text: 'Gasté' });
   assert.equal(calls, 1);
   assert.equal(session.getState(), after);
-});
-
-test('setWriting marks the one draft being written, notifies only on a change, and keeps the conversation', () => {
-  const session = createConversationSession();
-  let calls = 0;
-  session.subscribe(() => { calls++; });
-  session.dispatch({ type: 'compose', text: 'hola' });
-  const conversation = session.getState().conversation;
-  session.setWriting('a-2');
-  assert.equal(session.getState().writing, 'a-2');
-  assert.equal(session.getState().conversation, conversation);
-  assert.equal(calls, 2);
-  session.setWriting('a-2');
-  assert.equal(calls, 2, 'the same message again is no change');
-  session.setWriting(null);
-  assert.equal(session.getState().writing, null);
-  assert.equal(calls, 3);
 });
 
 test('reset (New chat) aborts the request in flight, empties the conversation and keeps message ids increasing', () => {
@@ -151,8 +134,7 @@ test('lastUserWords is the person\'s last real words, and null when there is not
 test('nothing is persisted: the session module imports no storage, preference, React or native module', () => {
   const source = readFileSync(new URL('../src/assistant/session.ts', import.meta.url), 'utf8');
   const imports = [...source.matchAll(/^import\s[^;]*?from\s+'([^']+)'/gm)].map(match => match[1]);
-  assert.equal(imports.join(), '@finanzapp/domain,./conversation.ts');
-  assert.match(source, /^import type \{ Entry \} from '@finanzapp\/domain';$/m, 'the domain is used for its Entry type only');
+  assert.equal(imports.join(), './conversation.ts', '25A-04: not even the Entry type: the session holds no write');
   for (const forbidden of [/sqlite/i, /kv-store/, /preference/i, /AsyncStorage/, /SecureStore/, /localStorage/, /\bstorage\//, /from 'react/, /expo-/, /backup/i])
     assert.equal(forbidden.test(source.replace(/\/\*\*[\s\S]*?\*\//g, '')), false, 'no ' + forbidden + ' outside comments');
 });

@@ -13,7 +13,7 @@ import { changeEntry, createAccount, createEntry, deleteAccount, deleteCreditCar
   type LedgerDatabase } from './database';
 import { openLedger, refreshLedger, savePurchaseOperation, savePurchasePlan, sessionWarning } from './ledger-session';
 import { openLedgerDatabase, openReviewDatabase } from './nativeDatabase';
-import { loadReviewTray, openReviewStore, type ReviewDatabase, type ReviewItem, type ReviewStore, type ReviewTray } from './review-database';
+import { loadReviewTray, openReviewStore, type ReviewCapture, type ReviewDatabase, type ReviewItem, type ReviewStore, type ReviewTray } from './review-database';
 
 declare const __DEV__: boolean | undefined;
 /** The creation gate of this build (docs/currency.md §7.5, stage 9): the production ARS/USD, or the preview set in a
@@ -83,6 +83,12 @@ type LedgerContextValue = {
   updateReview: (id: string, expectedRevision: number, draft: unknown) => Promise<ReviewItem>;
   /** pending → dismissed. Writes nothing to the ledger. */
   dismissReview: (id: string, expectedRevision: number) => Promise<void>;
+  /** 25A-04: a producer's proposal stored as a pending item (the Assistant's). Idempotent: the same capture again returns
+   * the stored item (an item edited since is kept as edited); the same id or key with other data is refused. Writes
+   * nothing to the ledger; the tray and the badge are read again afterwards. */
+  captureReview: (input: ReviewCapture) => Promise<ReviewItem>;
+  /** 25A-04: one item whatever its state (confirmed, dismissed), for a producer that shows it again; null when absent. */
+  getReviewItem: (id: string) => Promise<ReviewItem | null>;
 };
 const LedgerContext = createContext<LedgerContextValue | null>(null);
 
@@ -262,6 +268,11 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     }),
     updateReview: (id, expectedRevision, draft) => reviewOperation(store => store.updateDraft(id, expectedRevision, draft, new Date().toISOString())),
     dismissReview: (id, expectedRevision) => reviewOperation(async store => { await store.dismiss(id, expectedRevision, new Date().toISOString()); }),
+    captureReview: input => reviewOperation(async store => (await store.capture(input)).item),
+    getReviewItem: async id => {
+      if (!reviewStore.current) throw new Error('review.unavailable');
+      return reviewStore.current.get(id);
+    },
   }}>{children}</LedgerContext.Provider>;
 }
 

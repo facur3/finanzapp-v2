@@ -1,4 +1,3 @@
-import type { Entry } from '@finanzapp/domain';
 import { conversationReducer, emptyConversation, type ConversationAction, type ConversationState } from './conversation.ts';
 
 /** The Assistant's one conversation for the life of the app process (Producto 24UX6A, decision 005).
@@ -6,35 +5,34 @@ import { conversationReducer, emptyConversation, type ConversationAction, type C
  * Until 24UX6A the conversation lived in the Assistant tab's own state and survived only because the tab root stayed
  * mounted. The Assistant is now a screen of the root stack, opened from the capture hub, so leaving it unmounts the
  * screen; the conversation moves here, into memory, so leaving and coming back in the same app session finds it as it
- * was, including an answer that kept streaming or a confirm that finished while the screen was closed (the request
- * and the write dispatch here, not into a component that may be gone).
+ * was, including an answer that kept streaming or a proposal's capture that finished while the screen was closed (the
+ * request and the capture dispatch here, not into a component that may be gone).
  *
- * Memory only, on purpose: nothing is written to SQLite, a backup or a preference, and closing the app clears it, as
- * before. Chat history is not a FinanzApp feature (conversation.ts). The financial rules are unchanged: the reducer
- * never produces an Entry, and the screen writes only when the person confirms a draft.
+ * Memory only, on purpose: nothing of the conversation is written to SQLite, a backup or a preference, and closing the
+ * app clears it, as before. Chat history is not a FinanzApp feature (conversation.ts). Since 25A-04 a financial proposal
+ * is not the conversation's: it is captured into the review store (its own file) and lives there, so New chat, leaving
+ * the screen or closing the app never removes it. Nothing here writes the ledger.
  *
  * Pure (no React, no React Native), so Node tests drive it directly. */
 export type SessionState = {
   conversation: ConversationState;
-  /** The draft message whose confirm is writing right now: one write at a time, whether or not the screen is open. */
-  writing: string | null;
 };
 
 export type ConversationSession = {
   getState: () => SessionState;
   subscribe: (listener: () => void) => () => void;
   dispatch: (action: ConversationAction) => void;
-  setWriting: (messageId: string | null) => void;
   /** The request in flight, if any: at most one; Stop and New chat abort it. */
   request: { current: AbortController | null };
-  /** A confirm that failed after its Entry was built retries the same Entry (same id), never a second one. */
-  writes: Map<string, Entry>;
-  /** Forget the conversation (New chat): aborts a request in flight and keeps the message ids increasing. */
+  /** 25A-04: the proposals whose capture is in flight, so one is never sent twice at once. */
+  capturing: Set<string>;
+  /** Forget the conversation (New chat): aborts a request in flight and keeps the message ids increasing. It never touches
+   * the review store: a captured proposal stays in «Para revisar». */
   reset: () => void;
 };
 
 export function createConversationSession(): ConversationSession {
-  let state: SessionState = { conversation: emptyConversation, writing: null };
+  let state: SessionState = { conversation: emptyConversation };
   const listeners = new Set<() => void>();
   const set = (next: SessionState) => {
     if (next === state) return;
@@ -48,9 +46,8 @@ export function createConversationSession(): ConversationSession {
       const conversation = conversationReducer(state.conversation, action);
       if (conversation !== state.conversation) set({ ...state, conversation });
     },
-    setWriting: messageId => { if (state.writing !== messageId) set({ ...state, writing: messageId }); },
     request: { current: null },
-    writes: new Map(),
+    capturing: new Set(),
     reset: () => {
       session.request.current?.abort();
       session.request.current = null;

@@ -1,4 +1,4 @@
-import { isLegacyCurrency, type Account, type Currency, type Entry, type EntryKind, type LegacyCurrency } from '@finanzapp/domain';
+import { isLegacyCurrency, type Account, type Currency, type Entry, type EntryKind, type LegacyCurrency, type ReviewDraft } from '@finanzapp/domain';
 import type { AssistantFact, AssistantResult, CaptureDraft } from '../../../../packages/integrations/contracts.js';
 import { factCategory } from '../integrations/evidence.ts';
 import { translator, type MessageKey, type Translate } from '../i18n/messages.ts';
@@ -10,9 +10,8 @@ import { translator, type MessageKey, type Translate } from '../i18n/messages.ts
  * FinanzApp feature: the conversation is ephemeral and resets on demand.
  *
  * Two product rules live in this module and nowhere else:
- * - a parsed sentence becomes a **draft** the user confirms; the reducer never
- *   produces an Entry on its own, it only marks a draft confirmed once the
- *   screen reports that the ledger accepted the write;
+ * - a parsed sentence becomes a **proposal**: since 25A-04 it is captured as a review item (`ProposalContent`) and
+ *   reviewed, confirmed or discarded in «Para revisar» only; nothing in the conversation builds or writes an Entry;
  * - a financially meaningful gap (which account paid, what kind, how much)
  *   becomes a **clarification** with real options, never a silent guess.
  *
@@ -40,6 +39,11 @@ export type ResolvedDraft = {
   kind: EntryKind; amountMinor: number; currency: Currency; merchant: string; category: string; dateISO: string;
   /** Null until the user names the account: the reducer never picks one when several could pay. */
   accountId: string | null;
+  /** 25A-04: whether the model's draft named the currency and the date. When it did not, the conversation still offers
+   * the accounts of the screen's currency and shows today, as before, but the review draft keeps both unknown
+   * (`reviewDraftFromAssistant`): neither is ever invented in what is captured. Absent means stated. */
+  currencyStated?: boolean;
+  dateStated?: boolean;
 };
 
 export type DraftField = 'kind' | 'amount' | 'paymentMethod' | 'category';
@@ -57,9 +61,20 @@ export function optionText(option: ClarificationOption, t: Translate = translato
 
 /** `currency` is the one the facts were computed in: the rows keep it even if the screen later shows another. */
 export type AnswerContent = { kind: 'answer'; rows: EvidenceRow[]; links: EvidenceLink[]; currency: Currency };
-export type DraftContent = { kind: 'draft'; draft: ResolvedDraft; status: 'pending' | 'confirmed' | 'cancelled' | 'edited'; entryId: string | null };
+/** A resolved draft before the screen turns it into a proposal (it never reaches the reducer). */
+export type ResolvedContent = { kind: 'draft'; draft: ResolvedDraft };
+/** 25A-04: the frozen capture of one Assistant proposal into the review store: its item id, its write id and its capture
+ * key are fixed once, with the review draft, so a retry resends exactly the same capture (the store answers a repeat with
+ * the item it already holds, never a second one, and never overwrites an item edited since). */
+export type AssistantCapture = { id: string; writeId: string; captureKey: string; at: string; draft: ReviewDraft };
+/** A financial proposal in the thread. `capture.draft` is a snapshot to draw while the item is not (yet) in the store;
+ * once captured, the review item is the only source of truth and the card reads it, never this snapshot.
+ * - `preview`: the fixture view; never captured;
+ * - `capturing` / `failed`: the capture is in flight / did not land (nothing was written anywhere; Reintentar resends it);
+ * - `captured`: the review item exists. */
+export type ProposalContent = { kind: 'proposal'; capture: AssistantCapture; status: 'preview' | 'capturing' | 'failed' | 'captured' };
 export type ClarificationContent = { kind: 'clarification'; field: DraftField | null; options: ClarificationOption[]; chosen: string | null };
-export type AssistantContent = AnswerContent | DraftContent | ClarificationContent;
+export type AssistantContent = AnswerContent | ProposalContent | ClarificationContent;
 
 export type Message =
   | { id: string; role: 'user'; text: string }
@@ -90,10 +105,8 @@ export type ConversationAction =
   | { type: 'fail'; reason: AssistantReason; text: string; sent: string }
   | { type: 'stop' }
   | { type: 'choose'; messageId: string; optionId: string; label: string; next: { textKey: MessageKey; content: AssistantContent; pending: ConversationState['pending'] } | null }
-  | { type: 'draft-confirmed'; messageId: string; entryId: string }
-  | { type: 'draft-cancelled'; messageId: string }
-  /** The draft went to the entry form; the form's own save is the write. */
-  | { type: 'draft-edited'; messageId: string }
+  /** 25A-04: the capture of a proposal into the review store started, landed or failed. */
+  | { type: 'proposal'; messageId: string; status: 'capturing' | 'captured' | 'failed' }
   /** A note the screen adds outside a request (a refused confirm, a test-view reminder). */
   | { type: 'note'; reason: AssistantReason; text: string }
   | { type: 'reset' };
@@ -159,13 +172,13 @@ export function conversationReducer(state: ConversationState, action: Conversati
       if (action.next) messages.push({ id: `a-${state.nextId + 1}`, role: 'assistant', status: 'done', text: '', textKey: action.next.textKey, content: action.next.content });
       return { ...state, messages, pending: action.next?.pending ?? null, nextId: state.nextId + 2 };
     }
-    case 'draft-confirmed':
-    case 'draft-cancelled':
-    case 'draft-edited': {
+    case 'proposal': {
+      // A preview never captures, and a captured proposal never goes back: its item is the source of truth from then on.
       const target = state.messages.find(message => message.id === action.messageId);
-      if (!target || target.role !== 'assistant' || target.content?.kind !== 'draft' || target.content.status !== 'pending') return state;
-      const status = action.type === 'draft-confirmed' ? 'confirmed' : action.type === 'draft-cancelled' ? 'cancelled' : 'edited';
-      const content: DraftContent = { ...target.content, status, entryId: action.type === 'draft-confirmed' ? action.entryId : null };
+      if (!target || target.role !== 'assistant' || target.content?.kind !== 'proposal') return state;
+      const current = target.content.status;
+      if (current === 'preview' || current === 'captured' || current === action.status) return state;
+      const content: ProposalContent = { ...target.content, status: action.status };
       return { ...state, messages: state.messages.map(message => message === target ? { ...target, content } : message) };
     }
     case 'note':
@@ -220,8 +233,9 @@ export function categoryOptions(entries: Entry[], kind: EntryKind, limit = 4): C
 export function resolveDraft(draft: CaptureDraft, accounts: Account[], entries: Entry[], currency: Currency, todayISO: string, incomeAccounts: Account[] = accounts):
   { kind: 'draft'; draft: ResolvedDraft } | { kind: 'clarification'; field: DraftField; question: MessageKey; options: ClarificationOption[]; partial: Partial<ResolvedDraft> } {
   const resolvedCurrency = draft.currency ?? currency;
+  const stated = { currencyStated: draft.currency !== null, dateStated: draft.dateISO !== null };
   const partial: Partial<ResolvedDraft> = { currency: resolvedCurrency, merchant: draft.merchant ?? '', category: draft.category ?? '',
-    dateISO: draft.dateISO ?? todayISO, ...(draft.kind ? { kind: draft.kind } : {}), ...(draft.amountMinor ? { amountMinor: draft.amountMinor } : {}) };
+    dateISO: draft.dateISO ?? todayISO, ...stated, ...(draft.kind ? { kind: draft.kind } : {}), ...(draft.amountMinor ? { amountMinor: draft.amountMinor } : {}) };
   if (!draft.kind) return { kind: 'clarification', field: 'kind', question: 'assistant.clarify.kind',
     options: [{ id: 'expense', labelKey: 'movement.expense' }, { id: 'income', labelKey: 'movement.income' }], partial };
   if (!draft.amountMinor) return { kind: 'clarification', field: 'amount', question: 'assistant.clarify.amount', options: [], partial };
@@ -233,12 +247,12 @@ export function resolveDraft(draft: CaptureDraft, accounts: Account[], entries: 
     options: eligible.map(account => ({ id: account.id, label: account.name })), partial: { ...partial, accountId: null } };
   if (!draft.category) return { kind: 'clarification', field: 'category', question: 'assistant.clarify.category', options: categoryOptions(entries, draft.kind), partial: { ...partial, accountId } };
   return { kind: 'draft', draft: { kind: draft.kind, amountMinor: draft.amountMinor, currency: resolvedCurrency, merchant: draft.merchant ?? '',
-    category: draft.category, dateISO: draft.dateISO ?? todayISO, accountId } };
+    category: draft.category, dateISO: draft.dateISO ?? todayISO, accountId, ...stated } };
 }
 
 /** Apply a chosen option to a parked draft. Returns the next turn: another clarification (still parked) or the draft. */
 export function completeDraft(pending: { draft: Partial<ResolvedDraft>; field: DraftField }, optionId: string, accounts: Account[], entries: Entry[], todayISO: string, incomeAccounts: Account[] = accounts):
-  { textKey: MessageKey; content: AssistantContent; pending: ConversationState['pending'] } {
+  { textKey: MessageKey; content: ResolvedContent | ClarificationContent; pending: ConversationState['pending'] } {
   const draft = { ...pending.draft };
   if (pending.field === 'kind') draft.kind = optionId === 'income' ? 'income' : 'expense';
   else if (pending.field === 'paymentMethod') draft.accountId = optionId;
@@ -249,27 +263,12 @@ export function completeDraft(pending: { draft: Partial<ResolvedDraft>; field: D
     category: draft.category || null, dateISO: draft.dateISO ?? null, paymentMethodRef: null };
   const chosen = (pool: Account[]) => draft.accountId ? pool.filter(account => account.id === draft.accountId) : pool;
   const next = resolveDraft(capture, chosen(accounts), entries, currency, todayISO, chosen(incomeAccounts));
+  // What the model stated is carried from the first turn: the re-resolution above always passes a currency and a date.
+  const stated = { currencyStated: pending.draft.currencyStated ?? true, dateStated: pending.draft.dateStated ?? true };
   if (next.kind === 'draft') return { textKey: 'assistant.clarify.reviewDraft', pending: null,
-    content: { kind: 'draft', draft: { ...next.draft, accountId: draft.accountId ?? next.draft.accountId }, status: 'pending', entryId: null } };
+    content: { kind: 'draft', draft: { ...next.draft, accountId: draft.accountId ?? next.draft.accountId, ...stated } } };
   return { textKey: next.question, content: { kind: 'clarification', field: next.field, options: next.options, chosen: null },
-    pending: { draft: { ...next.partial, accountId: draft.accountId ?? next.partial.accountId ?? null }, field: next.field } };
-}
-
-/** Fields a confirmable draft still lacks. Confirm stays disabled while any remain; Editar completes them in the form. */
-export function draftGaps(draft: ResolvedDraft): ('merchant' | 'category' | 'account')[] {
-  const gaps: ('merchant' | 'category' | 'account')[] = [];
-  if (!draft.merchant.trim()) gaps.push('merchant');
-  if (!draft.category.trim()) gaps.push('category');
-  if (!draft.accountId) gaps.push('account');
-  return gaps;
-}
-
-/** The Entry a confirmed draft becomes. The caller validates it with the domain and writes it; nothing here writes.
- * A missing account throws the catalogue key, which the note translates at display. */
-export function entryFromDraft(draft: ResolvedDraft, entryId: string, createdAt: string): Entry {
-  if (!draft.accountId) throw new Error('assistant.draft.accountRequired');
-  return { id: entryId, accountId: draft.accountId, kind: draft.kind, amountMinor: draft.amountMinor, merchant: draft.merchant.trim(),
-    category: draft.category.trim(), dateISO: draft.dateISO, createdAt };
+    pending: { draft: { ...next.partial, accountId: draft.accountId ?? next.partial.accountId ?? null, ...stated }, field: next.field } };
 }
 
 /** What a fact is about, decided by its id; only a category's stored name is read from the label (see `factCategory`). */
@@ -321,12 +320,13 @@ export function answerContent(result: Pick<AssistantResult, 'factIds'>, facts: A
   return { kind: 'answer', rows: rows.slice(0, 5), links, currency };
 }
 
-/** The content the reducer stores for a validated server result. Drafts are resolved locally; answers get evidence. */
+/** The content for a validated server result. Drafts are resolved locally (a resolved one is turned into a proposal by the
+ * screen, which fixes its ids); answers get evidence. */
 export function contentFromResult(result: AssistantResult, facts: AssistantFact[], accounts: Account[], entries: Entry[], currency: Currency, todayISO: string, incomeAccounts: Account[] = accounts):
-  { text: string; textKey?: MessageKey; content: AssistantContent | null; pending: ConversationState['pending'] } {
+  { text: string; textKey?: MessageKey; content: AnswerContent | ClarificationContent | ResolvedContent | null; pending: ConversationState['pending'] } {
   if (result.kind === 'draft' && result.draft) {
     const resolved = resolveDraft(result.draft, accounts, entries, currency, todayISO, incomeAccounts);
-    if (resolved.kind === 'draft') return { text: result.message, content: { kind: 'draft', draft: resolved.draft, status: 'pending', entryId: null }, pending: null };
+    if (resolved.kind === 'draft') return { text: result.message, content: { kind: 'draft', draft: resolved.draft }, pending: null };
     return { text: '', textKey: resolved.question, content: { kind: 'clarification', field: resolved.field, options: resolved.options, chosen: null }, pending: { draft: resolved.partial, field: resolved.field } };
   }
   if (result.kind === 'clarification') return { text: result.message, content: { kind: 'clarification', field: null, options: [], chosen: null }, pending: null };

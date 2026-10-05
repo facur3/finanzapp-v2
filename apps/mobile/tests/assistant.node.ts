@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import type { Account, Entry } from '@finanzapp/domain';
-import { REASON_TEXT, SUGGESTIONS, answerContent, categoryOptions, classifyIntent, completeDraft, contentFromResult, conversationReducer, draftGaps,
-  emptyConversation, entryFromDraft, evidenceLabel, optionText, resolveDraft, shouldAutoscroll, type ConversationState } from '../src/assistant/conversation.ts';
+import { REASON_TEXT, SUGGESTIONS, answerContent, categoryOptions, classifyIntent, completeDraft, contentFromResult, conversationReducer,
+  emptyConversation, evidenceLabel, optionText, resolveDraft, shouldAutoscroll, type ConversationState } from '../src/assistant/conversation.ts';
 import { FACT_LABELS, monthlyEvidence } from '../src/integrations/evidence.ts';
 import { integrationClient } from '../src/integrations/client.ts';
 import { translator } from '../src/i18n/messages.ts';
@@ -12,6 +12,7 @@ import { assistantForEnvironment, disconnectedAssistant, failureMessage, failure
 import { validateAssistantRequest } from '../../../packages/integrations/contracts.js';
 import { assistantForBuild } from '../src/assistant/runtime.ts';
 import { FIXTURE_ANSWER, FIXTURE_DRAFT, FIXTURE_DRAFT_NO_ACCOUNT, FIXTURE_FACTS, fixtureAssistant, fixtureReply } from '../src/assistant/fixtures.ts';
+import type { AssistantCapture, ClarificationContent } from '../src/assistant/conversation.ts';
 
 // Producto 21: the Assistant conversation model, its client boundary and the
 // fixtures, as pure Node tests. No React, no SQLite, no network.
@@ -143,7 +144,6 @@ test('choosing an option completes the parked draft, or asks the next question, 
   const next = completeDraft(asked.pending!, 'cash', [visa, cash], entries, today);
   assert.equal(next.content.kind, 'draft');
   assert.equal(next.content.kind === 'draft' && next.content.draft.accountId, 'cash');
-  assert.equal(next.content.kind === 'draft' && next.content.status, 'pending');
   assert.equal(next.pending, null);
   // Two gaps in a row: kind first, then the account.
   const twoGaps = contentFromResult({ ...FIXTURE_DRAFT_NO_ACCOUNT, draft: { ...FIXTURE_DRAFT_NO_ACCOUNT.draft!, kind: null } }, [], [visa, cash], entries, 'ARS', today);
@@ -157,39 +157,39 @@ test('choosing an option completes the parked draft, or asks the next question, 
   assert.equal(afterAccount.content.kind === 'draft' && afterAccount.content.draft.kind, 'expense');
 });
 
-test('the reducer records a choice as the user\'s own words and never confirms a draft on its own', () => {
+test('the reducer records a choice as the user\'s own words; a proposal\'s capture only moves forward and never confirms anything', () => {
   const asked = contentFromResult(FIXTURE_DRAFT_NO_ACCOUNT, [], [visa, cash], entries, 'ARS', today);
-  const state = run([{ type: 'send', text: 'Gasté 18 mil en el súper' }, { type: 'answer', text: asked.text, textKey: asked.textKey, content: asked.content, pending: asked.pending }]);
+  const state = run([{ type: 'send', text: 'Gasté 18 mil en el súper' }, { type: 'answer', text: asked.text, textKey: asked.textKey, content: asked.content as ClarificationContent, pending: asked.pending }]);
   assert.equal(state.messages[1].role === 'assistant' && state.messages[1].textKey, 'assistant.clarify.paidWith');
   const clarification = state.messages[1];
-  const next = completeDraft(state.pending!, 'visa', [visa, cash], entries, today);
+  const resolved = completeDraft(state.pending!, 'visa', [visa, cash], entries, today);
+  assert.equal(resolved.content.kind, 'draft', 'a resolved draft, which the screen turns into a proposal before it reaches the reducer');
+  const capture: AssistantCapture = { id: 'item-1', writeId: 'write-1', captureKey: 'assistant:item-1', at: '2026-09-21T10:00:00.000Z',
+    draft: { version: 1, source: 'assistant', capturedAt: '2026-09-21T10:00:00.000Z', kind: 'expense', amountMinor: 1800000, currency: null, merchant: 'Súper',
+      category: 'Supermercado', dateISO: null, destinationId: 'visa', purchase: null, basis: [] } };
+  const next = { ...resolved, content: { kind: 'proposal' as const, capture, status: 'capturing' as const } };
   const chosen = run([{ type: 'choose', messageId: clarification.id, optionId: 'visa', label: 'Visa Galicia', next }], state);
   assert.deepEqual(chosen.messages.map(message => message.role), ['user', 'assistant', 'user', 'assistant']);
   assert.equal(chosen.messages[1].role === 'assistant' && chosen.messages[1].content?.kind === 'clarification' && chosen.messages[1].content.chosen, 'visa');
   assert.equal(chosen.messages[2].text, 'Visa Galicia');
-  const draft = chosen.messages[3];
-  assert.equal(draft.role === 'assistant' && draft.content?.kind === 'draft' && draft.content.status, 'pending');
+  const proposal = chosen.messages[3];
+  const status = (s: ConversationState) => { const m = s.messages[3]; return m.role === 'assistant' && m.content?.kind === 'proposal' ? m.content.status : null; };
+  assert.equal(status(chosen), 'capturing');
   // Choosing again on the same clarification is ignored.
   assert.equal(run([{ type: 'choose', messageId: clarification.id, optionId: 'cash', label: 'Efectivo', next }], chosen), chosen);
-  const confirmed = run([{ type: 'draft-confirmed', messageId: draft.id, entryId: 'entry-1' }], chosen);
-  assert.equal(confirmed.messages[3].role === 'assistant' && confirmed.messages[3].content?.kind === 'draft' && confirmed.messages[3].content.status, 'confirmed');
-  assert.equal(confirmed.messages[3].role === 'assistant' && confirmed.messages[3].content?.kind === 'draft' && confirmed.messages[3].content.entryId, 'entry-1');
-  const cancelled = run([{ type: 'draft-cancelled', messageId: draft.id }], chosen);
-  assert.equal(cancelled.messages[3].role === 'assistant' && cancelled.messages[3].content?.kind === 'draft' && cancelled.messages[3].content.status, 'cancelled');
-  // A cancelled draft cannot be confirmed afterwards.
-  assert.equal(run([{ type: 'draft-confirmed', messageId: draft.id, entryId: 'x' }], cancelled), cancelled);
-});
-
-test('a confirmed draft becomes exactly one Entry for the domain to validate; gaps block it', () => {
-  const resolved = resolveDraft(FIXTURE_DRAFT.draft!, [visa, cash], entries, 'ARS', today);
-  assert.equal(resolved.kind, 'draft');
-  const draft = resolved.kind === 'draft' ? resolved.draft : null!;
-  assert.deepEqual(draftGaps(draft), []);
-  const entry = entryFromDraft(draft, 'op-1', '2026-09-21T10:00:00.000Z');
-  assert.deepEqual(entry, { id: 'op-1', accountId: 'visa', kind: 'expense', amountMinor: 1850000, merchant: 'Carrefour', category: 'Supermercado', dateISO: today, createdAt: '2026-09-21T10:00:00.000Z' });
-  assert.deepEqual(draftGaps({ ...draft, merchant: ' ', accountId: null }), ['merchant', 'account']);
-  assert.throws(() => entryFromDraft({ ...draft, accountId: null }, 'op-2', createdAt), /^Error: assistant\.draft\.accountRequired$/);
-  assert.equal(bindLocale('es-AR').errorText('assistant.draft.accountRequired'), 'Elegí con qué cuenta se pagó antes de confirmar.');
+  const failed = run([{ type: 'proposal', messageId: proposal.id, status: 'failed' }], chosen);
+  assert.equal(status(failed), 'failed');
+  const captured = run([{ type: 'proposal', messageId: proposal.id, status: 'capturing' }, { type: 'proposal', messageId: proposal.id, status: 'captured' }], failed);
+  assert.equal(status(captured), 'captured');
+  // Captured is final: the review item is the source of truth from then on.
+  assert.equal(run([{ type: 'proposal', messageId: proposal.id, status: 'failed' }], captured), captured);
+  assert.equal(run([{ type: 'proposal', messageId: proposal.id, status: 'capturing' }], captured), captured);
+  // A preview (the fixture view) never captures.
+  const preview = run([{ type: 'choose', messageId: clarification.id, optionId: 'visa', label: 'Visa', next: { ...next, content: { ...next.content, status: 'preview' as const } } }], state);
+  assert.equal(run([{ type: 'proposal', messageId: preview.messages[3].id, status: 'captured' }], preview), preview);
+  // Nothing in the conversation builds or writes an Entry.
+  const source = readFileSync(new URL('../src/assistant/conversation.ts', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /entryFromDraft|validateEntry|addEntry|createEntry/);
 });
 
 test('answer rows and links come from the cited evidence: signed differences when both months are cited, absolute otherwise', () => {
@@ -316,13 +316,12 @@ test('English: the app\'s own words translate, the model\'s words, the user\'s d
   assert.equal(draft.textKey, undefined);
   const asked = contentFromResult(FIXTURE_DRAFT_NO_ACCOUNT, [], [visa, cash], entries, 'ARS', today);
   assert.equal(en(asked.textKey!), 'What did you pay with?');
-  assert.equal(en(completeDraft(asked.pending!, 'cash', [visa, cash], entries, today).textKey), 'Review the draft before saving it.');
+  assert.equal(en(completeDraft(asked.pending!, 'cash', [visa, cash], entries, today).textKey), 'Review it in To review before recording it.');
   const english = bindLocale('en-AR');
   assert.equal(english.errorText('assistant.reasons.offline'), 'No connection. Your transactions didn’t change; you can retry.');
-  assert.equal(english.errorText('assistant.draft.accountRequired'), 'Choose the account you paid with before confirming.');
-  // The Entry a confirmed draft becomes does not depend on the language.
+  // The draft a proposal is made of does not depend on the language.
   const resolved = resolveDraft(FIXTURE_DRAFT.draft!, [visa, cash], entries, 'ARS', today);
-  assert.deepEqual(entryFromDraft(resolved.kind === 'draft' ? resolved.draft : null!, 'op-1', createdAt).category, 'Supermercado');
+  assert.equal(resolved.kind === 'draft' && resolved.draft.category, 'Supermercado');
   // Protocol: the facts sent to the server keep their Spanish labels.
   const snapshot: import('@finanzapp/domain').LedgerSnapshot = { accounts: [cash], entries: [
     { id: 'x1', accountId: 'cash', kind: 'expense', amountMinor: 1000, merchant: 'Coto', category: 'Supermercado', dateISO: '2026-09-02', createdAt }], transfers: [] };

@@ -1,20 +1,21 @@
-import { useCallback, useMemo, useRef, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { FlatList, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
-import { isLegacyCurrency, postingAccountsFor, validateEntry, type Currency } from '@finanzapp/domain';
+import { isLegacyCurrency, postingAccountsFor, type Currency, type ReviewArchive } from '@finanzapp/domain';
 import { assistantForBuild } from '../src/assistant/runtime';
-import { REASON_TEXT, SUGGESTIONS, classifyIntent, completeDraft, contentFromResult, entryFromDraft,
-  optionText, shouldAutoscroll, type ClarificationOption, type DraftContent, type EvidenceLink, type Message } from '../src/assistant/conversation';
+import { REASON_TEXT, SUGGESTIONS, classifyIntent, completeDraft, contentFromResult, optionText, shouldAutoscroll, type AssistantContent,
+  type ClarificationOption, type EvidenceLink, type Message, type ProposalContent, type ResolvedContent } from '../src/assistant/conversation';
+import { assistantCapture, proposalContent } from '../src/assistant/review-proposal';
 import { conversationSession } from '../src/assistant/session';
 import { monthlyEvidence } from '../src/integrations/evidence';
 import { useI18n } from '../src/i18n/provider';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { AssistantComposer } from '../src/ui/assistant-composer';
-import { AnswerEvidence, AssistantText, ClarificationChoices, DraftCard, Suggestions, SystemNote, UserMessage } from '../src/ui/assistant-messages';
+import { AnswerEvidence, AssistantText, ClarificationChoices, ProposalCard, Suggestions, SystemNote, UserMessage, type ProposalState } from '../src/ui/assistant-messages';
 import { AppText, IconButton } from '../src/ui/components';
 import { postingAccounts } from '../src/ui/liability-presentation';
-import { Appear, impactHaptic, successHaptic } from '../src/ui/motion';
+import { Appear, impactHaptic } from '../src/ui/motion';
 import { availableCurrencies } from '../src/ui/presentation';
 import { space, useCurrentDay, usePalette, useReduceMotion } from '../src/ui/theme';
 
@@ -30,11 +31,12 @@ const TAB_ROOTS = new Set(['/', '/activity', '/reports', '/settings']);
  * the app session (`conversationSession`), so leaving and coming back finds it
  * as it was; nothing is persisted, and closing the app clears it.
  *
- * The screen owns no financial rules. It sends text to the client boundary
- * (`assistantForBuild`, disconnected in this build), reduces the events into
- * the conversation model, and writes the ledger in exactly one place: when
- * the user confirms a draft card, the draft becomes an Entry that the domain
- * validates and the storage repository saves. Nothing else here can write.
+ * The screen owns no financial rules and never writes the ledger. It sends text to the client boundary
+ * (`assistantForBuild`, disconnected in this build) and reduces the events into the conversation model. Producto 25A-04:
+ * a resolved draft becomes a proposal captured into the review store (`captureReview`, the store's capture, with an item
+ * id and a write id fixed once, so a retry never makes a second item) and is then reviewed, edited, confirmed or
+ * discarded in «Para revisar», the one write path (25A-02, 25A-03). Its card reads the review item, never the
+ * conversation's snapshot, so a change made there is what the card shows. The fixture view captures nothing.
  * Questions are explained against `monthlyEvidence`, aggregated on-device;
  * the answer's rows and links come from those facts, never from prose.
  *
@@ -43,13 +45,13 @@ const TAB_ROOTS = new Set(['/', '/activity', '/reports', '/settings']);
  * model's answer and the user's words are shown exactly as they arrived. */
 export default function AssistantScreen() {
   const params = useLocalSearchParams<{ currency?: string }>();
-  const { snapshot, archive, addEntry } = useLedger();
+  const { snapshot, archive, review, captureReview, getReviewItem } = useLedger();
   const day = useCurrentDay();
   const p = usePalette();
   const reduced = useReduceMotion();
   const { t, speechLanguage } = useI18n();
   const session = conversationSession();
-  const { conversation: state, writing } = useSyncExternalStore(session.subscribe, session.getState, session.getState);
+  const { conversation: state } = useSyncExternalStore(session.subscribe, session.getState, session.getState);
   const dispatch = session.dispatch;
   const client = useMemo(() => assistantForBuild(), []);
   const list = useRef<FlatList<Message>>(null);
@@ -64,6 +66,43 @@ export default function AssistantScreen() {
   const incomeAccounts = useMemo(() => postingAccountsFor('income', snapshot?.accounts ?? [], archive?.cards, archive?.debts), [snapshot?.accounts, archive?.cards, archive?.debts]);
   const entries = snapshot?.entries ?? [];
   const busy = state.phase !== 'idle';
+  const preview = client.mode === 'fixture';
+
+  /** A resolved draft becomes a proposal with its ids fixed now (a retry reuses them); anything else passes through. The
+   * basis is taken from the ledger as it is when the answer arrives (a ref), not when the request was sent. */
+  const latest = useRef(archive);
+  latest.current = archive;
+  const toContent = useCallback((content: AssistantContent | ResolvedContent | null): AssistantContent | null => {
+    if (content?.kind !== 'draft') return content;
+    return proposalContent(assistantCapture(content.draft, (latest.current ?? { accounts: [], records: [] }) as ReviewArchive,
+      { id: randomUUID(), writeId: randomUUID() }, new Date().toISOString()), preview);
+  }, [preview]);
+
+  /** Stores a proposal in the review store, from the session (so it finishes even if the screen closes). Only a proposal
+   * not yet captured is sent, always as it was frozen; a failure writes nothing anywhere and leaves Reintentar. */
+  const capture = useCallback(async (messageId: string) => {
+    const message = session.getState().conversation.messages.find(item => item.id === messageId);
+    if (message?.role !== 'assistant' || message.content?.kind !== 'proposal') return;
+    const { status, capture: frozen } = message.content;
+    if (status === 'preview' || status === 'captured') return;
+    if (status === 'capturing' && session.capturing.has(messageId)) return;
+    session.capturing.add(messageId);
+    dispatch({ type: 'proposal', messageId, status: 'capturing' });
+    try {
+      await captureReview({ id: frozen.id, writeId: frozen.writeId, captureKey: frozen.captureKey, draft: frozen.draft, at: frozen.at });
+      dispatch({ type: 'proposal', messageId, status: 'captured' });
+    } catch {
+      dispatch({ type: 'proposal', messageId, status: 'failed' });
+    } finally {
+      session.capturing.delete(messageId);
+    }
+  }, [session, dispatch, captureReview]);
+  /** Every proposal the thread just added that is waiting for its capture. */
+  const captureNew = useCallback(() => {
+    for (const message of session.getState().conversation.messages) {
+      if (message.role === 'assistant' && message.content?.kind === 'proposal' && message.content.status === 'capturing' && !session.capturing.has(message.id)) void capture(message.id);
+    }
+  }, [session, capture]);
 
   const send = useCallback(async (raw: string) => {
     const text = raw.trim();
@@ -80,7 +119,11 @@ export default function AssistantScreen() {
       for await (const event of client.ask({ action, text, todayISO: day, currency, facts }, controller.signal)) {
         if (controller.signal.aborted) break;
         if (event.type === 'delta') dispatch({ type: 'delta', text: event.text });
-        else if (event.type === 'result') dispatch({ type: 'answer', ...contentFromResult(event.result, event.facts, accounts, entries, currency, day, incomeAccounts) });
+        else if (event.type === 'result') {
+          const { content, ...rest } = contentFromResult(event.result, event.facts, accounts, entries, currency, day, incomeAccounts);
+          dispatch({ type: 'answer', ...rest, content: toContent(content) });
+          captureNew();
+        }
         // A failure's message is the integration client's catalogue key or empty (then the reason's own note); the note translates it through errorText.
         else dispatch({ type: 'fail', reason: event.reason, text: event.reason === 'failed' && event.message ? event.message : REASON_TEXT[event.reason], sent: raw });
       }
@@ -89,43 +132,47 @@ export default function AssistantScreen() {
     } finally {
       if (session.request.current === controller) session.request.current = null;
     }
-  }, [client, session, dispatch, snapshot, accounts, incomeAccounts, entries, currency, day]);
+  }, [client, session, dispatch, snapshot, accounts, incomeAccounts, entries, currency, day, toContent, captureNew]);
 
   const stop = useCallback(() => { session.request.current?.abort(); session.request.current = null; dispatch({ type: 'stop' }); }, [session, dispatch]);
 
   // `shown` is what the chip displayed: it becomes the user's own words in the thread.
   const choose = useCallback((messageId: string, option: ClarificationOption, shown?: string) => {
-    const next = state.pending ? completeDraft(state.pending, option.id, accounts, entries, day, incomeAccounts) : null;
+    const resolved = state.pending ? completeDraft(state.pending, option.id, accounts, entries, day, incomeAccounts) : null;
+    const next = resolved ? { ...resolved, content: toContent(resolved.content)! } : null;
     dispatch({ type: 'choose', messageId, optionId: option.id, label: shown ?? optionText(option, t), next });
-  }, [dispatch, state.pending, accounts, incomeAccounts, entries, day, t]);
+    captureNew();
+  }, [dispatch, state.pending, accounts, incomeAccounts, entries, day, t, toContent, captureNew]);
 
-  const confirm = useCallback(async (messageId: string, content: DraftContent) => {
-    // Only a pending draft can be written, and only one write at a time: a stale tap on a confirmed card is a no-op.
-    if (writing || content.status !== 'pending') return;
-    if (client.mode === 'fixture') { dispatch({ type: 'note', reason: 'info', text: 'assistant.fixtureConfirmRefused' }); return; }
-    session.setWriting(messageId);
-    try {
-      // Build once, validate with the domain, write through the repository. A retry reuses the same Entry.
-      const entry = session.writes.get(messageId) ?? entryFromDraft(content.draft, randomUUID(), new Date().toISOString());
-      validateEntry(entry, accounts);
-      session.writes.set(messageId, entry);
-      await addEntry(entry);
-      session.writes.delete(messageId);
-      successHaptic();
-      dispatch({ type: 'draft-confirmed', messageId, entryId: entry.id });
-    } catch (cause) {
-      dispatch({ type: 'note', reason: 'failed', text: cause instanceof Error ? cause.message : 'assistant.saveFailed' });
-    } finally {
-      session.setWriting(null);
+  // A captured proposal that left the pending tray (confirmed or dismissed in «Para revisar», or no longer readable) is
+  // looked up once, so its card says what happened instead of offering it again.
+  const tray = review && review !== 'unavailable' ? review : null;
+  const [closed, setClosed] = useState<Record<string, ProposalState>>({});
+  const captured = state.messages.flatMap(item => item.role === 'assistant' && item.content?.kind === 'proposal' && item.content.status === 'captured' ? [item.content.capture.id] : []);
+  // Each id is looked up once (the provider's functions are new on every render: the lookup is read through a ref, and the
+  // effect runs only when another proposal leaves the tray), so a lookup never re-renders into another lookup.
+  const missing = tray ? captured.filter(id => !tray.items.some(row => row.id === id) && !(id in closed)) : [];
+  const lookup = useRef(getReviewItem);
+  lookup.current = getReviewItem;
+  useEffect(() => {
+    let live = true;
+    for (const id of missing) {
+      lookup.current(id).then(item => {
+        // Still pending (a tray that could not be read again) or not readable now: nothing is recorded, so the card keeps
+        // offering «Revisar»; only an outcome that cannot change is kept.
+        const next: ProposalState | null = !item ? { kind: 'gone' } : item.status === 'confirmed' && item.receipt
+          ? { kind: 'confirmed', record: item.receipt.type, writeId: item.writeId } : item.status === 'dismissed' ? { kind: 'dismissed' } : null;
+        if (live && next) setClosed(current => ({ ...current, [id]: next }));
+      }, () => { /* Unknown: the card keeps «Revisar». */ });
     }
-  }, [session, dispatch, writing, client.mode, accounts, addEntry]);
-
-  const edit = useCallback((messageId: string, content: DraftContent) => {
-    const { draft } = content;
-    dispatch({ type: 'draft-edited', messageId });
-    router.push({ pathname: '/new-entry', params: { kind: draft.kind, currency: draft.currency, ...(draft.accountId ? { accountId: draft.accountId } : {}),
-      amountMinor: String(draft.amountMinor), merchant: draft.merchant, category: draft.category, date: draft.dateISO } });
-  }, [dispatch]);
+    return () => { live = false; };
+  }, [missing.join(',')]);
+  const proposalState = (content: ProposalContent): ProposalState => {
+    if (content.status !== 'captured') return { kind: content.status };
+    const item = tray?.items.find(row => row.id === content.capture.id);
+    if (item) return { kind: 'pending', item, conflict: tray!.conflicts.includes(item.id), writable: tray!.writable };
+    return closed[content.capture.id] ?? { kind: 'unknown' };
+  };
 
   const open = useCallback((href: EvidenceLink['href']) => {
     const to = href.params ? { pathname: href.pathname, params: href.params } : href.pathname;
@@ -152,9 +199,9 @@ export default function AssistantScreen() {
       {(item.text || item.textKey || item.status === 'streaming') && <AssistantText text={item.textKey ? t(item.textKey) : item.text} ownWords={!!item.textKey} status={item.status} />}
       {item.content?.kind === 'answer' && <AnswerEvidence content={item.content} onOpen={open} />}
       {item.content?.kind === 'clarification' && <ClarificationChoices options={item.content.options} chosen={item.content.chosen} onChoose={(option, shown) => choose(item.id, option, shown)} />}
-      {item.content?.kind === 'draft' && <DraftCard content={item.content} accounts={accounts} busy={writing === item.id}
-        onConfirm={() => void confirm(item.id, item.content as DraftContent)} onEdit={() => edit(item.id, item.content as DraftContent)}
-        onCancel={() => dispatch({ type: 'draft-cancelled', messageId: item.id })} onOpenEntry={entryId => router.push({ pathname: '/entry/[id]', params: { id: entryId } })} />}
+      {item.content?.kind === 'proposal' && <ProposalCard content={item.content} state={proposalState(item.content)} archive={archive as ReviewArchive | null}
+        onReview={id => router.push({ pathname: '/review/[id]', params: { id } })} onRetry={() => void capture(item.id)}
+        onOpenRecord={(record, id) => router.push(record === 'plan' ? { pathname: '/installment/[id]', params: { id } } : { pathname: '/entry/[id]', params: { id } })} />}
     </View>;
   };
 

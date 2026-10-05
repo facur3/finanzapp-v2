@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
@@ -181,13 +181,16 @@ test('unreadable rows are counted apart and never listed; an empty tray, an unav
   assert.equal(all(root, 'LifecycleNote')[0].props.detail, 'Estas propuestas vienen de una versión más nueva de FinanzApp: se pueden ver, no modificar.');
 });
 
-test('the tray has no in-app producer: no development action creates a proposal, in any build', () => {
+test('the tray has no in-app producer: no development action creates a proposal, in any build; the Assistant is the one producer', () => {
   for (const dev of [false, true]) {
     const root = harness('review.tsx', { review: trayOf([]), calls: [] }, {}, { dev }).render();
     assert.equal(all(root, 'ActionButton').length, 0, 'synthetic proposals live in tests only (AGENTS.md rule 6)');
   }
   assert.doesNotMatch(readFileSync(new URL('../app/review.tsx', import.meta.url), 'utf8'), /randomUUID|capture|fixture|__DEV__/);
-  assert.doesNotMatch(readFileSync(new URL('../src/storage/LedgerProvider.tsx', import.meta.url), 'utf8'), /captureReview|store\.capture/);
+  // 25A-04: the one producer is the Assistant (a real proposal, never a fixture: its preview never captures).
+  const callers = (dir: string): string[] => readdirSync(new URL('../' + dir, import.meta.url), { withFileTypes: true }).flatMap(entry =>
+    entry.isDirectory() ? callers(dir + '/' + entry.name) : /\.tsx?$/.test(entry.name) && /captureReview\(/.test(readFileSync(new URL('../' + dir + '/' + entry.name, import.meta.url), 'utf8')) ? [dir + '/' + entry.name] : []);
+  assert.deepEqual([...callers('app'), ...callers('src/ui')], ['app/assistant.tsx']);
 });
 
 // ---- the detail ---------------------------------------------------------------------------------------------------------

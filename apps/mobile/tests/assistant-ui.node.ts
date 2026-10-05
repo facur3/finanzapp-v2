@@ -4,6 +4,8 @@ import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import * as conversation from '../src/assistant/conversation.ts';
+import * as domain from '@finanzapp/domain';
+import * as reviewPresentation from '../src/ui/review-presentation.ts';
 import * as materialPolicy from '../src/ui/material-policy.ts';
 import * as presentation from '../src/ui/presentation.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
@@ -58,6 +60,8 @@ function load(file: string, { reduced = false, fontScale = 1, dark = false, bott
     './theme': { radius: { chip: 14, tile: 12, group: 16, card: 20, sheet: 24, creditCard: 18, button: 14 }, space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
       usePalette: () => palette, useReduceMotion: () => reduced, useCurrentDay: () => '2026-09-21' },
     '../assistant/conversation': conversation,
+    '@finanzapp/domain': domain,
+    './review-presentation': reviewPresentation,
     './category-hues': { useCategoryLook: (stored: string, kind?: 'expense' | 'income') => ({ label: categoryLabel(stored, kind) }),
       useCategoryLookOf: (kind?: 'expense' | 'income') => (stored: string) => ({ label: categoryLabel(stored, kind) }) },
   };
@@ -159,55 +163,80 @@ test('the composer bar is a control surface: native glass when the material allo
   assert.equal(flat(nodes(send).find(node => node.type === 'View')!.props.style).backgroundColor, '#2557D6', 'the send button is solid on glass too');
 });
 
-test('a draft card lists kind, amount, merchant, category, account and date, confirms only when complete, and collapses when cancelled or edited', () => {
+// 25A-04: the proposal card. A captured proposal is read from its review item; it is never confirmed in the chat.
+const proposalAccounts = [{ id: 'visa', name: 'Visa Galicia', currency: 'ARS', openingMinor: 0, createdAt: '2026-09-01T12:00:00.000Z' },
+  { id: 'card-acc', name: 'Mastercard', currency: 'ARS', openingMinor: 0, createdAt: '2026-09-01T12:00:00.000Z' }];
+const proposalArchive = { accounts: proposalAccounts, records: [], debts: [], categories: [],
+  cards: [{ id: 'mc', accountId: 'card-acc', issuer: 'Banco', last4: '1234', creditLimitMinor: 100000, closingDay: 20, dueDay: 5, active: true, deleted: false,
+    createdAt: '2026-09-01T12:00:00.000Z', revision: 0, updatedAt: '2026-09-01T12:00:00.000Z' }] };
+const reviewDraft = (change: Partial<domain.ReviewDraft> = {}): domain.ReviewDraft => {
+  const draft: domain.ReviewDraft = { version: 1, source: 'assistant', capturedAt: '2026-09-21T10:00:00.000Z', kind: 'expense', amountMinor: 1850000, currency: 'ARS',
+    merchant: 'Carrefour', category: 'Supermercado', dateISO: '2026-09-21', destinationId: 'visa', purchase: null, basis: [], ...change };
+  return { ...draft, basis: domain.reviewBasis(draft, proposalArchive as domain.ReviewArchive) };
+};
+const proposal = (draft = reviewDraft(), status: conversation.ProposalContent['status'] = 'captured'): conversation.ProposalContent =>
+  ({ kind: 'proposal', status, capture: { id: 'item-1', writeId: 'write-1', captureKey: 'assistant:item-1', at: '2026-09-21T10:00:00.000Z', draft } });
+const itemOf = (draft: domain.ReviewDraft) => ({ id: 'item-1', source: 'assistant', captureKey: 'assistant:item-1', draft, writeId: 'write-1', status: 'pending',
+  attempt: null, receipt: null, createdAt: '2026-09-21T10:00:00.000Z', updatedAt: '2026-09-21T10:00:00.000Z', revision: 0 });
+
+test('25A-04: a proposal card shows what the review item holds, says what it needs, and leads to «Para revisar»; it never confirms', () => {
   const ui = load('assistant-messages.tsx');
-  const accounts = [{ id: 'visa', name: 'Visa Galicia', currency: 'ARS', openingMinor: 0, createdAt: 'x' }];
-  const draft = { kind: 'expense', amountMinor: 1850000, currency: 'ARS', merchant: 'Carrefour', category: 'Supermercado', dateISO: '2026-09-21', accountId: 'visa' };
   const calls: string[] = [];
-  const handlers = { accounts, onConfirm: () => calls.push('confirm'), onEdit: () => calls.push('edit'), onCancel: () => calls.push('cancel'), onOpenEntry: (id: string) => calls.push('open:' + id) };
-  const pending = ui.render('DraftCard', { content: { kind: 'draft', draft, status: 'pending', entryId: null }, ...handlers });
+  const handlers = { archive: proposalArchive, onReview: (id: string) => calls.push('review:' + id), onRetry: () => calls.push('retry'),
+    onOpenRecord: (record: string, id: string) => calls.push(record + ':' + id) };
+  // The live item, edited since the capture: the card reads it, not the snapshot.
+  const live = itemOf(reviewDraft({ merchant: 'Carrefour Express' }));
+  const pending = ui.render('ProposalCard', { content: proposal(), state: { kind: 'pending', item: live, conflict: false, writable: true }, ...handlers });
   const all = nodes(pending);
   const labels = all.filter(node => typeof node.props.accessibilityLabel === 'string').map(node => node.props.accessibilityLabel);
-  assert.deepEqual(labels.filter(label => label.includes(': ')), ['Comercio: Carrefour', 'Categoría: Supermercado', 'Pagado con: Visa Galicia', 'Fecha: Hoy · 21 sep']);
+  assert.deepEqual(labels.filter(label => label.includes(': ')), ['Comercio: Carrefour Express', 'Categoría: Supermercado', 'Dónde se registra: Visa Galicia',
+    'Fecha: 21 de septiembre de 2026']);
   assert.equal(all.find(node => node.type === 'Money')!.props.minor, 1850000);
-  assert.equal(all.find(node => node.type === 'Money')!.props.tone, 'expense');
-  assert.equal(all.find(node => node.type === 'Money')!.props.signed, false, 'an expense draft shows the stored amount with no sign');
-  assert.ok(all.some(node => node.type === 'CategoryBadge' && node.props.category === 'Supermercado'));
-  assert.ok(all.some(node => node.type === 'AccountBadge' && node.props.accountId === 'visa'));
-  assert.equal(all.some(node => node.type === 'AppText' && /Borrador · Gasto/.test(textOf(node))), true);
-  const buttons = all.filter(node => node.type === 'ActionButton').map(node => node.props.label);
-  assert.deepEqual(buttons, ['Confirmar', 'Editar']);
-  assert.equal(all.find(node => node.type === 'ActionButton' && node.props.label === 'Confirmar')!.props.disabled, false);
-  all.find(node => node.type === 'ActionButton' && node.props.label === 'Confirmar')!.props.onPress();
-  all.find(node => node.type === 'ActionButton' && node.props.label === 'Editar')!.props.onPress();
-  byLabel(pending, 'Descartar borrador')!.props.onPress();
-  assert.deepEqual(calls, ['confirm', 'edit', 'cancel']);
-  assert.equal(pending.type, 'Appear', 'the card reveals with the shared motion (fade only under Reduce Motion)');
-  // A gap (no account, no merchant) disables Confirmar and says what is missing.
-  const gappy = ui.render('DraftCard', { content: { kind: 'draft', draft: { ...draft, accountId: null, merchant: '' }, status: 'pending', entryId: null }, ...handlers });
-  assert.equal(nodes(gappy).find(node => node.type === 'ActionButton' && node.props.label === 'Confirmar')!.props.disabled, true);
-  assert.ok(nodes(gappy).some(node => node.type === 'AppText' && /Completá los datos que faltan/.test(textOf(node))));
-  assert.ok(nodes(gappy).some(node => node.props.accessibilityLabel === 'Pagado con: Falta elegir'));
-  // Income wording.
-  const income = ui.render('DraftCard', { content: { kind: 'draft', draft: { ...draft, kind: 'income', merchant: 'Sueldo' }, status: 'pending', entryId: null }, ...handlers });
-  assert.ok(nodes(income).some(node => node.props.accessibilityLabel === 'Ingresa en: Visa Galicia'));
-  assert.ok(nodes(income).some(node => node.props.accessibilityLabel === 'Origen: Sueldo'));
-  const incomeMoney = nodes(income).find(node => node.type === 'Money')!;
-  assert.equal(incomeMoney.props.minor, 1850000, 'the stored magnitude, untouched');
-  assert.equal(incomeMoney.props.tone, 'income');
-  assert.equal(incomeMoney.props.signed, true, 'an income draft shows «+»');
-  // Confirmed: a receipt with the link to the movement, no more Confirmar.
-  const confirmed = ui.render('DraftCard', { content: { kind: 'draft', draft, status: 'confirmed', entryId: 'e-1' }, ...handlers });
-  assert.deepEqual(nodes(confirmed).filter(node => node.type === 'ActionButton').map(node => node.props.label), ['Ver movimiento']);
-  nodes(confirmed).find(node => node.type === 'ActionButton')!.props.onPress();
-  assert.equal(calls.at(-1), 'open:e-1');
-  assert.ok(nodes(confirmed).some(node => node.type === 'AppText' && /Guardado · Gasto/.test(textOf(node))));
-  // Cancelled and edited collapse to one line that says so.
-  const cancelled = ui.render('DraftCard', { content: { kind: 'draft', draft, status: 'cancelled', entryId: null }, ...handlers });
-  assert.equal(cancelled.props.accessibilityLabel, 'Borrador descartado');
-  assert.equal(nodes(cancelled).some(node => node.type === 'ActionButton'), false);
-  const edited = ui.render('DraftCard', { content: { kind: 'draft', draft, status: 'edited', entryId: null }, ...handlers });
-  assert.equal(edited.props.accessibilityLabel, 'Borrador abierto en el formulario');
+  assert.equal(all.some(node => node.type === 'AppText' && textOf(node) === 'Para revisar · Gasto'), true);
+  assert.ok(all.some(node => node.type === 'AppText' && textOf(node) === 'Lista para confirmar en Para revisar.'));
+  assert.deepEqual(all.filter(node => node.type === 'ActionButton').map(node => [node.props.label, node.props.secondary]), [['Revisar', true]],
+    'one way on: the review; no Confirmar, Editar or Descartar in the chat, and no lime');
+  all.find(node => node.type === 'ActionButton')!.props.onPress();
+  assert.deepEqual(calls, ['review:item-1']);
+  assert.equal(pending.type, 'Appear');
+  // Missing facts read as missing, neutral, never invented: no amount, no date (never «Hoy»).
+  const gappy = itemOf(reviewDraft({ amountMinor: null, currency: null, dateISO: null, merchant: null }));
+  const incomplete = nodes(ui.render('ProposalCard', { content: proposal(), state: { kind: 'pending', item: gappy, conflict: false, writable: true }, ...handlers }));
+  assert.equal(incomplete.some(node => node.type === 'Money'), false);
+  assert.ok(incomplete.some(node => node.type === 'AppText' && textOf(node) === 'Sin monto'));
+  assert.ok(incomplete.some(node => node.props.accessibilityLabel === 'Fecha: Falta completar'));
+  assert.ok(incomplete.some(node => node.props.accessibilityLabel === 'Comercio: Falta completar'));
+  const line = incomplete.find(node => node.type === 'AppText' && /Faltan 4 datos/.test(textOf(node)))!;
+  assert.equal(line.props.style.color, '#6E7078', 'incomplete is neutral, never a warning or an error');
+  // A card destination shows the purchase mode the domain chose: «Una vez».
+  const onCard = nodes(ui.render('ProposalCard', { content: proposal(), state: { kind: 'pending', item: itemOf(reviewDraft({ destinationId: 'card-acc', purchase: { mode: 'once' } })), conflict: false, writable: true }, ...handlers }));
+  assert.ok(onCard.some(node => node.props.accessibilityLabel === 'Pago: Una vez'));
+  // Capturing, failed, preview: the snapshot, and what is happening; Reintentar only after a failure.
+  const capturing = nodes(ui.render('ProposalCard', { content: proposal(reviewDraft(), 'capturing'), state: { kind: 'capturing' }, ...handlers }));
+  assert.ok(capturing.some(node => node.type === 'AppText' && textOf(node) === 'Guardando en Para revisar…'));
+  assert.equal(capturing.some(node => node.type === 'ActionButton'), false);
+  const failed = nodes(ui.render('ProposalCard', { content: proposal(reviewDraft(), 'failed'), state: { kind: 'failed' }, ...handlers }));
+  assert.ok(failed.some(node => node.type === 'AppText' && textOf(node) === 'No se pudo guardar en Para revisar. No se registró nada.'));
+  failed.find(node => node.type === 'ActionButton' && node.props.label === 'Reintentar')!.props.onPress();
+  assert.equal(calls.at(-1), 'retry');
+  const preview = nodes(ui.render('ProposalCard', { content: proposal(reviewDraft(), 'preview'), state: { kind: 'preview' }, ...handlers }));
+  assert.ok(preview.some(node => node.type === 'AppText' && textOf(node) === 'Vista de prueba: esta propuesta no se guarda ni se puede registrar.'));
+  assert.equal(preview.some(node => node.type === 'ActionButton'), false, 'nothing a preview could save or record');
+  // Confirmed there: a receipt and the link to what was recorded; dismissed or gone: one quiet line, nothing to press.
+  const confirmed = nodes(ui.render('ProposalCard', { content: proposal(), state: { kind: 'confirmed', record: 'plan', writeId: 'write-1' }, ...handlers }));
+  assert.ok(confirmed.some(node => node.type === 'AppText' && textOf(node) === 'Registrado desde Para revisar.'));
+  assert.deepEqual(confirmed.filter(node => node.type === 'ActionButton').map(node => node.props.label), ['Ver plan']);
+  confirmed.find(node => node.type === 'ActionButton')!.props.onPress();
+  assert.equal(calls.at(-1), 'plan:write-1');
+  const dismissed = ui.render('ProposalCard', { content: proposal(), state: { kind: 'dismissed' }, ...handlers });
+  assert.equal(dismissed.props.accessibilityLabel, 'Propuesta descartada. No se registró nada.');
+  assert.equal(nodes(dismissed).some(node => node.type === 'ActionButton'), false);
+  assert.equal(ui.render('ProposalCard', { content: proposal(), state: { kind: 'gone' }, ...handlers }).props.accessibilityLabel, 'Esta propuesta ya no está pendiente.');
+  // Income: «Origen», «+», and the review's own words for a stale one (amber).
+  const income = nodes(ui.render('ProposalCard', { content: proposal(), state: { kind: 'pending', item: itemOf({ ...reviewDraft({ kind: 'income', merchant: 'Sueldo', category: 'Sueldo' }), basis: [] }), conflict: false, writable: true }, ...handlers }));
+  assert.ok(income.some(node => node.props.accessibilityLabel === 'Origen: Sueldo'));
+  assert.equal(income.find(node => node.type === 'Money')!.props.signed, true);
+  assert.ok(income.some(node => node.type === 'AppText' && textOf(node) === 'Revisala de nuevo' && node.props.style.color === '#B45309'));
 });
 
 test('suggestions cap at four with VoiceOver names; clarification chips tick once and leave after a choice', () => {
@@ -289,28 +318,24 @@ test('answer evidence renders rows with the shared Money component and links as 
 
 test('English: every word the Assistant UI says is English; account names, merchants, custom categories and the model\'s text are untouched', () => {
   const ui = load('assistant-messages.tsx', { locale: 'en-AR' });
-  const accounts = [{ id: 'visa', name: 'Visa Galicia', currency: 'ARS', openingMinor: 0, createdAt: 'x' }];
-  const draft = { kind: 'expense', amountMinor: 1850000, currency: 'ARS', merchant: 'Carrefour', category: 'Supermercado', dateISO: '2026-09-21', accountId: 'visa' };
-  const handlers = { accounts, onConfirm: () => {}, onEdit: () => {}, onCancel: () => {}, onOpenEntry: () => {} };
-  const pending = ui.render('DraftCard', { content: { kind: 'draft', draft, status: 'pending', entryId: null }, ...handlers });
+  const handlers = { archive: proposalArchive, onReview: () => {}, onRetry: () => {}, onOpenRecord: () => {} };
+  const pending = ui.render('ProposalCard', { content: proposal(), state: { kind: 'pending', item: itemOf(reviewDraft()), conflict: false, writable: true }, ...handlers });
   const labels = nodes(pending).map(node => node.props.accessibilityLabel).filter((label): label is string => typeof label === 'string');
-  assert.deepEqual(labels.filter(label => label.includes(': ')), ['Merchant: Carrefour', 'Category: Groceries', 'Paid with: Visa Galicia', 'Date: Today · Sep 21']);
+  assert.deepEqual(labels.filter(label => label.includes(': ')), ['Merchant: Carrefour', 'Category: Groceries', 'Recorded in: Visa Galicia', 'Date: September 21, 2026']);
   assert.ok(nodes(pending).some(node => node.type === 'CategoryBadge' && node.props.category === 'Supermercado'), 'the stored category is what the badge receives');
-  assert.ok(nodes(pending).some(node => node.type === 'AppText' && textOf(node) === 'Draft · Expense'));
-  assert.deepEqual(nodes(pending).filter(node => node.type === 'ActionButton').map(node => node.props.label), ['Confirm', 'Edit']);
-  assert.ok(byLabel(pending, 'Discard draft'));
-  const custom = ui.render('DraftCard', { content: { kind: 'draft', draft: { ...draft, category: 'Kiosco Pepe', merchant: '', accountId: null }, status: 'pending', entryId: null }, ...handlers });
+  assert.ok(nodes(pending).some(node => node.type === 'AppText' && textOf(node) === 'To review · Expense'));
+  assert.deepEqual(nodes(pending).filter(node => node.type === 'ActionButton').map(node => node.props.label), ['Review']);
+  const custom = ui.render('ProposalCard', { content: proposal(), state: { kind: 'pending', item: itemOf(reviewDraft({ category: 'Kiosco Pepe', merchant: null, destinationId: null })), conflict: false, writable: true }, ...handlers });
   const customLabels = nodes(custom).map(node => node.props.accessibilityLabel);
   assert.ok(customLabels.includes('Category: Kiosco Pepe'), 'a custom category is the user\'s word');
   assert.ok(customLabels.includes('Merchant: Missing'));
-  assert.ok(customLabels.includes('Paid with: Not chosen'));
-  assert.ok(nodes(custom).some(node => node.type === 'AppText' && textOf(node) === 'Fill in the missing details with Edit before confirming.'));
-  const income = ui.render('DraftCard', { content: { kind: 'draft', draft: { ...draft, kind: 'income', merchant: 'Sueldo' }, status: 'confirmed', entryId: 'e' }, ...handlers });
-  assert.ok(nodes(income).some(node => node.props.accessibilityLabel === 'Received in: Visa Galicia'));
+  assert.ok(customLabels.includes('Recorded in: Missing'));
+  assert.ok(nodes(custom).some(node => node.type === 'AppText' && textOf(node) === '3 details missing: complete them in To review.'));
+  const income = ui.render('ProposalCard', { content: proposal(reviewDraft({ kind: 'income', merchant: 'Sueldo', category: 'Sueldo' })), state: { kind: 'confirmed', record: 'entry', writeId: 'w' }, ...handlers });
   assert.ok(nodes(income).some(node => node.props.accessibilityLabel === 'Source: Sueldo'));
-  assert.ok(nodes(income).some(node => node.type === 'AppText' && textOf(node) === 'Saved · Income'));
+  assert.ok(nodes(income).some(node => node.type === 'AppText' && textOf(node) === 'Recorded · Income'));
   assert.deepEqual(nodes(income).filter(node => node.type === 'ActionButton').map(node => node.props.label), ['View transaction']);
-  assert.equal(ui.render('DraftCard', { content: { kind: 'draft', draft, status: 'cancelled', entryId: null }, ...handlers }).props.accessibilityLabel, 'Draft discarded');
+  assert.equal(ui.render('ProposalCard', { content: proposal(), state: { kind: 'dismissed' }, ...handlers }).props.accessibilityLabel, 'Proposal discarded. Nothing was recorded.');
   // The model's text is shown as it arrived; only the frame around it is English.
   const answer = ui.render('AssistantText', { text: 'Gastaste más.', status: 'stopped' });
   assert.equal(answer.props.accessibilityLabel, 'Assistant: Gastaste más.');
@@ -375,9 +400,7 @@ test('English: every word the Assistant UI says is English; account names, merch
 test('VoiceOver: with an interface language that differs from the device\'s, every element the Assistant builds speaks it; amounts are said in spoken form', () => {
   // English chosen in Más on a Spanish iPhone: each element VoiceOver reaches that is not a shared component carries the interface language.
   const english = load('assistant-messages.tsx', { locale: 'en-US', deviceLanguage: 'es' });
-  const accounts = [{ id: 'visa', name: 'Visa Galicia', currency: 'ARS', openingMinor: 0, createdAt: 'x' }];
-  const draft = { kind: 'expense', amountMinor: 1850000, currency: 'ARS', merchant: 'Carrefour', category: 'Supermercado', dateISO: '2026-09-21', accountId: 'visa' };
-  const handlers = { accounts, onConfirm: () => {}, onEdit: () => {}, onCancel: () => {}, onOpenEntry: () => {} };
+  const handlers = { archive: proposalArchive, onReview: () => {}, onRetry: () => {}, onOpenRecord: () => {} };
   const content = conversation.answerContent({ factIds: ['current.category.1', 'previous.category.1'] },
     [{ id: 'current.category.1', label: 'Categoría de gasto: Supermercado', amountMinor: 12120000, count: 11, startISO: '2026-09-01', endISO: '2026-09-21' },
       { id: 'previous.category.1', label: 'Categoría de gasto: Supermercado', amountMinor: 12200000, count: 10, startISO: '2026-08-01', endISO: '2026-08-21' }], 'ARS');
@@ -387,11 +410,11 @@ test('VoiceOver: with an interface language that differs from the device\'s, eve
     ui.render('AssistantText', { text: '', status: 'streaming' }),
     ui.render('SystemNote', { message: { id: 's', role: 'system', reason: 'offline', text: 'assistant.reasons.offline', retryText: null } }),
     ui.render('AnswerEvidence', { content, currency: 'ARS', onOpen: () => {} }),
-    ui.render('DraftCard', { content: { kind: 'draft', draft, status: 'pending', entryId: null }, ...handlers }),
-    ui.render('DraftCard', { content: { kind: 'draft', draft, status: 'cancelled', entryId: null }, ...handlers }),
+    ui.render('ProposalCard', { content: proposal(), state: { kind: 'pending', item: itemOf(reviewDraft()), conflict: false, writable: true }, ...handlers }),
+    ui.render('ProposalCard', { content: proposal(), state: { kind: 'dismissed' }, ...handlers }),
   ].flatMap(nodes).filter(node => node.type === 'View' && node.props.accessible);
   const elements = rendered(english);
-  assert.equal(elements.length, 10, 'user, answer, thinking, note, one evidence row, four draft rows, the collapsed card');
+  assert.equal(elements.length, 10, 'user, answer, thinking, note, one evidence row, four proposal rows, the collapsed card');
   const answerLabel = (node: { props: { accessibilityLabel?: string } }) => /^Assistant: /.test(String(node.props.accessibilityLabel));
   assert.deepEqual([...new Set(elements.filter(node => !answerLabel(node)).map(node => node.props.accessibilityLanguage))], ['en']);
   // The model's prose is content: the v1 server writes Spanish, so it keeps a Spanish voice whatever the interface says.
