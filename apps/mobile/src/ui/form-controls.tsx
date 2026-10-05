@@ -416,8 +416,11 @@ export function DateField({ value, onChange, disabled = false, allowFuture = fal
 
 /** The chosen category looks like itself here too: its glyph on its hue, as in
  * every row and detail. Income categories keep the income tone. */
-export function CategoryField({ entries, kind, value, onChange, disabled = false, prominent = false, detail, spokenDetail, detailTone }: {
+export function CategoryField({ entries, kind, value, onChange, disabled = false, prominent = false, detail, spokenDetail, detailTone, allowCreate = true }: {
   entries: Entry[]; kind: EntryKind; value: string; onChange: (category: string) => void; disabled?: boolean;
+  /** 25A-03: false offers only categories that already exist (presets, stored definitions, ones in use): no «Usar …» for a
+   * typed name. The review editor passes it, since a draft only confirms with a category the person already has. */
+  allowCreate?: boolean;
   /** `spokenDetail` is the detail line (a budget sentence with its amount) for VoiceOver (see SelectorCard). */
   prominent?: boolean; detail?: string; spokenDetail?: string; detailTone?: 'neutral' | 'warning' | 'expense';
 }) {
@@ -430,7 +433,7 @@ export function CategoryField({ entries, kind, value, onChange, disabled = false
   const [query, setQuery] = useState('');
   // Choices are identities: the display name (a built-in one in the interface language) is shown, the stored spelling is what the movement records.
   const choices = useMemo(() => categoryChoices(entries, kind, query, value, definitions, language, inUse), [entries, kind, query, value, definitions, language, inUse]);
-  const custom = customCategory(query, choices, kind, definitions);
+  const custom = allowCreate ? customCategory(query, choices, kind, definitions) : null;
   const choose = (category: string) => { Keyboard.dismiss(); if (categoryKey(category) !== categoryKey(value)) selectionHaptic(); onChange(category); setVisible(false); };
   const open = () => { Keyboard.dismiss(); setQuery(''); setVisible(true); };
   return <>

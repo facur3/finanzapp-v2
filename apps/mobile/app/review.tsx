@@ -1,40 +1,24 @@
-import { useState } from 'react';
 import { View } from 'react-native';
 import { router } from 'expo-router';
-import { randomUUID } from 'expo-crypto';
 import { todayKey, type ReviewArchive } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
 import type { ReviewItem } from '../src/storage/review-database';
-import { ActionButton, AppText, EmptyState, ErrorMessage, GlyphTile, LifecycleNote, Money, PressFeedback, Screen, Surface } from '../src/ui/components';
+import { AppText, EmptyState, GlyphTile, LifecycleNote, Money, PressFeedback, Screen, Surface } from '../src/ui/components';
 import { useAccountNameOf, useCategoryLabel } from '../src/ui/category-hues';
 import { reviewFacts, stateTone, type ReviewContext, type ReviewFacts } from '../src/ui/review-presentation';
 import { space, usePalette } from '../src/ui/theme';
 import { useI18n } from '../src/i18n/provider';
-
-declare const __DEV__: boolean | undefined;
-const DEV = typeof __DEV__ !== 'undefined' && __DEV__;
 
 /** Producto 25A-03, «Para revisar»: the pending proposals of the review store (25A-02), oldest first (the store's order),
  * each row saying what it would record and what it still lacks. A row opens the proposal's detail, where it is confirmed,
  * edited or discarded; nothing on this screen writes. An unreadable row is never listed as a proposal: one quiet line
  * counts them. Reached from Más (and the dock's Más badge); never a tab, never on Inicio. */
 export default function ReviewScreen() {
-  const { review, archive, captureReview } = useLedger();
+  const { review, archive } = useLedger();
   const { t } = useI18n();
-  const [error, setError] = useState<string | null>(null);
   if (!archive || review === null) return <Screen>{null}</Screen>;
   if (review === 'unavailable') return <Screen><EmptyState icon="file-tray-outline" title={t('nav.titles.review')} detail={t('review.unavailable')} /></Screen>;
   const context: ReviewContext = { todayISO: todayKey(), writable: review.writable, conflicts: review.conflicts };
-  // Development builds only: one mostly empty proposal, to walk Editar, Confirmar and Descartar on the iPhone before a
-  // producer exists (25A-04). Its source is `fixture`; it writes the review file only, never the ledger.
-  const addFixture = async () => {
-    setError(null);
-    const at = new Date().toISOString();
-    try {
-      await captureReview({ id: randomUUID(), writeId: randomUUID(), captureKey: null, at, draft: { version: 1, source: 'fixture', capturedAt: at, kind: 'expense',
-        amountMinor: null, currency: null, merchant: t('review.dev.merchant'), category: null, dateISO: todayKey(), destinationId: null, purchase: null, basis: [] } });
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'review.unavailable'); }
-  };
   return <Screen gap={space.l}>
     {review.items.length > 0 && <AppText secondary variant="subhead">{t('review.header')}</AppText>}
     {!review.writable && <LifecycleNote icon="lock-closed-outline" detail={t('review.readOnly')} />}
@@ -43,8 +27,6 @@ export default function ReviewScreen() {
         last={index === review.items.length - 1} />)}
     </Surface> : <EmptyState icon="file-tray-outline" title={t('review.emptyTitle')} detail={t('review.emptyDetail')} />}
     {review.unreadable.length > 0 && <AppText secondary variant="footnote">{t('review.unreadable', { count: review.unreadable.length })}</AppText>}
-    <ErrorMessage message={error} />
-    {DEV && review.writable && <ActionButton label={t('review.dev.add')} icon="flask-outline" secondary compact onPress={addFixture} />}
   </Screen>;
 }
 

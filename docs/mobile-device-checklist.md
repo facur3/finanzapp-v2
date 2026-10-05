@@ -4,37 +4,26 @@
 
 Metro from this branch (`npm run start:dev-client -- --clear`) on the installed FinanzApp Dev build; JavaScript only, no
 native dependency, no EAS build, no schema (14) or backup (v14) change: the review file (`finanzapp-review-v1.sqlite`)
-already exists since 25A-02. Use your own test data; never seed movements. A development build adds «Agregar propuesta de
-prueba» at the end of the tray: it stores one proposal in the review file only (a merchant and today, everything else
-missing). Record the iPhone model, iOS version, theme and text size with the result.
+already exists since 25A-02. Record the iPhone model, iOS version, theme and text size with the result.
 Rules: `app/review.tsx`, `app/review/[id].tsx`, `app/edit-review/[id].tsx`, `src/ui/review-presentation.ts`; design:
 mobile-design.md, «Producto 25A-03».
 
-- [ ] **Entry:** Más → Finanzas shows «Para revisar» first («Nada pendiente» with none, «1 propuesta», «2 propuestas»);
-  the dock's Más tab shows a small white count with graphite only while something waits, never on another tab, never at
-  zero; VoiceOver reads «Más, pestaña, 4 de 4, 2 para revisar». Inicio and the four tabs are otherwise unchanged.
-- [ ] **Tray, light and dark:** add two test proposals; each row shows «Sin monto», «Falta completar» where data is
-  missing and «Faltan n datos» in grey (never red); oldest first; a tap opens the detail.
-- [ ] **Edit:** Gasto | Ingreso, «Pago» and the instalment count start with nothing selected (no thumb); choose a cash
-  account → the amount field appears in its currency; fill amount, category (an existing one), merchant and date →
-  Guardar cambios → the detail says «Lista para confirmar» and the same proposal is still the one in the tray.
-- [ ] **Confirm a movement:** Confirmar (lime, echoing the amount) records one movement in Movimientos on the chosen
-  account and date; the proposal leaves the tray; the screen pops without flashing «ya no está pendiente»; the count
-  drops.
-- [ ] **Confirm cuotas:** a proposal on an active card with «En cuotas» and a count: the detail says the instalments are
-  added as each statement closes; after Confirmar the card shows one plan and no movement on the purchase date.
-  «Una vez» on a card records one card expense.
-- [ ] **Stale:** rename (or edit) the account of a ready proposal → its detail says «Revisala de nuevo» and Confirmar is
-  disabled; Editar → Guardar cambios → confirmable again.
-- [ ] **Crash safety:** Confirmar, then swipe the app away at once; reopen: exactly one movement, the proposal gone.
-- [ ] **Discard:** Descartar asks first; Cancelar keeps it; Descartar removes it for good (not back after reopening);
-  Movimientos unchanged.
+**What this slice can and cannot show on the iPhone.** The app has no producer of proposals yet: 25A-04 (the
+Assistant's drafts) brings the first real one. Synthetic proposals belong only in tests (AGENTS.md rule 6), so this
+slice adds no in-app way to create one, and the pending → Editar → Confirmar / Descartar flow, a stale or conflicting
+proposal and the crash reconciliation cannot be generated safely on the physical app for this slice. Their evidence is
+the automated suite: real SQLite for the store and the tray (`tests/review-store.node.ts`) and route harnesses for the
+screens (`tests/review-routes.node.ts`). Those flows join the device pass of 25A-04.
+
+- [ ] **Entry (development build):** Más → Finanzas shows «Para revisar» first with «Nada pendiente»; the dock's Más tab
+  shows no badge; Inicio and the four tabs are otherwise unchanged.
+- [ ] **Empty tray, light and dark:** «Nada para revisar» with its one-line explanation; back gesture and header as any
+  pushed screen; no action button on the tray.
 - [ ] **Hero amount:** Inicio's number, light and dark: the digits ink as before; the currency symbol and the cents
   neutral graphite (not olive), the symbol darker than the cents, both clearly readable on the lime; size and layout
   unchanged; the white `Gastado | Disponible` thumb unchanged.
-- [ ] **Accessibility:** VoiceOver reads each row as one sentence (amounts and dates spoken in full) and the detail's
-  facts; Dynamic Type at the largest sizes (rows wrap, nothing cut); Reduce Motion; Reduce Transparency on the dock with
-  the badge; safe areas and the modal editor's close button.
+- [ ] **Accessibility:** VoiceOver on the Más row and the empty tray; the largest Dynamic Type sizes; Reduce Motion and
+  Reduce Transparency on the dock; safe areas.
 
 ## Producto 25VIS1 — Electric Lime palette (merged as PR #83, merge commit 0ff9859; owner's palette verdict 2026-10-03: keep)
 
@@ -224,11 +213,7 @@ version line at the end of Más: «FinanzApp 0.1.0 (25A-02)» on a build from th
 The review-draft domain model (`packages/domain/review-drafts.ts`) is pure domain: no screen, storage, schema or native
 change, and no EAS build.
 
-## Producto 24T3 — merged as PR #76; targeted gate passed (owner, 2026-10-04, iPhone 14 Pro)
-
-**Gate passed (owner, 2026-10-04).** The owner reported that the required targeted 24T3 pass was completed successfully on
-a physical iPhone 14 Pro with the FinanzApp Dev build. It was reported as a whole, not item by item, so the boxes below
-are left as they were; the gate on 25A-03, 25A-04, 25A-11 and 25A-12 is open.
+## Producto 24T3 — merged as PR #76; must pass before 25A-03, 25A-04, 25A-11 or 25A-12 merges
 
 **Gate (owner, 2026-10-02).** The owner merged PR #76 (merge commit 399a1fa) after targeted use and deliberately deferred
 this recorded pass: nothing below is checked. 25A-01 and 25A-02 may proceed; this pass must be done before 25A-03,

@@ -88,9 +88,5 @@ export const review = {
       noInterest: 'Sin interés. Una compra financiada se registra desde el formulario de compra.',
       categoryNote: 'Solo una categoría que ya uses: una nueva se crea desde el formulario de gasto o ingreso.',
     },
-    dev: {
-      add: 'Agregar propuesta de prueba',
-      merchant: 'Propuesta de prueba',
-    },
   },
 } as const;

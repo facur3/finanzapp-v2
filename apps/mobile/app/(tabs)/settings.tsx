@@ -56,7 +56,7 @@ export default function MoreScreen() {
   const undone = (archive?.records.filter(record => record.voided).length ?? 0) + (archive?.transfers?.filter(record => record.voided).length ?? 0)
     + (archive?.purchaseOperations?.filter(operation => operation.voided).length ?? 0);
   // 25A-03: «Para revisar» leads Finanzas while a proposal waits or a row cannot be read (and always in a development
-  // build, where its test proposal is added); otherwise, or while the review file is unavailable, it is not there at all.
+  // build, so its empty tray can be opened); otherwise, or while the review file is unavailable, it is not there at all.
   const tray = review && review !== 'unavailable' ? review : null;
   const pendingReview = tray?.items.length ?? 0;
   const showsReview = !!tray && (DIAGNOSTICS || pendingReview > 0 || tray.unreadable.length > 0);

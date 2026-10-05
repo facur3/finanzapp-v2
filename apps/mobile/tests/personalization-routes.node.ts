@@ -313,6 +313,34 @@ test('the category picker shows display names, records the stored spelling, and 
   assert.deepEqual(chosen, ['Comida'], 'the movement records the stored spelling, so reports keep one group');
 });
 
+test('25A-03: «allowCreate={false}» lists existing categories (a stored custom one included) and never offers a typed new name; the default still does', () => {
+  const custom = domain.editedCategoryDefinition(domain.resolveCategory('expense', 'Mascotas'), { label: 'Mascotas' }, createdAt);
+  const data = { ...archive, categories: [custom] };
+  const entries = data.records.map(record => record.entry);
+  const offer = (allowCreate: boolean | undefined, query: string) => {
+    const chosen: string[] = [];
+    const view = harness('src/ui/form-controls.tsx', { entries, kind: 'expense', value: '', onChange: (value: string) => chosen.push(value), prominent: true,
+      ...(allowCreate === undefined ? {} : { allowCreate }) }, { data });
+    const header = (root: Node) => nodes(nodes(root).find(node => node.type === 'FlatList')!.props.ListHeaderComponent);
+    nodes(header(view.render('CategoryField'))).find(node => node.type === 'Field')!.props.onChangeText(query);
+    const root = view.render('CategoryField');
+    const list = nodes(root).find(node => node.type === 'FlatList')!;
+    const create = header(root).find(node => node.type === 'PressFeedback');
+    return { keys: (list.props.data as domain.CategoryIdentity[]).map(item => item.key), create, list, chosen };
+  };
+  const restricted = offer(false, 'Mascotas');
+  assert.ok(restricted.keys.includes('mascotas'), 'a stored custom category is offered');
+  restricted.list.props.renderItem({ item: (restricted.list.props.data as domain.CategoryIdentity[]).find(item => item.key === 'mascotas') }).props.onPress();
+  assert.deepEqual(restricted.chosen, ['Mascotas']);
+  const unknown = offer(false, 'Zzz nueva');
+  assert.equal(unknown.keys.length, 0);
+  assert.equal(unknown.create, undefined, 'no «Usar …» row for a name that does not exist');
+  for (const allowCreate of [undefined, true]) {
+    const ordinary = offer(allowCreate, 'Zzz nueva');
+    assert.match(ordinary.create!.props.accessibilityLabel, /Zzz nueva/, 'every other caller keeps creating a category from the search');
+  }
+});
+
 // The shared picker on its own module: names for VoiceOver, one haptic per
 // change, no motion under Reduce Motion. Layout and touch need the iPhone.
 function pickerHarness(props: any, reduced: boolean, locale: AppLocale = 'es-AR', deviceLanguage: string | null = null) {

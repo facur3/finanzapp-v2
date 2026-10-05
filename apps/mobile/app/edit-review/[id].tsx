@@ -111,7 +111,7 @@ function ReviewEditor({ item }: { item: ReviewItem }) {
     {!fit.ok && <AppText variant="footnote" secondary>{t('review.gaps.amount')}</AppText>}
     <View style={{ gap: space.m }}>
       <View style={{ gap: space.s }}>
-        <CategoryField entries={snapshot?.entries ?? []} kind={kind ?? 'expense'} value={category} onChange={setCategory} disabled={busy} prominent />
+        <CategoryField entries={snapshot?.entries ?? []} kind={kind ?? 'expense'} value={category} onChange={setCategory} disabled={busy} prominent allowCreate={false} />
         <AppText secondary variant="footnote">{t('review.edit.categoryNote')}</AppText>
       </View>
       {destinations.length ? <AccountField label={t('review.fields.destination')} accounts={destinations} value={destinationId ?? ''} disabled={busy} prominent

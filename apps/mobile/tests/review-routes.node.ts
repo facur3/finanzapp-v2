@@ -66,7 +66,6 @@ function harness(file: string, ledger: Ledger, params: Record<string, string> = 
     confirmReview: (...args: unknown[]) => { ledger.calls.push(['confirm', ...args]); return ledger.confirmResult?.() ?? Promise.resolve({ recorded: true }); },
     updateReview: (...args: unknown[]) => { ledger.calls.push(['update', ...args]); return ledger.updateResult?.() ?? Promise.resolve(args[2]); },
     dismissReview: (...args: unknown[]) => { ledger.calls.push(['dismiss', ...args]); return Promise.resolve(); },
-    captureReview: (...args: unknown[]) => { ledger.calls.push(['capture', ...args]); return Promise.resolve(); },
   });
   const names = ['ActionButton', 'AmountField', 'AppText', 'Choices', 'DetailRow', 'EmptyState', 'ErrorMessage', 'Field', 'GlyphTile', 'IconButton', 'LifecycleNote',
     'Money', 'PressFeedback', 'Screen', 'SectionTitle', 'Surface'];
@@ -87,7 +86,6 @@ function harness(file: string, ledger: Ledger, params: Record<string, string> = 
       Alert: { alert: (title: string, detail: string, buttons: any[]) => { alerts.push({ title, detail, buttons }); } } },
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, useLocalSearchParams: () => params,
       router: { push: (to: unknown) => pushed.push(to), back: () => { nav.back += 1; }, canGoBack: () => options.canGoBack ?? true, replace: (to: unknown) => nav.replaced.push(to) } },
-    'expo-crypto': { randomUUID: () => '11111111-2222-3333-4444-' + String(++sequence).padStart(12, '0') },
     'expo-haptics': { notificationAsync: () => Promise.resolve(), NotificationFeedbackType: { Success: 'success' } },
     '@finanzapp/domain': domain,
   };
@@ -183,18 +181,13 @@ test('unreadable rows are counted apart and never listed; an empty tray, an unav
   assert.equal(all(root, 'LifecycleNote')[0].props.detail, 'Estas propuestas vienen de una versión más nueva de FinanzApp: se pueden ver, no modificar.');
 });
 
-test('the development fixture is offered only in a development build, writes the review file only, and fills in nothing but a merchant and today', async () => {
-  assert.equal(button(harness('review.tsx', { review: trayOf([]), calls: [] }).render(), 'Agregar') , undefined, 'never in a release build');
-  const ledger: Ledger = { review: trayOf([]), calls: [] };
-  button(harness('review.tsx', ledger, {}, { dev: true }).render(), 'Agregar propuesta de prueba')!.props.onPress();
-  await settle();
-  const [[kind, input]] = ledger.calls as [string, any][];
-  assert.equal(kind, 'capture');
-  assert.match(input.id, domain.REVIEW_WRITE_ID);
-  assert.notEqual(input.id, input.writeId);
-  const draft = domain.parseReviewDraft(JSON.parse(JSON.stringify(input.draft))); // Out of the vm's realm, as storage would read it.
-  assert.deepEqual([draft.source, draft.amountMinor, draft.currency, draft.destinationId, draft.category, draft.purchase, draft.dateISO, draft.merchant],
-    ['fixture', null, null, null, null, null, today, 'Propuesta de prueba']);
+test('the tray has no in-app producer: no development action creates a proposal, in any build', () => {
+  for (const dev of [false, true]) {
+    const root = harness('review.tsx', { review: trayOf([]), calls: [] }, {}, { dev }).render();
+    assert.equal(all(root, 'ActionButton').length, 0, 'synthetic proposals live in tests only (AGENTS.md rule 6)');
+  }
+  assert.doesNotMatch(readFileSync(new URL('../app/review.tsx', import.meta.url), 'utf8'), /randomUUID|capture|fixture|__DEV__/);
+  assert.doesNotMatch(readFileSync(new URL('../src/storage/LedgerProvider.tsx', import.meta.url), 'utf8'), /captureReview|store\.capture/);
 });
 
 // ---- the detail ---------------------------------------------------------------------------------------------------------
@@ -533,4 +526,21 @@ test('an amount typed for one destination is cleared when a destination in anoth
   assert.equal(field(root(), 'AmountField').props.value, '100,00', 'the same currency keeps it');
   field(root(), 'AccountField').props.onChange(dollars.id);
   assert.deepEqual([field(root(), 'AmountField').props.currency, field(root(), 'AmountField').props.value], ['USD', '']);
+});
+
+test('the review editor\'s category picker offers only existing categories, and one chosen there makes the draft confirmable', async () => {
+  const custom = domain.editedCategoryDefinition(domain.resolveCategory('expense', 'Mascotas'), { label: 'Mascotas' }, createdAt);
+  const withCustom: domain.LedgerArchive = { ...archive, categories: [custom] };
+  assert.deepEqual(domain.reviewGaps(drafted({ category: 'Mascotas' }, withCustom), withCustom as domain.ReviewArchive, today), [], 'a stored custom category is known');
+  const item = itemOf(drafted({ category: null }));
+  const { ledger, root } = editor(item);
+  const picker = field(root(), 'CategoryField');
+  assert.equal(picker.props.allowCreate, false, 'no «Usar …» for a typed name in the review picker');
+  picker.props.onChange('Supermercado');
+  button(root(), 'Guardar cambios')!.props.onPress();
+  await settle();
+  const saved = (ledger.calls[0] as any[])[3] as domain.ReviewDraft;
+  assert.deepEqual(domain.reviewGaps(saved, archive as domain.ReviewArchive, today), [], 'complete');
+  const facts = reviewPresentation.reviewFacts(itemOf(saved), archive as domain.ReviewArchive, { todayISO: today, writable: true, conflicts: [] });
+  assert.deepEqual([facts.state, facts.canConfirm], ['ready', true]);
 });

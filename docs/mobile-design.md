@@ -877,6 +877,8 @@ siempre (filas agrupadas, `DetailRow`, `LifecycleNote`, `ActionButton`, los sele
 - **Editar** usa los controles de un movimiento y **no elige nada por la persona**: el segmentado Gasto | Ingreso, el de
   «Pago» y el de la cantidad de cuotas se muestran sin selección (sin pulgar) hasta que se toca uno; nunca 12 por defecto.
   El monto se escribe en la moneda del destino; si la propuesta trae una moneda, solo se ofrecen cuentas en esa moneda.
+  El selector de categoría ofrece solo categorías existentes (predefinidas, guardadas o en uso), sin «Usar …» para un
+  nombre nuevo: una propuesta solo se confirma con una categoría que la persona ya tiene.
 - **Descartar** pregunta antes («¿Descartar esta propuesta?») con el botón destructivo del sistema.
 - **Monto de Inicio: grafito sólido.** El símbolo y los centavos dejaron de ser la tinta con transparencia (que sobre la
   lima se veía oliva) y pasaron a dos grises grafito neutros: `heroMoneySymbol` #3A3C3F y `heroMoneyCents` #505255, el
@@ -3007,12 +3009,10 @@ color propio.
 
 ## Pendiente de revisión en iPhone
 
-- Producto 25A-03 (en su rama; sin build de EAS; nada revisado en el iPhone): la fila «Para revisar» de Más y el número
-  en la pestaña Más del dock (con una y varias propuestas, ninguno en cero); la bandeja con filas completas e
-  incompletas, en claro y oscuro; el detalle con cada dato faltante, una propuesta desactualizada, Confirmar de un gasto
-  y de una compra en cuotas, Editar sin cantidad de cuotas elegida de antemano, Descartar con su pregunta; cerrar la app
-  justo después de Confirmar y volver a abrirla; el símbolo y los centavos del monto de Inicio en grafito, en claro y
-  oscuro; VoiceOver, texto grande, Reduce Motion y Reduce Transparency. La lista exacta está en
+- Producto 25A-03 (en su rama; sin build de EAS; nada revisado en el iPhone): la fila «Para revisar» de Más y la bandeja
+  vacía, en claro y oscuro; el símbolo y los centavos del monto de Inicio en grafito, en claro y oscuro; VoiceOver, texto
+  grande, Reduce Motion y Reduce Transparency. Todavía no hay quien produzca propuestas en la app (llega con 25A-04): las
+  filas, Confirmar, Editar y Descartar se prueban en los tests automáticos, no en el iPhone. La lista exacta está en
   docs/mobile-device-checklist.md («Producto 25A-03»).
 - Producto 25VIS1 (mergeada como PR #83; sin build de EAS; el dueño conservó la paleta en el iPhone el 2026-10-03, el
   resto sin revisar punto por punto): el pulgar blanco con texto en tinta del segmento elegido `Gastado | Disponible`

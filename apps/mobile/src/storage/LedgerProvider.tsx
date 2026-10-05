@@ -13,7 +13,7 @@ import { changeEntry, createAccount, createEntry, deleteAccount, deleteCreditCar
   type LedgerDatabase } from './database';
 import { openLedger, refreshLedger, savePurchaseOperation, savePurchasePlan, sessionWarning } from './ledger-session';
 import { openLedgerDatabase, openReviewDatabase } from './nativeDatabase';
-import { loadReviewTray, openReviewStore, type ReviewCapture, type ReviewDatabase, type ReviewItem, type ReviewStore, type ReviewTray } from './review-database';
+import { loadReviewTray, openReviewStore, type ReviewDatabase, type ReviewItem, type ReviewStore, type ReviewTray } from './review-database';
 
 declare const __DEV__: boolean | undefined;
 /** The creation gate of this build (docs/currency.md §7.5, stage 9): the production ARS/USD, or the preview set in a
@@ -83,8 +83,6 @@ type LedgerContextValue = {
   updateReview: (id: string, expectedRevision: number, draft: unknown) => Promise<ReviewItem>;
   /** pending → dismissed. Writes nothing to the ledger. */
   dismissReview: (id: string, expectedRevision: number) => Promise<void>;
-  /** A new pending item (a producer; in 25A-03 only the development fixture). Writes nothing to the ledger. */
-  captureReview: (input: ReviewCapture) => Promise<void>;
 };
 const LedgerContext = createContext<LedgerContextValue | null>(null);
 
@@ -264,7 +262,6 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     }),
     updateReview: (id, expectedRevision, draft) => reviewOperation(store => store.updateDraft(id, expectedRevision, draft, new Date().toISOString())),
     dismissReview: (id, expectedRevision) => reviewOperation(async store => { await store.dismiss(id, expectedRevision, new Date().toISOString()); }),
-    captureReview: input => reviewOperation(async store => { await store.capture(input); }),
   }}>{children}</LedgerContext.Provider>;
 }
 
