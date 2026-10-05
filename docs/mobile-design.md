@@ -855,6 +855,23 @@ barras de Día a día y una cabecera fija sólida. Siguen permitidos para una pa
 vinculante del roadmap no cambia: la próxima entrega de producto es 24T3; 24UX6C (Movimientos y Más) y 24UX6D
 (Tarjetas) siguen a 24UX6B en el carril UX, y su lugar frente a 24T3 lo decide el dueño (ver `docs/mobile-roadmap.md`).
 
+## Producto 25A-04 — Asistente → Para revisar
+
+El Asistente ya no registra nada por su cuenta: cada propuesta suya se guarda en «Para revisar» y se confirma ahí.
+
+- **La tarjeta del chat** es la de una propuesta: «Para revisar · Gasto», el monto (o «Sin monto»), comercio, categoría,
+  dónde se registra, el pago en una tarjeta y la fecha (lo que falta dice «Falta completar», en gris, nunca en rojo), una
+  línea con lo que necesita en las palabras de la revisión («Lista para confirmar en Para revisar.», «Faltan 2 datos…»,
+  desactualizada o interrumpida en ámbar) y **una sola acción secundaria, «Revisar»**, que abre el detalle de 25A-03. No
+  hay Confirmar en el chat: la lima sigue siendo del Confirmar de la revisión.
+- **Lee el ítem, no el chat.** Lo que se edite en «Para revisar» es lo que muestra la tarjeta; confirmada, dice
+  «Registrado desde Para revisar» con «Ver movimiento» (o «Ver plan»); descartada, una línea discreta; no ofrece nada
+  que pueda registrarla de nuevo.
+- **Guardando y error.** Mientras se guarda: «Guardando en Para revisar…»; si falla: «No se pudo guardar en Para revisar.
+  No se registró nada.» con «Reintentar», que reenvía la misma propuesta.
+- **Vista de prueba:** la tarjeta se ve, dice que no se guarda y no tiene acciones.
+- **Nuevo chat** borra la conversación, nunca una propuesta guardada.
+
 ## Producto 25A-03 — Para revisar
 
 La primera interfaz sobre las propuestas guardadas en el dispositivo (25A-02). Sin rediseño: las piezas son las de
@@ -3009,6 +3026,11 @@ crédito, marca elegida) y los filetes de las píldoras, el chip y el compositor
 color propio.
 
 ## Pendiente de revisión en iPhone
+
+- Producto 25A-04 (en su rama; sin build de EAS; diferida al control previo al lanzamiento): la tarjeta de vista de prueba
+  sin acciones y «Para revisar» vacío después; con el Asistente conectado (más adelante), la propuesta en «Para revisar»
+  y en el número de Más, «Revisar», la edición que se refleja en el chat, «Registrado» y «Propuesta descartada». La lista
+  exacta está en docs/mobile-device-checklist.md («Producto 25A-04»).
 
 - Producto 25A-03 (en su rama; sin build de EAS; nada revisado en el iPhone): la fila «Para revisar» de Más y la bandeja
   vacía, en claro y oscuro; el símbolo y los centavos del monto de Inicio en grafito, en claro y oscuro; VoiceOver, texto

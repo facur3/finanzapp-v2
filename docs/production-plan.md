@@ -489,14 +489,14 @@ untrusted model output
 (`apps/mobile/src/storage/review-database.ts`, 25A-02) with their tests: one deterministic write per draft, a stale
 draft never writes, an interrupted confirmation is reconciled from the ledger and never writes twice.
 
-**Honest state.** The Assistant screen is **not on that path yet**. `apps/mobile/app/assistant.tsx` still confirms
-through the older in-memory path (`resolveDraft` → `entryFromDraft` → `validateEntry` → `addEntry`), which defaults a
-missing currency and date, matches an account by name, cannot produce cuotas and keeps its retry id only in memory.
-It is safe today only because the Assistant is disconnected in every build and still requires Confirmar. Joining the
-two is 25A-03 (the «Para revisar» tray) and 25A-04 (the Assistant's drafts go into the tray); the deferred 24T3 device
-pass no longer gates them and is a release blocker instead (owner decision, 2026-10-04: roadmap §2). Until 25A-04 merges, no real model may be connected. The differences to reconcile there: the wire
-contract allows longer merchant and category text than `ReviewDraft`, knows only ARS and USD, and `resolveDraft`
-applies defaults that `ReviewDraft` forbids.
+**Honest state (25A-04, on its branch).** The Assistant screen is **on that path**: its older in-memory confirmation
+(`resolveDraft` → `entryFromDraft` → `validateEntry` → `addEntry`) is removed; a resolved draft is adapted to
+`ReviewDraft` (`reviewDraftFromAssistant`) and captured into the review store with its ids fixed once, and it is
+confirmed only in «Para revisar» (25A-03), through the store's frozen write. The reconciled differences: a currency or
+date the model did not state stays unknown (a gap), a merchant or category the draft cannot hold is missing, a card
+gets «Una vez» and an income never a card. Still open: the wire contract knows only ARS and USD (contract v2), and the
+Assistant stays disconnected in every build until its own slices; the deferred 24T3 device pass is a release blocker,
+not a merge gate (owner decision, 2026-10-04: roadmap §2).
 
 ### 5.4 Minimal context: what leaves the device
 

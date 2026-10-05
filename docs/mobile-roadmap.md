@@ -1,10 +1,17 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-04 (Producto 25A-03, on its branch: «Para revisar», the first screens over the local review store of
+Updated: 2026-10-04 (Producto 25A-04, on its branch: Assistant → «Para revisar». The Assistant no longer writes the
+ledger: its direct path (`entryFromDraft` → `validateEntry` → `addEntry`) is gone; every resolved Assistant draft is
+adapted to the canonical review draft (`reviewDraftFromAssistant`: nothing invented, an unstated currency or date stays
+unknown, a card gets «Una vez», an income never a card) and captured into the review store with an item id and a write
+id fixed once, so a retry never makes a second item; the chat card reads the review item and leads to it («Revisar»),
+the one place where it is confirmed, edited or discarded; New chat never touches it; the fixture view captures nothing.
+No cloud, provider, Supabase, server, voice, Wallet, notification, schema (14) or backup (v14) change; the version line
+reads «FinanzApp 0.1.0 (25A-04)». Producto 25A-03 merged as PR #84, merge commit aef2edf: «Para revisar», the first screens over the local review store of
 25A-02: a tray of pending proposals reached from Más (a pending count on the dock's Más tab), a proposal's detail with
 Confirmar, Editar and Descartar, confirmation only through the store's frozen write and reconciliation; no cloud, provider,
 Supabase, Wallet, notification, schema (14) or backup (v14) change; plus the owner-observed follow-up of 25VIS1: the hero
-amount's currency symbol and cents in solid neutral graphite on the lime field; the version line reads «FinanzApp 0.1.0
+amount's currency symbol and cents in solid neutral graphite on the lime field; the version line read «FinanzApp 0.1.0
 (25A-03)». The targeted 24T3 device pass was not performed; by owner decision (2026-10-04) it is **deferred and a release
 blocker**: it no longer blocks development merges of 25A-03, 25A-04, later 25A slices or 25A2, and is consolidated
 into the physical-device release gate that must pass before the first external or public TestFlight candidate and
@@ -249,7 +256,13 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
 `LEDGER_CURRENCIES`): what a build offers, verified on Linux; nothing is distributed to people yet
 (§4).
 
-- **«Para revisar» (25A-03, on its branch; device QA pending).** §3, «Producto 25A-03». The first screens over the
+- **Assistant → «Para revisar» (25A-04, on its branch; device QA deferred to the release gate).** §3, «Producto 25A-04».
+  The Assistant has no ledger write path: a resolved draft becomes a proposal captured into the review store
+  (`src/assistant/review-proposal.ts`, `captureReview`), and its chat card (`ProposalCard`) reads the review item and
+  offers «Revisar» (the 25A-03 detail), Reintentar after a failed capture, and what became of it once confirmed or
+  discarded there. The conversation stays memory-only; the proposal survives New chat, leaving the screen and a restart.
+  The version line reads «FinanzApp 0.1.0 (25A-04)».
+- **«Para revisar» (25A-03, PR #84, merge commit aef2edf; device QA deferred to the release gate).** §3, «Producto 25A-03». The first screens over the
   review store of 25A-02: `/review` lists the pending proposals oldest first, each row saying what it would record (gasto
   or ingreso, amount and currency, merchant, category, account or card, day, source, cuotas) and what it still lacks,
   never inventing a fact; `/review/[id]` is the authoritative surface (what Confirmar writes, where and when, the purchase
@@ -263,7 +276,7 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   never listed. No in-app producer exists yet (synthetic proposals live only in tests; 25A-04 brings the first real
   one). Inicio's hero amount: the symbol and cents in solid graphite
   (`heroMoneySymbol` #3A3C3F, `heroMoneyCents` #505255, `Money onField`) instead of the ink at an alpha. No schema (14),
-  backup (v14), review-schema (1), cloud or native change. The version line reads «FinanzApp 0.1.0 (25A-03)».
+  backup (v14), review-schema (1), cloud or native change. The version line read «FinanzApp 0.1.0 (25A-03)».
 - **Electric Lime, the current product palette (25VIS1, PR #83, merge commit 0ff9859; the owner kept it after the iPhone review of
   2026-10-03; the rest of its device checklist open).** Electric Lime is the selected product visual direction; it is
   not a finished public name, logo or brand identity, whose naming, trademark and confusing-similarity gate stays
@@ -695,7 +708,12 @@ it was checked in). Metro from `master` (or a delivery's branch) on the installe
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
-- **25A-03 — «Para revisar» (on its branch; no EAS build; nothing device-verified):** the checklist section Producto
+- **25A-04 — Assistant → «Para revisar» (on its branch; no EAS build; nothing device-verified; joins the release gate):**
+  the checklist section Producto 25A-04. The Assistant is disconnected in every build, so a real proposal cannot be
+  produced on the iPhone yet; the fixture view (a development bundle with `EXPO_PUBLIC_ASSISTANT_FIXTURES=1`) shows the
+  preview card and must save nothing. Its capture, retry, restart, New chat, edit and confirmation states are evidenced
+  by the automated suite on real SQLite until the Assistant connects (a later 25A slice).
+- **25A-03 — «Para revisar» (merged as PR #84, merge commit aef2edf; no EAS build; nothing device-verified):** the checklist section Producto
   25A-03: the Más row and the empty tray in a development build, light and dark; the hero amount's graphite symbol and
   cents on Inicio's field, light and dark; VoiceOver, large text, Reduce Motion and Reduce Transparency. No producer of
   proposals exists in the app yet and synthetic ones belong only in tests, so the pending → Editar → Confirmar /
@@ -915,8 +933,8 @@ launch plan, documentation, plus the dock's last-row clearance found on the owne
 [competitive-landscape.md](competitive-landscape.md) and [brand-brief.md](brand-brief.md), documentation only) merged
 as PR #82 (merge commit 227942c) and changes no order either; **25VIS1** (Electric Lime, colour tokens only, «Producto
 25VIS1» below) merged as PR #83 (merge commit 0ff9859), accepted by the owner on the iPhone as the current product palette, and changed no order (25DISC1's suggested priority changes are owner decisions listed under «Producto 25DISC1»
-below, none applied); **25A-03** (the «Para revisar» tray, «Producto 25A-03» below) is this PR; then 25A-04 (the
-Assistant's drafts into the tray) and the rest of 25A, with no paid provider call before its own approved slice. **25A2** (Wallet Shortcut Capture) still
+below, none applied); **25A-03** (the «Para revisar» tray, «Producto 25A-03» below) merged as PR #84 (merge commit aef2edf); **25A-04** (the
+Assistant's drafts into the tray, «Producto 25A-04» below) is this PR; then the rest of 25A, with no paid provider call before its own approved slice. **25A2** (Wallet Shortcut Capture) still
 follows the review-tray foundation: it may begin once 25A-03 has merged, without waiting for 25A's cloud, paid, live or
 voice slices. The targeted 24T3 device pass was not performed and is deferred to the pre-release device gate (owner
 decision, 2026-10-04; §2): a release blocker, not a merge blocker for 25A or 25A2. After 25A: **25C** (with
@@ -1641,7 +1659,7 @@ Assistant's capability boundary and model evaluation, monetary safety).
   review item's write is frozen after an unknown outcome, as the purchase form freezes its submission, and storage refuses
   one id used as both a movement and a plan, which today `createEntry` and `createInstallmentPlan` do not cross-check);
   **25A-03** the «Para revisar» tray (Confirmar / Editar / Descartar; Editar keeps the same write id and never presets a
-  count) (this PR); **25A-04** the Assistant's drafts go into the tray; **25A-11** transfer, card payment and devolución drafts;
+  count) (PR #84, merged); **25A-04** the Assistant's drafts go into the tray (this PR); **25A-11** transfer, card payment and devolución drafts;
   **25A-12** edits of an existing movement. Server lane, CI only, no paid call: literal env reads and a bundle secret scan;
   a provider port with deterministic fakes (no provider chosen by familiarity); handler order, error codes and one timeout
   budget; request contract v2 (server first); money-based cost, rate and token controls with a kill switch and a monthly
@@ -4049,7 +4067,7 @@ nothing of it is on a screen yet.
   OK; `test:storage` 1259 passed, 0 failed; `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0 errors,
   0 stale (no app string changed); `check` OK; `export:ios` OK. No EAS build, no iPhone run by the agent.
 
-### Producto 25A-03 — Para revisar (this PR)
+### Producto 25A-03 — Para revisar (PR #84, merged)
 
 - **Goal.** The first UI over the durable local review store (25A-02): pending proposals the person confirms, edits or
   discards, with every financial judgement left to the domain (25A-01) and every write to the store's one path.
@@ -4117,11 +4135,82 @@ nothing of it is on a screen yet.
   `more-routes.node.ts` (the badge and the Más row); `theme.node.ts` and `typography.node.ts` (the graphite tones and
   contrast in both palettes, `Money onField`); `spending-home.node.ts` (Inicio asks for it).
 - **Device QA.** The checklist section «Producto 25A-03».
-- **Status.** This PR; not merged.
+- **Status.** Merged as PR #84 (merge commit aef2edf), with the review fixes of 1f85adb and the documentation of 116a8cf.
 - **Gates.** 2026-10-04, local, Linux. Root `npm test` 590 passed, 1 todo; `check:repo` OK. `apps/mobile`: `typecheck`
   OK; `test:storage` 1300 passed, 0 failed (real SQLite included); `currency:verify`, `regions:verify` OK;
   `i18n:check -- --strict` 0 errors, 0 stale (English lock accepted); `check` OK; `export:ios` OK. No EAS build, no
   iPhone run by the agent.
+
+### Producto 25A-04 — Assistant → Para revisar (this PR)
+
+- **Goal.** The Assistant stops owning a financial write: every proposal it produces enters the same durable review
+  draft, review item and «Para revisar» architecture as any other producer (25A-01, 25A-02, 25A-03). The conversation
+  stays memory-only; the proposal does not.
+- **Scope.** Branch `feat/producto-25a-04-assistant-review-store` from master aef2edf (25A-03 merged as PR #84). No cloud
+  AI, provider, Supabase, server or contract change, voice, Wallet, Shortcuts, Dynamic Island or notification; no ledger
+  schema (14), backup (v14) or review schema (1) change; no EAS build.
+- **Removed: the direct write.** `app/assistant.tsx` lost `confirm` (`entryFromDraft` → `validateEntry` → `addEntry`, with
+  the `session.writes` retry map of Entries and `session.writing`), `edit` (a push to `/new-entry` prefilled from the
+  chat) and the card's inline Confirmar, Editar and Descartar; `conversation.ts` lost `entryFromDraft`, `draftGaps`, the
+  `DraftContent` statuses and the `draft-confirmed` / `draft-cancelled` / `draft-edited` actions; `session.ts` holds no
+  write; the strings `assistant.draft.*`, `assistant.fixtureConfirmRefused` and `assistant.saveFailed` are gone. The
+  manual entry forms are untouched.
+- **The adapter.** `src/assistant/review-proposal.ts`, `reviewDraftFromAssistant(resolved, archive, at)`: kind, amount,
+  merchant and category as the conversation resolved them (empty is missing); the currency and the date only when the
+  model stated them (`currencyStated`, `dateStated` on `ResolvedDraft`: the screen's currency and today still pick the
+  accounts to offer and fill the conversation, but are never captured as facts); the destination only when the person
+  chose it or it was the one account that fits, through `withDestination` (a card gets «Una vez», never cuotas; a
+  destination the domain does not offer for the kind, an income on a card, is left unchosen); the basis from
+  `reviewBasis`; the source `assistant`; parsed strictly (a value the draft cannot hold, a merchant over 120 characters
+  or a hidden character, is missing, never cut). Clarifications are unchanged: kind, amount, account, category.
+- **Capture and idempotency.** When a draft resolves, the screen fixes two fresh UUIDs (the item id and the write id) and
+  freezes the whole capture (`AssistantCapture`: ids, the capture key `assistant:<item id>`, the time and the review
+  draft) on the proposal before anything is sent; `captureReview` (the store's capture, in the ledger's queue, then the
+  tray is read again, so the list, the count and the Más badge show it at once) stores it. A retry resends exactly that
+  capture; the store answers a repeat with the item it holds (an item edited since keeps the edit), so no retry makes a
+  second item, and nothing compares amounts or merchants. A failure is said on the card («No se pudo guardar en Para
+  revisar. No se registró nada.») with Reintentar; nothing is written anywhere. The capture runs from the session, so it
+  finishes if the screen closes; one capture per proposal at a time (`session.capturing`).
+- **One source of truth.** A captured proposal is the review item: the card reads it from the tray while pending (an edit
+  made in «Para revisar» is what it shows); its frozen snapshot is only drawn before the capture lands, and is never sent
+  again once captured. Confirmed, dismissed or gone from the tray, it is looked up once (`getReviewItem`) and says so
+  («Registrado desde Para revisar» with «Ver movimiento» / «Ver plan», «Propuesta descartada», «ya no está pendiente»),
+  with nothing that could write it again.
+- **The card.** `ProposalCard` (`src/ui/assistant-messages.tsx`): «Para revisar · Gasto», the amount (or «Sin monto»), the
+  merchant, category, where it is recorded, the purchase mode on a card, the date (missing ones «Falta completar»,
+  neutral), then one line in the review's words («Lista para confirmar en Para revisar.», «Faltan 2 datos: completalos
+  en Para revisar.», stale or interrupted in amber) and one secondary action, «Revisar» (the 25A-03 detail); lime stays
+  Confirmar's, in the review. No second confirmation exists.
+- **New chat and the session.** New chat clears the conversation only; leaving the screen, killing the app and a
+  restart keep every captured proposal in Más → Para revisar. Chat history is still not a feature.
+- **Fixture view.** Presentation only: its proposal is a `preview` («Vista de prueba: esta propuesta no se guarda ni se
+  puede registrar.»), never captured into the review file and never written (AGENTS.md rule 6).
+- **Answers and evidence.** Unchanged: analytical answers, local evidence rows and links, the client boundary,
+  streaming, cancellation and the disconnected state; no more ledger data leaves the device.
+- **Later contract (decision recorded, not implemented).** One message or utterance may later produce several drafts
+  (competitive-landscape.md §8.1, voice in 25A): each becomes its own review item with its own item id, write id and
+  explicit confirmation. Nothing here assumes one proposal per conversation (a thread already holds any number of
+  proposal messages, each with its own frozen capture); the protocol expansion is a later 25A contract slice, and the
+  server contract is unchanged now.
+- **Device QA.** Deferred to the physical-device release gate (owner decision, 2026-10-04); the checklist section
+  «Producto 25A-04» lists what joins it.
+- **Tests.** `tests/assistant-review.node.ts` (the adapter: mapping, basis, nothing invented, card «Una vez», income
+  never a card, frozen ids; real SQLite: a repeated capture is one item, a failed one stores and writes nothing, an
+  edit is never overwritten, confirmation writes once); `tests/assistant-routes.node.ts` (on real SQLite: capture into
+  the tray with no ledger write, failure and retry with the same capture, the edit read from the item, confirmed and
+  dismissed cards, one lookup, New chat, unmount and restart; the fixture preview; no write path left in the screen);
+  `assistant-ui.node.ts` (the card in every state, English, VoiceOver); `assistant.node.ts` and
+  `assistant-session.node.ts` (the reducer and the session without writes); `review-routes.node.ts` (the Assistant is
+  the one producer).
+- **Review (before the PR).** An adversarial pass found no high-confidence defect; two lower ones were fixed: a captured
+  proposal missing from a tray that could not be read again stays «Revisar» (never shown as gone), and the basis is taken
+  from the ledger when the answer arrives, not when the request was sent. Recorded trade-off: an unstated currency or
+  date is a gap the person completes in «Para revisar» (the amount is re-entered there when the currency was unstated).
+- **Status.** This PR; not merged.
+- **Gates.** 2026-10-04, local, Linux. Root `npm test` 590 passed, 1 todo; `check:repo` OK. `apps/mobile`: `typecheck`
+  OK; `test:storage` 1306 passed, 0 failed (real SQLite included); `currency:verify`, `regions:verify` OK;
+  `i18n:check -- --strict` 0 errors, 0 stale (English lock accepted); `check` OK; `export:ios` OK. No EAS build, no
+  remote provider call, no iPhone run by the agent.
 
 ### Later notes recorded in 24UX6A (future; document only, not scheduled)
 

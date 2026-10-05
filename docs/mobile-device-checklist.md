@@ -1,5 +1,25 @@
 # Physical iPhone acceptance checklist
 
+## Producto 25A-04 — Assistant → Para revisar (on its branch; nothing device-verified; joins the release gate)
+
+Deferred, with the other device items, to the consolidated pre-release device gate («Release gate», owner decision
+2026-10-04): it must pass before the first external or public TestFlight candidate and before App Store submission.
+JavaScript only, no native dependency, no EAS build, no schema (14) or backup (v14) change. **What can be checked now:**
+the Assistant is disconnected in every build, so a real proposal cannot be produced on the iPhone; the capture, retry,
+New chat, restart, edit and confirmation states are evidenced by the automated suite on real SQLite
+(`tests/assistant-review.node.ts`, `tests/assistant-routes.node.ts`). Synthetic proposals are never written to the
+real review file.
+
+- [ ] **Fixture view (development bundle with `EXPO_PUBLIC_ASSISTANT_FIXTURES=1`):** «Gasté 18.500 en Carrefour con la
+  Visa» shows a «Vista de prueba» proposal card with no action, and Más → Para revisar stays empty («Nada pendiente»,
+  no badge) afterwards; Movimientos unchanged.
+- [ ] **Disconnected build:** a typed message still returns to the composer with its note; nothing appears in Para revisar.
+- [ ] **When the Assistant connects (a later 25A slice), in the release gate:** a proposal appears at once in Para
+  revisar and on the Más badge; «Revisar» opens its detail; Editar there is what the chat card then shows; Confirmar
+  records one movement (one plan for cuotas); the card says «Registrado» and «Ver movimiento»; Descartar makes it say
+  «Propuesta descartada»; New chat, leaving the Assistant and closing the app keep the proposal in Para revisar; light
+  and dark, VoiceOver, large text.
+
 ## Producto 25A-03 — Para revisar (on its branch; nothing device-verified)
 
 Metro from this branch (`npm run start:dev-client -- --clear`) on the installed FinanzApp Dev build; JavaScript only, no
