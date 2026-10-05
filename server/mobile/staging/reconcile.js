@@ -58,7 +58,10 @@ export function reconcile({ ours, provider, evals = [], projectId }) {
     const extra = evalCost.get(day) ?? 0;
     // `estimated`: what FinanzApp knows it spent. `bound`: the most it can have spent (unknown costs at their maximum).
     const estimated = row.settledMicroUsd + extra;
-    const bound = Math.max(row.chargedMicroUsd, row.settledMicroUsd) + extra;
+    // A request reserved in the previous day's last minute may be billed on this day (the provider files it by when it
+    // ran), so its cost may appear here too.
+    const previous = ours.days.find(d => d.day === new Date(Date.parse(day + 'T00:00:00Z') - DAY * 1000).toISOString().slice(0, 10));
+    const bound = Math.max(row.chargedMicroUsd, row.settledMicroUsd) + extra + (previous?.nearMidnightMicroUsd ?? 0);
     const actual = billed.get(day);
     const notes = [];
     let status = 'ok';
@@ -67,7 +70,9 @@ export function reconcile({ ours, provider, evals = [], projectId }) {
     if (actual === undefined) {
       if (estimated > 0 && status === 'ok') { status = 'pending'; notes.push('no provider cost for this day yet'); }
     } else if (actual > bound) { status = 'investigate'; notes.push('the provider billed more than FinanzApp can have spent'); }
-    else if (!(row.unsettled || row.staleReserved) && estimated > actual * (1 + OVER_ESTIMATE.ratio) + OVER_ESTIMATE.slackMicroUsd && status === 'ok') {
+    // The day's last-minute requests may have been billed tomorrow: they do not make today an over-estimate.
+    else if (!(row.unsettled || row.staleReserved) && estimated - (row.nearMidnightMicroUsd ?? 0) > actual * (1 + OVER_ESTIMATE.ratio) + OVER_ESTIMATE.slackMicroUsd
+      && status === 'ok') {
       status = 'over_estimate'; notes.push('FinanzApp settled noticeably more than billed');
     }
     return { day, status, estimatedMicroUsd: estimated, boundMicroUsd: bound, billedMicroUsd: actual ?? null, notes };

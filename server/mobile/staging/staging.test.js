@@ -180,6 +180,11 @@ describe('staging cost reconciliation (offline)', () => {
     const unsettled = day('2026-10-06', { unsettled: 1, chargedMicroUsd: 60_000 });
     expect(reconcile({ projectId: PROJECT, ours: ours([unsettled]), provider: costs([bucket('2026-10-06', 0.055)]) })[0].status).toBe('ok');
     expect(reconcile({ projectId: PROJECT, ours: ours([unsettled]), provider: costs([bucket('2026-10-06', 5)]) })[0].status).toBe('investigate');
+    // A request reserved at 23:59:50 UTC and billed after midnight: the next day may carry it, nothing more.
+    const crossing = [day('2026-10-06', { nearMidnightMicroUsd: 20_000 }), day('2026-10-07', { settledMicroUsd: 10_000, chargedMicroUsd: 10_000 })];
+    expect(reconcile({ projectId: PROJECT, ours: ours(crossing), provider: costs([bucket('2026-10-06', 0.03), bucket('2026-10-07', 0.03)]) }).map(v => v.status))
+      .toEqual(['ok', 'ok']);
+    expect(reconcile({ projectId: PROJECT, ours: ours(crossing), provider: costs([bucket('2026-10-06', 0.03), bucket('2026-10-07', 0.031)]) })[1].status).toBe('investigate');
     // Spend the provider billed on a day FinanzApp has no record of.
     expect(reconcile({ projectId: PROJECT, ours: ours([]), provider: costs([bucket('2026-10-06', 0.01)]) })[0].status).toBe('investigate');
   });

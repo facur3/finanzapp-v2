@@ -255,9 +255,11 @@ function metrics(records) {
     estimateExceededCount: records.filter(item => item.estimateExceeded).length,
     // What the provider reports serving, per case: the adoption record names the model and tier actually measured.
     servedModels: tally(records.map(item => item.model ?? 'unknown')), servedTiers: tally(records.map(item => item.tier ?? 'unknown')),
-    // Unknown stays unknown: one case without a reported count makes that total null (cost.js prices it pessimistically).
+    // Unknown stays unknown: a case without trusted usage, or without a reported count, makes that total null (cost.js
+    // prices it pessimistically); a partial sum would read as a measurement.
     tokens: Object.fromEntries(['inputTokens', 'cachedInputTokens', 'cacheWriteTokens', 'outputTokens', 'reasoningTokens']
-      .map(key => [key, used.some(item => item.usage[key] === null) ? null : used.reduce((sum, item) => sum + item.usage[key], 0)])),
+      .map(key => [key, used.length !== records.length || used.some(item => item.usage[key] === null) ? null
+        : used.reduce((sum, item) => sum + item.usage[key], 0)])),
     untrustedUsageCases: records.length - used.length,
   };
 }

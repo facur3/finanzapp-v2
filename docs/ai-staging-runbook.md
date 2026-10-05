@@ -721,6 +721,9 @@ defeats the check. Changing a price to make an evaluation pass is never allowed.
    - A day is `investigate` when the provider billed more than FinanzApp can have spent, or when any `estimate_exceeded`
      row exists. The script exits 1. What FinanzApp can have spent counts unsettled and stale requests at their maximum
      (`chargedMicroUsd`), so a drill's unsettled rows never hide an overbilled day.
+   - A request reserved in a day's last minute may run, and be billed, after UTC midnight. The report carries that
+     minute's cost (`nearMidnightMicroUsd`), and the next day's bound includes it, so such a crossing is never flagged
+     as overbilling.
 4. [ ] **`estimate_exceeded` must be zero.** One means the input-token bound or the price table under-reserves, so the
    ceilings would not bound spend. Stop: switch AI off in the database, open an investigation, and fix the bound or
    the table in a reviewed PR. Never adjust a number to make the report pass.

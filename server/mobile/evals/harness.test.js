@@ -315,5 +315,9 @@ describe('eval CLI', () => {
     expect(report.metrics.servedModels).toEqual({ fixture: 2 });
     expect(report.metrics.tokens.cacheWriteTokens).toBeNull();
     expect(report.metrics.tokens.inputTokens).toBe(1_000_000);
+    // A case with no trusted usage at all: every total is unknown, never a partial sum.
+    const mixed = await runEval({ cases: CASES.slice(0, 2), respond: (call, testCase) => testCase === CASES[0] ? { output: goldenOutput(testCase), usage: null, latencyMs: 1 }
+      : { output: goldenOutput(testCase), latencyMs: 1, model: 'fixture', tier: 'default', usage: { inputTokens: 10, cachedInputTokens: 0, cacheWriteTokens: 0, outputTokens: 1, reasoningTokens: 0 } } });
+    expect(Object.values(mixed.metrics.tokens)).toEqual([null, null, null, null, null]);
   });
 });

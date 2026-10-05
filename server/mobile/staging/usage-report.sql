@@ -16,6 +16,8 @@ select jsonb_build_object(
       -- Still 'reserved' after its in-flight window: a settlement that never arrived, counted at its maximum.
       'staleReserved', count(*) filter (where r.state = 'reserved' and r.created_at < now() - interval '10 minutes'),
       'estimateExceeded', count(*) filter (where r.outcome = 'estimate_exceeded'),
+      -- Reserved in the day's last minute: the provider call may have run, and been billed, after UTC midnight.
+      'nearMidnightMicroUsd', coalesce(sum(r.charged_micro_usd) filter (where r.created_at >= (r.day_key + 1)::timestamp at time zone 'UTC' - interval '60 seconds'), 0),
       'chargedMicroUsd', sum(r.charged_micro_usd),
       'settledMicroUsd', coalesce(sum(r.charged_micro_usd) filter (where r.state = 'settled'), 0),
       'maxMicroUsd', sum(r.max_micro_usd),
