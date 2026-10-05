@@ -34,9 +34,11 @@ const PAIR_PATTERNS = [/\['ARS', 'USD'\]/, /'ARS' \| 'USD'/, /"ARS", "USD"/, /==
 const ALLOWED_PAIRS: { file: string; includes: string; why: string }[] = [
   { file: 'packages/domain/currency.ts', includes: "LegacyCurrency = 'ARS' | 'USD'", why: 'the two currencies rows and backups from before 24B can name (permanent)' },
   { file: 'packages/domain/currency.ts', includes: "LEGACY_CURRENCIES: readonly LegacyCurrency[] = ['ARS', 'USD']", why: 'permanent' },
-  { file: 'packages/integrations/contracts.d.ts', includes: "currency: 'ARS' | 'USD'", why: 'Assistant contract v1 is frozen; stage 7 adds the next version' },
-  { file: 'packages/integrations/contracts.js', includes: "['ARS', 'USD'].includes", why: 'Assistant contract v1 is frozen; stage 7 adds the next version' },
-  { file: 'server/mobile/openai.js', includes: "enum: ['ARS', 'USD', null]", why: 'the model schema of contract v1; stage 7 imports a generated superset' },
+  { file: 'packages/integrations/contracts.d.ts', includes: "currency: 'ARS' | 'USD'", why: 'the capture contract v1 is frozen; stage 7 adds the next version' },
+  { file: 'packages/integrations/contracts.js', includes: "['ARS', 'USD'].includes", why: 'the capture contract v1 is frozen; stage 7 adds the next version' },
+  { file: 'packages/integrations/assistant-protocol.d.ts', includes: "ProtocolCurrency = 'ARS' | 'USD'", why: 'Assistant protocol v2 (25A-05) keeps the pair; stage 7 widens it' },
+  { file: 'packages/integrations/assistant-protocol.js', includes: "PROTOCOL_CURRENCIES = ['ARS', 'USD']", why: 'Assistant protocol v2 (25A-05) keeps the pair; stage 7 widens it' },
+  { file: 'server/mobile/evals/corpus.js', includes: "currency = region === 'AR' ? 'ARS' : 'USD'", why: 'the eval corpus\'s default currency per region, within protocol v2\'s pair (25A-05)' },
   { file: 'apps/mobile/src/i18n/locale.ts', includes: "dollarSignCurrency: 'ARS' | 'USD' | (string & {}) | null", why: 'a region convention: which currency a bare $ names (permanent; any tender code since the 24R1 catalogue)' },
   { file: 'apps/mobile/src/i18n/format.ts', includes: "currency === 'ARS') return conventions(locale, explicit).dollarSignCurrency === 'ARS' ? '$' : 'AR$'", why: 'the ARS symbol rule (permanent)' },
 ];

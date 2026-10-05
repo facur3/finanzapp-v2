@@ -64,6 +64,21 @@ export const RETIRED_IMPORTS = [
   { name: 'Capacitor', re: /['"]@capacitor(?:-community)?\/[^'"]*['"]/g },
 ];
 
+/* Server-only secrets never reach the app (Producto 25A-05): a file under apps/mobile may not name a server secret, and
+   no tracked file may declare a public Expo variable that sounds like a secret or a provider key. Expo inlines every
+   `EXPO_PUBLIC_*` value into the bundle anyone can unzip; a publishable key is public by design and allowed. */
+export const APP_TREE = /^apps\/mobile\//;
+export const SERVER_SECRET_NAMES = /\b(?:MOBILE_AI_API_KEY|MOBILE_SUPABASE_SECRET_KEY|MOBILE_OPENAI_API_KEY|OPENAI_API_KEY|ANTHROPIC_API_KEY|SUPABASE_SERVICE_ROLE_KEY)\b/;
+export const PUBLIC_SECRET_NAME = /\bEXPO_PUBLIC_[A-Z0-9_]*(?:SECRET|PRIVATE|SERVICE_ROLE|API_KEY|OPENAI|ANTHROPIC|GEMINI|PROVIDER|PASSWORD)[A-Z0-9_]*\b/;
+
+export function findExposureOffenders(file, text) {
+  const hits = [];
+  const add = (name, match) => { if (match) hits.push({ file, name, line: text.slice(0, match.index).split('\n').length }); };
+  if (APP_TREE.test(file)) add('a server-only secret named in the app', SERVER_SECRET_NAMES.exec(text));
+  add('a secret-like EXPO_PUBLIC_ variable (inlined into the app bundle)', PUBLIC_SECRET_NAME.exec(text));
+  return hits;
+}
+
 const TEXT_LIMIT = 2 * 1024 * 1024;
 const SKIP_CONTENT = /(^|\/)package-lock\.json$|\.(png|jpg|jpeg|gif|webp|ico|pdf|ttf|otf|woff2?|zip|gz)$/;
 
@@ -102,6 +117,7 @@ export function audit(files, read) {
     if (text === null) continue;
     if (SOURCE_TREES.test(file) && SOURCE_FILE.test(file)) imports.push(...findImportOffenders(file, text));
     secrets.push(...findSecretOffenders(file, text));
+    secrets.push(...findExposureOffenders(file, text));
   }
   return { generated, legacy, sensitive, imports, secrets };
 }

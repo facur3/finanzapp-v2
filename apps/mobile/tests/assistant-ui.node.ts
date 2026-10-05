@@ -304,7 +304,7 @@ test('assistant text, thinking and system notes are said in words; the pulse sto
 test('answer evidence renders rows with the shared Money component and links as text buttons; nothing when there is no evidence', () => {
   const ui = load('assistant-messages.tsx');
   const opened: unknown[] = [];
-  const content = conversation.answerContent({ factIds: ['current.category.1', 'previous.category.1'] },
+  const content = conversation.answerContent({ evidenceIds: ['current.category.1', 'previous.category.1'] },
     [{ id: 'current.category.1', label: 'Categoría de gasto: Supermercado', amountMinor: 12120000, count: 11, startISO: '2026-09-01', endISO: '2026-09-21' },
       { id: 'previous.category.1', label: 'Categoría de gasto: Supermercado', amountMinor: 9000000, count: 10, startISO: '2026-08-01', endISO: '2026-08-21' }], 'ARS');
   const root = ui.render('AnswerEvidence', { content, currency: 'ARS', onOpen: (href: unknown) => opened.push(href) });
@@ -380,7 +380,7 @@ test('English: every word the Assistant UI says is English; account names, merch
   const accountsChips = nodes(ui.render('ClarificationChoices', { options: [{ id: 'visa', label: 'Visa Galicia' }], chosen: null, onChoose: () => {} })).filter(node => node.props.accessibilityRole === 'button');
   assert.deepEqual(accountsChips.map(node => node.props.accessibilityLabel), ['Visa Galicia']);
   // Evidence: rows named from the fact id in English, built-in categories localized; links from their stable ids.
-  const content = conversation.answerContent({ factIds: ['current.expenses', 'current.category.1', 'previous.category.0'] }, [
+  const content = conversation.answerContent({ evidenceIds: ['current.expenses', 'current.category.1', 'previous.category.0'] }, [
     { id: 'current.expenses', label: 'Gastos registrados', amountMinor: 5, count: 1, startISO: '2026-09-01', endISO: '2026-09-21' },
     { id: 'current.category.1', label: 'Categoría de gasto: Supermercado', amountMinor: 3, count: 1, startISO: '2026-09-01', endISO: '2026-09-21' },
     { id: 'previous.category.0', label: 'Categoría de gasto: Kiosco Pepe', amountMinor: 2, count: 1, startISO: '2026-08-01', endISO: '2026-08-21' }], 'ARS');
@@ -407,7 +407,7 @@ test('VoiceOver: with an interface language that differs from the device\'s, eve
   // English chosen in Más on a Spanish iPhone: each element VoiceOver reaches that is not a shared component carries the interface language.
   const english = load('assistant-messages.tsx', { locale: 'en-US', deviceLanguage: 'es' });
   const handlers = { archive: proposalArchive, onReview: () => {}, onRetry: () => {}, onOpenRecord: () => {} };
-  const content = conversation.answerContent({ factIds: ['current.category.1', 'previous.category.1'] },
+  const content = conversation.answerContent({ evidenceIds: ['current.category.1', 'previous.category.1'] },
     [{ id: 'current.category.1', label: 'Categoría de gasto: Supermercado', amountMinor: 12120000, count: 11, startISO: '2026-09-01', endISO: '2026-09-21' },
       { id: 'previous.category.1', label: 'Categoría de gasto: Supermercado', amountMinor: 12200000, count: 10, startISO: '2026-08-01', endISO: '2026-08-21' }], 'ARS');
   const rendered = (ui: ReturnType<typeof load>) => [
@@ -433,7 +433,7 @@ test('VoiceOver: with an interface language that differs from the device\'s, eve
     .render('AssistantText', { text: 'What did you pay with?', status: 'done', ownWords: true })).find(node => node.type === 'View' && node.props.accessible)!.props.accessibilityLanguage;
   assert.deepEqual([own('en-US', 'en'), own('en-AR', 'es'), own('es-AR', 'es'), own('es-US', 'en')], [undefined, 'en', undefined, 'es']);
   // An answer keeps the currency it was computed in, and a difference that grew says so in English too.
-  const dollars = conversation.answerContent({ factIds: ['current.category.1', 'previous.category.1'] },
+  const dollars = conversation.answerContent({ evidenceIds: ['current.category.1', 'previous.category.1'] },
     [{ id: 'current.category.1', label: 'Categoría de gasto: Supermercado', amountMinor: 50000, count: 2, startISO: '2026-09-01', endISO: '2026-09-21' },
       { id: 'previous.category.1', label: 'Categoría de gasto: Supermercado', amountMinor: 20000, count: 1, startISO: '2026-08-01', endISO: '2026-08-21' }], 'USD');
   const usd = nodes(load('assistant-messages.tsx', { locale: 'en-US', deviceLanguage: 'en' }).render('AnswerEvidence', { content: dollars, onOpen: () => {} }));

@@ -1,11 +1,12 @@
 # FinanzApp: dirección visual móvil
 
-Interfaz 17 · 21 de septiembre de 2026; estado al 4 de octubre de 2026: el carril Forest (24UX6A–24UX6E) y 24T3
+Interfaz 17 · 21 de septiembre de 2026; estado al 5 de octubre de 2026: el carril Forest (24UX6A–24UX6E) y 24T3
 mergeados, 25A-01 y 25A-02 mergeadas (PR #77, #78, #79) sin cambios visuales, 25UX1 mergeada (PR #80: dock, Tarjetas y
 Reportes: interacción), 25OPS1 mergeada (PR #81; la última fila sobre el dock, confirmada por el dueño en el iPhone el
 2026-10-03), 25DISC1 mergeada (PR #82, solo documentación), **25VIS1 mergeada (PR #83): Electric Lime, la paleta
-actual del producto**, aceptada por el dueño en el iPhone el 2026-10-03 («Producto 25VIS1»), y 25A-03 en su rama: «Para
-revisar» y el símbolo y los centavos del monto de Inicio en grafito sólido («Producto 25A-03»). El resto de la revisión
+actual del producto**, aceptada por el dueño en el iPhone el 2026-10-03 («Producto 25VIS1»), 25A-03 mergeada (PR #84:
+«Para revisar» y el símbolo y los centavos del monto de Inicio en grafito sólido), 25A-04 mergeada (PR #85: la hoja de
+revisión sobre el Asistente) y 25A-05 en su rama, sin cambios visuales («Producto 25A-05»). El resto de la revisión
 visual y gestual en iPhone sigue pendiente. [Alcance del producto](decisions/002-spending-first.md) ·
 [Navegación y tarjetas](decisions/003-five-tabs-and-cards.md).
 
@@ -854,6 +855,21 @@ La selección de porciones dentro de la dona (solo visual, dentro del reporte) *
 barras de Día a día y una cabecera fija sólida. Siguen permitidos para una pasada siguiente; no hay ruta de detalle por comercio. El orden
 vinculante del roadmap no cambia: la próxima entrega de producto es 24T3; 24UX6C (Movimientos y Más) y 24UX6D
 (Tarjetas) siguen a 24UX6B en el carril UX, y su lugar frente a 24T3 lo decide el dueño (ver `docs/mobile-roadmap.md`).
+
+## Producto 25A-05 — seguridad de la IA, contrato del proveedor y evaluación (sin cambios visuales)
+
+Trabajo de servidor y de contrato, en su rama `feat/producto-25a-05-ai-security-provider-foundation`: ninguna pantalla,
+color, texto visible ni gesto cambia, y todas las builds siguen desconectadas. El protocolo cerrado v2 del Asistente, la
+frontera del proveedor, los límites de costo y la evaluación son del servidor y del contrato
+([production-plan.md](production-plan.md) §5 y §6); acá vale una sola regla de presentación para cuando el Asistente se
+conecte (25A-06):
+
+- **Fuera de alcance = solo texto.** Una respuesta `out_of_scope` se muestra como la prosa del modelo en el hilo, sin
+  tarjeta, sin chips, sin enlaces y sin acciones. Nunca abre la hoja de revisión.
+- **Los enlaces de una respuesta** siguen saliendo de la evidencia local citada; la intención de navegación del modelo
+  solo cambia cuál va primero, nunca agrega uno.
+- **Una aclaración** muestra chips solo para candidatos que son datos que el teléfono envió.
+- La línea de versión de Más dice «FinanzApp 0.1.0 (25A-05)». Nada que revisar en el iPhone ahora.
 
 ## Producto 25A-04 — Asistente → hoja de revisión
 
@@ -3039,14 +3055,18 @@ color propio.
 
 ## Pendiente de revisión en iPhone
 
-- Producto 25A-04 (en su rama; sin build de EAS; diferida al control previo al lanzamiento): la tarjeta de vista de prueba
+- Producto 25A-05 (en su rama; sin build de EAS): nada visual que revisar ahora. Cuando 25A-06 conecte una build de
+  staging: una respuesta fuera de alcance aparece solo como texto, sin tarjeta ni acciones; los enlaces de una respuesta
+  siguen siendo los de la evidencia local. Se suma a 25A-06/25A-07 y al control previo al lanzamiento
+  (docs/mobile-device-checklist.md, «Producto 25A-05»).
+- Producto 25A-04 (mergeada como PR #85; sin build de EAS; diferida al control previo al lanzamiento): la tarjeta de vista de prueba
   sin acciones ni hoja y «Para revisar» vacío después; con el Asistente conectado (más adelante), la hoja de revisión que
   aparece sola después de guardar la propuesta, su tamaño ajustado y con texto grande, deslizarla hacia abajo sin
   descartar, Editar y volver a la hoja, Confirmar con un solo registro, «Descartar propuesta» con su pregunta, «Revisar»
   desde la tarjeta, «Registrado» y «Propuesta descartada». La lista exacta está en docs/mobile-device-checklist.md
   («Producto 25A-04»).
 
-- Producto 25A-03 (en su rama; sin build de EAS; nada revisado en el iPhone): la fila «Para revisar» de Más y la bandeja
+- Producto 25A-03 (mergeada como PR #84; sin build de EAS; nada revisado en el iPhone): la fila «Para revisar» de Más y la bandeja
   vacía, en claro y oscuro; el símbolo y los centavos del monto de Inicio en grafito, en claro y oscuro; VoiceOver, texto
   grande, Reduce Motion y Reduce Transparency. Todavía no hay quien produzca propuestas en la app (llega con 25A-04): las
   filas, Confirmar, Editar y Descartar se prueban en los tests automáticos, no en el iPhone. La lista exacta está en

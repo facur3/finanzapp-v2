@@ -128,7 +128,7 @@ confirmed, and a failed write keeps the draft.
 `.github/workflows/ci.yml` runs on every push and PR: `mobile` (isolated install, dependency
 tree, Expo compatibility, typecheck, the currency and region catalogue locks, the localization
 catalogues, the SQLite tests, the iOS JavaScript export), `mobile_api` (the PostgreSQL inbox,
-ownership and quota tests) and `domain` (the root vitest suite over `packages/domain`,
+ownership, quota, Assistant reservation and ceiling tests, with two-connection concurrency proofs) and `domain` (the root vitest suite over `packages/domain`,
 `server/mobile` and the repository guard, then `npm run check:repo`).
 
 ## Hosting
@@ -137,8 +137,9 @@ The Vercel project `finanzapp-v2` deploys `api/mobile/*` as functions from this 
 static output holds only a plain `404.html` (Vercel refuses an empty output directory), so `/`
 and every other path answer 404 and no web page is served. Without the
 owner's configuration (`server/mobile/runtime.js` reads `MOBILE_INTEGRATIONS_ENABLED`,
-`MOBILE_SUPABASE_URL`, `MOBILE_SUPABASE_PUBLISHABLE_KEY`, `MOBILE_AI_ENABLED`,
-`MOBILE_OPENAI_API_KEY`) every endpoint fails closed: `GET` answers 405, `POST` answers 503;
+`MOBILE_SUPABASE_URL`, `MOBILE_SUPABASE_PUBLISHABLE_KEY`, `MOBILE_SUPABASE_SECRET_KEY`, and for the
+Assistant `MOBILE_AI_ENABLED` and the other `MOBILE_AI_*` names of docs/production-plan.md §4.7) every
+endpoint fails closed: `GET` answers 405, `POST` answers 503;
 once configured, a request without a session answers 401. The app's API origin is
 `EXPO_PUBLIC_MOBILE_API_ORIGIN` (apps/mobile/README.md).
 

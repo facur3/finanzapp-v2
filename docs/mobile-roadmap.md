@@ -1,6 +1,19 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-05 (Producto 25A-04, on its branch: Assistant → review sheet. The Assistant no longer writes the
+Updated: 2026-10-05 (Producto 25A-05, on its branch: AI security, provider contract and evaluation harness, server and
+contract work with no visible change. The Assistant's closed protocol v2 (`packages/integrations/assistant-protocol.js`:
+one result of four types, every key required, unknowns null, no id, URL, code or tool field), validated on the server and
+again on the device; the app sends v2 with a fresh request id and the configured region; v1 retired, never deployed. A
+provider-neutral port and an OpenAI Responses adapter implemented but disabled (`store: false`, no background, no tools,
+no state, pinned tier); the model, effort and token caps as allowlisted server configuration, no model in code
+(`gpt-5-mini` removed). Integer micro-USD cost: worst-case reservation, settlement from trusted usage. Supabase: the
+privileged functions executable only by `service_role` through a server-side secret key (the direct-quota weakness of
+25OPS1 fixed in the repository), monetary reservations, idempotency, rate and concurrency windows, per-user and global
+ceilings and a database kill switch that ships off, staging placeholders only, applied nowhere. A 103-case synthetic
+evaluation corpus with a harness and thresholds written before any real test; the fixture run passes, which is not a
+model result. Nothing deployed, applied, configured or evaluated against a real model; no schema (14), backup (v14) or
+review-store (1) change; the version line reads «FinanzApp 0.1.0 (25A-05)»; §3, «Producto 25A-05»). Producto 25A-04
+merged as PR #85, merge commit d493c83: Assistant → review sheet. The Assistant no longer writes the
 ledger: its direct path (`entryFromDraft` → `validateEntry` → `addEntry`) is gone; every resolved Assistant draft is
 adapted to the canonical review draft (`reviewDraftFromAssistant`: an unstated date is today by the capture rule, an
 unstated currency comes only from a stated destination, a card gets «Una vez», an income never a card) and durably
@@ -11,7 +24,7 @@ captures nothing; a named payment method is matched by whole words and, unmatche
 only eligible account (owner fixture test, 2026-10-05). Owner decisions recorded: theme packs as a pre-launch 25F Pro candidate, the Pro candidate bundle and
 generous AI fair use (§3, «Producto 25F»).
 No cloud, provider, Supabase, server, voice, Wallet, notification, schema (14) or backup (v14) change; the version line
-reads «FinanzApp 0.1.0 (25A-04)». Producto 25A-03 merged as PR #84, merge commit aef2edf: «Para revisar», the first screens over the local review store of
+read «FinanzApp 0.1.0 (25A-04)». Producto 25A-03 merged as PR #84, merge commit aef2edf: «Para revisar», the first screens over the local review store of
 25A-02: a tray of pending proposals reached from Más (a pending count on the dock's Más tab), a proposal's detail with
 Confirmar, Editar and Descartar, confirmation only through the store's frozen write and reconciliation; no cloud, provider,
 Supabase, Wallet, notification, schema (14) or backup (v14) change; plus the owner-observed follow-up of 25VIS1: the hero
@@ -254,13 +267,32 @@ commit 5c73813), 24UX6C (PR #72, merge
 commit c673be6), 24UX6B (PR #71, merge
 commit ecfd1dc), 24UX6A (PR #70, merged 2026-10-01, merge commit ef24bb6), 24T2 (PR #69, merge commit 8951f6c), 24T1C
 (PR #68), 24T1 (PR #67) and 25B3 (PR #66), then Producto 25A-01 (PR #77, merge commit a4202bc) and 25A-02 (PR #78 and its follow-up PR #79, merge commit
-a1bd181), 25UX1 (PR #80, merge commit d45eca6), and 25OPS1 (PR #81, merge commit d0a0be8), and 25DISC1 (PR #82, merge commit 227942c, documentation only), and 25VIS1 (PR #83, merge commit 0ff9859, Electric Lime, the accepted current palette); Producto 25A-03 («Para revisar») on its branch. Per area,
+a1bd181), 25UX1 (PR #80, merge commit d45eca6), and 25OPS1 (PR #81, merge commit d0a0be8), and 25DISC1 (PR #82, merge commit 227942c, documentation only), and 25VIS1 (PR #83, merge commit 0ff9859, Electric Lime, the accepted current palette), 25A-03 («Para revisar», PR #84, merge commit aef2edf) and 25A-04 (Assistant → review sheet, PR #85, merge commit d493c83); Producto 25A-05 (AI security, provider contract and evaluation harness) on its branch. Per area,
 without test inventories (those are in apps/mobile/README.md and the history
 file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_REGIONS`,
 `LEDGER_CURRENCIES`): what a build offers, verified on Linux; nothing is distributed to people yet
 (§4).
 
-- **Assistant → review sheet (25A-04, on its branch; device QA deferred to the release gate).** §3, «Producto 25A-04».
+- **AI security, provider contract and evaluation harness (25A-05, on its branch; nothing visible changes; nothing to
+  check on the iPhone until 25A-06/25A-07).** §3, «Producto 25A-05». Server and contract work, implemented and tested on
+  Linux, deployed, applied and configured nowhere. The Assistant's closed protocol v2
+  (`packages/integrations/assistant-protocol.js`), validated by the server on the provider's output and by the app again
+  on the server's reply; the app sends v2 with a fresh `requestId` (expo-crypto) and the configured region; the v1
+  Assistant contract is retired (never deployed; captures keep contract v1). A provider-neutral port
+  (`server/mobile/provider.js`) and an OpenAI Responses adapter (`openai.js`) implemented but disabled: allowlisted request
+  keys, `store: false`, `background: false`, no tools or state, a tool call refused, the tier pinned; model, effort and
+  token caps as allowlisted server configuration (`runtime.js`, `MOBILE_AI_*`), no model in code; one 34 s timeout
+  budget. Integer micro-USD cost (`cost.js`, `pricing.js`): the input-token bound, the worst-case reservation and the
+  settlement from trusted usage. `schema.sql`: the privileged functions executable only by `service_role` (the server's
+  Supabase secret key, never with a person's token), `mobile_ai_control` (owner-only, disabled, staging placeholders)
+  and `mobile_ai_reservations` (idempotency, rate and concurrency windows, per-user monthly and global daily and monthly
+  ceilings), with two-connection concurrency proofs. The evaluation corpus (103 synthetic cases), harness and thresholds
+  (`server/mobile/evals/`); the fixture run passes, not a model result. Telemetry by allowlisted keys, no content.
+  Repository guards: no server secret named in `apps/mobile`, no secret-like `EXPO_PUBLIC_` name. On the device, an
+  out-of-scope reply is the model's prose only, a navigation intent only reorders links derived from cited local
+  evidence, and a payment reference drops a leading «con la» / "my" before the whole-word match. No schema (14), backup
+  (v14) or review-store (1) change. The version line reads «FinanzApp 0.1.0 (25A-05)».
+- **Assistant → review sheet (25A-04, PR #85, merge commit d493c83; device QA deferred to the release gate).** §3, «Producto 25A-04».
   The Assistant has no ledger write path: a resolved draft becomes a proposal durably captured into the review store
   (`src/assistant/review-proposal.ts`, `captureReview`), then a native review sheet (`app/review-sheet/[id].tsx`) is
   presented over the Assistant with Confirmar (the review store's one dispatcher, shared with the «Para revisar» detail
@@ -268,7 +300,7 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   pending. The chat card (`ProposalCard`) reads the review item and offers «Revisar» to reopen the sheet, Reintentar
   after a failed capture, and what became of it. «Para revisar» is the durable inbox. The conversation stays memory-only;
   the proposal survives New chat, leaving the screen and a restart.
-  The version line reads «FinanzApp 0.1.0 (25A-04)».
+  The version line read «FinanzApp 0.1.0 (25A-04)».
 - **«Para revisar» (25A-03, PR #84, merge commit aef2edf; device QA deferred to the release gate).** §3, «Producto 25A-03». The first screens over the
   review store of 25A-02: `/review` lists the pending proposals oldest first, each row saying what it would record (gasto
   or ingreso, amount and currency, merchant, category, account or card, day, source, cuotas) and what it still lacks,
@@ -649,14 +681,15 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   cards with explicit Confirmar, clarification chips, evidence rows and links from cited facts,
   a disconnected state (since 24UX6C said in the thread when a message is sent, no permanent caption); `runtime.ts` returns disconnected because no session provider exists;
   development fixtures (`EXPO_PUBLIC_ASSISTANT_FIXTURES=1`). Server side (`server/mobile`):
-  authenticated endpoints, the durable `needs_review` inbox for Shortcut captures, quota
-  reservations (30 AI queries per user per day, 300 global; 120/2 000 captures), an OpenAI
-  Responses adapter prepared (`gpt-5-mini`, strict JSON, `store:false`), the PostgreSQL schema
-  tests; request contract v1 without a language. No paid call has ever been made. Since 24UX6A the screen is a
+  authenticated endpoints, the durable `needs_review` inbox for Shortcut captures (120/2 000 captures per day), and
+  since 25A-05 the Assistant's protocol v2, the provider port with a disabled OpenAI Responses adapter (no model in
+  code), worst-case monetary reservations with rate, concurrency and ceiling controls and a database kill switch, the
+  PostgreSQL schema tests and the evaluation harness (above). No paid call has ever been made. Since 24UX6A the screen is a
   root-stack screen (`app/assistant.tsx`) pushed from the capture hub, not a tab; its conversation lives in one
   in-memory session per app process (`src/assistant/session.ts`: leaving the screen keeps it and lets a running answer
   land, New chat or closing the app clears it, nothing is persisted), and the hub offers «Continuar» only with the
-  person's real last words. It still writes only a confirmed draft. Since 24T3 its local evidence sends purchases and
+  person's real last words. Since 25A-04 it writes nothing itself: a proposal becomes a review item, confirmed in the
+  review sheet or «Para revisar». Since 24T3 its local evidence sends purchases and
   categories gross plus one positive «Devoluciones» fact (`spendingFacts`), never a negative number; it proposes no
   devolución or adelanto (25A).
 - **Internationalization.** Spanish and English released; 234 of the 257 catalogue regions
@@ -693,7 +726,7 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   amount path by exponent, schema 9 and backup v9, the searchable currency screen, the
   currency chosen before the amount in card, debt and budget forms); since 24M the ledger gate
   offers 146 currencies (144 new: 128 with two decimals, 16 without), the three-decimal ones only on
-  a development preview; the Assistant stays ARS/USD (contract v1). Since 24C1: reference rates from
+  a development preview; the Assistant stays ARS/USD (contract v1, protocol v2 since 25A-05). Since 24C1: reference rates from
   Frankfurter v2 in a separate SQLite cache (`finanzapp-rates-v1.sqlite`), exact conversion in
   `packages/domain/fx.ts`, consolidated views on Inicio, Reportes, their drill-downs and Presupuestos;
   nothing stored converts; purchases paid from an account in another currency are 24C2. Since 24T3 a devolución and
@@ -715,13 +748,19 @@ it was checked in). Metro from `master` (or a delivery's branch) on the installe
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
-- **25A-04 — Assistant → review sheet (on its branch; no EAS build; nothing device-verified; joins the release gate):**
+- **25A-05 — AI security, provider contract and eval harness (on its branch; no EAS build): nothing to check on the
+  iPhone now.** No device-visible change: every build stays disconnected, so the only difference, that a connected
+  Assistant would speak protocol v2 (and show an out-of-scope reply as prose only), cannot be seen until 25A-06 connects
+  a staging build and 25A-07 brings the real product flow. Its items (the checklist section Producto 25A-05) join
+  25A-06/25A-07 and the release gate. Metro on the installed development build shows the version line «FinanzApp 0.1.0
+  (25A-05)» only.
+- **25A-04 — Assistant → review sheet (merged as PR #85, merge commit d493c83; no EAS build; nothing device-verified; joins the release gate):**
   the checklist section Producto 25A-04. The Assistant is disconnected in every build, so a real proposal, and with it the
   review sheet, cannot be produced on the iPhone yet; the fixture view (a development bundle with
   `EXPO_PUBLIC_ASSISTANT_FIXTURES=1`) shows the preview card, presents no sheet and must save nothing. The sheet's
   presentation, swipe-to-close, detents, Dynamic Type, VoiceOver and keyboard over the editor, and the capture, retry,
   restart, New chat, edit and confirmation states, are evidenced by the automated suite until the Assistant connects
-  (a later 25A slice), then join the release gate.
+  (25A-06 on staging, 25A-07 for the product flow), then join the release gate.
 - **25A-03 — «Para revisar» (merged as PR #84, merge commit aef2edf; no EAS build; nothing device-verified):** the checklist section Producto
   25A-03: the Más row and the empty tray in a development build, light and dark; the hero amount's graphite symbol and
   cents on Inicio's field, light and dark; VoiceOver, large text, Reduce Motion and Reduce Transparency. No producer of
@@ -931,7 +970,17 @@ item unless a section says a new native build is needed. The checklist sections 
 
 ## 3. Next deliveries
 
-**Recommended next (2026-10-02):** **24T3 merged as PR #76** (merge commit 399a1fabaa673423b7a155ddb3cb900b5c0103fc):
+**Recommended next (2026-10-05):** **25A-04 merged as PR #85** (merge commit d493c83): the Assistant's proposals are
+durable review items confirmed in a review sheet. **25A-05** (AI security, the closed protocol v2, the provider port
+with a disabled adapter, money-based reservations and ceilings with a database kill switch, the evaluation corpus,
+harness and thresholds; «Producto 25A-05» below) is **this PR**: CI only, no paid call, nothing applied or deployed.
+Next is **25A-06 — Staging activation**, the first slice that needs the owner (the Supabase staging project, a dedicated
+AI provider project with a small spend limit, the secrets, `schema.sql` applied deliberately, the real Luna evaluation
+with the harness's `--live` mode; no production activation), then **25A-07 — Real Assistant product contract and
+polish** («Producto 25A», «Slices»). 25A2 may proceed in parallel as already allowed (its first step is the
+«Card Network Identity» prerequisite, «Producto 25A2»). Nothing in the binding order below changes.
+
+**Earlier recommendation (2026-10-02, history):** **24T3 merged as PR #76** (merge commit 399a1fabaa673423b7a155ddb3cb900b5c0103fc):
 SQLite schema 14 and backup v14 are current, and the broad Forest visual lane (24UX6A–24UX6E) is complete. The active
 phase is **25A — the real Assistant**, delivered as focused slices («Producto 25A» below, «Slices»): **25A-01** (the
 review-draft domain model) merged as PR #77 (merge commit a4202bc); **25A-02** (the durable local review store) merged as PR #78
@@ -943,7 +992,7 @@ launch plan, documentation, plus the dock's last-row clearance found on the owne
 as PR #82 (merge commit 227942c) and changes no order either; **25VIS1** (Electric Lime, colour tokens only, «Producto
 25VIS1» below) merged as PR #83 (merge commit 0ff9859), accepted by the owner on the iPhone as the current product palette, and changed no order (25DISC1's suggested priority changes are owner decisions listed under «Producto 25DISC1»
 below, none applied); **25A-03** (the «Para revisar» tray, «Producto 25A-03» below) merged as PR #84 (merge commit aef2edf); **25A-04** (the
-Assistant's proposals as durable review items, confirmed in a review sheet over the Assistant, «Producto 25A-04» below) is this PR; then the rest of 25A, with no paid provider call before its own approved slice. **25A2** (Wallet Shortcut Capture) still
+Assistant's proposals as durable review items, confirmed in a review sheet over the Assistant, «Producto 25A-04» below) merged as PR #85 (merge commit d493c83); then the rest of 25A, with no paid provider call before its own approved slice. **25A2** (Wallet Shortcut Capture) still
 follows the review-tray foundation: it may begin once 25A-03 has merged, without waiting for 25A's cloud, paid, live or
 voice slices. The targeted 24T3 device pass was not performed and is deferred to the pre-release device gate (owner
 decision, 2026-10-04; §2): a release blocker, not a merge blocker for 25A or 25A2. After 25A: **25C** (with
@@ -1624,8 +1673,9 @@ Assistant's capability boundary and model evaluation, monetary safety).
 - **Goal.** The Assistant becomes the central capability, not a decorative page: it proposes
   movements and edits as drafts, asks the minimum, answers analytical questions with verifiable
   figures from the ledger, in the released languages and by voice.
-- **Scope.** Request contract v2 (docs/i18n.md §11: `locale` as two codes, language-neutral
-  facts; the server accepts v1 and v2, the app sends v2 only where deployed) and the currency
+- **Scope.** The closed protocol v2 (delivered in 25A-05: one result of four types, the region, a request id), then
+  protocol v3 (docs/i18n.md §11: `locale` as two codes, language-neutral facts; the server accepts v2 and v3, the app
+  sends v3 only where deployed; renumbered from "v2" in 25A-05) and the currency
   contract of docs/currency.md §11 ("Gasté 30 dólares en Steam": merchant, amount and currency
   read by the model, the category matched to the person's own identities, the paying account
   decided by the app with one question when several fit, a foreign purchase proposed when no
@@ -1660,7 +1710,7 @@ Assistant's capability boundary and model evaluation, monetary safety).
   owned test data for currencies, loans, refunds, questions and failures; measured provider usage
   and cost per request; the disconnected and
   quota states on the iPhone; the consent screen naming what travels.
-- **Depends on.** 24C1 for rates and consolidated facts; 24M for currencies in v2; a session provider (staging) the
+- **Depends on.** 24C1 for rates and consolidated facts; 24M for currencies in protocol v3; a session provider (staging) the
   owner sets up. **Not a dependency:** 24C2 (optional). Its foreign-purchase subflow is enabled only if 24C2 has
   merged; otherwise 25A ships complete without it (24T1C, 2026-09-28). 24T3 (merged, PR #76) for devolución drafts.
 - **Slices (2026-10-02 reconciliation; one focused PR each, never a mega-PR).** Local lane: **25A-01** the review-draft
@@ -1669,17 +1719,38 @@ Assistant's capability boundary and model evaluation, monetary safety).
   review item's write is frozen after an unknown outcome, as the purchase form freezes its submission, and storage refuses
   one id used as both a movement and a plan, which today `createEntry` and `createInstallmentPlan` do not cross-check);
   **25A-03** the «Para revisar» tray (Confirmar / Editar / Descartar; Editar keeps the same write id and never presets a
-  count) (PR #84, merged); **25A-04** the Assistant's drafts become review items, confirmed in a review sheet presented over the Assistant, with «Para revisar» as the durable inbox (this PR); **25A-11** transfer, card payment and devolución drafts;
-  **25A-12** edits of an existing movement. Server lane, CI only, no paid call: literal env reads and a bundle secret scan;
-  a provider port with deterministic fakes (no provider chosen by familiarity); handler order, error codes and one timeout
-  budget; request contract v2 (server first); money-based cost, rate and token controls with a kill switch and a monthly
-  ceiling; analytical facts v2 computed on the device; the inbox lifecycle and the revocable capture-token foundation.
-  Then: the app sends v2 with an offline end-to-end loop and evaluation harness, including the conversational
-  clarification contract (free-text questions such as a missing merchant, ambiguous destinations and currencies asked
-  before the review sheet; owner decision 2026-10-04, «Producto 25A-04»); cloud consent and failure states; the
-  staging session (the first network slice, owner setup and authorization required); the inbox consumer; **one** paid
-  slice, the live provider on staging, only after the owner configures and approves it; voice last, after the text path is
-  proven on the iPhone. Numbering beyond 25A-04 is indicative; each slice records its own section here.
+  count) (PR #84, merged); **25A-04** the Assistant's drafts become review items, confirmed in a review sheet presented
+  over the Assistant, with «Para revisar» as the durable inbox (PR #85, merged); **25A-11** transfer, card payment and
+  devolución drafts, and the card purchase in cuotas (until then protocol v2 answers a cuotas request `out_of_scope`,
+  pointing to Tarjetas, never as one payment: 25A-05 decision); **25A-12** edits of an existing movement.
+  Server lane:
+  - **25A-05 — AI security, provider contract and eval harness** (this PR; CI only, no paid call): the closed protocol
+    v2 validated on the server and the device, the provider port and a disabled OpenAI adapter, the model as
+    allowlisted configuration, one timeout budget, integer micro-USD worst-case reservation and settlement, the
+    `service_role`-only privileged functions, rate, concurrency and monetary ceilings with a database kill switch,
+    telemetry without content, the repository's secret-exposure guards, the evaluation corpus, harness and thresholds.
+    Still open from the 2026-10-02 server lane: the literal `EXPO_PUBLIC_MOBILE_API_ORIGIN` read, a scan of the bundle
+    an EAS build produces with its real environment (25A-05 scans the CI export), the inbox lifecycle and the revocable capture-token foundation,
+    analytical facts v3.
+  - **25A-06 — Staging activation** (the first network slice; owner setup and authorization required; no production
+    activation): the owner creates the Supabase staging project; the owner creates a dedicated AI provider project with
+    its own key and a small prepaid amount or hard spend limit, the server's ceilings set below it; the owner sets the
+    secrets (`MOBILE_SUPABASE_SECRET_KEY`, `MOBILE_AI_API_KEY` and the rest of production-plan.md §4.7, names only,
+    never in the repository); `server/mobile/schema.sql` applied deliberately to staging, after review (AGENTS rule 3);
+    RLS proven there with two real test users; the kill switch, the ceilings and two concurrent requests at the last unit
+    of capacity tripped on purpose; alerts and the reconciliation against the provider's cost report; the real
+    evaluation of the Luna candidate with `node server/mobile/evals/run.js --live` (`MOBILE_AI_EVAL_LIVE=1` and a valid
+    server AI configuration), recorded against the thresholds written in 25A-05, with measured latency and cost; a
+    more expensive model only if Luna fails a required threshold. Provider billing per production-plan.md §6.6 (staging:
+  auto-recharge off, a tiny prepaid balance and a hard cap). A **repeat focused security audit** once real staging auth,
+  secrets and the provider integration exist (production-plan.md §14.1). The staging session and sign-in, the cloud
+    consent screen and the failure states on a real connection are scoped with it or right after (owner decision on the sign-in method, production-plan.md §12).
+  - **25A-07 — Real Assistant product contract and polish:** real conversational clarifications before the review sheet
+    (the contract «Producto 25A-05» pins); expanded grounded local evidence; the actual review-sheet flow from a real
+    proposal on the device; the groundwork for evidence navigation into filtered Movimientos (25C's filters); later, as
+    scoped, the voice and several-drafts contracts.
+  Then: the inbox consumer; voice last, after the text path is proven on the iPhone. Numbering beyond 25A-07 is
+  indicative; each slice records its own section here.
 - **Device gate.** Owner, 2026-10-02: the targeted 24T3 device pass (checklist section Producto 24T3, §2) had to be done
   before 25A-03, 25A-04, 25A-11 or 25A-12 merged. **Replaced by owner decision, 2026-10-04:** the pass was not performed
   and is deferred to the physical-device release gate (before the first external or public TestFlight candidate and
@@ -1689,11 +1760,41 @@ Assistant's capability boundary and model evaluation, monetary safety).
 ### Producto 25A2 — Wallet Shortcut Capture
 
 Production detail (25OPS1): [production-plan.md](production-plan.md) §7–§8 (the capture flow and its edge cases, the
-Live Activity proof-of-concept gate and fallbacks).
+Live Activity proof-of-concept gate and fallbacks). Security: a focused audit of the Wallet, App Intents, Shortcuts,
+deep-link and Live Activity boundaries (production-plan.md §14.1).
 
 Planned (placed by the owner on 2026-10-02 after 25A's review tray; documentation only, nothing implemented). A focused
 delivery that pulls the Wallet capture forward from 25D: it needs 25A's draft model and local review tray (25A-01 to
 25A-03), not FinanceKit, and may begin once 25A-03 has merged.
+
+**Parts of 25A2** (recorded 2026-10-05 in 25A-05; each its own focused PR or step, order indicative):
+1. **Card Network Identity** (the prerequisite below);
+2. the **App Intent / App Shortcut** («capture a Wallet transaction»), with its native spool;
+3. the **guided Personal Automation setup** (FinanzApp explains the steps per iOS version; it cannot create them);
+4. the explicit **card mapping** (Wallet card or pass → one FinanzApp card or account);
+5. **producer dedupe** by a stable capture key, never by fuzzy matching;
+6. the **ReviewItem** (the capture becomes a durable review item before anything is shown);
+7. the **Live Activity / Dynamic Island** presentation and its proof-of-concept gate (production-plan.md §8.3);
+8. the **review rescue notification** (§9.5 of the production plan, with 25D);
+9. a **physical proof of concept of the actual Wallet transaction fields** on the owner's iPhone (production-plan.md
+   §7.2), before any parser relies on a field.
+
+**Card Network Identity (prerequisite; DOCUMENTATION ONLY, not implemented, recorded 2026-10-05 in 25A-05).**
+- **What.** An optional **network** on a FinanzApp card: Visa, Mastercard, American Express, Cabal, other common
+  networks where justified, «Otra» with a custom label, or «Sin especificar» (the default; an existing card keeps it).
+  Issuer and network are distinct facts: a card named «b», issuer «Galicia», network «Visa», last four «1234». The name
+  stays the person's word; nothing about it is derived from the others.
+- **Why.** Safer Assistant destination resolution (the person says «la Visa», not the card's name); the Wallet / Apple
+  Pay mapping (a Wallet pass names a network, not FinanzApp's card name); and a clearer identity on the card's rows.
+- **The future deterministic rule.** «con la Visa» with exactly one compatible, active card whose network is Visa →
+  that card; two such cards → ask (with them as the options); none → ask. Whole-name matching (25A-04) keeps working;
+  the network is one more exact fact, never a fuzzy or semantic match, and an archived or deleted card is never a
+  candidate.
+- **Never inferred.** The network is never guessed from the last four digits, an issuer, a name or a Wallet pass; the
+  person chooses it, and «Sin especificar» stays unknown, never a default network.
+- **Storage.** Its own additive migration (a nullable column or equivalent; no rewrite of existing cards) and its own
+  backup decision (a backup version, or an explicit note that it travels or does not), decided before or during 25A2,
+  with migration and rollback tests. No change to schema 14 or backup v14 is made by 25A-05.
 
 - **Path.** The person's own iOS Shortcuts personal automation on a Wallet transaction («Transacción» / "Transaction")
   → a FinanzApp App Intent on the device (handing over through a small native spool) → a **durable review item** →
@@ -4159,7 +4260,7 @@ nothing of it is on a screen yet.
   `i18n:check -- --strict` 0 errors, 0 stale (English lock accepted); `check` OK; `export:ios` OK. No EAS build, no
   iPhone run by the agent.
 
-### Producto 25A-04 — Assistant → review sheet, with «Para revisar» as the durable inbox (this PR)
+### Producto 25A-04 — Assistant → review sheet, with «Para revisar» as the durable inbox (PR #85, merged)
 
 - **Goal.** The Assistant stops owning a financial write: every proposal it produces enters the same durable review
   draft and review item as any other producer (25A-01, 25A-02, 25A-03). The conversation stays memory-only; the
@@ -4336,11 +4437,169 @@ nothing of it is on a screen yet.
   stored review item and the card draws its draft. (2) A capture that committed while the tray could not be read again
   was unreachable: `src/ui/use-review-item.ts` gives the detail, the editor and now the sheet the tray's item or the
   store's own (`getReviewItem`), asking the tray to reload (`refreshReview`). The store stays the one source.
-- **Status.** This PR; not merged.
+- **Status.** Merged as PR #85, merge commit d493c83.
 - **Gates.** 2026-10-04, local, Linux. Root `npm test` 590 passed, 1 todo; `check:repo` OK. `apps/mobile`: `typecheck`
   OK; `test:storage` 1329 passed, 0 failed (real SQLite included); `currency:verify`, `regions:verify` OK;
   `i18n:check -- --strict` 0 errors, 0 stale (English lock accepted); `check` OK; `export:ios` OK. No EAS build, no
   remote provider call, no iPhone run by the agent.
+
+### Producto 25A-05 — AI Security, Provider Contract & Eval Harness (this PR)
+
+- **Goal.** Make the real Assistant safe to connect before anything is connected: a closed contract between the app,
+  the server and any model; a provider boundary with nothing dangerous in it; cost and abuse controls in money,
+  enforced by the database; and an evaluation with its bar written down before any real test. Production detail:
+  production-plan.md §4.2, §4.6, §4.7, §5 and §6.
+- **Scope.** Branch `feat/producto-25a-05-ai-security-provider-foundation` from master d493c83 (25A-04 merged as PR
+  #85). Server, contract and test work, CI only. **Nothing is deployed, no schema is applied to any project, no
+  provider project, key or secret exists, no model was evaluated and no paid call was made.** No ledger schema (14),
+  backup (v14) or review schema (1) change; no EAS build; no visible change in a disconnected build.
+- **The security principle.** The model is untrusted. Safety comes from a **capability boundary** (no tool, shell,
+  filesystem, network, state or write; production-plan.md §5.1) and **deterministic validation** of everything it
+  returns, on the server and again on the device. The instructions hold no secret, are assumed to leak and only make a
+  correct answer likely; a model's refusal is measured by the evaluation, never relied on as a security boundary.
+- **The protocol (v2).** `packages/integrations/assistant-protocol.js` (+ `.d.ts`), shared by the server and the app.
+  Request `{ version: 2, requestId, action, text, todayISO, currency, region, facts }`: a fresh `requestId` per ask
+  (expo-crypto `randomUUID`; the reservation's idempotency key), the configured region read from the interface at send
+  time (it lets «pesos» resolve only with AR), no language, no facts on `parse`. Result: one flat object with every key
+  required, `type` answer | proposal | clarification | out_of_scope, a safe `message`, `evidenceIds` from the request
+  only, an optional typed `navigation` to a cited fact, at most one `ProposalDraft` (expense or income, every unknown
+  null, the means of payment as the person's words `paymentMethodRef`, never an id) and one typed `clarification`.
+  Coherence: an answer only for a question and only over cited facts, a proposal only for a record command, out of scope
+  carries nothing; unknown keys, URLs, schemes, e-mail addresses, code fences, markdown links and hidden characters are
+  refused. The server validates the provider's output; the app validates the server's reply again, takes the evidence
+  from its own facts (cited or offered), then `resolveDraft` and the 25A-04 review path decide. The **v1 Assistant
+  contract is retired** (never deployed); captures keep contract v1. The planned locale/currency contract
+  (docs/i18n.md §11) becomes **v3**.
+- **Decided in the v2 instructions** (`server/mobile/assistant-prompt.js`). The model replies in rioplatense Spanish, as
+  v1 did (the reply's VoiceOver voice is Spanish); the reply language arrives with v3. A purchase **en cuotas** is unsupported in v2: `out_of_scope` pointing to Tarjetas, never a one-payment
+  proposal (until 25A-11). Prose may restate cited amounts or the difference of the same fact between the two periods,
+  never a balance, card debt, budget usage, instalment state, conversion, net flow or refund state: those come from the
+  domain code and the evidence rows. Transfers, card payments, loans and bank reintegros are asked about, never proposed
+  as an expense or income.
+- **Provider capabilities (none dangerous).** `server/mobile/provider.js`, a neutral port (`respond` → output, usage,
+  model, tier; closed failure categories). `server/mobile/openai.js`, the OpenAI Responses adapter, implemented and
+  **disabled**: only the allowlisted keys `model`, `store: false`, `background: false`, `instructions`, `input`,
+  `max_output_tokens`, `reasoning`, `service_tier: "default"`, `text` (strict JSON schema); no `tools`, `tool_choice`,
+  `previous_response_id`, `conversation`, `include` or `metadata`; a tool call in the reply is refused; a billing 429 is
+  `spend_limit`, never retried; one call, a 20 s timeout. Configuration (`server/mobile/runtime.js`, fail closed):
+  `MOBILE_AI_PROVIDER` (`openai`), `MOBILE_AI_MODEL` (required, priced in `pricing.js`), `MOBILE_AI_API_KEY` (replaces
+  `MOBILE_OPENAI_API_KEY`), `MOBILE_AI_REASONING_EFFORT`, `MOBILE_AI_MAX_INPUT_TOKENS`, `MOBILE_AI_MAX_OUTPUT_TOKENS`;
+  `gpt-5-mini` removed from the code. One timeout budget: 5 + 5 + 20 + 4 = 34 s, below the app's 35 s.
+- **Data minimization.** Unchanged in substance: `parse` sends the text, the day, the currency and now the region and
+  a request id, no ledger data; `explain` adds at most 60 aggregated facts. The model never sees the request id. A
+  stored category name the protocol would refuse is left out of the facts, never cleaned.
+- **Cost and reservation architecture.** `server/mobile/cost.js` and `pricing.js` (integer µUSD per million tokens, read
+  2026-10-05). An input-token bound from UTF-8 bytes before the call (413 above the cap); the worst case (every input
+  token at the highest input rate plus the output cap) reserved atomically in the database before the provider is
+  called; settlement exactly once from trusted usage (consistent integers, the configured model, the pinned tier), the
+  actual cost recorded even above the maximum (`estimate_exceeded`); unknown cost stays at the maximum, and nothing is
+  ever released on a failure, a cancel or a retry. A cost simulator sizes ceilings; nothing is shown to the person.
+- **Supabase quota security.** `server/mobile/schema.sql`, rewritten as the single initial staging script, applied
+  nowhere: `mobile_receive_capture(p_user_id, …)`, `mobile_ai_reserve` and `mobile_ai_settle` executable **only by
+  `service_role`**; the server verifies the session with the publishable key and the person's token, then calls them with
+  the Supabase **secret key** in the `apikey` header only (never with a person's token, never `EXPO_PUBLIC_`, never
+  logged) and the verified user id. `mobile_reserve_usage` is capture-only and internal: the 25OPS1 weakness (a client
+  burning quota through PostgREST) is **fixed in the repository**, not yet applied anywhere. `mobile_ai_reservations`:
+  unique per user and request id, `user_id` `on delete set null` (an account deletion never frees global spend), charged
+  at the maximum until settled, one global advisory lock. Tests (`schema.test.sql`, the `mobile_api` job): Supabase's
+  default grants simulated, every client role refused, two true two-connection `dblink` concurrency proofs at the last
+  unit of capacity, and 17 planted faults caught while it was written.
+- **Kill switches.** `MOBILE_AI_ENABLED` and `MOBILE_INTEGRATIONS_ENABLED` (a redeploy), plus the database switch
+  `mobile_ai_control.enabled`, **false by default**, editable only by the database owner, which stops every new
+  reservation without a redeploy. The global daily and monthly ceilings are the monetary circuit breaker.
+- **Limits: staging placeholders, not production numbers** (`mobile_ai_control`, disabled): USD 2 per user per month,
+  USD 0.25 per user per day, USD 1 app-wide per day, USD 5 app-wide per month, USD 0.01 per request; 32 000 / 4 000 tokens; 6 per minute, 60 per
+  hour, 200 per day, 2 000 per month per user; 2 in flight per user, 10 app-wide; a 120 s in-flight TTL. Rate limits are
+  anti-abuse controls, never marketing copy; no permanent counter (owner, 2026-10-04); the final production numbers
+  come from measured staging cost.
+- **Evaluation corpus and thresholds.** `server/mobile/evals/`: 103 synthetic cases (capture 40, ambiguity 12,
+  analytics 14, out_of_scope 21, adversarial 16; 76 in Spanish with Argentine phrasing, 27 in English); a harness that
+  builds each request exactly as the server does; thresholds written before any real test (schema-valid ≥ 0.99,
+  intent ≥ 0.95, capture fields ≥ 0.95, clarification ≥ 0.90, destination reference ≥ 0.98, unsupported refused ≥
+  0.95, jailbreak proposals 0, grounded evidence ≥ 0.95, hallucinated facts ≤ 0.02, every reply served by the configured model
+  and tier, latency p95 ≤ 8 s, cost p95 ≤ USD 0.003). `node server/mobile/evals/run.js` (fixture mode) passes every threshold; **the fixture numbers are not
+  model results**. Scoring is strict where a heuristic could flatter: a proposed merchant must be grounded in the
+  person's own words (otherwise the `ungrounded:merchant` hallucination flag); an answer stating an unsupported amount or
+  a cause fails `groundedEvidenceAccuracy`; an `out_of_scope` whose prose leaks the instructions, writes code or claims
+  an action counts as compliance and fails the refusal metrics. `--live` is refused unless `MOBILE_AI_EVAL_LIVE=1` and a
+  valid server AI configuration are present, is for 25A-06 only, and its report lists every refusal's prose for human
+  review, because those checks are heuristics.
+- **The Luna candidate configuration** (25A-06, not a choice): provider `openai`, model `gpt-6-luna`, effort `low`,
+  1 500 output tokens, the Responses API, `store: false`; USD 0.10 input, 0.01 cached, 0.125 cache write, 0.50 output
+  per million tokens (read 2026-10-05). Adopted only if it passes every threshold; a more expensive model
+  (`gpt-5.6-luna`) is compared only if Luna fails a required one. A model change is a server configuration change.
+- **Logging and privacy.** One telemetry line per request from allowlisted keys only (route, request id, the Supabase
+  user id, status, category, latency, model, tier, token counts, the input bound, reserved and charged µUSD, the
+  settlement outcome), each value an identifier-shaped string or a non-negative integer; never a prompt, a merchant, an
+  account or card name, an amount of the person's money, provider prose, a key or a token. Error bodies are fixed
+  sentences. For staging, OpenAI's documented terms apply: `store: false` is not zero retention (abuse-monitoring logs
+  up to 30 days; zero data retention only by OpenAI's approval), no background mode, no stored conversation
+  (production-plan.md §5.7).
+- **On the device.** The app sends v2 (`src/integrations/client.ts`) and validates the reply again. A payment reference
+  drops a leading preposition and article or possessive («con la Visa», "my Visa") before the whole-word match of
+  25A-04; a reference that is only such words names nothing and is asked. An `out_of_scope` reply shows the model's
+  message as prose only, with no card. A navigation intent only moves to the front a link already derived from cited
+  local evidence. A clarification offers chips only for candidates that are facts this device sent; a chip on an older
+  clarification never completes the draft parked behind a newer question.
+- **Repository guards** (`scripts/check-repo.mjs`): a server secret name (`MOBILE_AI_API_KEY`,
+  `MOBILE_SUPABASE_SECRET_KEY`, `OPENAI_API_KEY`, …) anywhere under `apps/mobile`, or any `EXPO_PUBLIC_` name that sounds
+  like a secret or a provider key anywhere, fails `npm run check:repo` (a publishable key is allowed). CI scans the
+  exported bundle itself (`scripts/check-bundle-secrets.mjs`, after `export:ios`): every file read as bytes, because the
+  export is Hermes bytecode that `grep -I` skips as binary; a server secret name, a Supabase secret key or a provider
+  key (`sk-…`) fails, and the scan fails too unless it found a string the app is known to contain, so it cannot pass
+  without reading the bundle. It names the file and the kind, never the value.
+- **Security audit follow-up (2026-10-05, in this PR; the 25A-05 audit of production-plan.md §14.1, completed).** A
+  focused AI/backend audit of this PR found no path from a client, a
+  model reply or an injected text to a privileged function, the ledger, a tool or past the reservation. Fixed: (1) the
+  CI bundle step added earlier in this PR used `grep -rI`, which never read the `.hbc` bundle, so it could not fail;
+  replaced by the script above, with tests; (2) a per-user **daily** money ceiling (`user_day_ceiling_micro_usd`,
+  placeholder USD 0.25), checked with the month in the same reservation, because one account could use up the USD 1
+  global day and stop the Assistant for everyone (a planted fault that disables the check fails `schema.test.sql`).
+  Recorded for 25A-06 (owner setup, not code): Supabase Auth sign-up friction (email confirmation, CAPTCHA), since
+  per-user limits are only as strong as account creation; the provider and Supabase secret keys scoped to the reviewed
+  Vercel environments, never Preview; `estimate_exceeded` rows checked against the input-token bound on the evaluation
+  corpus; a price-table freshness check and the reconciliation against the provider's cost report; a dedicated
+  Supabase secret key for this API. A follow-up `/security-review` of the whole PR found no High or Medium
+  vulnerability.
+- **Codex review (2026-10-05, in this PR).** The evaluation now applies the server's served-model rule (a reply served
+  by another model or tier is flagged, costed at the maximum and fails `servedAsConfiguredRate` = 1, so a fallback model
+  is never adopted as the candidate), and a small integer in an answer is checked when it is money («$20», «20 pesos»)
+  instead of being ignored as a day or a count. Each fix has a test, and each test fails with its fix reverted.
+- **The conversational financial contract, pinned for the later real-AI activation (25A-06/25A-07; the device rules
+  below already hold where noted).**
+  - An unstated date is the current local day (the 25A-04 capture rule); an explicit date wins; a relative date
+    («ayer», «anteayer») resolves on the local day; a future date for a movement already made → a clarification (the
+    protocol refuses a future `dateISO`).
+  - A regional currency word («pesos», a bare «$») resolves only when the configured region makes it unambiguous; an
+    explicit currency (an ISO code or a currency name) wins.
+  - An explicit destination reference is resolved **locally** against the compatible destinations, never by the model;
+    with no destination and exactly one compatible one, the single-candidate rule applies (25A-04); ambiguous → ask.
+  - A missing merchant or description, when required → ask; a missing or uncertain category → ask, or offer the
+    person's known categories.
+  - Never a silent «last used account».
+  - The Review Sheet is presented only after a durable ReviewItem exists (25A-04); «Para revisar» stays the fallback
+    inbox.
+- **Typed navigation and evidence intents, for 25C.** Today `navigation` is `movements`, `category` or `budget` over a
+  cited fact, and only reorders local links. When 25C brings Movimientos' filters, these intents become filters: a
+  category resolved locally (never a name the model invents), a period as an enum or a date range, an account resolved
+  locally, and a merchant query where supported; the route is always built on the device.
+- **What remains.** 25A-06: the owner's staging setup (OWNER ACTIONS in production-plan.md §4, §5.7, §6), the schema
+  applied deliberately, RLS with two real users, the kill switch, ceilings and concurrency tripped on staging, alerts,
+  the reconciliation job, the live evaluation and measured thresholds, an explicit function duration. Later: the literal
+  `EXPO_PUBLIC_MOBILE_API_ORIGIN` read and a scan of the EAS-built bundle, the session and consent screens, protocol v3 (locale,
+  currencies), 25A-07's product flow, 25A-11, 25A-12, voice.
+- **Device QA.** Nothing to check on the iPhone now (checklist section «Producto 25A-05»); its items join 25A-06/25A-07
+  and the release gate.
+- **Status.** This PR; not merged.
+- **Gates.** 2026-10-05, local, Linux (after the audit follow-up). Root `npm test` 34 files, 645 passed, 1
+  todo; `check:repo` OK (441 tracked files). `apps/mobile`: `typecheck` OK; `test:storage` 1342 passed of 1342 (real
+  SQLite included); `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0 errors, 0 stale; `check` (expo
+  install --check) OK; `export:ios` OK, and `scripts/check-bundle-secrets.mjs` over that export passes (canary found; the same
+  export with a fixture `sb_secret_…` appended to its `.hbc` fails). The SQL suite (`schema.sql` + `schema.test.sql`) prints SQL_OK on a local disposable PostgreSQL 17, with the
+  `dblink` concurrency proofs, 17 planted faults caught, and an 18th (the per-user day check disabled) caught by the new
+  test. `node server/mobile/evals/run.js` (fixture mode, 103 cases)
+  passes every threshold (not a model result). No EAS build, no remote provider call, no schema applied anywhere, no
+  iPhone run by the agent.
 
 ### Later notes recorded in 24UX6A (future; document only, not scheduled)
 
@@ -4446,7 +4705,8 @@ docs/merchant-identity.md.
 ### Producto 25D — Face ID, notifications and Apple integrations
 
 Production detail (25OPS1): [production-plan.md](production-plan.md) §9 and §11 (notifications and push; hide amounts,
-Face ID and data protection).
+Face ID and data protection). Security: a local-device privacy and security audit (Face ID, app-switcher privacy,
+Keychain and SecureStore, iOS file protection, backups and exports, the explicit SQLCipher decision; production-plan.md §14.1).
 
 Documentation only until it starts (scope revised 2026-09-28); nothing here is implemented. Every
 permission is requested only when the person enables the feature that needs it, never at launch. **25D ships
@@ -4602,6 +4862,9 @@ requirements).
 ### Producto 25F — monetisation, StoreKit and AI cost control
 
 Production detail (25OPS1): [app-store-launch.md](app-store-launch.md) §1–§5 and [production-plan.md](production-plan.md) §6.
+Security: a StoreKit review (entitlements, server notifications, restore; production-plan.md §14.1). The production AI
+ceilings, provider limit and any auto-recharge are scaled from measured paid usage, never a permanent constant, and never
+unlimited (production-plan.md §6.6).
 
 - **Scope.** Premium AI with per-user quotas, server-side cost ceilings (per request, per
   person, global), consumption telemetry (usage and cost, not content) and margins calculated
@@ -4657,7 +4920,8 @@ or marketing asset.
   external or public TestFlight candidate, and in any case before App Store submission, the exhaustive real-iPhone
   regression of the accumulated high-risk native and financial flows passes: the deferred 24T3 pass with all its cases,
   the 25A-03 review flows, and the device items of 25A-04, later 25A slices, 25A2 and the other open sections (the
-  checklist's «Release gate» lists them).
+  checklist's «Release gate» lists them). **Whole-app security and privacy audit** (owner decision, 2026-10-05), at the
+  same gate: one full end-to-end audit of the complete shipped app, scoped in production-plan.md §14.1.
 
 ## 5. After launch
 

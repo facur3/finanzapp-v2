@@ -55,6 +55,18 @@ describe('check:repo', () => {
     expect(result.imports).toEqual([]);
   });
 
+  it('fails when a server secret is named in the app or a secret-like value is made public (25A-05)', () => {
+    // Assembled at run time so this file never contains one (the guard scans it too).
+    const server = ['MOBILE', 'AI', 'API', 'KEY'].join('_');
+    const exposed = ['EXPO', 'PUBLIC', 'OPENAI', 'API', 'KEY'].join('_');
+    const secrets = run({ ...clean,
+      'apps/mobile/src/assistant/runtime.ts': `const key = process.env.${server};\n`,
+      'apps/mobile/app.config.ts': `extra: { key: process.env.${exposed} }\n`,
+      'server/mobile/runtime.js': `const key = env.${server};\n`,
+      'apps/mobile/src/session.ts': `const url = process.env.${['EXPO', 'PUBLIC', 'SUPABASE', 'PUBLISHABLE', 'KEY'].join('_')};\n` }).secrets;
+    expect(secrets.map(h => h.file).sort()).toEqual(['apps/mobile/app.config.ts', 'apps/mobile/src/assistant/runtime.ts']);
+  });
+
   it('fails on generated files, native projects and databases', () => {
     for (const path of ['node_modules/x/index.js', 'dist/index.html', 'apps/mobile/ios/Podfile', 'apps/mobile/android/build.gradle', '.env', '.env.production',
       'apps/mobile/.expo/settings.json', 'data/ledger.sqlite', 'ledger.sqlite-wal', 'build.ipa', 'release.keystore']) {

@@ -102,7 +102,7 @@ and the same Vercel project deploys both the static web and the mobile API funct
 | --- | --- | --- |
 | The native financial domain | `packages/domain` (now including `dates.ts`) | Every rule the app runs; 254 tests at the root plus the app's own |
 | Backups and migrations | `apps/mobile/src/storage` (SQLite schema 9, backup v9) and `packages/domain/recovery.ts` | Users' data; the one-way upgrades documented in `docs/currency.md` |
-| The Assistant contracts | `packages/integrations/contracts.js` (+ `.d.ts`), `server/mobile/openai.js` schema | Shared by the app and the backend; `currency-guards.node.ts` scans them |
+| The Assistant contracts | `packages/integrations/assistant-protocol.js` (+ `.d.ts`, protocol v2 and its output schema since 25A-05), `packages/integrations/contracts.js` (captures) | Shared by the app and the backend; `currency-guards.node.ts` scans them |
 | Authentication and quotas | `server/mobile/handlers.js`, `runtime.js`, `schema.sql`, `schema.test.sql` | The `mobile_api` CI job proves ownership, deduplication and quotas on PostgreSQL |
 | The mobile endpoints | `api/mobile/assistant.js`, `api/mobile/captures.js` | What the app calls at `/api/mobile/*` |
 | Tests | `packages/domain/*.test.ts` (with `dates.test.ts`), `server/mobile/handlers.test.js`, `scripts/check-repo.test.js`, everything under `apps/mobile/tests` | Regression coverage of the product and of the repository guard |

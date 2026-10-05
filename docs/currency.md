@@ -820,7 +820,7 @@ Rules for every stage:
    - v9 without a unit, v9 with a wrong unit, and a v1–v8 file naming JPY are refused
    - a scale-only difference is a conflict
    - a failed import changes nothing
-7. **Assistant contract, server first.** One version carries both docs/i18n.md §11's `locale` and the currency change, and §11 is updated in the same commit. Its sentence "`amountMinor` is integer minor units of the stated currency" becomes: facts keep `amountMinor` at the request's explicit `minorUnitExponent`, and a draft amount is a canonical major-unit string. If §11's v2 ships first, this change is v3, with the same rollout.
+7. **Assistant contract, server first.** One version carries both docs/i18n.md §11's `locale` and the currency change, and §11 is updated in the same commit. Its sentence "`amountMinor` is integer minor units of the stated currency" becomes: facts keep `amountMinor` at the request's explicit `minorUnitExponent`, and a draft amount is a canonical major-unit string. Protocol v2 (25A-05: the closed result, the region and a request id) shipped first with neither, so this change is v3, with the same rollout.
    - The server validates the currency against a fixed superset that does not depend on the client gate: every catalogue code whose data status is `ready` (or `historical`). `generate.mjs` emits this list as a JS module that `contracts.js` and the enum at `openai.js:6` import.
    - The parse prompt (`openai.js:20`) and the explain prompt (`:24`) drop "centavos" and state the scale.
    - Staging payloads record their version (`schema.sql:9`). `schema.test.sql:19`–`:36` gains a fixture in which a payload without a version reads as v1. This is a reviewed staging migration only.
@@ -1190,12 +1190,17 @@ the person's own dated rate) and must not be modelled with one.
 
 ## 11. The Assistant with several currencies and languages (design, not implemented)
 
-Contract v1 knows ARS and USD; the client does not send anything else (24B1). The next
-version (docs/i18n.md §11, stage 7 of §7.5) carries language and region as two separate
-preferences, validates currencies against a generated superset independent of the client
-gate, states the scale instead of "centavos", and returns draft amounts as canonical
-major-unit strings that the client converts and checks. Nothing below is active; no paid
-AI is enabled and v1 is not modified.
+The Assistant's contract v1 is retired (Producto 25A-05; never deployed). **Protocol v2**
+(`packages/integrations/assistant-protocol.js`) is the closed result plus the configured
+region (two letters) and a `requestId`, with **no language**; like v1 it knows ARS and USD
+only, and the client does not send anything else (24B1). The region lets a regional word
+(«pesos», a bare «$») resolve only when it is unambiguous (AR → ARS, US → USD); an explicit
+currency wins; anything else stays null or is asked. The planned next version is therefore
+**v3** (docs/i18n.md §11, stage 7 of §7.5), with the same server-first rollout: it carries
+language and region as two separate preferences, validates currencies against a generated
+superset independent of the client gate, states the scale instead of "centavos", and returns
+draft amounts as canonical major-unit strings that the client converts and checks. Nothing
+below is active; no paid AI is enabled and v2 is not modified by it.
 
 ### 11.1 "Gasté 30 dólares en Steam."
 
@@ -1241,7 +1246,8 @@ does not show why" is a valid answer. Each reply records the language it was ask
 
 The model must understand a message written in any language, including one different from
 the interface language, and reply in the interface language unless the person explicitly
-asks otherwise in the message. Merchant names, custom categories and the person's words
+asks otherwise in the message (from v3; protocol v2 carries no language, so its instructions
+keep answering in rioplatense Spanish, as v1 did, 25A-05). Merchant names, custom categories and the person's words
 are copied verbatim, never translated or "corrected". Voice needs a transcription provider
 with proven multilingual coverage before it is offered; a transcript is shown and editable
 before it becomes a draft.
@@ -1253,4 +1259,8 @@ prompt logging with content, facts only, the consent screen names what travels),
 quotas and per-request, per-person and global spend ceilings, cost telemetry (usage and
 cost, not content), drafts with confirmation only, and idempotency by operation id on both
 the inbox and the ledger so a repeated request or a retried confirmation never records a
-movement twice. None of this exists in 24B2; the server contract v1 is unchanged.
+movement twice. None of this existed in 24B2. Since 25A-05 the server side exists in the
+repository, applied and configured nowhere (docs/production-plan.md §4–§6): the server keyed
+with no key in the bundle, telemetry without content, per-request, per-person and global
+ceilings reserved atomically in money, and idempotency by `requestId`; the session, the
+consent screen and every real number remain for 25A-06.

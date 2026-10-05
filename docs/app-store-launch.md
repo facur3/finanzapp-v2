@@ -858,7 +858,7 @@ profiles»):
 | App, public by design | `EXPO_PUBLIC_EAS_PROJECT_ID`, `EXPO_PUBLIC_MOBILE_API_ORIGIN` | Anything `EXPO_PUBLIC_` is "visible in plain-text in your compiled application": never a secret. The API origin differs per environment. |
 | App, development only | `EXPO_PUBLIC_ASSISTANT_FIXTURES`, `EXPO_PUBLIC_LOCALE_PREVIEW`, `EXPO_PUBLIC_CURRENCY_PREVIEW`, `EXPO_PUBLIC_MERCHANT_MARK_PREVIEW` | Compiled away outside a development bundle; "never set them in `eas.json`, `app.config.ts` or a committed `.env`" (`apps/mobile/README.md`, «Test flags»). |
 | App, build-time switch | `EXPO_PUBLIC_DISABLE_GLASS` | A build-time kill switch for the glass material. |
-| Server (`server/mobile/runtime.js`) | `MOBILE_INTEGRATIONS_ENABLED`, `MOBILE_SUPABASE_URL`, `MOBILE_SUPABASE_PUBLISHABLE_KEY`, `MOBILE_AI_ENABLED`, `MOBILE_OPENAI_API_KEY` | Set in the hosting project per environment, never in the app, never in the repository (production-plan.md §2, §3). |
+| Server (`server/mobile/runtime.js`) | `MOBILE_INTEGRATIONS_ENABLED`, `MOBILE_SUPABASE_URL`, `MOBILE_SUPABASE_PUBLISHABLE_KEY`, `MOBILE_SUPABASE_SECRET_KEY`, `MOBILE_AI_ENABLED`, `MOBILE_AI_PROVIDER`, `MOBILE_AI_MODEL`, `MOBILE_AI_API_KEY`, `MOBILE_AI_REASONING_EFFORT`, `MOBILE_AI_MAX_INPUT_TOKENS`, `MOBILE_AI_MAX_OUTPUT_TOKENS` (25A-05; `MOBILE_OPENAI_API_KEY` retired) | Set in the hosting project per environment, never in the app, never in the repository (production-plan.md §2–§4.7). `npm run check:repo` fails if a server secret is named under `apps/mobile` or if an `EXPO_PUBLIC_` name sounds like a secret. |
 | Future (25F) | An App Store Server API key, the notification endpoint's configuration, a purchase-SDK public key if option B | Named when they exist. Server-side keys follow the server rule; an SDK's public app key is public by design. |
 
 EAS environment variables have three visibilities (plain text, sensitive, secret); none makes a value safe once it is
@@ -917,8 +917,11 @@ sandbox with daily renewals (§4.5). Sandbox notifications go to the staging bac
   503) and `MOBILE_AI_ENABLED` (off: only `/api/mobile/assistant` answers 503; the capture inbox stays on). The app
   falls back to manual entry; no app build is needed, but
   on Vercel a changed variable takes effect only with a new deployment of the server (production-plan.md §6.2). They
-  stop cloud capabilities, the only parts that can cost money; the reference-rate download has no remote switch. **NOT IMPLEMENTED:** the monetary
-  circuit breaker of production-plan.md §6, and any remote switch for an app-side feature. A purely local feature has
+  stop cloud capabilities, the only parts that can cost money; the reference-rate download has no remote switch. **In
+  the repository since 25A-05, applied nowhere:** the database switch `mobile_ai_control.enabled` (off by default; the
+  owner flips it with SQL, no redeploy) and the monetary circuit breaker of production-plan.md §6 (per-user monthly and
+  global daily and monthly ceilings reserved atomically, at staging placeholder values). **NOT IMPLEMENTED:** alerts,
+  an automatic anomaly stop, and any remote switch for an app-side feature. A purely local feature has
   no kill switch but a new build; that is one more reason local features ship only after device QA.
 - **Removing the app from sale** takes it off the store within 24 hours; existing installs keep working, which for a
   local-first app means people keep their data.

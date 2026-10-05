@@ -4,7 +4,7 @@ import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router
 import { randomUUID } from 'expo-crypto';
 import { isLegacyCurrency, postingAccountsFor, todayKey, type Currency, type ReviewArchive } from '@finanzapp/domain';
 import { assistantForBuild } from '../src/assistant/runtime';
-import { REASON_TEXT, SUGGESTIONS, classifyIntent, completeDraft, contentFromResult, optionText, shouldAutoscroll, type AssistantContent,
+import { REASON_TEXT, SUGGESTIONS, classifyIntent, completeDraft, contentFromResult, ownsPending, optionText, shouldAutoscroll, type AssistantContent,
   type ClarificationOption, type EvidenceLink, type Message, type ProposalContent, type ResolvedContent } from '../src/assistant/conversation';
 import { assistantCapture, proposalContent } from '../src/assistant/review-proposal';
 import { conversationSession } from '../src/assistant/session';
@@ -51,11 +51,11 @@ export default function AssistantScreen() {
   const day = useCurrentDay();
   const p = usePalette();
   const reduced = useReduceMotion();
-  const { t, speechLanguage } = useI18n();
+  const { t, speechLanguage, region } = useI18n();
   const session = conversationSession();
   const { conversation: state } = useSyncExternalStore(session.subscribe, session.getState, session.getState);
   const dispatch = session.dispatch;
-  const client = useMemo(() => assistantForBuild(), []);
+  const client = useMemo(() => assistantForBuild(undefined, undefined, randomUUID), []);
   const list = useRef<FlatList<Message>>(null);
   const scroll = useRef({ offset: 0, content: 0, viewport: 0 });
   // Coming back to a conversation that is already there (from the hub's «Continuar»): open at its last exchange, once.
@@ -130,13 +130,14 @@ export default function AssistantScreen() {
     impactHaptic();
     dispatch({ type: 'send', text });
     const action = classifyIntent(text);
-    // Contract v1 knows ARS and USD only: the client never sends another currency (docs/currency.md §7.5, stage 7 brings the next version).
+    // Protocol v2 knows ARS and USD only: the client never sends another currency (docs/currency.md §7.5).
     if (!isLegacyCurrency(currency)) { dispatch({ type: 'fail', reason: 'unavailable', text: REASON_TEXT.unavailable, sent: raw }); return; }
     const facts = action === 'explain' && snapshot ? monthlyEvidence(snapshot, currency, day) : [];
     const controller = new AbortController();
     session.request.current = controller;
     try {
-      for await (const event of client.ask({ action, text, todayISO: day, currency, facts }, controller.signal)) {
+      // The region is the interface's, as configured when the ask is sent: it lets a regional currency word («pesos») resolve.
+      for await (const event of client.ask({ action, text, todayISO: day, currency, region, facts }, controller.signal)) {
         if (controller.signal.aborted) break;
         if (event.type === 'delta') dispatch({ type: 'delta', text: event.text });
         else if (event.type === 'result') {
@@ -152,17 +153,17 @@ export default function AssistantScreen() {
     } finally {
       if (session.request.current === controller) session.request.current = null;
     }
-  }, [client, session, dispatch, snapshot, accounts, incomeAccounts, entries, currency, day, toContent, captureNew]);
+  }, [client, session, dispatch, snapshot, accounts, incomeAccounts, entries, currency, region, day, toContent, captureNew]);
 
   const stop = useCallback(() => { session.request.current?.abort(); session.request.current = null; dispatch({ type: 'stop' }); }, [session, dispatch]);
 
   // `shown` is what the chip displayed: it becomes the user's own words in the thread.
   const choose = useCallback((messageId: string, option: ClarificationOption, shown?: string) => {
-    const resolved = state.pending ? completeDraft(state.pending, option.id, accounts, entries, day, incomeAccounts) : null;
+    const resolved = state.pending && ownsPending(state, messageId) ? completeDraft(state.pending, option.id, accounts, entries, day, incomeAccounts) : null;
     const next = resolved ? { ...resolved, content: toContent(resolved.content)! } : null;
     dispatch({ type: 'choose', messageId, optionId: option.id, label: shown ?? optionText(option, t), next });
     captureNew();
-  }, [dispatch, state.pending, accounts, incomeAccounts, entries, day, t, toContent, captureNew]);
+  }, [dispatch, state, accounts, incomeAccounts, entries, day, t, toContent, captureNew]);
 
   // A captured proposal that is not in the tray is read from the store itself. Confirmed or dismissed there, the card
   // keeps that item (a confirmed card draws what was recorded, edits included) and it is never looked up again. Still

@@ -37,9 +37,9 @@ export function UserMessage({ text }: { text: string }) {
 /** Streaming shows the words as they arrive, or "Pensando…" with a pulse
  * before the first one; a stopped answer says so under its partial text.
  * The model's words are content in the language they were written in, which
- * for the v1 server is always Spanish (docs/i18n.md §11): VoiceOver reads them
+ * for the server is always Spanish (docs/i18n.md §11): VoiceOver reads them
  * with a Spanish voice, the device's own when the device is in Spanish, even
- * with English chosen in Más. A v2 reply will carry the language it was asked in.
+ * with English chosen in Más. Protocol v2 carries no reply language yet.
  * `ownWords` marks a turn the app wrote itself (a clarification question, "review
  * the draft"): it is already in the interface language and follows the usual rule. */
 const REPLY_LANGUAGE_V1 = 'es';
