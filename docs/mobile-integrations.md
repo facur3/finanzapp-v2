@@ -3,10 +3,15 @@
 > **Nota 2026-10-02 (Producto 25OPS1).** Este documento describe el código base de la Interfaz 07 y sigue vigente como
 > contrato de los dos endpoints. El plan de producción (entornos, Vercel y Supabase, la frontera de capacidades del
 > Asistente, la evaluación de modelos, los límites monetarios, la captura de Wallet) está en
-> [production-plan.md](production-plan.md). Dos precisiones de ese plan sobre lo de abajo: `gpt-5-mini` es el valor por
-> defecto del adaptador, **no una elección de modelo** (el modelo se elige con una evaluación repetible y queda como
-> configuración detrás del adaptador), y la captura de Wallet de 25A2 es **local** (Atajo → App Intent → borrador en el
-> teléfono), sin pasar por `/api/mobile/captures`, que queda como base de una captura remota futura.
+> [production-plan.md](production-plan.md). La captura de Wallet de 25A2 es **local** (Atajo → App Intent → borrador en
+> el teléfono), sin pasar por `/api/mobile/captures`, que queda como base de una captura remota futura.
+>
+> **Nota 2026-10-05 (Producto 25A-05).** El contrato v1 del Asistente quedó **retirado** (nunca se desplegó): el Asistente
+> habla el **protocolo v2** (`packages/integrations/assistant-protocol.js`), validado en el servidor y otra vez en el
+> teléfono; las capturas siguen con el contrato v1. No hay modelo en el código (`gpt-5-mini` se quitó): el proveedor y el
+> modelo son configuración del servidor, y el modelo se elige con la evaluación de `server/mobile/evals/`. Las funciones
+> privilegiadas de Supabase solo las ejecuta `service_role`, con una clave secreta del servidor. Nada de esto está
+> desplegado ni aplicado en un proyecto. Las secciones de abajo están actualizadas a ese estado.
 
 Interfaz 07, 2026-09-19. Código base implementado, **integraciones no activadas**.
 No se hicieron llamadas pagas ni se modificó una base de datos remota.
@@ -23,8 +28,10 @@ build y hoy devuelve **desconectado** porque no existe proveedor de sesión: nin
 solicitud sale del dispositivo. La respuesta `draft` se resuelve en el teléfono
 (`resolveDraft`: cuenta por nombre o única elegible, si no pregunta; tipo, importe y
 categoría faltantes también preguntan) y solo Confirmar escribe, validado por el dominio.
-Las filas y enlaces de una respuesta salen únicamente de los `factIds` citados sobre la
-evidencia local, nunca del texto. Grabación/transcripción, consentimiento, login móvil
+Las filas y enlaces de una respuesta salen únicamente de los `evidenceIds` citados sobre la
+evidencia local, nunca del texto (desde 25A-05; la intención de navegación del modelo solo
+reordena esos enlaces). Desde 25A-04 Confirmar ocurre en la hoja de revisión, sobre un ítem
+de revisión guardado; el Asistente no escribe el libro. Grabación/transcripción, consentimiento, login móvil
 y guardado automático siguen pendientes.
 
 Atajo → POST autenticado → bandeja durable `needs_review`. Esta entrega **no**
@@ -44,13 +51,17 @@ credenciales bancarias, backups o información financiera en una URL.
 | Método/ruta | Entrada | Resultado |
 | --- | --- | --- |
 | POST `/api/mobile/captures` | CaptureRequest v1 | 202 recibido pendiente; 200 repetido; 409 mismo ID con otros datos |
-| POST `/api/mobile/assistant` | AssistantRequest v1 | draft, answer o clarification; jamás escribe el libro |
+| POST `/api/mobile/assistant` | Protocolo v2 (`version:2`) | answer, proposal, clarification u out_of_scope; jamás escribe el libro |
 
 Ambos requieren JSON y sesión verificada con Supabase, límite 24 KB y respuestas
 sin caché. Sin configuración devuelven 503 sin contactar proveedores. Contratos
-estrictos en `packages/integrations/contracts.js` y tipos públicos en `.d.ts`.
-No se acepta un userId del cliente. El servidor obtiene el propietario de la sesión,
-y PostgreSQL vuelve a derivarlo de `auth.uid()` al recibir la captura.
+estrictos en `packages/integrations/contracts.js` (capturas) y
+`packages/integrations/assistant-protocol.js` (Asistente), con tipos públicos en `.d.ts`.
+No se acepta un userId del cliente. El servidor verifica la sesión con la clave
+publicable y el token de la persona, y recién entonces llama a las funciones
+privilegiadas con la clave secreta (solo en el encabezado `apikey`, nunca junto al token
+de la persona) pasando el id verificado; PostgreSQL rechaza un dueño nulo, inexistente o
+anónimo, y ningún rol de cliente puede ejecutar esas funciones.
 
 CaptureRequest: `version:1`, `requestId` estable (16–100 caracteres alfanuméricos,
 guion o guion bajo), `source:shortcut|assistant`, `draft`. El borrador contiene
@@ -61,42 +72,55 @@ usar una cuenta: el consumidor futuro debe validar propiedad/tipo/moneda.
 El Atajo debe conservar el ID en reintentos; generar uno nuevo cada vez evita
 la deduplicación. La política de eventos sin ID y duplicados entre fuentes queda pendiente.
 
-AssistantRequest: `version:1`, `action:parse|explain`, `text` (hasta 2.000 caracteres),
-`todayISO` local, `currency` y `facts`. Parse no necesita historial. Explain recibe
-hasta 60 hechos con id, etiqueta, centavos, cantidad y fechas. `monthlyEvidence`
-calcula datos agregados localmente y compara la misma cantidad de días; no envía
-nombres de cuentas ni movimientos completos. El usuario debe autorizar este envío.
-La respuesta devuelve IDs de evidencia y los hechos originales. Esta validación
-no prueba que cada frase del modelo sea correcta: la evaluación y la UI que permite
-abrir esos hechos son requisitos antes de activar respuestas financieras.
-La v1 no lleva idioma ni región (el validador rechaza claves desconocidas) y el
-servidor responde en español argentino. El diseño de la v2 (idioma y región de la
-interfaz como dos códigos, hechos neutros al idioma, servidor antes que app, nombres
-de categoría resueltos por identidad antes de conectar un build con inglés) está en
-[docs/i18n.md §11](i18n.md). No se activó ningún proveedor.
+Protocolo v2 del Asistente: `version:2`, `requestId` nuevo en cada consulta (16–100 caracteres
+alfanuméricos, guion o guion bajo; es la clave de idempotencia de la reserva), `action:parse|explain`,
+`text` (hasta 2.000 caracteres, sin controles ni marcas bidireccionales), `todayISO` local,
+`currency` (ARS/USD), `region` (dos letras, la región configurada al enviar) y `facts`. Parse
+no lleva hechos. Explain recibe hasta 60 hechos con id, etiqueta, centavos, cantidad y fechas.
+`monthlyEvidence` calcula datos agregados localmente y compara la misma cantidad de días; no
+envía nombres de cuentas ni movimientos completos, y deja afuera un nombre de categoría que el
+protocolo rechazaría. El usuario debe autorizar este envío. La respuesta es un único objeto con
+todas las claves: `type` (answer, proposal, clarification, out_of_scope), `message`,
+`evidenceIds` (solo ids del pedido), `navigation`, `proposals` (cero o una propuesta con
+`kind`, `amountMinor`, `currency`, `merchant`, `category`, `dateISO`, `paymentMethodRef`, lo
+desconocido en null) y `clarification`. Se rechaza cualquier clave extra, URL, código, enlace
+o carácter oculto. El teléfono vuelve a validar la respuesta y toma la evidencia de sus propios
+hechos. Esta validación no prueba que cada frase del modelo sea correcta: la evaluación y la UI
+que permite abrir esos hechos son requisitos antes de activar respuestas financieras.
+La v2 no lleva idioma (el validador rechaza claves desconocidas); sus instrucciones piden
+responder en español rioplatense, como v1, para que la voz de VoiceOver siga siendo la correcta. El diseño con idioma y región de la
+interfaz como dos códigos, hechos neutros al idioma y servidor antes que app pasa a ser la
+**v3** ([docs/i18n.md §11](i18n.md)). No se activó ningún proveedor.
 
 ## IA y control de costo
 
-Adaptador inicial: OpenAI Responses, `gpt-5-mini`, salida JSON estricta,
-`store:false`, salida máxima 1.800 tokens y timeout de 25 s, sin reintentos
-automáticos. Clave solo del servidor; nunca EXPO_PUBLIC ni código cliente.
-Se puede sustituir el adaptador sin cambiar el libro ni el contrato.
-Audio requiere una etapa de transcripción con sus propios límites; este modelo
-no recibe audio. No se incluye audio en esta entrega.
+Puerto neutral de proveedor (`server/mobile/provider.js`) y un adaptador de OpenAI Responses
+(`openai.js`) **implementado y deshabilitado**: solo claves permitidas, `store:false`,
+`background:false`, esquema JSON estricto, nivel de servicio fijo `default`, sin herramientas,
+sin estado de conversación, una llamada sin reintentos y timeout de 20 s; una respuesta con una
+llamada a herramienta se rechaza. Proveedor, modelo, esfuerzo y topes de tokens son
+configuración del servidor con listas permitidas (`MOBILE_AI_PROVIDER`, `MOBILE_AI_MODEL`,
+`MOBILE_AI_REASONING_EFFORT`, `MOBILE_AI_MAX_INPUT_TOKENS`, `MOBILE_AI_MAX_OUTPUT_TOKENS`);
+no hay modelo en el código. Clave solo del servidor (`MOBILE_AI_API_KEY`); nunca EXPO_PUBLIC
+ni código cliente. Se puede sustituir el adaptador sin cambiar el libro ni el contrato.
+Audio requiere una etapa de transcripción con sus propios límites; no se incluye audio.
 
-La ficha oficial consultada publica USD 0,25 / millón de tokens de entrada y
-USD 2 / millón de salida. Como orden de magnitud, 1.000 tokens de entrada + 300
-de salida cuestan USD 0,00085; 1.000 llamadas iguales, USD 0,85. **No es presupuesto
-final**: razonamiento, contexto, transcripción, reintentos y otros servicios suman.
-Medir `usage`, costo y calidad real antes de elegir planes/precios; no prometer
-un costo fijo por usuario. `store:false` no equivale a retención cero del proveedor.
+Costo en micro-USD enteros (`cost.js`, `pricing.js`, precios leídos el 2026-10-05): antes de
+llamar se acota la entrada y se **reserva el peor caso** en la base, de forma atómica; después se
+liquida con el uso informado si es confiable, y si no queda reservado al máximo. El candidato de
+staging, `gpt-6-luna`, no es una elección: lo decide la evaluación de 25A-06. **No es presupuesto
+final**: medir `usage`, costo y calidad real antes de elegir planes/precios; no prometer un costo
+fijo por usuario. `store:false` no equivale a retención cero del proveedor.
 
-Reservas durables: 30 consultas IA por usuario/día y 300 para toda la app/día UTC;
-120 capturas por usuario/día y 2.000 globales. Se consumen antes de la llamada;
-un error de proveedor no devuelve cuota. No usar contadores en memoria en
-funciones sin estado. Es un techo de solicitudes, no un límite monetario exacto.
-Configurar también alertas/restricciones del proyecto proveedor. Fallos de cuota
-bloquean la IA; nunca abren un camino de consumo ilimitado.
+Límites durables en `server/mobile/schema.sql` (nunca aplicado a un proyecto): 120 capturas
+por usuario/día y 2.000 globales (`mobile_reserve_usage`, interno). Para la IA,
+`mobile_ai_control` (una fila que solo edita el dueño de la base, **deshabilitada** por defecto:
+interruptor sin redeploy) con valores **provisorios de staging**, no de producción: ventanas
+por minuto, hora, día y mes, concurrencia, tope por consulta y techos en dinero por usuario/mes y
+globales por día y mes. Cada consulta reserva su máximo antes de la llamada; un error no
+devuelve lo reservado. No usar contadores en memoria en funciones sin estado. Configurar
+también el tope del proyecto del proveedor, por encima de los techos del servidor. Fallos de
+reserva bloquean la IA; nunca abren un camino de consumo ilimitado.
 
 ## Activación futura en staging
 
@@ -104,9 +128,11 @@ bloquean la IA; nunca abren un camino de consumo ilimitado.
    `server/mobile/schema.sql` después de que CI pase las pruebas PostgreSQL.
    Es una migración inicial, no repetible; no ejecutarla sobre tablas existentes.
 2. Configurar en el servidor: `MOBILE_SUPABASE_URL`,
-   `MOBILE_SUPABASE_PUBLISHABLE_KEY`, `MOBILE_INTEGRATIONS_ENABLED=true`.
-   Para IA: `MOBILE_OPENAI_API_KEY` y `MOBILE_AI_ENABLED=true` solamente después
-   de habilitar presupuesto en la cuenta del propietario. No publicar secretos.
+   `MOBILE_SUPABASE_PUBLISHABLE_KEY`, `MOBILE_SUPABASE_SECRET_KEY`,
+   `MOBILE_INTEGRATIONS_ENABLED=true`. Para IA: `MOBILE_AI_PROVIDER`, `MOBILE_AI_MODEL`,
+   `MOBILE_AI_API_KEY` y `MOBILE_AI_ENABLED=true` (y habilitar `mobile_ai_control`)
+   solamente después de crear un proyecto de proveedor dedicado con su tope de gasto. No
+   publicar secretos. Es la porción 25A-06 del roadmap, a cargo del dueño.
 3. Implementar login móvil + consentimiento y emparejamiento del Atajo. El
    endpoint base usa un JWT de sesión: **no copiar un JWT temporal ni un refresh
    token a un Atajo permanente**. Antes de habilitar automatización sin intervención,
@@ -116,8 +142,9 @@ bloquean la IA; nunca abren un camino de consumo ilimitado.
    también cuando tipo, moneda y cuenta están resueltos y el recibo es único (el
    "auto-registro" opcional que se mencionaba acá quedó reemplazado el 2026-09-22; ver
    el roadmap). Préstamos/reintegros/cuotas incompletos piden aclaración.
-5. Evaluar frases argentinas reales autorizadas, ambigüedades, negaciones, preguntas,
-   múltiples gastos, cuentas equivocadas, devoluciones, offline, 401, 429 y duplicados.
+5. Evaluar con `node server/mobile/evals/run.js --live` (`MOBILE_AI_EVAL_LIVE=1`): el corpus
+   sintético de 103 casos más frases argentinas reales autorizadas, contra los umbrales ya
+   escritos; además offline, 401, 429 y duplicados.
 6. Verificar RLS con dos usuarios en staging, TTL/retención/exportación/borrado,
    monitoreo sin prompts/saldos, secretos y consentimiento. Probar Atajos en el iPhone.
 
@@ -126,15 +153,18 @@ sustituto silencioso: sin red o permiso de nube se mantiene el registro manual.
 
 ## Verificación
 
-`npm test`: contratos, método/auth, tamaño, propiedad de sesión, cuotas antes del
-modelo, respuestas inválidas, rechazo/truncamiento y cero consumo sin configuración.
+`npm test`: contratos y protocolo v2, método/auth, tamaño, propiedad de sesión, reserva
+antes del modelo, respuestas inválidas, rechazo/truncamiento/herramientas, costo, el arnés
+de evaluación y cero consumo sin configuración.
 `npm run test:storage --prefix apps/mobile`: cliente/evidencia y almacenamiento.
 El trabajo CI `mobile_api` aplica el esquema a PostgreSQL 17 desechable con un
-adaptador mínimo de `auth.uid()/jwt()`, y prueba lectura por propietario, rechazo
-anónimo, deduplicación/conflicto y límites por usuario/globales. No certifica la
+adaptador mínimo de `auth.uid()/jwt()` y los permisos por defecto de Supabase simulados, y
+prueba lectura por propietario, rechazo de todo rol cliente, deduplicación/conflicto,
+límites de capturas, interruptor, idempotencia, ventanas, concurrencia, techos y
+liquidación, con dos pruebas reales de concurrencia entre conexiones (`dblink`). No certifica la
 configuración del proyecto Supabase del usuario ni la automatización de Apple.
 
-Fuentes: [modelo](https://developers.openai.com/api/docs/models/gpt-5-mini),
+Fuentes: [precios](https://developers.openai.com/api/docs/pricing),
 [salidas estructuradas](https://developers.openai.com/api/docs/guides/structured-outputs),
 [RLS de Supabase](https://supabase.com/docs/guides/database/postgres/row-level-security),
 [transacciones de Apple](https://support.apple.com/en-sg/guide/shortcuts/apd65c67538a/ios).

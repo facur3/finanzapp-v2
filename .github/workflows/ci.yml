@@ -77,6 +77,9 @@ jobs:
       - name: Export iOS JavaScript and assets (not a signed native build)
         run: npm run export:ios
 
+      - name: The exported bundle names no server secret (provider key, Supabase secret key)
+        run: "! grep -rIlE 'MOBILE_AI_API_KEY|MOBILE_SUPABASE_SECRET_KEY|MOBILE_OPENAI_API_KEY|sb_secret_|sk-proj-' dist"
+
   mobile_api:
     runs-on: ubuntu-latest
     timeout-minutes: 5

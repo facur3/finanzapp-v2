@@ -24,7 +24,7 @@ export function aiConfig(env) {
   const modelKey = provider + ':' + model;
   const price = PRICING.models[modelKey];
   const reasoningEffort = env.MOBILE_AI_REASONING_EFFORT || 'low';
-  const maxInputTokens = tokens(env.MOBILE_AI_MAX_INPUT_TOKENS, 24000, 6000, 32000);
+  const maxInputTokens = tokens(env.MOBILE_AI_MAX_INPUT_TOKENS, 32000, 6000, 32000);
   const maxOutputTokens = tokens(env.MOBILE_AI_MAX_OUTPUT_TOKENS, 1500, 256, 4000);
   if (!price || !price.reasoningEfforts.includes(reasoningEffort) || maxInputTokens === null || maxOutputTokens === null
     || maxInputTokens >= price.shortContextTokens || typeof env.MOBILE_AI_API_KEY !== 'string' || !env.MOBILE_AI_API_KEY) return null;

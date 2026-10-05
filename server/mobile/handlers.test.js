@@ -204,7 +204,7 @@ describe('assistant route: order, reservation and settlement', () => {
 describe('server configuration fails closed and keeps the model out of code', () => {
   const env = { MOBILE_AI_ENABLED: 'true', MOBILE_AI_PROVIDER: 'openai', MOBILE_AI_MODEL: 'gpt-6-luna', MOBILE_AI_API_KEY: 'fixture-key' };
   it('needs every value, an allowlisted provider, a priced model and a bounded effort and caps', () => {
-    expect(aiConfig(env)).toMatchObject({ model: 'gpt-6-luna', reasoningEffort: 'low', serviceTier: 'default', maxOutputTokens: 1500, maxInputTokens: 24000 });
+    expect(aiConfig(env)).toMatchObject({ model: 'gpt-6-luna', reasoningEffort: 'low', serviceTier: 'default', maxOutputTokens: 1500, maxInputTokens: 32000 });
     expect(aiConfig({ ...env, MOBILE_AI_MODEL: 'gpt-5.6-luna' }).model).toBe('gpt-5.6-luna'); // A model change is configuration.
     for (const broken of [{ MOBILE_AI_ENABLED: 'false' }, { MOBILE_AI_ENABLED: 'TRUE' }, { MOBILE_AI_PROVIDER: undefined }, { MOBILE_AI_PROVIDER: 'anthropic' },
       { MOBILE_AI_MODEL: undefined }, { MOBILE_AI_MODEL: 'gpt-5.6-terra' }, { MOBILE_AI_MODEL: 'gpt-6-luna; rm -rf' }, { MOBILE_AI_API_KEY: '' },
