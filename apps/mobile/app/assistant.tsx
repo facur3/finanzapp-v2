@@ -15,7 +15,6 @@ import type { ReviewItem } from '../src/storage/review-database';
 import { AssistantComposer } from '../src/ui/assistant-composer';
 import { AnswerEvidence, AssistantText, ClarificationChoices, ProposalCard, Suggestions, SystemNote, UserMessage, type ProposalState } from '../src/ui/assistant-messages';
 import { AppText, IconButton } from '../src/ui/components';
-import { postingAccounts } from '../src/ui/liability-presentation';
 import { Appear, impactHaptic } from '../src/ui/motion';
 import { availableCurrencies } from '../src/ui/presentation';
 import { space, useCurrentDay, usePalette, useReduceMotion } from '../src/ui/theme';
@@ -48,7 +47,7 @@ const TAB_ROOTS = new Set(['/', '/activity', '/reports', '/settings']);
  * model's answer and the user's words are shown exactly as they arrived. */
 export default function AssistantScreen() {
   const params = useLocalSearchParams<{ currency?: string }>();
-  const { snapshot, archive, review, captureReview, getReviewItem, refreshReview } = useLedger();
+  const { snapshot, archive, review, reviewVersion, captureReview, getReviewItem, refreshReview } = useLedger();
   const day = useCurrentDay();
   const p = usePalette();
   const reduced = useReduceMotion();
@@ -64,7 +63,9 @@ export default function AssistantScreen() {
 
   const currencies = availableCurrencies(snapshot?.accounts ?? []);
   const currency: Currency = typeof params.currency === 'string' && currencies.includes(params.currency as Currency) ? params.currency as Currency : currencies[0] ?? 'ARS';
-  const accounts = useMemo(() => postingAccounts(snapshot?.accounts ?? [], archive?.debts), [snapshot?.accounts, archive?.debts]);
+  // The accounts an expense may post to now, as the review draft's own rule (`postingAccountsFor`): never an archived or
+  // deleted card, so no chip or implied account is one the capture would then drop.
+  const accounts = useMemo(() => postingAccountsFor('expense', snapshot?.accounts ?? [], archive?.cards, archive?.debts), [snapshot?.accounts, archive?.cards, archive?.debts]);
   // An income draft may only land in a cash account (24B6); a card is neither offered nor implied for it.
   const incomeAccounts = useMemo(() => postingAccountsFor('income', snapshot?.accounts ?? [], archive?.cards, archive?.debts), [snapshot?.accounts, archive?.cards, archive?.debts]);
   const entries = snapshot?.entries ?? [];
@@ -82,17 +83,15 @@ export default function AssistantScreen() {
       { id: randomUUID(), writeId: randomUUID() }, new Date().toISOString(), todayKey()), preview);
   }, [preview]);
 
-  /** Whether the Assistant is the screen in front. The review sheet is presented only then, and at most one at a time: the
-   * flag drops as soon as one is presented (the blur that follows would be too late for a second capture). */
-  const focused = useRef(false);
+  /** While the Assistant is the screen in front it registers, on the session, how to present the review sheet. A capture
+   * takes the presenter (clearing it) once its item is stored: at most one sheet at a time, only over an Assistant in
+   * front, and the one in front now even if the request was sent from an earlier mount. Coming back (a sheet closed)
+   * registers it again. */
   useFocusEffect(useCallback(() => {
-    focused.current = true;
-    return () => { focused.current = false; };
-  }, []));
-  const present = useCallback((itemId: string) => {
-    focused.current = false;
-    router.push({ pathname: '/review-sheet/[id]', params: { id: itemId } });
-  }, []);
+    const present = (itemId: string) => { router.push({ pathname: '/review-sheet/[id]', params: { id: itemId } }); };
+    session.presenter.current = present;
+    return () => { if (session.presenter.current === present) session.presenter.current = null; };
+  }, [session]));
 
   /** Stores a proposal in the review store, from the session (so it finishes even if the screen closes). Only a proposal
    * not yet captured is sent, always as it was frozen; a failure writes nothing anywhere and leaves Reintentar. Once the
@@ -109,13 +108,15 @@ export default function AssistantScreen() {
     try {
       await captureReview({ id: frozen.id, writeId: frozen.writeId, captureKey: frozen.captureKey, draft: frozen.draft, at: frozen.at });
       dispatch({ type: 'proposal', messageId, status: 'captured' });
-      if (focused.current) present(frozen.id);
+      const present = session.presenter.current;
+      session.presenter.current = null;
+      present?.(frozen.id);
     } catch {
       dispatch({ type: 'proposal', messageId, status: 'failed' });
     } finally {
       session.capturing.delete(messageId);
     }
-  }, [session, dispatch, captureReview, present]);
+  }, [session, dispatch, captureReview]);
   /** Every proposal the thread just added that is waiting for its capture. */
   const captureNew = useCallback(() => {
     for (const message of session.getState().conversation.messages) {
@@ -166,8 +167,9 @@ export default function AssistantScreen() {
   // A captured proposal that is not in the tray is read from the store itself. Confirmed or dismissed there, the card
   // keeps that item (a confirmed card draws what was recorded, edits included) and it is never looked up again. Still
   // pending (the tray could not be read again after the capture), the card shows the stored item, «Revisar» opens it (the
-  // detail reads the store too) and the tray is asked to reload; it is read again whenever the tray changes. Unreadable
-  // or failing: nothing is kept and the card keeps «Revisar».
+  // sheet reads the store too) and the tray is asked to reload; it is read again whenever the tray changes or a review
+  // operation ran (`reviewVersion`: a confirmation or an edit whose tray reload failed). Unreadable or failing: nothing is
+  // kept and the card keeps «Revisar».
   const tray = review && review !== 'unavailable' ? review : null;
   const [stored, setStored] = useState<Record<string, ReviewItem | null>>({});
   const captured = state.messages.flatMap(item => item.role === 'assistant' && item.content?.kind === 'proposal' && item.content.status === 'captured' ? [item.content.capture.id] : []);
@@ -187,7 +189,7 @@ export default function AssistantScreen() {
       }, () => { /* Unknown: the card keeps «Revisar». */ });
     }
     return () => { live = false; };
-  }, [missing.join(','), tray]);
+  }, [missing.join(','), tray, reviewVersion]);
   const proposalState = (content: ProposalContent): ProposalState => {
     if (content.status !== 'captured') return { kind: content.status };
     const id = content.capture.id;

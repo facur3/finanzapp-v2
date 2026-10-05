@@ -47,6 +47,9 @@ export type ResolvedDraft = {
   /** 25A-04: whether the person named the account (matched by name) or chose it in a clarification, rather than it being
    * the one account of the screen's currency that fits. Only a stated destination lends its currency to an unstated one. */
   destinationStated?: boolean;
+  /** 25A-04: the account the model named («con la Visa»), kept while a clarification about something else is open, so the
+   * next turn still matches it (and it still counts as stated). Conversation data only, never captured. */
+  paymentMethodRef?: string | null;
 };
 
 export type DraftField = 'kind' | 'amount' | 'paymentMethod' | 'category';
@@ -236,7 +239,7 @@ export function categoryOptions(entries: Entry[], kind: EntryKind, limit = 4): C
 export function resolveDraft(draft: CaptureDraft, accounts: Account[], entries: Entry[], currency: Currency, todayISO: string, incomeAccounts: Account[] = accounts):
   { kind: 'draft'; draft: ResolvedDraft } | { kind: 'clarification'; field: DraftField; question: MessageKey; options: ClarificationOption[]; partial: Partial<ResolvedDraft> } {
   const resolvedCurrency = draft.currency ?? currency;
-  const stated = { currencyStated: draft.currency !== null, dateStated: draft.dateISO !== null };
+  const stated = { currencyStated: draft.currency !== null, dateStated: draft.dateISO !== null, paymentMethodRef: draft.paymentMethodRef };
   const partial: Partial<ResolvedDraft> = { currency: resolvedCurrency, merchant: draft.merchant ?? '', category: draft.category ?? '',
     dateISO: draft.dateISO ?? todayISO, ...stated, ...(draft.kind ? { kind: draft.kind } : {}), ...(draft.amountMinor ? { amountMinor: draft.amountMinor } : {}) };
   if (!draft.kind) return { kind: 'clarification', field: 'kind', question: 'assistant.clarify.kind',
@@ -263,19 +266,22 @@ export function completeDraft(pending: { draft: Partial<ResolvedDraft>; field: D
   else if (pending.field === 'category') draft.category = optionId;
   // Contract v1 only ever parks ARS or USD drafts; the ARS default for a draft without a currency is stage 7's to remove.
   const currency: LegacyCurrency = isLegacyCurrency(draft.currency) ? draft.currency : 'ARS';
+  // A named account is matched again (it was asked about something else first); a chosen one is already fixed below.
   const capture: CaptureDraft = { kind: draft.kind ?? null, amountMinor: draft.amountMinor ?? null, currency, merchant: draft.merchant || null,
-    category: draft.category || null, dateISO: draft.dateISO ?? null, paymentMethodRef: null };
+    category: draft.category || null, dateISO: draft.dateISO ?? null, paymentMethodRef: draft.accountId ? null : draft.paymentMethodRef ?? null };
   const chosen = (pool: Account[]) => draft.accountId ? pool.filter(account => account.id === draft.accountId) : pool;
   const next = resolveDraft(capture, chosen(accounts), entries, currency, todayISO, chosen(incomeAccounts));
   // What the model stated is carried from the first turn: the re-resolution above always passes a currency and a date.
   // An account chosen now, or named or chosen in an earlier turn, is a stated destination; the one account left by the
   // filter above is not.
+  const named = (resolved: { destinationStated?: boolean }) => resolved.destinationStated ?? false;
   const stated = { currencyStated: pending.draft.currencyStated ?? true, dateStated: pending.draft.dateStated ?? true,
-    destinationStated: pending.field === 'paymentMethod' || (pending.draft.destinationStated ?? false) };
+    paymentMethodRef: pending.draft.paymentMethodRef ?? null };
+  const destinationStated = pending.field === 'paymentMethod' || (pending.draft.destinationStated ?? false);
   if (next.kind === 'draft') return { textKey: 'assistant.clarify.reviewDraft', pending: null,
-    content: { kind: 'draft', draft: { ...next.draft, accountId: draft.accountId ?? next.draft.accountId, ...stated } } };
+    content: { kind: 'draft', draft: { ...next.draft, accountId: draft.accountId ?? next.draft.accountId, ...stated, destinationStated: destinationStated || named(next.draft) } } };
   return { textKey: next.question, content: { kind: 'clarification', field: next.field, options: next.options, chosen: null },
-    pending: { draft: { ...next.partial, accountId: draft.accountId ?? next.partial.accountId ?? null, ...stated }, field: next.field } };
+    pending: { draft: { ...next.partial, accountId: draft.accountId ?? next.partial.accountId ?? null, ...stated, destinationStated: destinationStated || named(next.partial) }, field: next.field } };
 }
 
 /** What a fact is about, decided by its id; only a category's stored name is read from the label (see `factCategory`). */

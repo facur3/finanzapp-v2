@@ -16,7 +16,8 @@ test('a new session is empty and idle, with no request, no capture in flight and
   assert.equal(state.conversation, emptyConversation);
   assert.equal(session.request.current, null);
   assert.equal(session.capturing.size, 0);
-  assert.deepEqual(Object.keys(session).sort(), ['capturing', 'dispatch', 'getState', 'request', 'reset', 'subscribe']);
+  assert.equal(session.presenter.current, null, 'no Assistant in front yet: nothing can present a review sheet');
+  assert.deepEqual(Object.keys(session).sort(), ['capturing', 'dispatch', 'getState', 'presenter', 'request', 'reset', 'subscribe']);
   assert.equal(lastUserWords(state.conversation), null);
 });
 

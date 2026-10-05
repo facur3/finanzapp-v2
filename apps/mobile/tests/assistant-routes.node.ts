@@ -67,7 +67,9 @@ function scriptedClient(mode: AssistantClient['mode'] = 'remote') {
  * default keeps items in memory (as the store does: a repeat of a capture returns the item already there, never a second
  * one); `sqliteReview` puts a real store on real SQLite behind the same three calls. */
 interface ReviewBacking { tray: () => ReviewTray | 'unavailable' | null; capture: (input: ReviewCapture) => Promise<ReviewItem>; get: (id: string) => Promise<ReviewItem | null>;
-  captures: ReviewCapture[]; failNext: (count?: number) => void }
+  captures: ReviewCapture[]; failNext: (count?: number) => void;
+  /** The provider's count of review operations (default 0). */
+  version?: () => number }
 function memoryReview(): ReviewBacking {
   const items = new Map<string, ReviewItem>();
   const captures: ReviewCapture[] = [];
@@ -103,8 +105,8 @@ async function sqliteReview(store: () => ReviewStore): Promise<ReviewBacking & {
     get: id => { gets.push(id); return store().get(id); }, gets };
 }
 
-function harness({ client, accounts = [visa, cash, usd], data = entries, params = {}, reduced = false, review = memoryReview(), refreshReview = async () => {}, locale = 'es-AR', deviceLanguage = null, session = createConversationSession() }: {
-  client: AssistantClient; accounts?: domain.Account[]; data?: domain.Entry[]; params?: Record<string, string>; reduced?: boolean; review?: ReviewBacking; locale?: AppLocale;
+function harness({ client, accounts = [visa, cash, usd], cards = [], data = entries, params = {}, reduced = false, review = memoryReview(), refreshReview = async () => {}, locale = 'es-AR', deviceLanguage = null, session = createConversationSession() }: {
+  client: AssistantClient; accounts?: domain.Account[]; cards?: domain.CreditCardProfile[]; data?: domain.Entry[]; params?: Record<string, string>; reduced?: boolean; review?: ReviewBacking; locale?: AppLocale;
   refreshReview?: () => Promise<void>;
   /** The device's first language, for `speechLanguage` (null: nothing read, so it is never set). */
   deviceLanguage?: string | null;
@@ -177,7 +179,7 @@ function harness({ client, accounts = [visa, cash, usd], data = entries, params 
     '../src/integrations/evidence': evidence,
     '../src/assistant/review-proposal': reviewProposal,
     // No ledger write is offered to the screen at all: only the review store's capture and lookup.
-    '../src/storage/LedgerProvider': { useLedger: () => ({ snapshot, archive: { accounts, records: [], debts: [] }, review: review.tray(), captureReview: review.capture, getReviewItem: review.get, refreshReview }) },
+    '../src/storage/LedgerProvider': { useLedger: () => ({ snapshot, archive: { accounts, records: [], debts: [], cards }, review: review.tray(), reviewVersion: review.version?.() ?? 0, captureReview: review.capture, getReviewItem: review.get, refreshReview }) },
     '../src/ui/assistant-composer': { AssistantComposer: 'AssistantComposer' },
     '../src/ui/assistant-messages': Object.fromEntries(['AnswerEvidence', 'AssistantText', 'ClarificationChoices', 'ProposalCard', 'Suggestions', 'SystemNote', 'UserMessage'].map(n => [n, n])),
     '../src/ui/components': { AppText: 'AppText', IconButton: 'IconButton' },
@@ -418,10 +420,43 @@ test('25A-04: one review sheet at a time: a capture that lands while a sheet is 
   const second = find([view.render().items[3]], 'ProposalCard')[0];
   assert.deepEqual([second.props.content.status, second.props.state.kind, view.pushed.length], ['captured', 'pending', 1]);
   assert.equal(view.review.captures.length, 2, 'both are stored');
-  // Back in the Assistant (the sheet closed): the card reopens it on request; nothing is presented by itself again.
+  // Back in the Assistant (the sheet closed): the card reopens it on request; nothing is presented by itself for it.
   view.refocus();
+  assert.equal(view.pushed.length, 1);
   second.props.onReview(second.props.content.capture.id);
   assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/review-sheet/[id]', params: { id: second.props.content.capture.id } }));
+  // A new proposal captured once the Assistant is in front again is presented by itself, once.
+  view.refocus();
+  const before = view.pushed.length;
+  view.render().composer.props.onChange('Gasté 18.500 en Carrefour con la Visa');
+  view.render().composer.props.onSend();
+  await tick();
+  scripted.reply([{ type: 'result', result: FIXTURE_DRAFT, facts: [] }]);
+  await settle();
+  const third = find([view.render().items[5]], 'ProposalCard')[0];
+  assert.equal(view.pushed.length, before + 1);
+  assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/review-sheet/[id]', params: { id: third.props.content.capture.id } }));
+});
+
+test('25A-04: an answer that lands after the Assistant was left and reopened presents the sheet over the Assistant now in front', async () => {
+  const scripted = scriptedClient();
+  const review = memoryReview();
+  const first = harness({ client: scripted.client, review });
+  first.render().empty.props.onPick('Gasté 18.500 en Carrefour con la Visa');
+  await tick();
+  first.unmount();
+  // «+» → Asistente again: a new mount over the same session, in front, while the first request is still open.
+  const again = harness({ client: scripted.client, review, session: first.session });
+  again.render();
+  scripted.reply([{ type: 'result', result: FIXTURE_DRAFT, facts: [] }]);
+  await settle();
+  const card = find([again.render().items[1]], 'ProposalCard')[0];
+  assert.equal(card.props.content.status, 'captured');
+  assert.equal(first.pushed.length, 0, 'never over the closed screen');
+  assert.equal(JSON.stringify(again.pushed), JSON.stringify([{ pathname: '/review-sheet/[id]', params: { id: card.props.content.capture.id } }]));
+  assert.equal(first.session.presenter.current, null, 'taken: one sheet at a time');
+  again.unmount();
+  assert.equal(first.session.presenter.current, null, 'a screen that leaves takes its presenter with it');
 });
 
 test('25A-04: a capture that fails writes nothing anywhere and says so; Reintentar resends the same frozen capture, and a repeat never makes a second item (real SQLite)', async () => {
@@ -579,6 +614,74 @@ test('25A-04 (Codex review of #85): a capture that committed while the tray coul
     assert.equal(find([other.render().items[1]], 'ProposalCard')[0].props.state.kind, 'unknown');
     assert.deepEqual(await files.entries(), []);
   } finally { await files.dispose(); }
+});
+
+test('25A-04: with a stale tray, a confirmation or an edit made in the sheet reaches the card (the provider counts the operation; real SQLite)', async () => {
+  const files = await reviewFiles([visa, cash, usd]);
+  try {
+    const review = await sqliteReview(() => files.store);
+    const before = review.tray();
+    let version = 0;
+    const stale: ReviewBacking = { ...review, tray: () => before, version: () => version };
+    const scripted = scriptedClient();
+    const view = harness({ client: scripted.client, review: stale });
+    view.render().empty.props.onPick('Gasté 18.500 en Carrefour con la Visa');
+    await tick();
+    scripted.reply([{ type: 'result', result: FIXTURE_DRAFT, facts: [] }]);
+    await settle();
+    view.render();
+    await settle();
+    let card = find([view.render().items[1]], 'ProposalCard')[0];
+    const { capture } = card.props.content as conversation.ProposalContent;
+    assert.equal(card.props.state.kind, 'pending');
+    // Edited in the sheet; the tray reload failed again; the provider still counts the operation.
+    const edited = await files.store.updateDraft(capture.id, 0, { ...capture.draft, merchant: 'Carrefour Express' }, new Date().toISOString());
+    version = 1;
+    view.render();
+    await settle();
+    card = find([view.render().items[1]], 'ProposalCard')[0];
+    assert.equal(card.props.state.item.draft.merchant, 'Carrefour Express', 'the edit, not the pre-edit read');
+    // Confirmed in the sheet, the reload failed again: the card says «Registrado» with the stored values.
+    await files.store.confirm(capture.id, { expectedRevision: edited.revision, todayISO: domain.todayKey(), at: new Date().toISOString() });
+    version = 2;
+    view.render();
+    await settle();
+    card = find([view.render().items[1]], 'ProposalCard')[0];
+    assert.deepEqual([card.props.state.kind, card.props.state.item.draft.merchant], ['confirmed', 'Carrefour Express']);
+    assert.deepEqual(await files.entries(), [capture.writeId]);
+  } finally { await files.dispose(); }
+});
+
+test('25A-04: an archived card is never offered or implied, so a capture never drops a destination the person chose', async () => {
+  const card: domain.CreditCardProfile = { id: 'visa-card', accountId: visa.id, issuer: 'Galicia', last4: '1111', creditLimitMinor: 0, closingDay: 20, dueDay: 5,
+    active: false, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
+  const scripted = scriptedClient();
+  const view = harness({ client: scripted.client, cards: [card] });
+  view.render().empty.props.onPick('Gasté 18 mil en el súper');
+  await tick();
+  scripted.reply([{ type: 'result', result: FIXTURE_DRAFT_NO_ACCOUNT, facts: [] }]);
+  await settle();
+  // Only Efectivo is an ARS destination now: implied, never asked about the archived Visa.
+  const proposal = find([view.render().items[1]], 'ProposalCard')[0];
+  assert.equal(proposal.props.content.capture.draft.destinationId, cash.id);
+  assert.equal(find([view.render().items[1]], 'ClarificationChoices').length, 0);
+});
+
+test('25A-04: an account the model named survives a kind clarification: it is matched again and lends its currency', async () => {
+  const scripted = scriptedClient();
+  const view = harness({ client: scripted.client });
+  view.render().empty.props.onPick('500 en efectivo');
+  await tick();
+  scripted.reply([{ type: 'result', result: { kind: 'draft', message: '', factIds: [], draft: { kind: null, amountMinor: 50000, currency: null, merchant: 'Kiosco',
+    category: 'Comida', dateISO: null, paymentMethodRef: 'Efectivo' } }, facts: [] }]);
+  await settle();
+  const choices = find([view.render().items[1]], 'ClarificationChoices')[0];
+  assert.equal(choices.props.options.map((option: { id: string }) => option.id).join(','), 'expense,income');
+  choices.props.onChoose(choices.props.options[0], 'Gasto');
+  await settle();
+  const proposal = find([view.render().items[3]], 'ProposalCard')[0];
+  assert.deepEqual([proposal.props.content.capture.draft.destinationId, proposal.props.content.capture.draft.currency], [cash.id, 'ARS'],
+    'named «Efectivo» before the kind was asked: still the destination, and its currency');
 });
 
 test('25A-04: New chat, leaving the screen and an app restart never remove a captured proposal (real SQLite)', async () => {
@@ -850,7 +953,24 @@ test('an answer streaming while the screen is closed still lands in the session,
   assert.equal(done.props.content.status, 'captured');
   assert.equal(done.props.state.kind, 'pending');
   assert.equal(writer.session.capturing.size, 0);
-  assert.equal(writer.pushed.length + back.pushed.length, 0, 'the person had left the Assistant: no sheet is presented; the card offers «Revisar»');
+  assert.equal(writer.pushed.length, 0, 'never over the screen that was left');
+  assert.equal(back.pushed.length, 1, 'the person came back: the sheet is presented over the Assistant now in front');
+  // Nobody in front: a capture that lands then presents nothing, and the card offers «Revisar».
+  back.unmount();
+  const late = scriptedClient();
+  let release: (() => void) | null = null;
+  const held = memoryReview();
+  const slowCapture: ReviewBacking = { ...held, capture: async input => { const done = held.capture(input); await new Promise<void>(resolve => { release = resolve; }); return done; } };
+  const away = harness({ client: late.client, review: slowCapture });
+  away.render().empty.props.onPick('Gasté 18.500 en Carrefour con la Visa');
+  await tick();
+  late.reply([{ type: 'result', result: FIXTURE_DRAFT, facts: [] }]);
+  await settle();
+  away.unmount();
+  release!();
+  await settle();
+  assert.equal(away.pushed.length, 0);
+  assert.equal(away.session.presenter.current, null);
 });
 
 test('the Assistant is a root stack route reached from the capture hub; there is no Assistant tab and no tab route file', () => {

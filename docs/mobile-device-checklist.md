@@ -16,8 +16,10 @@ SQLite where persistence matters). Synthetic proposals are never written to the 
 - [ ] **Disconnected build:** a typed message still returns to the composer with its note; nothing appears in Para revisar.
 - [ ] **When the Assistant connects (a later 25A slice), in the release gate:**
   - the review sheet appears by itself right after the proposal is saved, as a native form sheet fitted to its content
-    with a grabber, over the Assistant, safe areas respected, light and dark; at the largest text sizes it opens full
-    height and scrolls, every button reachable;
+    with a grabber, over the Assistant, safe areas respected, light and dark; at the largest text sizes and on an
+    iPhone SE or mini it opens full height and scrolls, every button reachable; on a standard iPhone the fitted sheet
+    shows every button with several missing facts and a note;
+  - tapping Confirmar and swiping at once: the sheet holds until the result, and the Assistant is never closed with it;
   - Confirmar (lime, with the amount) records exactly one movement (one plan for cuotas), with the success haptic; the
     sheet closes and the card says «Registrado» with «Ver movimiento»;
   - Editar opens the editor over the sheet (keyboard and safe areas fine); saving returns to the sheet with the edit;

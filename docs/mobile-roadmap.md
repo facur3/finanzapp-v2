@@ -4173,7 +4173,10 @@ nothing of it is on a screen yet.
   Confirmar, Editar or Descartar there. The card in the thread reads the item from then on. If the app dies after the
   capture and before or during the presentation, the item is pending in «Para revisar».
 - **The review sheet.** `app/review-sheet/[id].tsx`, a native iOS form sheet (`presentation: 'formSheet'`, fitted to its
-  content, grabber; the large detent and a scrolling body at accessibility text sizes). Generic over a review item (the
+  content, grabber; the large detent and a scrolling body at the stacked text sizes or on a short screen, an SE or mini
+  class phone: `reviewSheetScrolls` in `src/ui/geometry.ts`, read by the registration and the sheet alike). While
+  Confirmar or Descartar is in flight it holds (no swipe, «Ahora no» disabled), and a result that lands after the sheet
+  was closed anyway closes nothing else. Generic over a review item (the
   tray's, or the store's own when the tray is stale: `useReviewItem`), so 25A2 and a future queue present the same
   route. Compact: «Confirmá el gasto», the amount, the merchant, then Categoría, Cuenta or Tarjeta, Pago on a card,
   Fecha, every missing fact named (neutral), and stale, interrupted or conflict notes; Confirmar (the one lime action,
@@ -4189,8 +4192,10 @@ nothing of it is on a screen yet.
     Más → Para revisar and the Más badge.
   - **Descartar** is explicit, asks first (the system's destructive button) and is the store's pending → dismissed; the
     ledger is never touched.
-  - One sheet at a time: it is presented only while the Assistant is the screen in front, and the flag drops as soon as
-    one is presented; a proposal captured meanwhile waits as a pending card.
+  - One sheet at a time, and only over an Assistant in front: the focused Assistant registers a presenter on the session
+    (`session.presenter`); a capture takes it once its item is stored, so a second capture meanwhile waits as a pending
+    card, and an answer that lands after the Assistant was left and reopened presents over the one now in front, never
+    over a closed screen. Coming back re-registers it.
 - **The role of «Para revisar».** Not a required step of the Assistant flow: the durable inbox and recovery surface for
   every proposal that stays pending (an Assistant proposal closed for later; several drafts of one future voice or text
   command; a Wallet capture ignored in the Dynamic Island, 25A2; an incomplete capture; an app terminated during a
@@ -4267,11 +4272,31 @@ nothing of it is on a screen yet.
 - **Review (before the PR).** An adversarial pass found no high-confidence defect; two lower ones were fixed: a captured
   proposal missing from a tray that could not be read again stays reachable, and the basis is taken from the ledger when
   the answer arrives, not when the request was sent.
+- **Review of the sheet flow (multi-agent, 2026-10-04: 7 risk dimensions, every finding put to two independent skeptics;
+  13 of 14 survived, all fixed).** (1) Closing the sheet while Confirmar or Descartar was in flight let the late success
+  pop the Assistant too: the sheet now holds while busy and its `leave` acts only while it is in front. (2) An answer
+  landing after the Assistant was reopened never presented: the presenter lives on the session. (3) With a stale tray,
+  an edit or a confirmation made in the sheet did not reach the sheet or the card: the provider counts review operations
+  (`reviewVersion`) and both read the store again. (4) A refusal on a store-read item blanked the sheet and lost its
+  message: the hook keeps its last read while re-reading. (5) The Assistant offered and implied archived cards, which
+  the capture then dropped: its expense destinations are `postingAccountsFor('expense', …)`. (6) An account the model
+  named was forgotten across a kind clarification: `paymentMethodRef` is carried. (7) Tall content could be clipped in
+  a fitted sheet on a short screen: the large detent and scrolling there. Plus tests that could not fail (the sheet's
+  hold-while-leaving and its stale-tray path) made real.
+  A second round (one verifier per fix, each confirming a test fails without it, plus two regression critics) found
+  four regressions in those fixes, all fixed: the swipe hold is owned by the sheet screen and released whenever its
+  content is not shown; a sheet covered while a call runs closes when it is in front again (never stuck held); an item
+  being read again from the store is drawn but offers no action until the store answers (`refreshing`), so nothing is
+  sent at an outdated revision; and a tray row always replaces an older store read.
 - **Codex review of #85 (two P2, fixed).** (1) A confirmed card drew the capture's snapshot: the closed state now keeps the
   stored review item and the card draws its draft. (2) A capture that committed while the tray could not be read again
   was unreachable: `src/ui/use-review-item.ts` gives the detail, the editor and now the sheet the tray's item or the
   store's own (`getReviewItem`), asking the tray to reload (`refreshReview`). The store stays the one source.
 - **Status.** This PR; not merged.
+- **Gates.** 2026-10-04, local, Linux. Root `npm test` 590 passed, 1 todo; `check:repo` OK. `apps/mobile`: `typecheck`
+  OK; `test:storage` 1329 passed, 0 failed (real SQLite included); `currency:verify`, `regions:verify` OK;
+  `i18n:check -- --strict` 0 errors, 0 stale (English lock accepted); `check` OK; `export:ios` OK. No EAS build, no
+  remote provider call, no iPhone run by the agent.
 
 ### Later notes recorded in 24UX6A (future; document only, not scheduled)
 

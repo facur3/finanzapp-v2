@@ -91,6 +91,10 @@ type LedgerContextValue = {
   getReviewItem: (id: string) => Promise<ReviewItem | null>;
   /** Reads the tray again (reconciling first), in the ledger's queue; a failure keeps the tray shown. */
   refreshReview: () => Promise<void>;
+  /** Counts the review operations this session has run (a confirmation, an edit, a dismissal, a capture), whether or not
+   * the tray could be read again after them: a screen that reads an item from the store (a stale tray) reads it again
+   * when it changes. A reload alone never changes it, so a failing reload cannot loop. */
+  reviewVersion: number;
 };
 const LedgerContext = createContext<LedgerContextValue | null>(null);
 
@@ -109,6 +113,7 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
   const reviewStore = useRef<ReviewStore | null>(null);
   const reviewDatabase = useRef<ReviewDatabase | null>(null);
   const [review, setReview] = useState<ReviewTray | 'unavailable' | null>(null);
+  const [reviewVersion, setReviewVersion] = useState(0);
 
   const enqueue = useCallback((work: () => Promise<void>) => {
     const next = queue.current.then(work);
@@ -207,7 +212,10 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     let result: T, done = false;
     return rereadOnRefusal(async db => {
       if (!reviewStore.current) throw new Error('review.unavailable');
-      try { result = await work(reviewStore.current); done = true; } finally { await loadReview(db); }
+      try { result = await work(reviewStore.current); done = true; } finally {
+        await loadReview(db);
+        if (mounted.current) setReviewVersion(value => value + 1);
+      }
     }).then(() => result, cause => {
       if (done && cause instanceof Error && cause.message === VIEW_REFRESH_MESSAGE) return result;
       throw cause;
@@ -215,7 +223,7 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
   };
 
   return <LedgerContext.Provider value={{
-    gate: BUILD_CURRENCY_GATE, snapshot, archive, error, review,
+    gate: BUILD_CURRENCY_GATE, snapshot, archive, error, review, reviewVersion,
     retry: () => setAttempt(value => value + 1),
     addAccount: (account, appearance) => mutate(db => createAccount(db, account, appearance, BUILD_CURRENCY_GATE)),
     addEntry: entry => mutate(db => createEntry(db, entry)),

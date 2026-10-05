@@ -197,3 +197,12 @@ export function fitFontSize(text: string, width: number, base: number, min: numb
   const fitting = width / (amountWidthEm(text) * scale);
   return Math.max(min, Math.min(base, Math.floor(fitting * 2) / 2));
 }
+
+/** Producto 25A-04: below this window height (an iPhone SE or mini class phone) the review sheet's content, with its notes
+ * and three actions, may not fit a sheet sized to it. */
+export const REVIEW_SHEET_COMPACT_HEIGHT = 760;
+/** Whether the review sheet opens at the large detent with a scrolling body instead of fitting its content: at the
+ * stacked text sizes, or on a short screen. Read by the route's registration and by the sheet, so the two agree. */
+export function reviewSheetScrolls(fontScale: number, height: number): boolean {
+  return fontScale >= ROW_STACK_SCALE || height < REVIEW_SHEET_COMPACT_HEIGHT;
+}

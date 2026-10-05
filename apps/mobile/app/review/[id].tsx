@@ -21,7 +21,7 @@ export default function ReviewItemScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { t } = useI18n();
   // 25A-04: the tray's item, or the store's own when the tray could not be read again (a capture that committed).
-  const { item, resolving, reload } = useReviewItem(id);
+  const { item, resolving, refreshing, reload } = useReviewItem(id);
   // A proposal this screen just confirmed or dismissed leaves the tray before the screen pops: it is drawn as it was (its
   // actions held) while it leaves, never as «no longer pending». Any other disappearance says so.
   const seen = useRef<ReviewItem | undefined>(undefined);
@@ -30,10 +30,10 @@ export default function ReviewItemScreen() {
   const shown = item ?? (leaving.current ? seen.current : undefined);
   if (!shown && resolving) return <Screen>{null}</Screen>;
   if (!shown) return <Screen><EmptyState icon="file-tray-outline" title={t('review.detail.notFoundTitle')} detail={t('review.detail.notFoundDetail')} /></Screen>;
-  return <ReviewDetail item={shown} leaving={leaving} reload={reload} />;
+  return <ReviewDetail item={shown} leaving={leaving} reload={reload} refreshing={refreshing} />;
 }
 
-function ReviewDetail({ item, leaving, reload }: { item: ReviewItem; leaving: MutableRefObject<boolean>; reload: () => void }) {
+function ReviewDetail({ item, leaving, reload, refreshing }: { item: ReviewItem; leaving: MutableRefObject<boolean>; reload: () => void; refreshing: boolean }) {
   const { archive, review } = useLedger();
   const p = usePalette();
   const { t, formatDate, spokenMoney, moneyText } = useI18n();
@@ -101,10 +101,10 @@ function ReviewDetail({ item, leaving, reload }: { item: ReviewItem; leaving: Mu
     <ErrorMessage message={error} />
     {/* A conflict cannot be confirmed or edited (the store refuses both); it can be dismissed while no write is frozen on it. */}
     {tray.writable && <View style={{ gap: 10 }}>
-      {!conflict && <ActionButton label={confirmText.text} spokenLabel={confirmText.spoken} icon="checkmark" onPress={confirm} busy={busy} disabled={!facts.canConfirm} />}
-      {!conflict && <ActionButton label={t('review.detail.edit')} icon="create-outline" secondary disabled={busy}
+      {!conflict && <ActionButton label={confirmText.text} spokenLabel={confirmText.spoken} icon="checkmark" onPress={confirm} busy={busy} disabled={!facts.canConfirm || refreshing} />}
+      {!conflict && <ActionButton label={t('review.detail.edit')} icon="create-outline" secondary disabled={busy || refreshing}
         onPress={() => router.push({ pathname: '/edit-review/[id]', params: { id: item.id } })} />}
-      {(!conflict || item.attempt === null) && <ActionButton label={t('review.detail.dismiss')} icon="close" secondary disabled={busy} onPress={dismiss} />}
+      {(!conflict || item.attempt === null) && <ActionButton label={t('review.detail.dismiss')} icon="close" secondary disabled={busy || refreshing} onPress={dismiss} />}
     </View>}
   </Screen>;
 }

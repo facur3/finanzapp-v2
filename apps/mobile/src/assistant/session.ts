@@ -26,6 +26,10 @@ export type ConversationSession = {
   request: { current: AbortController | null };
   /** 25A-04: the proposals whose capture is in flight, so one is never sent twice at once. */
   capturing: Set<string>;
+  /** 25A-04: how the Assistant in front presents the review sheet for a stored item, or null when no Assistant is in front
+   * (or one sheet was just presented). Registered by the focused screen, so a capture that lands after the screen was
+   * left and reopened reaches the screen now in front, never a closed one. Taking it clears it: one sheet at a time. */
+  presenter: { current: ((itemId: string) => void) | null };
   /** Forget the conversation (New chat): aborts a request in flight and keeps the message ids increasing. It never touches
    * the review store: a captured proposal stays in «Para revisar». */
   reset: () => void;
@@ -48,6 +52,7 @@ export function createConversationSession(): ConversationSession {
     },
     request: { current: null },
     capturing: new Set(),
+    presenter: { current: null },
     reset: () => {
       session.request.current?.abort();
       session.request.current = null;
