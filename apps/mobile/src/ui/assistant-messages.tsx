@@ -98,7 +98,7 @@ export function Suggestions({ items, onPick, disabled = false }: { items: readon
   const p = usePalette();
   const { t } = useI18n();
   return <View style={styles.empty}>
-    {/* 24UX6C: the Assistant's mark as the hub draws it (sage-mint circle, pine glyph, 9.5:1): it reads on both grounds. */}
+    {/* 24UX6C: the Assistant's mark is the lime accent circle with an ink glyph (14.1:1; the hub's lime tile uses an ink circle instead): it reads on both grounds. */}
     <View style={[styles.emptyGlyph, { backgroundColor: p.accent }]}><Ionicons name="sparkles" size={22} color={p.onAccent} accessible={false} /></View>
     <AppText accessibilityRole="header" variant="title2" style={{ textAlign: 'center' }}>{t('assistant.emptyTitle')}</AppText>
     <View style={styles.chips}>

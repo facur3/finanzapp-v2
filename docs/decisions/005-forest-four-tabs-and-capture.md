@@ -21,7 +21,9 @@ vez el 2026-10-01 por Producto 24UX6E (más destinos financieros en Forest: en D
 dirección; el presupuesto general plano con el héroe en tinta salvo excedido; resúmenes planos y una sola nota de ciclo
 de vida en Cuentas, Presupuestos, Recurrentes, Deudas y Categorías; sin chevron en una fila que abre un editor modal; el
 ámbar de Recurrentes solo para un gasto): ver «Enmienda 2026-10-01 — Producto 24UX6E» al final. Con ella se cierra la
-línea visual amplia de Forest.*
+línea visual amplia de Forest.* *Enmendada el 2026-10-03 por Producto 25VIS1, **aceptada por el dueño en el iPhone** el
+mismo día como la paleta actual del producto (los colores de Forest reemplazados por Electric Lime con los mismos tokens; navegación, composición y
+reglas semánticas sin cambio): ver «Enmienda 2026-10-03 — Producto 25VIS1» al final.*
 
 ## Decisión
 
@@ -126,6 +128,9 @@ borra ninguna entrega pasada.
   `push`.
 
 ## Sistema visual: Forest
+
+*(Los colores de esta sección se reemplazan el 2026-10-03 por Electric Lime, Producto 25VIS1: ver la enmienda
+al final. La regla semántica sigue, con la transferencia en pizarra neutra.)*
 
 - **Ventana de tono 158–168°**, pino sobrio: nunca turquesa, cian, esmeralda ni azul. Sin
   reescritura global de tipografía ni radios. La ventana vinculante de 158–168° rige el campo
@@ -492,3 +497,27 @@ quedaba arriba del dock (corregido por 25OPS1, abajo). La verificación en Linux
 
 **Estado.** Implementado en `apps/mobile`, en su rama; **sin revisar en un iPhone** (`docs/mobile-device-checklist.md`,
 «Producto 25OPS1»).
+
+## Enmienda 2026-10-03 — Producto 25VIS1 (paleta Electric Lime)
+
+- **Aceptada.** Empezó como prueba; el dueño la revisó en su iPhone, en claro y oscuro, el 2026-10-03 y la conserva
+  como la paleta actual del producto, tal como está implementada. Es la dirección visual del producto, no un nombre,
+  logo ni identidad de marca pública terminados: la compuerta de nombre, marca registrada y similitud confusa
+  (`docs/brand-brief.md` §3) sigue pendiente. Los valores de Forest quedan en el historial (master 227942c).
+- **Reemplaza §Sistema visual: Forest en su color:** la marca es una lima amarilla-chartreuse (#C6F12E, ventana de tono
+  68–82°), siempre con tinta encima; lienzos, tinta y dock son neutros (grafito, blanco mineral, casi negro); no hay
+  un verde bosque como segunda marca. La lima va al campo de Inicio, al «+», al botón lleno y a la tarjeta del Asistente;
+  como texto, un oliva-lima profundo en claro y una lima suave en oscuro. El lienzo oscuro deja de ser negro OLED puro
+  (#0B0C0A). Detalle y tabla de tokens en `docs/mobile-design.md`, «Producto 25VIS1».
+- **La regla semántica sigue:** gasto en tinta, ingreso en su verde (lejos de la lima), alerta ámbar, vencido y
+  destructivo en rojo; la transferencia pasa de azul petróleo a **pizarra neutra**. La lima nunca es éxito, ingreso,
+  alerta ni error.
+- **Pulido final (2026-10-04, aprobado por el dueño):** el segmento elegido `Gastado | Disponible` de Inicio es un pulgar
+  blanco neutro (el `surface` claro) con texto en tinta, igual en claro y oscuro; la jerarquía del importe (símbolo y
+  centavos más silenciosos) queda igual a propósito.
+- **No cambia:** cuatro pestañas, el dock y su geometría (ahora grafito; solo el «+» es lima), el hub, Inicio y sus
+  módulos (Próximos compromisos sigue neutro como Actividad reciente), Reportes, Tarjetas, colores de categorías y caras
+  de tarjeta, ni ninguna regla contable.
+
+**Estado.** Implementado en `apps/mobile`, en su rama (PR #83, sin mergear); paleta aceptada por el dueño en el iPhone
+el 2026-10-03; los demás puntos de `docs/mobile-device-checklist.md`, «Producto 25VIS1», siguen abiertos.

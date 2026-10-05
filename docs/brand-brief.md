@@ -232,6 +232,28 @@ Recorded as decisions; the exploration boards are not copied into the repository
 - **Naming.** «FinanzApp» is only the internal working name. No name from the Claude Design shortlist is approved, and
   none is promoted to the roadmap or the product configuration before the availability and conflict screening of §3.
 
+### 4.8 Electric Lime, the current product palette (Producto 25VIS1, 2026-10-03)
+
+After the palette-only exploration the owner preferred an Electric Lime direction and asked to see it on the real
+iPhone. 25VIS1 implemented it as a token trial on the existing product (`apps/mobile/src/ui/palette.ts`; mobile-design.md,
+«Producto 25VIS1»), and after reviewing it on the iPhone in light and dark (2026-10-03) the owner **kept it as the
+current product palette**, as implemented. It is the selected product visual direction; it is **not** a finished public
+name, logo or brand identity: the naming, trademark and confusing-similarity gate below stays future work.
+
+- **A colour direction, not an imitation of Wise.** The lime is paired with neutral ink, graphite and mineral
+  off-white, never with a deep forest green as the brand pair, and sits on the yellow side of a bright green. The
+  identity does not reproduce Wise's Bright Green + Forest Green pairing, its logo, lettering, icon system, global-currency
+  motifs, copy or distinctive brand compositions.
+- **The research's caution still applies.** §5 lists «acid green on deep green» as crowded and lime as a poor default
+  accent; pairing with ink instead of green answers part of it, not all of it. Final public naming, logo, trademark and
+  confusing-similarity screening stay in the existing brand, naming and identity launch gate (§3 and
+  [app-store-launch.md §9.4](app-store-launch.md)); nothing
+  here is a legal assessment.
+- **Theme packs later, maybe.** Optional visual themes (for example Forest, Lime, Sapphire) remain only a documented
+  post-launch candidate if the product later wants customisation: not a launch commitment, not part of the
+  current monetisation, no selector built. Every theme multiplies visual and accessibility QA, and the launch needs one
+  recognisable default identity.
+
 ## 5. What the identity must stay away from
 
 The current identities of the products the owner named, described at a high level for differentiation only, from the

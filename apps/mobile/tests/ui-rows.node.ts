@@ -15,12 +15,13 @@ import * as moneyInput from '../src/ui/money-input.ts';
 import type { AppLocale } from '../src/i18n/locale.ts';
 import * as movementAmount from '../src/ui/movement-amount.ts';
 import * as presentation from '../src/ui/presentation.ts';
+import { darkPalette, lightPalette } from '../src/ui/palette.ts';
 
 // Producto 22.1: the row and field components at source level (React Native
 // replaced by descriptors). Structure, hierarchy and labels are checked here;
 // wrapping at Dynamic Type sizes and narrow widths needs the iPhone.
 type Node = { type: any; props: Record<string, any> };
-function load(file: string, extra: Record<string, unknown> = {}, fontScale = 1, width = 390) {
+function load(file: string, extra: Record<string, unknown> = {}, fontScale = 1, width = 390, palette?: Record<string, unknown>) {
   const source = readFileSync(new URL('../src/ui/' + file, import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: any, props: any) => ({ type, props });
@@ -28,7 +29,7 @@ function load(file: string, extra: Record<string, unknown> = {}, fontScale = 1, 
   const alerts: { title: string; message: string; buttons?: { text: string }[] }[] = [];
   const haptics: string[] = [];
   let cursor = 0;
-  const p = { isDark: false, surface: '#FFFFFF', inset: '#EEEEF3', text: '#0A0A0C', secondary: '#6E7078', tertiary: '#8E9098', line: '#E6E6EC', primary: '#2557D6', primaryFill: '#2557D6', onPrimary: '#FFF', primarySoft: '#E5ECFB', background: '#F2F2F6',
+  const p = palette ?? { isDark: false, surface: '#FFFFFF', inset: '#EEEEF3', text: '#0A0A0C', secondary: '#6E7078', tertiary: '#8E9098', line: '#E6E6EC', primary: '#2557D6', primaryFill: '#2557D6', onPrimary: '#FFF', primarySoft: '#E5ECFB', background: '#F2F2F6',
     income: '#1F7A4D', expense: '#C0392B', warning: '#B26A00', transfer: '#2D6476', transferSoft: '#E2EDF1', incomeSoft: '#E3F1E8' };
   const modules: Record<string, unknown> = {
     react: { useState: (initial: unknown) => { const index = cursor++; if (!(index in state)) state[index] = initial; return [state[index], (value: unknown) => { state[index] = typeof value === 'function' ? (value as (c: unknown) => unknown)(state[index]) : value; }]; },
@@ -329,6 +330,25 @@ test('24T3 carry-in: Reportes\' prominent switch reads at the subhead size, semi
   const plain = nodes(ui.render('Choices', { value: 'categories', onChange: () => {}, options })).filter(node => node.type === 'Animated.Text');
   assert.equal(flat(plain[0].props.style).fontSize, 13);
   assert.equal(plain[0].props.adjustsFontSizeToFit, true);
+});
+
+test('25VIS1 final: Inicio\'s Gastado | Disponible on the field: a white thumb with an ink label, the other label secondary; accessibilityState says which', () => {
+  for (const palette of [lightPalette, darkPalette]) {
+    const ui = load('components.tsx', {}, 1, 390, { ...palette, isDark: palette === darkPalette });
+    const props = { onField: true, value: 'spent', onChange: () => {}, options: [{ value: 'spent', label: 'Gastado' }, { value: 'available', label: 'Disponible' }] };
+    // The thumb is drawn once the track is measured.
+    ui.render('Choices', props).props.onLayout({ nativeEvent: { layout: { width: 300 } } });
+    const control = ui.render('Choices', props);
+    assert.equal(flat(control.props.style).backgroundColor, palette.heroControl, 'the track is unchanged');
+    const thumb = nodes(control).find(node => node.type === 'Animated.View')!;
+    assert.equal(flat(thumb.props.style).backgroundColor, palette.heroThumb);
+    assert.deepEqual([palette.heroThumb, palette.heroThumbInk], [lightPalette.surface, palette.heroInk], 'white thumb, ink label, in both themes');
+    const labels = nodes(control).filter(node => node.type === 'Animated.Text');
+    assert.deepEqual(labels.map(label => flat(label.props.style).color), [palette.heroThumbInk, palette.heroSecondary]);
+    assert.deepEqual(labels.map(label => flat(label.props.style).fontWeight), ['600', '500'], 'weight marks the chosen one too, not colour alone');
+    const segments = [...new Set(nodes(control).filter(node => node.type === 'Pressable'))];
+    assert.deepEqual(segments.map(segment => segment.props.accessibilityState.selected), [true, false]);
+  }
 });
 
 test('24T3 carry-in: the prominent labels fit their segment on a 375 pt screen at the 1.3× cap, in Spanish and English', () => {
