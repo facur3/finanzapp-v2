@@ -40,21 +40,25 @@ const HIDDEN = /[\u0000-\u001f\u007f-\u009f\u200b\u2028-\u202e\u2060-\u2064\u206
 const HIDDEN_IN_PROSE = /[\u0000-\u0009\u000b-\u001f\u007f-\u009f\u200b\u2028-\u202e\u2060-\u2064\u2066-\u2069\ufeff\ufff9-\ufffb]/;
 // The person's own text: controls and bidirectional overrides are refused; zero-width joiners stay (emoji sequences).
 const HIDDEN_IN_INPUT = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/;
-// Something to follow or run, not words to read: a scheme, a bare www host, a markdown link or image, a code fence.
-const ACTIONABLE = /[a-z][a-z0-9+.-]*:\/\/|\bwww\.|\]\(|```|\b(?:javascript|data|file|vbscript):/i;
+// Beyond the Basic Multilingual Plane: tag characters (invisible ASCII smuggling) and lone surrogates.
+const INVISIBLE = /[\u{E0000}-\u{E007F}]|\p{Cs}/u;
+// Something to follow, call or run, not words to read: a scheme with an address, a bare www host, a host with a path,
+// an e-mail address, a markdown link or image, a code fence. A bare domain name ("Netflix.com") is a merchant's name.
+const ACTIONABLE = /[a-z][a-z0-9+.-]*:\/\/|\bwww\.|\]\(|```|\b(?:javascript|vbscript|file|mailto|tel|sms|intent):\S|\bdata:[a-z]+\/|[^\s@]+@[^\s@]+\.[a-z]{2,}|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}\/\S/i;
 
 /** Whether a string from the model may be shown or kept: plain words, no link, no code, no hidden character. */
 export function isSafeModelText(value, max, prose = false) {
   return typeof value === 'string' && value.trim().length > 0 && value.length <= max
-    && !(prose ? HIDDEN_IN_PROSE : HIDDEN).test(value) && !ACTIONABLE.test(value);
+    && !(prose ? HIDDEN_IN_PROSE : HIDDEN).test(value) && !INVISIBLE.test(value) && !ACTIONABLE.test(value);
 }
 const modelText = (value, max, prose = false) => isSafeModelText(value, max, prose) ? value.trim() : refuse();
 const nullableName = (value, max) => value === null ? null : modelText(value, max);
 
-function inputText(value, max) {
-  if (typeof value !== 'string' || !value.trim() || value.length > max || HIDDEN_IN_INPUT.test(value)) refuse();
-  return value.trim();
+/** Whether the person's own text (or a stored name sent as a fact label) may travel in a request. */
+export function isSafeInputText(value, max) {
+  return typeof value === 'string' && value.trim().length > 0 && value.length <= max && !HIDDEN_IN_INPUT.test(value) && !INVISIBLE.test(value);
 }
+const inputText = (value, max) => isSafeInputText(value, max) ? value.trim() : refuse();
 
 function fact(value, todayISO) {
   exact(value, ['id', 'label', 'amountMinor', 'count', 'startISO', 'endISO']);

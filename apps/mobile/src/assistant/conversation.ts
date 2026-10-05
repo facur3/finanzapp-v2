@@ -120,6 +120,13 @@ export type ConversationAction =
 
 const id = (state: ConversationState, prefix: string) => `${prefix}-${state.nextId}`;
 
+/** 25A-05: whether a tapped clarification owns the parked draft. The draft is parked by the newest assistant message
+ * (an answer or a chosen option always replaces it), so a chip on an older clarification only repeats its words: it
+ * never completes, clears or changes the draft parked behind a newer question. */
+export function ownsPending(state: ConversationState, messageId: string): boolean {
+  return state.pending !== null && state.messages.findLast(message => message.role === 'assistant')?.id === messageId;
+}
+
 export function conversationReducer(state: ConversationState, action: ConversationAction): ConversationState {
   switch (action.type) {
     case 'compose':
@@ -176,8 +183,9 @@ export function conversationReducer(state: ConversationState, action: Conversati
       const chosen = { ...message, content: { ...message.content, chosen: action.optionId } };
       const messages = [...state.messages.slice(0, index), chosen, ...state.messages.slice(index + 1),
         { id: id(state, 'u'), role: 'user' as const, text: action.label }];
-      if (action.next) messages.push({ id: `a-${state.nextId + 1}`, role: 'assistant', status: 'done', text: '', textKey: action.next.textKey, content: action.next.content });
-      return { ...state, messages, pending: action.next?.pending ?? null, nextId: state.nextId + 2 };
+      const owner = ownsPending(state, action.messageId);
+      if (action.next && owner) messages.push({ id: `a-${state.nextId + 1}`, role: 'assistant', status: 'done', text: '', textKey: action.next.textKey, content: action.next.content });
+      return { ...state, messages, pending: owner ? action.next?.pending ?? null : state.pending, nextId: state.nextId + 2 };
     }
     case 'proposal': {
       // A preview never captures, and a captured proposal never goes back: its item is the source of truth from then on.
@@ -221,7 +229,11 @@ const fold = (value: string) => value.normalize('NFD').replace(/[̀-ͯ]/g, '').t
 const words = (value: string) => fold(value).split(/[^\p{L}\p{M}\p{N}]+/u).filter(Boolean).join(' ');
 /** 25A-05: the person's words for a means of payment as the model copies them («con la Visa», "my Visa", «en efectivo»),
  * without a leading preposition and article or possessive, so they are matched against account names like a bare name. */
-const reference = (value: string) => words(value).replace(/^(?:(?:con|with|on|en) )?(?:(?:la|el|los|las|mi|mis|my|the) )?/, '');
+const reference = (value: string) => {
+  const name = words(value).replace(/^(?:(?:con|with|on|en) )?(?:(?:la|el|los|las|mi|mis|my|the) )?/, '');
+  // Only a preposition or an article («con la») names no account: matched as is it would find any «La …» account.
+  return /^(?:con|with|on|en|la|el|los|las|mi|mis|my|the)$/.test(name) ? '' : name;
+};
 
 /** Categories the user has already recorded for that kind, most used first, as chips for a category clarification. */
 export function categoryOptions(entries: Entry[], kind: EntryKind, limit = 4): ClarificationOption[] {

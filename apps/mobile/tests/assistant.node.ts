@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import type { Account, Entry } from '@finanzapp/domain';
 import { REASON_TEXT, SUGGESTIONS, answerContent, categoryOptions, classifyIntent, completeDraft, contentFromResult, conversationReducer,
-  emptyConversation, evidenceLabel, optionText, resolveDraft, shouldAutoscroll, type ConversationState } from '../src/assistant/conversation.ts';
+  emptyConversation, evidenceLabel, optionText, ownsPending, resolveDraft, shouldAutoscroll, type ConversationState } from '../src/assistant/conversation.ts';
 import { FACT_LABELS, monthlyEvidence } from '../src/integrations/evidence.ts';
 import { integrationClient } from '../src/integrations/client.ts';
 import { translator } from '../src/i18n/messages.ts';
@@ -593,4 +593,43 @@ test('24T3 (A25): devoluciones reach the evidence as one positive «Devoluciones
   const only = monthlyEvidence(domain.snapshotFromArchive({ accounts: [cash], records: [ropa].map(domain.initialRecord), purchaseOperations: [refund(5000, '2026-09-08')] }), 'ARS', today);
   assert.deepEqual(only.filter(fact => fact.id.startsWith('current.')).map(fact => [fact.id, fact.amountMinor, fact.count]),
     [['current.expenses', 0, 0], ['current.income', 0, 0], ['current.refunds', 5000, 1]]);
+});
+
+// Security review of 25A-05.
+test('25A-05: a chip on an older clarification never completes, clears or changes the draft parked behind a newer one', () => {
+  const ask: ClarificationContent = { kind: 'clarification', field: null, options: [{ id: 'current.category.0', label: 'Restaurantes' }], chosen: null };
+  const parked = resolveDraft({ ...FIXTURE_DRAFT.proposals[0], category: null }, [visa, cash], entries, 'ARS', today);
+  assert.ok(parked.kind === 'clarification' && parked.field === 'category');
+  let state = conversationReducer(emptyConversation, { type: 'send', text: '¿Este mes o el año?' });
+  state = conversationReducer(state, { type: 'answer', text: '¿Qué período?', content: ask });
+  const older = state.messages.at(-1)!.id;
+  state = conversationReducer(state, { type: 'send', text: 'Gasté 18500 en Carrefour con la Visa' });
+  state = conversationReducer(state, { type: 'answer', text: '', textKey: parked.question,
+    content: { kind: 'clarification', field: parked.field, options: parked.options, chosen: null }, pending: { draft: parked.partial, field: parked.field } });
+  const newer = state.messages.at(-1)!.id;
+  assert.equal(ownsPending(state, older), false);
+  assert.equal(ownsPending(state, newer), true);
+  const after = conversationReducer(state, { type: 'choose', messageId: older, optionId: 'current.category.0', label: 'Restaurantes', next: null });
+  assert.equal(JSON.stringify(after.pending), JSON.stringify(state.pending), 'the newer question still holds its draft, untouched');
+  assert.equal(after.messages.at(-1)!.role, 'user');
+});
+
+test('25A-05: a payment reference made only of a preposition or article names no account («con la» is not «La Caja»)', () => {
+  const caja: Account = { id: 'caja', name: 'La Caja', currency: 'ARS', openingMinor: 0, createdAt };
+  for (const ref of ['con la', 'la', 'my', 'con']) {
+    const resolved = resolveDraft({ ...FIXTURE_DRAFT.proposals[0], paymentMethodRef: ref }, [caja, cash], entries, 'ARS', today);
+    assert.ok(resolved.kind === 'clarification' && resolved.field === 'paymentMethod', ref);
+  }
+  const named = resolveDraft({ ...FIXTURE_DRAFT.proposals[0], paymentMethodRef: 'con la Caja' }, [caja, cash], entries, 'ARS', today);
+  assert.ok(named.kind === 'draft' && named.draft.accountId === 'caja');
+});
+
+test('25A-05: a stored category name the protocol refuses is left out of the evidence, and every other fact still travels', () => {
+  const snapshot: import('@finanzapp/domain').LedgerSnapshot = { accounts: [cash], entries: [
+    { id: 'x1', accountId: 'cash', kind: 'expense', amountMinor: 1000, merchant: 'Coto', category: 'Supermercado', dateISO: '2026-09-02', createdAt },
+    { id: 'x2', accountId: 'cash', kind: 'expense', amountMinor: 2000, merchant: 'Kiosco', category: 'a\u2068b\u2069', dateISO: '2026-09-03', createdAt }], transfers: [] };
+  const facts = monthlyEvidence(snapshot, 'ARS', today);
+  assert.ok(facts.some(fact => fact.label === 'Categoría de gasto: Supermercado'));
+  assert.ok(!facts.some(fact => fact.label.includes('\u2068')));
+  assert.doesNotThrow(() => validateAssistantRequestV2({ version: 2, requestId: 'fixture-request-0001', action: 'explain', text: '¿Cuánto gasté?', todayISO: today, currency: 'ARS', region: 'AR', facts }));
 });

@@ -4,7 +4,7 @@ import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router
 import { randomUUID } from 'expo-crypto';
 import { isLegacyCurrency, postingAccountsFor, todayKey, type Currency, type ReviewArchive } from '@finanzapp/domain';
 import { assistantForBuild } from '../src/assistant/runtime';
-import { REASON_TEXT, SUGGESTIONS, classifyIntent, completeDraft, contentFromResult, optionText, shouldAutoscroll, type AssistantContent,
+import { REASON_TEXT, SUGGESTIONS, classifyIntent, completeDraft, contentFromResult, ownsPending, optionText, shouldAutoscroll, type AssistantContent,
   type ClarificationOption, type EvidenceLink, type Message, type ProposalContent, type ResolvedContent } from '../src/assistant/conversation';
 import { assistantCapture, proposalContent } from '../src/assistant/review-proposal';
 import { conversationSession } from '../src/assistant/session';
@@ -159,11 +159,11 @@ export default function AssistantScreen() {
 
   // `shown` is what the chip displayed: it becomes the user's own words in the thread.
   const choose = useCallback((messageId: string, option: ClarificationOption, shown?: string) => {
-    const resolved = state.pending ? completeDraft(state.pending, option.id, accounts, entries, day, incomeAccounts) : null;
+    const resolved = state.pending && ownsPending(state, messageId) ? completeDraft(state.pending, option.id, accounts, entries, day, incomeAccounts) : null;
     const next = resolved ? { ...resolved, content: toContent(resolved.content)! } : null;
     dispatch({ type: 'choose', messageId, optionId: option.id, label: shown ?? optionText(option, t), next });
     captureNew();
-  }, [dispatch, state.pending, accounts, incomeAccounts, entries, day, t, toContent, captureNew]);
+  }, [dispatch, state, accounts, incomeAccounts, entries, day, t, toContent, captureNew]);
 
   // A captured proposal that is not in the tray is read from the store itself. Confirmed or dismissed there, the card
   // keeps that item (a confirmed card draws what was recorded, edits included) and it is never looked up again. Still

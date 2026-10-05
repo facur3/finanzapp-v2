@@ -27,7 +27,9 @@ function usageOf(data) {
   const usage = data?.usage;
   if (!usage) return null;
   return { inputTokens: int(usage.input_tokens), cachedInputTokens: int(usage.input_tokens_details?.cached_tokens ?? 0),
-    cacheWriteTokens: int(usage.input_tokens_details?.cache_write_tokens ?? 0), outputTokens: int(usage.output_tokens),
+    // A missing cache-write count is unknown, not zero: the settlement then prices it at the highest input rate.
+    cacheWriteTokens: usage.input_tokens_details?.cache_write_tokens === undefined ? null : int(usage.input_tokens_details.cache_write_tokens),
+    outputTokens: int(usage.output_tokens),
     reasoningTokens: int(usage.output_tokens_details?.reasoning_tokens ?? 0) };
 }
 const text = value => typeof value === 'string' && value.length <= 100 ? value : null;

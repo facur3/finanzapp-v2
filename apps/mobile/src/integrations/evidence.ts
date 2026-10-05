@@ -1,5 +1,6 @@
 import { spendingComparison, spendingFacts, type Currency, type LedgerSnapshot } from '@finanzapp/domain';
 import type { AssistantFact } from '../../../../packages/integrations/contracts.js';
+import { PROTOCOL_LIMITS, isSafeInputText } from '../../../../packages/integrations/assistant-protocol.js';
 
 /** Fact labels are protocol data, not interface copy: they are what the
  * server (and the model) reads, validated by `packages/integrations/assistant-protocol.js`,
@@ -43,8 +44,12 @@ export function monthlyEvidence(snapshot: LedgerSnapshot, currency: Currency, to
     facts.push({ id: prefix + '.expenses', label: FACT_LABELS.expenses, amountMinor: side.grossPurchasesMinor, count: side.purchaseCount, ...period });
     facts.push({ id: prefix + '.income', label: FACT_LABELS.income, amountMinor: side.incomeMinor, count: side.incomeCount, ...period });
     if (side.refundCount) facts.push({ id: prefix + '.refunds', label: FACT_LABELS.refunds, amountMinor: side.refundsMinor, count: side.refundCount, ...period });
-    side.categories.slice(0, 26).forEach((category, index) => facts.push({ id: prefix + '.category.' + index,
-      label: FACT_LABELS.categoryPrefix + category.category, amountMinor: category.amountMinor, count: category.count, ...period }));
+    side.categories.slice(0, 26).forEach((category, index) => {
+      // 25A-05: a stored name the protocol refuses (a direction override, a control or a tag character) is left out, never
+      // cleaned: one such category must not make every question fail, and its exact spelling is what links resolve.
+      const label = FACT_LABELS.categoryPrefix + category.category;
+      if (isSafeInputText(label, PROTOCOL_LIMITS.factLabelChars)) facts.push({ id: prefix + '.category.' + index, label, amountMinor: category.amountMinor, count: category.count, ...period });
+    });
   }
   return facts;
 }

@@ -19,10 +19,13 @@ export function maxCostMicroUsd(price, { inputTokens, outputTokens }) {
   return micro(BigInt(inputTokens) * input + BigInt(outputTokens) * BigInt(price.outputPerMTok));
 }
 
-/** Normalized usage, or null when it cannot be trusted for settlement (missing, negative, inconsistent). */
+/** Normalized usage, or null when it cannot be trusted for settlement (missing, negative, inconsistent). A null
+ * `cacheWriteTokens` means the provider did not report it: every uncached input token is then priced as a cache write
+ * (the highest input rate), never as zero cache writes. */
 export function usageOrNull(usage) {
-  if (!usage || ![usage.inputTokens, usage.cachedInputTokens, usage.cacheWriteTokens, usage.outputTokens, usage.reasoningTokens].every(count)) return null;
-  if (usage.cachedInputTokens + usage.cacheWriteTokens > usage.inputTokens || usage.reasoningTokens > usage.outputTokens) return null;
+  if (!usage || ![usage.inputTokens, usage.cachedInputTokens, usage.outputTokens, usage.reasoningTokens].every(count)
+    || (usage.cacheWriteTokens !== null && !count(usage.cacheWriteTokens))) return null;
+  if (usage.cachedInputTokens + (usage.cacheWriteTokens ?? 0) > usage.inputTokens || usage.reasoningTokens > usage.outputTokens) return null;
   return { inputTokens: usage.inputTokens, cachedInputTokens: usage.cachedInputTokens, cacheWriteTokens: usage.cacheWriteTokens,
     outputTokens: usage.outputTokens, reasoningTokens: usage.reasoningTokens };
 }
@@ -31,9 +34,10 @@ export function usageOrNull(usage) {
 export function actualCostMicroUsd(price, usage) {
   const used = usageOrNull(usage);
   if (!used) throw new RangeError('Untrusted usage');
-  const uncached = used.inputTokens - used.cachedInputTokens - used.cacheWriteTokens;
+  const writes = used.cacheWriteTokens ?? used.inputTokens - used.cachedInputTokens;
+  const uncached = used.inputTokens - used.cachedInputTokens - writes;
   return micro(BigInt(uncached) * BigInt(price.inputPerMTok) + BigInt(used.cachedInputTokens) * BigInt(price.cachedInputPerMTok)
-    + BigInt(used.cacheWriteTokens) * BigInt(price.cacheWritePerMTok) + BigInt(used.outputTokens) * BigInt(price.outputPerMTok));
+    + BigInt(writes) * BigInt(Math.max(price.cacheWritePerMTok, price.inputPerMTok)) + BigInt(used.outputTokens) * BigInt(price.outputPerMTok));
 }
 
 const percentile = (sorted, p) => sorted[Math.min(sorted.length - 1, Math.ceil(p * sorted.length) - 1)];

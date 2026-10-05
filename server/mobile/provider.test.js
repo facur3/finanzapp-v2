@@ -124,6 +124,13 @@ describe('cost model: integer micro-USD, rounded up, worst case first', () => {
       expect(() => actualCostMicroUsd(luna, bad)).toThrow();
     }
   });
+  it('prices an unreported cache-write count at the highest input rate, never as zero writes (security review)', () => {
+    const parsed = parseOpenAIResponse(completed({ usage: { input_tokens: 20000, input_tokens_details: { cached_tokens: 0 }, output_tokens: 300, output_tokens_details: { reasoning_tokens: 0 } } }));
+    expect(parsed.usage.cacheWriteTokens).toBeNull();
+    // 20 000 × 0.125 + 300 × 0.50 = 2 650 µUSD, the same as if every uncached token were a cache write.
+    expect(actualCostMicroUsd(luna, parsed.usage)).toBe(2650);
+    expect(actualCostMicroUsd(luna, { ...parsed.usage, cacheWriteTokens: 0 })).toBe(2150);
+  });
   it('simulates monthly cost deterministically from sample requests', () => {
     const requests = [1, 2, 3, 4].map(n => ({ inputTokens: 1000 * n, cachedInputTokens: 0, cacheWriteTokens: 0, outputTokens: 200 * n, reasoningTokens: 0 }));
     const result = simulateMonthlyCost(luna, { requests, monthlyRequests: [30, 300], people: 2 });

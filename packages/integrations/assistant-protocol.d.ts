@@ -27,6 +27,7 @@ export interface Clarification { field: ClarificationField; candidateIds: string
 export interface AssistantResultV2 {
   type: ResultType; message: string; evidenceIds: string[]; navigation: NavigationIntent | null; proposals: ProposalDraft[]; clarification: Clarification | null;
 }
+export declare function isSafeInputText(value: unknown, max: number): boolean;
 export declare function isSafeModelText(value: unknown, max: number, prose?: boolean): boolean;
 export declare function validateAssistantRequestV2(value: unknown): AssistantRequestV2;
 export declare function modelInput(request: AssistantRequestV2): Omit<AssistantRequestV2, 'version' | 'requestId'>;

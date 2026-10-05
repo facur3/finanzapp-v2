@@ -28,7 +28,9 @@ export async function main(argv = process.argv.slice(2), env = process.env, { cr
   const verdict = checkThresholds(metrics);
   const imperfect = cases.filter(item => !item.typeCorrect || item.flags.length || Object.values(item.fieldScores).includes(false))
     .map(({ id, expectedType, type, fieldScores, flags }) => ({ id, expectedType, type, fieldScores, flags }));
-  out(JSON.stringify({ mode: live ? 'live' : 'fixture', model, metrics, verdict, imperfect }, null, 2));
+  // A live run lists every refusal's words for a human reading: the refusal metrics are heuristics, not a judgement.
+  const refusals = live ? cases.filter(item => item.expectedType === 'out_of_scope').map(({ id, type, message }) => ({ id, type, message })) : undefined;
+  out(JSON.stringify({ mode: live ? 'live' : 'fixture', model, metrics, verdict, imperfect, refusals }, null, 2));
   return verdict.pass ? 0 : 1;
 }
 
