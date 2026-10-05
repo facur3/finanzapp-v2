@@ -5,6 +5,7 @@ import { FloatingTabBar } from '../../src/ui/floating-tab-bar';
 import { selectionHaptic } from '../../src/ui/motion';
 import { tabHostOptions, tabScreenOptions } from '../../src/ui/navigation';
 import { useI18n } from '../../src/i18n/provider';
+import { useLedger } from '../../src/storage/LedgerProvider';
 
 // Four sections, each with one meaning (decision 005, Producto 24UX6A): Inicio (the current month, what is due and
 // what was recorded), Movimientos (everything recorded), Reportes (where the money went) and Más, the secondary hub
@@ -16,6 +17,9 @@ export default function TabsLayout() {
   const p = usePalette();
   // Tab labels and headers come from the catalogue: a language change re-labels the mounted tabs in place.
   const { t } = useI18n();
+  // 25A-03: Más carries the number of proposals waiting in «Para revisar» (readable pending items only), none at zero.
+  const { review } = useLedger();
+  const pendingReview = review && review !== 'unavailable' ? review.items.length : 0;
   // These lightweight roots stay mounted. Their visibility must not depend on
   // an interrupted opacity animation or a native detach/reattach.
   // Stack pushes and modal gestures still use the native navigator above us.
@@ -37,6 +41,6 @@ export default function TabsLayout() {
       tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'receipt' : 'receipt-outline'} size={size} color={color} /> }} />
     <Tabs.Screen name="reports" options={{ title: t('nav.tabs.reports'),
       tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'pie-chart' : 'pie-chart-outline'} size={size} color={color} /> }} />
-    <Tabs.Screen name="settings" options={{ title: t('nav.tabs.more'), tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'ellipsis-horizontal-circle' : 'ellipsis-horizontal-circle-outline'} size={size} color={color} /> }} />
+    <Tabs.Screen name="settings" options={{ title: t('nav.tabs.more'), tabBarBadge: pendingReview || undefined, tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'ellipsis-horizontal-circle' : 'ellipsis-horizontal-circle-outline'} size={size} color={color} /> }} />
   </Tabs>;
 }

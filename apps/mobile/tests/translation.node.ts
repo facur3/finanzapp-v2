@@ -76,6 +76,8 @@ test('both catalogues are complete: no empty text, and English is really English
     'categoryManager.icons.internet', 'settings.material.glass', 'assistant.draft.eyebrow', 'assistant.draft.row',
     // 24UX5: the product name with its version, the same in every language.
     'settings.version',
+    // 25A-03: Apple's product name, never translated.
+    'review.source.wallet',
     // 24C1: "Total · USD", a code with the same word in both languages.
     'display.total',
     // 24UX6D: Día a día's short «Total» label, the same word in both languages.

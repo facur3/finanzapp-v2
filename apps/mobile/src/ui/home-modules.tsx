@@ -50,7 +50,7 @@ export function CurrencyParts({ parts, line, detail, onField = false }: {
   const p = usePalette();
   const { t } = useI18n();
   return <View style={{ gap: 4 }}>
-    {parts.map(part => <Money key={part.currency} minor={part.minor} currency={part.currency} size={28} weight="700" color={onField ? p.heroInk : undefined} />)}
+    {parts.map(part => <Money key={part.currency} minor={part.minor} currency={part.currency} size={28} weight="700" color={onField ? p.heroInk : undefined} onField={onField} />)}
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
       <AppText secondary variant="footnote" style={[{ flexShrink: 1 }, onField ? { color: p.heroSecondary } : null]}>{line}</AppText>
       <MetricHelp title={t('fx.infoTitle')} detail={detail} color={onField ? p.heroSecondary : undefined} />

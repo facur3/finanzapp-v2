@@ -57,6 +57,10 @@ export const lightPalette = {
    * (the light surface's white thumb with ink text, 18.5:1, 1.8:1 against the track). The field is light in both themes, so
    * the status bar over it is dark and the thumb is the same white in dark. */
   hero: '#C6F12E', heroInk: '#131411', heroSecondary: '#3B4A12', heroControl: '#A9D01B', heroThumb: '#FFFFFF', heroThumbInk: '#131411',
+  /** 25A-03: the hero amount's two quiet parts on the field (`Money onField`): the currency symbol, then the cents a step
+   * lighter, both neutral graphite. Solid, never the ink at an alpha: translucent ink over the lime reads olive. The
+   * whole units stay `heroInk`. 8.4:1 and 6.0:1 on the light field, 7.2:1 and 5.1:1 on the dark one. */
+  heroMoneySymbol: '#3A3C3F', heroMoneyCents: '#505255',
   heroStatusBar: 'dark' as 'light' | 'dark',
   /** Electric Lime as an accent: the dock's «+» and the Assistant's circle (ink glyph on it, 14.1:1). */
   accent: '#C6F12E', onAccent: '#131411',
@@ -88,6 +92,8 @@ export const darkPalette: typeof lightPalette = {
   scrim: 'rgba(0, 0, 0, 0.60)',
   /** A step below the light field's lime so a large field does not glare on a dark screen; ink on it as in light. */
   hero: '#B8E02A', heroInk: '#131411', heroSecondary: '#3A4318', heroControl: '#9FC51C', heroThumb: '#FFFFFF', heroThumbInk: '#131411',
+  /** The field stays light in dark mode, so its quiet amount tones are the same graphite. */
+  heroMoneySymbol: '#3A3C3F', heroMoneyCents: '#505255',
   heroStatusBar: 'dark',
   accent: '#C6F12E', onAccent: '#131411',
   dock: '#20221E', dockInk: '#A9ADA3', dockActive: '#3D403A', dockActiveInk: '#FFFFFF',

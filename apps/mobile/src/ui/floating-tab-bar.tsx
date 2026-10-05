@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Platform, StyleSheet, View, type ViewStyle } from 'react-native';
+import { Platform, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import type { BottomTabBarProps } from 'expo-router/tabs';
 import { useI18n } from '../i18n/provider';
 import { CaptureAction } from './capture-hub';
@@ -54,7 +54,8 @@ export function FloatingTabBar({ state, descriptors, navigation, insets }: Botto
             const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
             if (!focused && !event.defaultPrevented) navigation.navigate(route.name, route.params);
           };
-          return <TabItem key={route.key} label={label} index={index} count={state.routes.length} focused={focused} onPress={press}
+          const badge = typeof options.tabBarBadge === 'number' && options.tabBarBadge > 0 ? options.tabBarBadge : null;
+          return <TabItem key={route.key} label={label} index={index} count={state.routes.length} focused={focused} onPress={press} badge={badge}
             onLongPress={() => navigation.emit({ type: 'tabLongPress', target: route.key })}
             icon={options.tabBarIcon?.({ focused, color: focused ? p.dockActiveInk : p.dockInk, size: 24 })} />;
         })}
@@ -65,16 +66,25 @@ export function FloatingTabBar({ state, descriptors, navigation, insets }: Botto
   </View>;
 }
 
-function TabItem({ label, index, count, focused, icon, onPress, onLongPress }: {
+function TabItem({ label, index, count, focused, icon, onPress, onLongPress, badge = null }: {
   label: string; index: number; count: number; focused: boolean; icon: ReactNode; onPress: () => void; onLongPress: () => void;
+  /** 25A-03: proposals waiting in «Para revisar» (Más only): a small white count on the glyph, said after the tab's name. */
+  badge?: number | null;
 }) {
   const p = usePalette();
   const { t, speechLanguage } = useI18n();
   const ios = Platform.OS === 'ios';
-  return <PressFeedback accessibilityRole={ios ? 'button' : 'tab'} accessibilityLabel={ios ? t('nav.tabPosition', { name: label, index: index + 1, count }) : label}
+  const name = ios ? t('nav.tabPosition', { name: label, index: index + 1, count }) : label;
+  return <PressFeedback accessibilityRole={ios ? 'button' : 'tab'} accessibilityLabel={badge ? name + ', ' + t('review.badge', { count: badge }) : name}
     accessibilityState={{ selected: focused }} accessibilityLanguage={speechLanguage} accessibilityShowsLargeContentViewer accessibilityLargeContentTitle={label}
     onPress={onPress} onLongPress={onLongPress} containerStyle={styles.itemContainer} style={styles.item}>
-    <View accessible={false} importantForAccessibility="no-hide-descendants" style={[styles.capsule, focused ? { backgroundColor: p.dockActive } : null]}>{icon}</View>
+    <View accessible={false} importantForAccessibility="no-hide-descendants" style={[styles.capsule, focused ? { backgroundColor: p.dockActive } : null]}>
+      {icon}
+      {/* Neutral, not lime (lime is the «+» beside it) and not red (nothing failed): the dock's white with its graphite. */}
+      {badge !== null && <View style={[styles.badge, { backgroundColor: p.dockActiveInk, borderColor: p.dock }]}>
+        <Text accessibilityLanguage={speechLanguage} maxFontSizeMultiplier={1.2} style={[styles.badgeText, { color: p.dock }]}>{badge > 99 ? '99+' : badge}</Text>
+      </View>}
+    </View>
   </PressFeedback>;
 }
 
@@ -85,4 +95,7 @@ const styles = StyleSheet.create({
   item: { minHeight: 48, alignItems: 'center', justifyContent: 'center' },
   // The selected capsule: a lighter graphite step behind the filled glyph, inside the item's full target.
   capsule: { minWidth: 56, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
+  badge: { position: 'absolute', top: 3, right: 6, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, borderWidth: 1.5,
+    alignItems: 'center', justifyContent: 'center' },
+  badgeText: { fontSize: 11, lineHeight: 13, fontWeight: '700', fontVariant: ['tabular-nums'] },
 });

@@ -519,5 +519,5 @@ quedaba arriba del dock (corregido por 25OPS1, abajo). La verificación en Linux
   módulos (Próximos compromisos sigue neutro como Actividad reciente), Reportes, Tarjetas, colores de categorías y caras
   de tarjeta, ni ninguna regla contable.
 
-**Estado.** Implementado en `apps/mobile`, en su rama (PR #83, sin mergear); paleta aceptada por el dueño en el iPhone
-el 2026-10-03; los demás puntos de `docs/mobile-device-checklist.md`, «Producto 25VIS1», siguen abiertos.
+**Estado.** Implementado en `apps/mobile`, mergeado como PR #83 (commit de merge 0ff9859, 2026-10-04); paleta aceptada por
+el dueño en el iPhone el 2026-10-03; el símbolo y los centavos del monto de Inicio pasaron a grafito sólido en 25A-03; los demás puntos de `docs/mobile-device-checklist.md`, «Producto 25VIS1», siguen abiertos.

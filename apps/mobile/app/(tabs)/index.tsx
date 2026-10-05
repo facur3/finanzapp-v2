@@ -159,7 +159,7 @@ export default function HomeScreen() {
       <ValueTransition id={heroId} style={{ flexDirection: 'row', alignItems: 'center', gap: space.s }}>
         <View style={{ flex: 1, minWidth: 0 }}>
           {hero.status === 'ready'
-            ? <Money minor={hero.minor} currency={currency} large size={HERO_SIZE} color={quiet ? p.heroSecondary : p.heroInk} />
+            ? <Money minor={hero.minor} currency={currency} large size={HERO_SIZE} color={quiet ? p.heroSecondary : p.heroInk} onField />
             : hero.status === 'unavailable'
               ? <CurrencyParts onField parts={hero.parts} line={hero.reason === 'fetching' ? t('fx.fetching') : t('fx.unavailable', { currency })} detail={shortfallDetail(hero, words)} />
               : <AppText variant="subhead" style={{ color: p.heroSecondary }}>{t(spending ? 'home.spendingOutOfRange' : 'home.balanceOutOfRange')}</AppText>}

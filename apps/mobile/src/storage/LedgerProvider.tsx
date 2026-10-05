@@ -12,12 +12,16 @@ import { changeEntry, createAccount, createEntry, deleteAccount, deleteCreditCar
   cancelInstallmentPlan, deleteInstallmentPlan, catchUpInstallments, changePurchaseOperation, reactivateInstallmentPlan,
   type LedgerDatabase } from './database';
 import { openLedger, refreshLedger, savePurchaseOperation, savePurchasePlan, sessionWarning } from './ledger-session';
-import { openLedgerDatabase } from './nativeDatabase';
+import { openLedgerDatabase, openReviewDatabase } from './nativeDatabase';
+import { loadReviewTray, openReviewStore, type ReviewCapture, type ReviewDatabase, type ReviewItem, type ReviewStore, type ReviewTray } from './review-database';
 
 declare const __DEV__: boolean | undefined;
 /** The creation gate of this build (docs/currency.md §7.5, stage 9): the production ARS/USD, or the preview set in a
  * development bundle started with the flag, read by its literal name so a release bundle inlines the constant. */
 export const BUILD_CURRENCY_GATE: CurrencyGate = currencyGateForBuild(process.env.EXPO_PUBLIC_CURRENCY_PREVIEW, typeof __DEV__ !== 'undefined' && __DEV__);
+
+/** A write committed but the view could not be read again: said in the banner, never as a failed write. */
+const VIEW_REFRESH_MESSAGE = 'El guardado terminó, pero no pudimos actualizar la vista. Verificá de nuevo antes de registrar otro movimiento; no lo cargues otra vez.';
 
 type LedgerContextValue = {
   /** The currencies a new account, card, debt or budget may take in this build. Reads never consult it. */
@@ -69,6 +73,18 @@ type LedgerContextValue = {
   /** 24T3: restore of an undone devolución or adelanto (`makeOperationChange(id, operation, 'restore', now)`). */
   restoreOperation: (change: OperationChange) => Promise<void>;
   restoreBackup: (incoming: LedgerArchive, baseline: string) => Promise<void>;
+  /** Producto 25A-03, «Para revisar»: the review store's pending items (its own file, 25A-02). `null` while it opens;
+   * `'unavailable'` when its file cannot be opened: the ledger works regardless and neither file is reset. */
+  review: ReviewTray | 'unavailable' | null;
+  /** The store's confirmation (its frozen write, then the ledger's own create), run in the ledger's queue; the view is read
+   * again after it. `recorded: false`: the movement is saved and the item is marked at the next reconciliation. */
+  confirmReview: (id: string, expectedRevision: number) => Promise<{ recorded: boolean }>;
+  /** The edited draft, at the revision the editor opened (a newer one is refused). Writes nothing to the ledger. */
+  updateReview: (id: string, expectedRevision: number, draft: unknown) => Promise<ReviewItem>;
+  /** pending → dismissed. Writes nothing to the ledger. */
+  dismissReview: (id: string, expectedRevision: number) => Promise<void>;
+  /** A new pending item (a producer; in 25A-03 only the development fixture). Writes nothing to the ledger. */
+  captureReview: (input: ReviewCapture) => Promise<void>;
 };
 const LedgerContext = createContext<LedgerContextValue | null>(null);
 
@@ -84,6 +100,9 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
   const queue = useRef<Promise<void>>(Promise.resolve());
   /** 24T1: a warning a write left behind (its instalment recognition failed after the save): shown instead of clearing the banner. */
   const pendingWarning = useRef<string | null>(null);
+  const reviewStore = useRef<ReviewStore | null>(null);
+  const reviewDatabase = useRef<ReviewDatabase | null>(null);
+  const [review, setReview] = useState<ReviewTray | 'unavailable' | null>(null);
 
   const enqueue = useCallback((work: () => Promise<void>) => {
     const next = queue.current.then(work);
@@ -105,6 +124,7 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
       if (cancelled) return;
       setArchive(session.archive);
       setError(sessionWarning(session));
+      await loadReview(db);
     }).catch(() => {
       if (!cancelled) setError('No pudimos abrir tus datos. No se borró ni reemplazó nada. Probá nuevamente o conservá la app para recuperar la base.');
     });
@@ -119,12 +139,27 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
         if (!mounted.current) return;
         setArchive(session.archive);
         setError(sessionWarning(session)); // A successful pass clears its warning; a failing one keeps it.
+        await loadReview(database.current!);
       }).catch(() => {
         if (mounted.current) setError('No pudimos verificar tus datos locales ni los vencimientos recurrentes. No se modificó nada fuera de una transacción completa.');
       });
     });
     return () => subscription.remove();
   }, [enqueue, snapshot !== null]);
+
+  /** 25A-03: opens the review file once (again after a failure) and reads the tray, reconciling first. Never throws: a review
+   * file that cannot be opened or read leaves the ledger as it is; a tray already shown stays until a read succeeds. */
+  const loadReview = async (db: LedgerDatabase) => {
+    try {
+      // One connection for the session: a store that failed to open is retried over it, never over a new one each time.
+      reviewDatabase.current ??= await openReviewDatabase();
+      reviewStore.current ??= await openReviewStore(reviewDatabase.current, db);
+      const tray = await loadReviewTray(reviewStore.current, new Date().toISOString());
+      if (mounted.current) setReview(tray);
+    } catch {
+      if (mounted.current) setReview(current => current && current !== 'unavailable' ? current : 'unavailable');
+    }
+  };
 
   const mutate = useCallback((operation: (db: LedgerDatabase) => Promise<void>) => enqueue(async () => {
     if (!database.current) throw new Error('Todavía estamos abriendo tus datos.');
@@ -136,9 +171,8 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
       const next = await readArchive(database.current);
       if (mounted.current) { setArchive(next); setError(pendingWarning.current); }
     } catch {
-      const message = 'El guardado terminó, pero no pudimos actualizar la vista. Verificá de nuevo antes de registrar otro movimiento; no lo cargues otra vez.';
-      if (mounted.current) setError(message);
-      throw new Error(message);
+      if (mounted.current) setError(VIEW_REFRESH_MESSAGE);
+      throw new Error(VIEW_REFRESH_MESSAGE);
     }
   }), [enqueue]);
 
@@ -159,8 +193,23 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     return changePurchaseOperation(db, change, todayKey());
   });
 
+  /** A review operation in the ledger's queue (a confirmation writes the ledger through its own create functions); the tray
+   * is read again afterwards, whatever happened, so a refused or reconciled item never shows a stale state. */
+  /** A refusal (stale, changed, closed) re-reads the archive first, so the screen judges from the stored ledger again. An
+   * operation that succeeded but whose view refresh failed is a success: the banner already says to verify before retrying. */
+  const reviewOperation = <T,>(work: (store: ReviewStore) => Promise<T>): Promise<T> => {
+    let result: T, done = false;
+    return rereadOnRefusal(async db => {
+      if (!reviewStore.current) throw new Error('review.unavailable');
+      try { result = await work(reviewStore.current); done = true; } finally { await loadReview(db); }
+    }).then(() => result, cause => {
+      if (done && cause instanceof Error && cause.message === VIEW_REFRESH_MESSAGE) return result;
+      throw cause;
+    });
+  };
+
   return <LedgerContext.Provider value={{
-    gate: BUILD_CURRENCY_GATE, snapshot, archive, error,
+    gate: BUILD_CURRENCY_GATE, snapshot, archive, error, review,
     retry: () => setAttempt(value => value + 1),
     addAccount: (account, appearance) => mutate(db => createAccount(db, account, appearance, BUILD_CURRENCY_GATE)),
     addEntry: entry => mutate(db => createEntry(db, entry)),
@@ -207,6 +256,15 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
       await processRecurring(db, todayKey());
       try { await catchUpInstallments(db, todayKey()); } catch { pendingWarning.current = sessionWarning({ recurringError: false, installmentError: true }); }
     }),
+    confirmReview: (id, expectedRevision) => reviewOperation(async store => {
+      const result = await store.confirm(id, { expectedRevision, todayISO: todayKey(), at: new Date().toISOString() });
+      // A plan whose first instalments could not be recognised right away is saved: its catch-up banner, as for the form.
+      pendingWarning.current = result.warning;
+      return { recorded: result.recorded };
+    }),
+    updateReview: (id, expectedRevision, draft) => reviewOperation(store => store.updateDraft(id, expectedRevision, draft, new Date().toISOString())),
+    dismissReview: (id, expectedRevision) => reviewOperation(async store => { await store.dismiss(id, expectedRevision, new Date().toISOString()); }),
+    captureReview: input => reviewOperation(async store => { await store.capture(input); }),
   }}>{children}</LedgerContext.Provider>;
 }
 

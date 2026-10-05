@@ -400,6 +400,8 @@ test('24UX6C: the hero numbers are byte-identical to the domain figures: Gastado
 test('24UX6A: the number is the field\'s ink at 46 pt, and the secondary ink when it is exactly zero; dark keeps the dark field', () => {
   let root = routeHarness('(tabs)/index.tsx', {}, homeData).render();
   assert.deepEqual([find(root, 'Money').props.size, find(root, 'Money').props.color], [46, lightPalette.heroInk]);
+  // 25A-03: the hero asks for the field's solid graphite symbol and cents; the whole units keep the ink.
+  assert.equal(find(root, 'Money').props.onField, true);
   root = routeHarness('(tabs)/index.tsx', {}, snapshot).render();
   assert.deepEqual([find(root, 'Money').props.minor, find(root, 'Money').props.color], [0, lightPalette.heroSecondary], 'a true zero reads quieter');
   assert.equal(/const HERO_SIZE = 46;/.test(homeSource), true);

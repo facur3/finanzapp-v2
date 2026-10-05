@@ -10,7 +10,7 @@ import { REVIEW_DRAFT_INVALID_MESSAGE, REVIEW_INCOMPLETE_MESSAGE, REVIEW_STALE_M
 import { createAccount, createCreditCard, createEntry, createInstallmentPlan, createTransfer, changeAccount, changeEntry, initializeDatabase, readArchive,
   cancelInstallmentPlan, type LedgerDatabase, type SqlExecutor } from '../src/storage/database.ts';
 import { REVIEW_CAPTURE_CONFLICT_MESSAGE, REVIEW_DATABASE_VERSION, REVIEW_INPUT_MESSAGE, REVIEW_ITEM_CHANGED_MESSAGE, REVIEW_ITEM_CLOSED_MESSAGE, REVIEW_ITEM_MISSING_MESSAGE,
-  REVIEW_ITEM_UNREADABLE_MESSAGE, REVIEW_READ_ONLY_MESSAGE, REVIEW_WRITE_CONFLICT_MESSAGE, initializeReviewDatabase, openReviewStore,
+  REVIEW_ITEM_UNREADABLE_MESSAGE, REVIEW_READ_ONLY_MESSAGE, REVIEW_WRITE_CONFLICT_MESSAGE, initializeReviewDatabase, loadReviewTray, openReviewStore,
   type ReviewDatabase, type ReviewStore } from '../src/storage/review-database.ts';
 import { runExclusiveTransaction, runSchemaMigration, type TransactionConnection } from '../src/storage/transaction.ts';
 
@@ -548,4 +548,49 @@ test('the same guard protects cuotas: a card renamed in between is refused insid
   await assert.rejects(store.confirm('item-1', { expectedRevision: 0, todayISO: today, at: later }), { message: REVIEW_STALE_MESSAGE });
   assert.deepEqual((await ledgerRows(ledger)).plans, [], 'no plan was written');
   assert.equal((await store.get('item-1'))?.status, 'pending');
+});
+
+// ---- 25A-03: what «Para revisar» loads ------------------------------------------------------------------------------------
+
+test('25A-03: the tray reconciles before listing: a write that landed before the app stopped never shows as pending again, and is never written twice', async () => {
+  const { ledgerPath, reviewPath } = directory();
+  const ledger = await ledgerWithCard(ledgerPath);
+  const db = reviewAt(reviewPath);
+  await capture(await openReviewStore(db, ledger), await drafted(ledger));
+  const crashed = await (await openReviewStore(failing(db, call => call === 2), ledger)).confirm('item-1', { expectedRevision: 0, todayISO: today, at: later });
+  assert.equal(crashed.recorded, false);
+  const store = await openReviewStore(reviewAt(reviewPath), ledgerAt(ledgerPath));
+  const tray = await loadReviewTray(store, '2026-09-28T11:00:00.000Z');
+  assert.deepEqual([tray.items.length, tray.conflicts.length, tray.unreadable.length, tray.writable], [0, 0, 0, true], 'reconciled: confirmed, off the tray');
+  assert.deepEqual([(await store.get('item-1'))?.status, (await store.get('item-1'))?.receipt?.how], ['confirmed', 'reconciled']);
+  assert.deepEqual((await ledgerRows(ledger)).entries, ['write-1'], 'exactly one movement');
+  assert.deepEqual((await loadReviewTray(store, '2026-09-28T11:05:00.000Z')).items, [], 'loading again changes nothing');
+});
+
+test('25A-03: the tray lists pending items oldest first, sets unreadable rows apart, names conflicts, and never brings back a confirmed or dismissed item', async () => {
+  const { ledger, db, store } = await setup();
+  const at = (minute: number) => `2026-09-28T10:${String(minute).padStart(2, '0')}:00.000Z`;
+  for (const [id, minute] of [['late', 9], ['early', 1], ['confirmed', 2], ['dismissed', 3], ['bad', 4], ['clash', 5]] as const) {
+    await store.capture({ id, writeId: 'w-' + id, captureKey: null, draft: await drafted(ledger), at: at(minute) });
+  }
+  await store.confirm('confirmed', { expectedRevision: 0, todayISO: today, at: later });
+  await store.dismiss('dismissed', 0, later);
+  await db.runAsync("UPDATE review_items SET draftJSON = '{}' WHERE id = 'bad'");
+  await createEntry(ledger, { id: 'w-clash', accountId: bank.id, kind: 'expense', amountMinor: 1, merchant: 'Otro', category: 'Comida', dateISO: '2026-09-20', createdAt });
+  const tray = await loadReviewTray(store, later);
+  assert.deepEqual(tray.items.map(item => item.id), ['early', 'clash', 'late']);
+  assert.deepEqual([tray.unreadable, tray.conflicts], [['bad'], ['clash']]);
+  assert.deepEqual((await ledgerRows(ledger)).entries, ['w-clash', 'w-confirmed'], 'loading the tray wrote nothing to the ledger');
+});
+
+test('25A-03: a newer build\'s review file is only read by the tray: no reconciliation, nothing written', async () => {
+  const { ledgerPath, reviewPath } = directory();
+  const ledger = await ledgerWithCard(ledgerPath);
+  const db = reviewAt(reviewPath);
+  await capture(await openReviewStore(db, ledger), await drafted(ledger));
+  await db.execAsync('PRAGMA user_version = 99');
+  const before = readFileSync(reviewPath);
+  const tray = await loadReviewTray(await openReviewStore(reviewAt(reviewPath), ledger), later);
+  assert.deepEqual([tray.writable, tray.items.map(item => item.id), tray.conflicts], [false, ['item-1'], []]);
+  assert.deepEqual(readFileSync(reviewPath), before, 'byte for byte');
 });

@@ -88,6 +88,20 @@ for (const [name, p] of [['light', lightPalette], ['dark', darkPalette]] as cons
     assert.ok(contrast(p.heroThumb, p.heroControl) >= 1.5, `the thumb separates from the track: ${ratio(p.heroThumb, p.heroControl)}`);
     assert.ok(luminance(p.heroThumb) > luminance(p.hero) && luminance(p.hero) > luminance(p.heroControl), 'the thumb is brighter than the field, the track darker');
   });
+  test(`${name}: the hero amount's symbol and cents are neutral graphite on the field, quieter than the ink (25A-03)`, () => {
+    for (const [token, hex] of [['heroMoneySymbol', p.heroMoneySymbol], ['heroMoneyCents', p.heroMoneyCents]] as const) {
+      assert.match(hex, /^#[0-9A-F]{6}$/, `${token} is a solid colour, never an alpha over the lime`);
+      const [r, g, b] = [1, 3, 5].map(index => parseInt(hex.slice(index, index + 2), 16));
+      // Neutral: the channels within 8 of each other, and green never the highest (that would read olive on the lime).
+      assert.ok(Math.max(r, g, b) - Math.min(r, g, b) <= 8 && g <= b, `${token} ${hex} is a neutral graphite, not olive`);
+      // Readable over both fields (AA for text, though the hero is large), and still clearly below the ink.
+      for (const field of [lightPalette.hero, darkPalette.hero]) assert.ok(contrast(hex, field) >= 4.5, `${token} on ${field}: ${ratio(hex, field)}`);
+      assert.ok(contrast(p.heroInk, p.hero) > contrast(hex, p.hero), `${token} is quieter than the whole units`);
+    }
+    // The hierarchy: whole units (heroInk) > symbol > cents.
+    assert.ok(luminance(p.heroInk) < luminance(p.heroMoneySymbol) && luminance(p.heroMoneySymbol) < luminance(p.heroMoneyCents), 'the symbol is darker than the cents');
+    assert.ok(contrast(p.heroMoneySymbol, p.heroMoneyCents) >= 1.25, 'the two quiet steps are distinguishable');
+  });
   test(`${name}: the dock and its «+» read in both themes; the selected capsule separates from the pill (24UX6A)`, () => {
     assert.ok(contrast(p.onAccent, p.accent) >= 4.5, `the «+» glyph on the accent: ${ratio(p.onAccent, p.accent)}`);
     assert.ok(contrast(p.dockInk, p.dock) >= 4.5, `inactive tab glyph on the dock: ${ratio(p.dockInk, p.dock)}`);

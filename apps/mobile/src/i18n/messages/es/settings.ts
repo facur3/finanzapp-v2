@@ -7,6 +7,10 @@ export const settings = {
     },
     /** Hub rows: a title, and a subtitle that is a live count or a placeholder when there is nothing to count. */
     rows: {
+      /** 25A-03: «Para revisar», first in Finanzas while something waits (always in a development build). */
+      review: 'Para revisar',
+      reviewNone: 'Nada pendiente',
+      reviewCount: { one: '{count} propuesta', other: '{count} propuestas' },
       accounts: 'Cuentas',
       accountsSubtitle: 'Saldos y movimientos',
       cards: 'Tarjetas',

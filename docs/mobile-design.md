@@ -1,10 +1,11 @@
 # FinanzApp: dirección visual móvil
 
-Interfaz 17 · 21 de septiembre de 2026; estado al 2 de octubre de 2026: el carril Forest (24UX6A–24UX6E) y 24T3
+Interfaz 17 · 21 de septiembre de 2026; estado al 4 de octubre de 2026: el carril Forest (24UX6A–24UX6E) y 24T3
 mergeados, 25A-01 y 25A-02 mergeadas (PR #77, #78, #79) sin cambios visuales, 25UX1 mergeada (PR #80: dock, Tarjetas y
 Reportes: interacción), 25OPS1 mergeada (PR #81; la última fila sobre el dock, confirmada por el dueño en el iPhone el
-2026-10-03), 25DISC1 mergeada (PR #82, solo documentación) y **25VIS1 (PR #83, sin mergear): Electric Lime, la paleta
-actual del producto**, aceptada por el dueño en el iPhone el 2026-10-03 («Producto 25VIS1»). El resto de la revisión
+2026-10-03), 25DISC1 mergeada (PR #82, solo documentación), **25VIS1 mergeada (PR #83): Electric Lime, la paleta
+actual del producto**, aceptada por el dueño en el iPhone el 2026-10-03 («Producto 25VIS1»), y 25A-03 en su rama: «Para
+revisar» y el símbolo y los centavos del monto de Inicio en grafito sólido («Producto 25A-03»). El resto de la revisión
 visual y gestual en iPhone sigue pendiente. [Alcance del producto](decisions/002-spending-first.md) ·
 [Navegación y tarjetas](decisions/003-five-tabs-and-cards.md).
 
@@ -853,6 +854,35 @@ La selección de porciones dentro de la dona (solo visual, dentro del reporte) *
 barras de Día a día y una cabecera fija sólida. Siguen permitidos para una pasada siguiente; no hay ruta de detalle por comercio. El orden
 vinculante del roadmap no cambia: la próxima entrega de producto es 24T3; 24UX6C (Movimientos y Más) y 24UX6D
 (Tarjetas) siguen a 24UX6B en el carril UX, y su lugar frente a 24T3 lo decide el dueño (ver `docs/mobile-roadmap.md`).
+
+## Producto 25A-03 — Para revisar
+
+La primera interfaz sobre las propuestas guardadas en el dispositivo (25A-02). Sin rediseño: las piezas son las de
+siempre (filas agrupadas, `DetailRow`, `LifecycleNote`, `ActionButton`, los selectores de un movimiento).
+
+- **Dónde vive.** Más → Finanzas, una fila «Para revisar» primera (baldosa neutra de bandeja, «2 propuestas») mientras
+  algo espera o hay una fila ilegible, y siempre en una build de desarrollo; si no, no está. La pestaña Más del dock lleva
+  la cantidad pendiente en un círculo chico **blanco con grafito**: ni lima (la lima es el «+» de al lado) ni rojo (nada
+  falló). Sin quinta pestaña y nada nuevo en Inicio.
+- **La bandeja.** Las propuestas en el orden del almacén (la más vieja primero). Cada fila: el glifo del tipo, el comercio
+  o «Sin comercio», el monto en su moneda o «Sin monto», «Gasto · categoría · cuenta o tarjeta», «día · cuotas · origen» y
+  el estado. **Un borrador incompleto no es un error**: «Faltan 2 datos» va en gris secundario; «Revisala de nuevo» y
+  «Registro sin verificar» en ámbar; solo «Ya existe otro registro» usa el tono negativo. Lo que falta dice «Falta
+  completar», nunca un valor supuesto. Las filas ilegibles son una nota al pie, nunca filas.
+- **El detalle** es la superficie que manda: una frase con lo que Confirmar registra (un gasto, un gasto en la tarjeta,
+  un ingreso, o una compra en N cuotas que se suman al cerrar cada resumen, no hoy), los datos, «Para confirmar falta» con
+  cada dato faltante como un paso, y la nota de desactualizada, interrumpida o en conflicto. **Confirmar es la única
+  acción lima** (repite el monto); Editar y Descartar son secundarias. Confirmar se habilita solo si el dominio no
+  encuentra faltantes y la base está al día.
+- **Editar** usa los controles de un movimiento y **no elige nada por la persona**: el segmentado Gasto | Ingreso, el de
+  «Pago» y el de la cantidad de cuotas se muestran sin selección (sin pulgar) hasta que se toca uno; nunca 12 por defecto.
+  El monto se escribe en la moneda del destino; si la propuesta trae una moneda, solo se ofrecen cuentas en esa moneda.
+- **Descartar** pregunta antes («¿Descartar esta propuesta?») con el botón destructivo del sistema.
+- **Monto de Inicio: grafito sólido.** El símbolo y los centavos dejaron de ser la tinta con transparencia (que sobre la
+  lima se veía oliva) y pasaron a dos grises grafito neutros: `heroMoneySymbol` #3A3C3F y `heroMoneyCents` #505255, el
+  símbolo más oscuro que los centavos, ambos legibles sobre la lima clara y la oscura. Los dígitos siguen en `heroInk`;
+  tamaño, peso y diseño iguales; el resto de los montos de la app no cambia; el pulgar blanco de `Gastado | Disponible`
+  tampoco.
 
 ## Producto 25VIS1 — Electric Lime, la paleta actual (sin rediseño)
 
@@ -2977,7 +3007,14 @@ color propio.
 
 ## Pendiente de revisión en iPhone
 
-- Producto 25VIS1 (PR #83, sin mergear; sin build de EAS; el dueño conservó la paleta en el iPhone el 2026-10-03, el
+- Producto 25A-03 (en su rama; sin build de EAS; nada revisado en el iPhone): la fila «Para revisar» de Más y el número
+  en la pestaña Más del dock (con una y varias propuestas, ninguno en cero); la bandeja con filas completas e
+  incompletas, en claro y oscuro; el detalle con cada dato faltante, una propuesta desactualizada, Confirmar de un gasto
+  y de una compra en cuotas, Editar sin cantidad de cuotas elegida de antemano, Descartar con su pregunta; cerrar la app
+  justo después de Confirmar y volver a abrirla; el símbolo y los centavos del monto de Inicio en grafito, en claro y
+  oscuro; VoiceOver, texto grande, Reduce Motion y Reduce Transparency. La lista exacta está en
+  docs/mobile-device-checklist.md («Producto 25A-03»).
+- Producto 25VIS1 (mergeada como PR #83; sin build de EAS; el dueño conservó la paleta en el iPhone el 2026-10-03, el
   resto sin revisar punto por punto): el pulgar blanco con texto en tinta del segmento elegido `Gastado | Disponible`
   (pulido final del 2026-10-04), en claro y oscuro; la paleta Electric Lime en claro y oscuro: el campo
   lima de Inicio con tinta y la barra de estado oscura sobre él; Próximos compromisos neutro como Actividad reciente; el

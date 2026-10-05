@@ -139,6 +139,10 @@ function Navigation() {
       <Stack.Screen name="new-refund" options={{ title: t('operations.titles.refund'), presentation: 'modal' }} />
       <Stack.Screen name="plan-payoff/[id]" options={{ title: t('operations.titles.payoff'), presentation: 'modal' }} />
       <Stack.Screen name="operation/[id]" options={{ title: t('operations.titles.operation') }} />
+      {/* 25A-03, «Para revisar»: the tray and a proposal's detail are pushed from Más; its editor is a modal over the detail. */}
+      <Stack.Screen name="review" options={{ title: t('nav.titles.review') }} />
+      <Stack.Screen name="review/[id]" options={{ title: t('nav.titles.reviewItem') }} />
+      <Stack.Screen name="edit-review/[id]" options={{ title: t('nav.titles.editReview'), presentation: 'modal' }} />
     </Stack>
   </View></ThemeProvider>;
 }
