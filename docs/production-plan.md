@@ -491,10 +491,11 @@ draft never writes, an interrupted confirmation is reconciled from the ledger an
 
 **Honest state (25A-04, on its branch).** The Assistant screen is **on that path**: its older in-memory confirmation
 (`resolveDraft` → `entryFromDraft` → `validateEntry` → `addEntry`) is removed; a resolved draft is adapted to
-`ReviewDraft` (`reviewDraftFromAssistant`) and captured into the review store with its ids fixed once, and it is
-confirmed only in «Para revisar» (25A-03), through the store's frozen write. The reconciled differences: a currency or
-date the model did not state stays unknown (a gap), a merchant or category the draft cannot hold is missing, a card
-gets «Una vez» and an income never a card. Still open: the wire contract knows only ARS and USD (contract v2), and the
+`ReviewDraft` (`reviewDraftFromAssistant`) and durably captured into the review store with its ids fixed once, then
+confirmed in the review sheet presented over the Assistant (or later in «Para revisar»), through the store's frozen
+write. The reconciled differences: an unstated date is today by the capture rule (the device's local day at capture);
+an unstated currency comes only from a destination the person named or chose, otherwise it is a gap; a merchant or
+category the draft cannot hold is missing; a card gets «Una vez» and an income never a card. Still open: the wire contract knows only ARS and USD (contract v2), and the
 Assistant stays disconnected in every build until its own slices; the deferred 24T3 device pass is a release blocker,
 not a merge gate (owner decision, 2026-10-04: roadmap §2).
 
@@ -752,9 +753,14 @@ Apple Pay / Wallet transaction
   → local capture adapter (a small native spool, drained by the app)
   → strict ReviewDraft (parseReviewDraft; source "wallet")
   → the separate local review SQLite (captureReviewItem)
-  → the review tray (25A-03): Confirmar / Editar / Descartar
-  → Dynamic Island / Live Activity when available (§8)
+  → Dynamic Island / Live Activity when available (§8): Confirmar / Editar / Descartar
+  → if ignored or the presentation fails: the item stays in «Para revisar» (25A-03), the durable inbox
 ```
+
+**Presentation over one item (25A-04, owner decision 2026-10-04).** The Dynamic Island / Live Activity, the Assistant's
+review sheet (`/review-sheet/[id]`) and «Para revisar» are presentation layers over the same durable review item and the
+same confirmation dispatcher (the review store's frozen write); none writes the ledger by itself, and ignoring one never
+discards the item. «Para revisar» is the recovery surface, not a required step.
 
 The path uses no network, no login, no paid AI and no remote inbox. It works offline like manual entry. FinanzApp
 cannot create the automation for the person; it explains the steps, per iOS version, because Apple's own instructions

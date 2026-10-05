@@ -1,24 +1,34 @@
 # Physical iPhone acceptance checklist
 
-## Producto 25A-04 — Assistant → Para revisar (on its branch; nothing device-verified; joins the release gate)
+## Producto 25A-04 — Assistant → review sheet (on its branch; nothing device-verified; joins the release gate)
 
 Deferred, with the other device items, to the consolidated pre-release device gate («Release gate», owner decision
 2026-10-04): it must pass before the first external or public TestFlight candidate and before App Store submission.
 JavaScript only, no native dependency, no EAS build, no schema (14) or backup (v14) change. **What can be checked now:**
-the Assistant is disconnected in every build, so a real proposal cannot be produced on the iPhone; the capture, retry,
-New chat, restart, edit and confirmation states are evidenced by the automated suite on real SQLite
-(`tests/assistant-review.node.ts`, `tests/assistant-routes.node.ts`). Synthetic proposals are never written to the
-real review file.
+the Assistant is disconnected in every build, so a real proposal, and with it the review sheet, cannot be produced on
+the iPhone; the capture, presentation, retry, New chat, restart, edit and confirmation states are evidenced by the
+automated suite (`tests/assistant-review.node.ts`, `tests/assistant-routes.node.ts`, `tests/review-routes.node.ts`, real
+SQLite where persistence matters). Synthetic proposals are never written to the real review file.
 
 - [ ] **Fixture view (development bundle with `EXPO_PUBLIC_ASSISTANT_FIXTURES=1`):** «Gasté 18.500 en Carrefour con la
-  Visa» shows a «Vista de prueba» proposal card with no action, and Más → Para revisar stays empty («Nada pendiente»,
-  no badge) afterwards; Movimientos unchanged.
+  Visa» shows a «Vista de prueba» proposal card with no action and **no review sheet**, and Más → Para revisar stays
+  empty («Nada pendiente», no badge) afterwards; Movimientos unchanged.
 - [ ] **Disconnected build:** a typed message still returns to the composer with its note; nothing appears in Para revisar.
-- [ ] **When the Assistant connects (a later 25A slice), in the release gate:** a proposal appears at once in Para
-  revisar and on the Más badge; «Revisar» opens its detail; Editar there is what the chat card then shows; Confirmar
-  records one movement (one plan for cuotas); the card says «Registrado» and «Ver movimiento»; Descartar makes it say
-  «Propuesta descartada»; New chat, leaving the Assistant and closing the app keep the proposal in Para revisar; light
-  and dark, VoiceOver, large text.
+- [ ] **When the Assistant connects (a later 25A slice), in the release gate:**
+  - the review sheet appears by itself right after the proposal is saved, as a native form sheet fitted to its content
+    with a grabber, over the Assistant, safe areas respected, light and dark; at the largest text sizes it opens full
+    height and scrolls, every button reachable;
+  - Confirmar (lime, with the amount) records exactly one movement (one plan for cuotas), with the success haptic; the
+    sheet closes and the card says «Registrado» with «Ver movimiento»;
+  - Editar opens the editor over the sheet (keyboard and safe areas fine); saving returns to the sheet with the edit;
+  - swiping the sheet down, «Ahora no» and back close it **without discarding**: the card says «Pendiente» with
+    «Revisar», Más → Para revisar lists it and the Más badge counts it; «Revisar» reopens the same proposal;
+  - «Descartar propuesta» asks first; Cancelar keeps it; Descartar makes the card say «Propuesta descartada»;
+  - closing the app right after the proposal is saved (before or while the sheet appears) leaves it pending in Para
+    revisar; New chat and leaving the Assistant keep it too;
+  - a request with no date records today; «ayer» records yesterday;
+  - VoiceOver: the sheet's title is a header, «Ahora no» names the close button, the facts and Confirmar are read with
+    spoken amounts and dates; Reduce Motion and Reduce Transparency.
 
 ## Producto 25A-03 — Para revisar (on its branch; nothing device-verified)
 
