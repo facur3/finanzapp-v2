@@ -133,21 +133,34 @@ ownership, quota, Assistant reservation and ceiling tests, with two-connection c
 
 ## Hosting
 
-The Vercel project `finanzapp-v2` deploys `api/mobile/*` as functions from this repository; its
-static output holds only a plain `404.html` (Vercel refuses an empty output directory), so `/`
-and every other path answer 404 and no web page is served. Without the
-owner's configuration (`server/mobile/runtime.js` reads `MOBILE_INTEGRATIONS_ENABLED`,
+Two Vercel projects are planned to deploy `api/mobile/*` as functions from this repository
+(Producto 25A-06, [docs/ai-staging-runbook.md](docs/ai-staging-runbook.md) §2 and §4):
+
+- `finanzapp-v2`, which exists today, is the planned **production** host of the mobile API. It is
+  to hold no AI or Supabase variable until a production release decision.
+- `finanzapp-api-staging`, not created yet (the owner creates it at runbook checkpoint B6), is the
+  Assistant's **staging**: its Production environment is staging, with variables in the Production
+  scope only (runbook §4.4), never Preview or Development.
+
+Each project's static output holds only a plain `404.html` (Vercel refuses an empty output
+directory), so `/` and every other path answer 404 and no web page is served. `vercel.json` builds
+only Production deployments (`ignoreCommand`), so Previews are not built; the code closes them too,
+because a route runs only with Vercel's own `VERCEL_ENV=production`. One region, `gru1` (São Paulo), next to the
+planned staging Supabase project in sa-east-1 (runbook §4.2); `maxDuration` 60 s for `api/mobile/*.js`; Node.js `24.x`
+(root `package.json`). Without the owner's configuration (`server/mobile/runtime.js` reads
+`MOBILE_ENVIRONMENT`, which must be `staging`, the only enabled environment, `MOBILE_INTEGRATIONS_ENABLED`,
 `MOBILE_SUPABASE_URL`, `MOBILE_SUPABASE_PUBLISHABLE_KEY`, `MOBILE_SUPABASE_SECRET_KEY`, and for the
-Assistant `MOBILE_AI_ENABLED` and the other `MOBILE_AI_*` names of docs/production-plan.md §4.7) every
-endpoint fails closed: `GET` answers 405, `POST` answers 503;
+Assistant `MOBILE_AI_ENABLED`, `MOBILE_AI_PROVIDER_PROJECT` and the other `MOBILE_AI_*` names of
+docs/production-plan.md §4.7) every endpoint fails closed: `GET` answers 405, `POST` answers 503;
 once configured, a request without a session answers 401. The app's API origin is
 `EXPO_PUBLIC_MOBILE_API_ORIGIN` (apps/mobile/README.md).
 
-This project is the mobile API's host on purpose, not a leftover of the retired web frontend: the two functions are the
-only thing it serves. Why it stays for the Assistant's staging, how it relates to Supabase and the AI provider, and the
-criteria for reconsidering it are in [docs/production-plan.md](docs/production-plan.md) (§2 to §4); the path to
-TestFlight and the App Store is in [docs/app-store-launch.md](docs/app-store-launch.md). Both are plans: no production
-environment, cloud Assistant, subscription or store listing exists yet.
+These projects are the mobile API's hosts on purpose, not a leftover of the retired web frontend: the two functions are
+the only thing they serve. How they relate to Supabase and the AI provider, and the criteria for reconsidering them, are
+in [docs/production-plan.md](docs/production-plan.md) (§2 to §4); bringing up staging, step by step and by whom, is
+[docs/ai-staging-runbook.md](docs/ai-staging-runbook.md); the path to TestFlight and the App Store is in
+[docs/app-store-launch.md](docs/app-store-launch.md). All are plans: no staging or production environment, cloud
+Assistant, subscription or store listing exists yet.
 
 ## Files that must never be committed
 

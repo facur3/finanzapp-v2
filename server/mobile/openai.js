@@ -48,15 +48,17 @@ export function parseOpenAIResponse(data) {
   catch { throw new ProviderError('invalid', usage, served); }
 }
 
-export function createOpenAIProvider({ apiKey, model, serviceTier, timeoutMs, fetcher = fetch }) {
+export function createOpenAIProvider({ apiKey, project, model, serviceTier, timeoutMs, fetcher = fetch }) {
   if (typeof apiKey !== 'string' || !apiKey) throw new Error('Missing provider key');
+  if (typeof project !== 'string' || !project) throw new Error('Missing provider project');
   return {
     async respond(request, { signal } = {}) {
       const timeout = AbortSignal.timeout(timeoutMs);
       let response;
       try {
         response = await fetcher(OPENAI_RESPONSES_URL, { method: 'POST',
-          headers: { Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
+          // The project header binds the key to the configured project: a key of any other project is refused (401).
+          headers: { Authorization: 'Bearer ' + apiKey, 'OpenAI-Project': project, 'Content-Type': 'application/json' },
           body: JSON.stringify(buildOpenAIRequest({ model, serviceTier }, request)),
           signal: signal ? AbortSignal.any([signal, timeout]) : timeout });
       } catch (cause) {

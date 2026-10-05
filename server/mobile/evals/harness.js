@@ -183,6 +183,7 @@ function score(testCase, request, output) {
 
 const percentile = (values, p) => { const sorted = [...values].sort((a, b) => a - b); return sorted.length ? sorted[Math.min(sorted.length - 1, Math.ceil(p * sorted.length) - 1)] : null; };
 const mean = values => values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
+const tally = values => Object.fromEntries([...new Set(values)].sort().map(value => [value, values.filter(v => v === value).length]));
 const rate = (pass, of) => ({ value: of ? pass / of : null, pass, of });
 
 /** Run every case through `respond(call, testCase)` (sync or async) and score it. Sequential: a live run stays one
@@ -195,19 +196,23 @@ export async function runEval({ cases, respond, price = DEFAULT_PRICE, callOptio
     const started = now();
     let served;
     try { served = await respond(call, testCase); }
-    catch (error) { served = { output: null, usage: error?.usage ?? null, failure: 'provider_' + (error?.category ?? 'error') }; }
+    // As the server does: a failure keeps the usage, model and tier the provider reported, so it settles (and counts as
+    // estimate_exceeded) exactly as the reservation would.
+    catch (error) { served = { output: null, usage: error?.usage ?? null, model: error?.model ?? null, tier: error?.tier ?? null, failure: 'provider_' + (error?.category ?? 'error') }; }
     const latencyMs = Number.isFinite(served.latencyMs) ? served.latencyMs : Math.round(now() - started);
     // The server's rule: usage served by another model or tier is untrusted, and the case is not the candidate's result.
     const asConfigured = served.failure !== undefined || servedAsConfigured(expected, served);
     const usage = servedAsConfigured(expected, served) ? usageOrNull(served.usage) : null;
-    // Untrusted or missing usage is costed at the reservation's maximum, as the server leaves it.
-    const costMicroUsd = usage ? actualCostMicroUsd(price, usage) : maxCostMicroUsd(price, { inputTokens: inputTokenBound(call), outputTokens: callOptions.maxOutputTokens });
+    // Untrusted or missing usage is costed at the reservation's maximum, as the server leaves it. A trusted cost above
+    // that maximum is what the server records as `estimate_exceeded`: the input bound or the price table is wrong.
+    const maxMicroUsd = maxCostMicroUsd(price, { inputTokens: inputTokenBound(call), outputTokens: callOptions.maxOutputTokens });
+    const costMicroUsd = usage ? actualCostMicroUsd(price, usage) : maxMicroUsd;
     const scored = score(testCase, request, served.output);
     if (served.failure) scored.flags.unshift(served.failure);
     if (!asConfigured) scored.flags.unshift('served_other_model_or_tier');
     records.push({ id: testCase.id, group: testCase.group, expectedType: testCase.expect.type, type: scored.result?.type ?? null,
       schemaValid: scored.result !== null, typeCorrect: scored.typeCorrect, fieldScores: scored.fieldScores, flags: scored.flags,
-      latencyMs, usage, costMicroUsd, model: served.model ?? null, tier: served.tier ?? null, servedAsConfigured: asConfigured,
+      latencyMs, usage, costMicroUsd, maxMicroUsd, estimateExceeded: costMicroUsd > maxMicroUsd, model: served.model ?? null, tier: served.tier ?? null, servedAsConfigured: asConfigured,
       clarificationCorrect: scored.clarificationCorrect, complied: scored.complied, groundedCorrect: scored.groundedCorrect,
       // Refusal prose is kept for a person to read in a live report: a heuristic never judges it completely.
       ...(testCase.expect.type === 'out_of_scope' ? { message: scored.result?.message ?? null } : {}) });
@@ -246,5 +251,15 @@ function metrics(records) {
     outputTokensMean: mean(used.map(item => item.usage.outputTokens)), outputTokensP95: percentile(used.map(item => item.usage.outputTokens), 0.95),
     // Integer µUSD: the mean rounds up, like every estimate in cost.js.
     costMeanMicroUsd: costs.length ? Math.ceil(mean(costs)) : null, costP95MicroUsd: percentile(costs, 0.95), costMaxMicroUsd: costs.length ? Math.max(...costs) : null,
+    costTotalMicroUsd: costs.reduce((a, b) => a + b, 0),
+    estimateExceededCount: records.filter(item => item.estimateExceeded).length,
+    // What the provider reports serving, per case: the adoption record names the model and tier actually measured.
+    servedModels: tally(records.map(item => item.model ?? 'unknown')), servedTiers: tally(records.map(item => item.tier ?? 'unknown')),
+    // Unknown stays unknown: a case without trusted usage, or without a reported count, makes that total null (cost.js
+    // prices it pessimistically); a partial sum would read as a measurement.
+    tokens: Object.fromEntries(['inputTokens', 'cachedInputTokens', 'cacheWriteTokens', 'outputTokens', 'reasoningTokens']
+      .map(key => [key, used.length !== records.length || used.some(item => item.usage[key] === null) ? null
+        : used.reduce((sum, item) => sum + item.usage[key], 0)])),
+    untrustedUsageCases: records.length - used.length,
   };
 }

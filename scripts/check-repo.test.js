@@ -67,6 +67,12 @@ describe('check:repo', () => {
     expect(secrets.map(h => h.file).sort()).toEqual(['apps/mobile/app.config.ts', 'apps/mobile/src/assistant/runtime.ts']);
   });
 
+  it('fails when the app names the reconciliation admin key or a staging probe password (25A-06)', () => {
+    for (const name of [['OPENAI', 'ADMIN', 'KEY'], ['STAGING', 'PROBE', 'A', 'PASSWORD']].map(parts => parts.join('_'))) {
+      expect(run({ ...clean, 'apps/mobile/src/x.ts': `const v = process.env.${name};\n` }).secrets.map(h => h.file), name).toEqual(['apps/mobile/src/x.ts']);
+    }
+  });
+
   it('fails on generated files, native projects and databases', () => {
     for (const path of ['node_modules/x/index.js', 'dist/index.html', 'apps/mobile/ios/Podfile', 'apps/mobile/android/build.gradle', '.env', '.env.production',
       'apps/mobile/.expo/settings.json', 'data/ledger.sqlite', 'ledger.sqlite-wal', 'build.ipa', 'release.keystore']) {

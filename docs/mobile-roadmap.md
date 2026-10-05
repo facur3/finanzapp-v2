@@ -1,18 +1,26 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-05 (Producto 25A-05, on its branch: AI security, provider contract and evaluation harness, server and
-contract work with no visible change. The Assistant's closed protocol v2 (`packages/integrations/assistant-protocol.js`:
-one result of four types, every key required, unknowns null, no id, URL, code or tool field), validated on the server and
-again on the device; the app sends v2 with a fresh request id and the configured region; v1 retired, never deployed. A
-provider-neutral port and an OpenAI Responses adapter implemented but disabled (`store: false`, no background, no tools,
-no state, pinned tier); the model, effort and token caps as allowlisted server configuration, no model in code
-(`gpt-5-mini` removed). Integer micro-USD cost: worst-case reservation, settlement from trusted usage. Supabase: the
-privileged functions executable only by `service_role` through a server-side secret key (the direct-quota weakness of
-25OPS1 fixed in the repository), monetary reservations, idempotency, rate and concurrency windows, per-user and global
-ceilings and a database kill switch that ships off, staging placeholders only, applied nowhere. A 103-case synthetic
-evaluation corpus with a harness and thresholds written before any real test; the fixture run passes, which is not a
-model result. Nothing deployed, applied, configured or evaluated against a real model; no schema (14), backup (v14) or
-review-store (1) change; the version line reads «FinanzApp 0.1.0 (25A-05)»; §3, «Producto 25A-05»). Producto 25A-04
+Updated: 2026-10-05 (Producto 25A-06 Phase A, on its branch: AI staging activation, the repository preflight, code and
+documentation only, no service touched. A fail-closed environment identity (`server/mobile/runtime.js`:
+`MOBILE_ENVIRONMENT=staging`, the only enabled environment, and Vercel's own `VERCEL_ENV=production` on a route, absent
+off Vercel for the scripts); only `sb_publishable_…` / `sb_secret_…` Supabase keys (a legacy JWT or a swapped pair
+refused) and a project-scoped OpenAI key with its project id sent as `OpenAI-Project`; a local claim precheck of the
+bearer before `/auth/v1/user`, which stays the authority (local JWKS verification evaluated, not added). The database
+bound to its environment (`mobile_ai_control.environment`; the reservation and capture functions refuse another name
+first, 503 `environment`). `vercel.json`: Previews skipped, one region `gru1` (São Paulo, with Supabase sa-east-1), 60 s for `api/mobile/*.js`; Node 24.x.
+The owner's staging scripts (`server/mobile/staging/`: `verify.sql`, also run by CI, 13 planted faults caught;
+`usage-report.sql`; `probe.js`; `reconcile.js`). A live evaluation also needs staging identity, a price table at most 30
+days old and an owner-approved spend at least the run's worst case; a new threshold, `estimateExceededCount` = 0. The
+[AI staging runbook](ai-staging-runbook.md) (owner checkpoints B1–B11) and [decision 006](decisions/006-cloud-identity.md)
+(Sign in with Apple as the one launch cloud identity, recommended, not built). Nothing deployed, applied, configured or
+called; no secret; no EAS build; no schema (14), backup (v14) or review-store (1) change; the version line reads
+«FinanzApp 0.1.0 (25A-06)»; §3, «Producto 25A-06»). Producto 25A-05 merged as PR #86, merge commit bd133a3: AI
+security, provider contract and evaluation harness, server and contract work with no visible change: the closed
+protocol v2 validated on the server and the device, a provider-neutral port and a disabled OpenAI Responses adapter
+(`store: false`, no tools, no model in code), integer micro-USD worst-case reservation and settlement, the privileged
+Supabase functions executable only by `service_role`, per-user and global ceilings and a database kill switch that
+ships off, and a 103-case synthetic evaluation corpus with thresholds written before any real test; nothing deployed,
+applied or evaluated against a real model; the version line read «FinanzApp 0.1.0 (25A-05)». Producto 25A-04
 merged as PR #85, merge commit d493c83: Assistant → review sheet. The Assistant no longer writes the
 ledger: its direct path (`entryFromDraft` → `validateEntry` → `addEntry`) is gone; every resolved Assistant draft is
 adapted to the canonical review draft (`reviewDraftFromAssistant`: an unstated date is today by the capture rule, an
@@ -267,14 +275,38 @@ commit 5c73813), 24UX6C (PR #72, merge
 commit c673be6), 24UX6B (PR #71, merge
 commit ecfd1dc), 24UX6A (PR #70, merged 2026-10-01, merge commit ef24bb6), 24T2 (PR #69, merge commit 8951f6c), 24T1C
 (PR #68), 24T1 (PR #67) and 25B3 (PR #66), then Producto 25A-01 (PR #77, merge commit a4202bc) and 25A-02 (PR #78 and its follow-up PR #79, merge commit
-a1bd181), 25UX1 (PR #80, merge commit d45eca6), and 25OPS1 (PR #81, merge commit d0a0be8), and 25DISC1 (PR #82, merge commit 227942c, documentation only), and 25VIS1 (PR #83, merge commit 0ff9859, Electric Lime, the accepted current palette), 25A-03 («Para revisar», PR #84, merge commit aef2edf) and 25A-04 (Assistant → review sheet, PR #85, merge commit d493c83); Producto 25A-05 (AI security, provider contract and evaluation harness) on its branch. Per area,
+a1bd181), 25UX1 (PR #80, merge commit d45eca6), and 25OPS1 (PR #81, merge commit d0a0be8), and 25DISC1 (PR #82, merge commit 227942c, documentation only), and 25VIS1 (PR #83, merge commit 0ff9859, Electric Lime, the accepted current palette), 25A-03 («Para revisar», PR #84, merge commit aef2edf), 25A-04 (Assistant → review sheet, PR #85, merge commit d493c83) and 25A-05 (AI security, provider contract and evaluation harness, PR #86, merge commit bd133a3); Producto 25A-06 Phase A (AI staging activation, the repository preflight) on its branch. Per area,
 without test inventories (those are in apps/mobile/README.md and the history
 file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_REGIONS`,
 `LEDGER_CURRENCIES`): what a build offers, verified on Linux; nothing is distributed to people yet
 (§4).
 
-- **AI security, provider contract and evaluation harness (25A-05, on its branch; nothing visible changes; nothing to
-  check on the iPhone until 25A-06/25A-07).** §3, «Producto 25A-05». Server and contract work, implemented and tested on
+- **AI staging activation, Phase A: the repository preflight (25A-06 Phase A, on its branch; nothing visible changes;
+  nothing to check on the iPhone).** §3, «Producto 25A-06»; the owner's checklist is
+  [ai-staging-runbook.md](ai-staging-runbook.md). Code and documentation, implemented and tested on Linux, deployed,
+  applied and configured nowhere; no secret exists and no provider was called. Environment identity, fail closed
+  (`server/mobile/runtime.js`, `ENABLED_ENVIRONMENTS = ['staging']`, `environmentOf`): a route runs only with
+  `MOBILE_ENVIRONMENT=staging` and Vercel's own `VERCEL_ENV=production`, and the scripts off Vercel only with
+  `VERCEL_ENV` absent. Key kinds: only `sb_publishable_…` and `sb_secret_…` Supabase keys, each in its own slot (a legacy
+  `anon` / `service_role` JWT or a swapped pair refused); only a project-scoped OpenAI key (`sk-proj-…`, `sk-svcacct-…`)
+  with `MOBILE_AI_PROVIDER_PROJECT` (`proj_…`), sent as the `OpenAI-Project` header. `plausibleAccessToken` refuses a
+  bearer that is not this project's unexpired, non-anonymous `authenticated` access token without a network call;
+  `/auth/v1/user` stays the only authority (local JWKS verification evaluated and not added: it cannot see revocation).
+  `schema.sql`: `mobile_ai_control.environment` (`staging` | `production`, installed `staging`); `mobile_ai_reserve` and
+  `mobile_receive_capture` take the deployment's environment and answer `environment` (503) on a mismatch before
+  anything else (`schema.test.sql` (o)). `vercel.json`: `ignoreCommand` builds Production deployments only, region
+  `gru1` (São Paulo), `maxDuration` 60 s for `api/mobile/*.js`; root `package.json` `engines.node` `24.x`. `server/mobile/staging/`:
+  `verify.sql` (the owner's self-rolling-back check, prints `STAGING_VERIFY_OK`; 13 planted faults caught),
+  `usage-report.sql`, `probe.js` (`boundary`, `api [--ai-enabled]`, `race`), `reconcile.js` (the provider's Costs API
+  against the usage report), `staging.test.js` (fake network only); CI's `mobile_api` job runs both SQL files after
+  `schema.test.sql`. Evaluation: `estimateExceededCount` (threshold `max: 0`, a tightening written before any real run),
+  `servedModels`, `servedTiers`, token totals and `costTotalMicroUsd`; `run.js --live` also needs staging identity off
+  Vercel, a project key and its id, a price table read within `PRICING_MAX_AGE_DAYS` (30) and `--approve-micro-usd` at
+  least the run's worst case. `check-repo` also forbids `OPENAI_ADMIN_KEY` and the probe password names in the app.
+  [Decision 006](decisions/006-cloud-identity.md) recommends Sign in with Apple as the one launch cloud identity (not
+  built). No schema (14), backup (v14) or review-store (1) change. The version line reads «FinanzApp 0.1.0 (25A-06)».
+- **AI security, provider contract and evaluation harness (25A-05, PR #86, merge commit bd133a3; nothing visible
+  changes; nothing to check on the iPhone until a build connects).** §3, «Producto 25A-05». Server and contract work, implemented and tested on
   Linux, deployed, applied and configured nowhere. The Assistant's closed protocol v2
   (`packages/integrations/assistant-protocol.js`), validated by the server on the provider's output and by the app again
   on the server's reply; the app sends v2 with a fresh `requestId` (expo-crypto) and the configured region; the v1
@@ -291,7 +323,7 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   Repository guards: no server secret named in `apps/mobile`, no secret-like `EXPO_PUBLIC_` name. On the device, an
   out-of-scope reply is the model's prose only, a navigation intent only reorders links derived from cited local
   evidence, and a payment reference drops a leading «con la» / "my" before the whole-word match. No schema (14), backup
-  (v14) or review-store (1) change. The version line reads «FinanzApp 0.1.0 (25A-05)».
+  (v14) or review-store (1) change. The version line read «FinanzApp 0.1.0 (25A-05)».
 - **Assistant → review sheet (25A-04, PR #85, merge commit d493c83; device QA deferred to the release gate).** §3, «Producto 25A-04».
   The Assistant has no ledger write path: a resolved draft becomes a proposal durably captured into the review store
   (`src/assistant/review-proposal.ts`, `captureReview`), then a native review sheet (`app/review-sheet/[id].tsx`) is
@@ -748,10 +780,16 @@ it was checked in). Metro from `master` (or a delivery's branch) on the installe
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
-- **25A-05 — AI security, provider contract and eval harness (on its branch; no EAS build): nothing to check on the
-  iPhone now.** No device-visible change: every build stays disconnected, so the only difference, that a connected
-  Assistant would speak protocol v2 (and show an out-of-scope reply as prose only), cannot be seen until 25A-06 connects
-  a staging build and 25A-07 brings the real product flow. Its items (the checklist section Producto 25A-05) join
+- **25A-06 Phase A — AI staging activation, the repository preflight (on its branch; no EAS build): nothing to check
+  on the iPhone.** No app change beyond the version line: every build stays disconnected (`assistantForBuild` passes no
+  session provider) and no build points at staging in 25A-06 (ai-staging-runbook.md §13). Phase B's checks happen on
+  the services, run by the owner (the runbook's checkpoints B1–B11), not on the device. Metro on the installed
+  development build shows the version line «FinanzApp 0.1.0 (25A-06)» only.
+- **25A-05 — AI security, provider contract and eval harness (merged as PR #86, merge commit bd133a3; no EAS build):
+  nothing to check on the iPhone now.** No device-visible change: every build stays disconnected, so the only
+  difference, that a connected Assistant would speak protocol v2 (and show an out-of-scope reply as prose only), cannot
+  be seen until a build connects (not in 25A-06, which points no build at staging; after the session slice of decision
+  006) and 25A-07 brings the real product flow. Its items (the checklist section Producto 25A-05) join
   25A-06/25A-07 and the release gate. Metro on the installed development build shows the version line «FinanzApp 0.1.0
   (25A-05)» only.
 - **25A-04 — Assistant → review sheet (merged as PR #85, merge commit d493c83; no EAS build; nothing device-verified; joins the release gate):**
@@ -970,15 +1008,28 @@ item unless a section says a new native build is needed. The checklist sections 
 
 ## 3. Next deliveries
 
-**Recommended next (2026-10-05):** **25A-04 merged as PR #85** (merge commit d493c83): the Assistant's proposals are
-durable review items confirmed in a review sheet. **25A-05** (AI security, the closed protocol v2, the provider port
-with a disabled adapter, money-based reservations and ceilings with a database kill switch, the evaluation corpus,
-harness and thresholds; «Producto 25A-05» below) is **this PR**: CI only, no paid call, nothing applied or deployed.
-Next is **25A-06 — Staging activation**, the first slice that needs the owner (the Supabase staging project, a dedicated
-AI provider project with a small spend limit, the secrets, `schema.sql` applied deliberately, the real Luna evaluation
-with the harness's `--live` mode; no production activation), then **25A-07 — Real Assistant product contract and
-polish** («Producto 25A», «Slices»). 25A2 may proceed in parallel as already allowed (its first step is the
-«Card Network Identity» prerequisite, «Producto 25A2»). Nothing in the binding order below changes.
+**Recommended next (2026-10-05):** **25A-05 merged as PR #86** (merge commit bd133a3): AI security, the closed
+protocol v2, the provider port with a disabled adapter, money-based reservations and ceilings with a database kill
+switch, the evaluation corpus, harness and thresholds. **25A-06 Phase A** (the repository preflight of the staging
+activation: environment identity, key kinds, the database's environment binding, `vercel.json`, the owner's staging
+scripts, the live-evaluation gates, [ai-staging-runbook.md](ai-staging-runbook.md) and
+[decision 006](decisions/006-cloud-identity.md); «Producto 25A-06» below) is **this PR**: CI only, no service touched,
+no secret, no paid call, nothing applied or deployed. The activation order is binding, each step only after the one
+before it passes (the runbook's §0.2):
+1. **25A-06 Phase A** (this PR) → review and merge by the owner (checkpoint A).
+2. **OWNER creates and configures staging**: remote inventory recorded (B1), the OpenAI staging project, keys and
+   limits (B2), the Supabase staging project and its auth settings (B3), `schema.sql` applied and `verify.sql` printing
+   `STAGING_VERIFY_OK` (B4), the boundary probe (B5), the Vercel project `finanzapp-api-staging` deployed with AI still
+   off in the database (B6).
+3. **Phase B activates staging**: the **real Luna evaluation** with an owner-approved spend (B7); AI enabled on staging,
+   the failure drills and the race (B8); the **cost reconciliation** against the provider (B9).
+4. A focused **`/security_audit`**, then **`/security_review`** (B10); results recorded and 25A-06 marked done (B11).
+5. **Only then 25A-07 — Real Assistant product contract and polish** («Producto 25A», «Slices»), with the session slice
+   (Sign in with Apple, decision 006) before any build calls the cloud Assistant.
+
+**25A2 and production activation are not started.** 25A2 stays a separate decision, allowed in parallel as already
+recorded (its first step is the «Card Network Identity» prerequisite, «Producto 25A2»); production activation is a
+later release decision, and nothing in 25A-06 enables AI on production. Nothing in the binding order below changes.
 
 **Earlier recommendation (2026-10-02, history):** **24T3 merged as PR #76** (merge commit 399a1fabaa673423b7a155ddb3cb900b5c0103fc):
 SQLite schema 14 and backup v14 are current, and the broad Forest visual lane (24UX6A–24UX6E) is complete. The active
@@ -1694,7 +1745,8 @@ Assistant's capability boundary and model evaluation, monetary safety).
   conversation with a hard stop,
   provider quotas mapped to graceful states, per-user and per-device rate limits, request
   signing, anomaly cut-offs, the owner's kill switch, a monthly spend ceiling with alerts);
-  staging Supabase, mobile sign-in and cloud-data consent (no login for the local core); the
+  staging Supabase, mobile sign-in (Sign in with Apple, [decision 006](decisions/006-cloud-identity.md), the session
+  slice) and cloud-data consent (no login for the local core); the
   scoped, revocable Shortcut pairing token; the durable inbox → local review tray →
   acknowledgement path with repeated-delivery and conflict tests.
 - **Rules.** Never a financial write without the person's confirmation; complete and ambiguous
@@ -1724,7 +1776,7 @@ Assistant's capability boundary and model evaluation, monetary safety).
   devolución drafts, and the card purchase in cuotas (until then protocol v2 answers a cuotas request `out_of_scope`,
   pointing to Tarjetas, never as one payment: 25A-05 decision); **25A-12** edits of an existing movement.
   Server lane:
-  - **25A-05 — AI security, provider contract and eval harness** (this PR; CI only, no paid call): the closed protocol
+  - **25A-05 — AI security, provider contract and eval harness** (PR #86, merge commit bd133a3; CI only, no paid call): the closed protocol
     v2 validated on the server and the device, the provider port and a disabled OpenAI adapter, the model as
     allowlisted configuration, one timeout budget, integer micro-USD worst-case reservation and settlement, the
     `service_role`-only privileged functions, rate, concurrency and monetary ceilings with a database kill switch,
@@ -1733,22 +1785,59 @@ Assistant's capability boundary and model evaluation, monetary safety).
     an EAS build produces with its real environment (25A-05 scans the CI export), the inbox lifecycle and the revocable capture-token foundation,
     analytical facts v3.
   - **25A-06 — Staging activation** (the first network slice; owner setup and authorization required; no production
-    activation): the owner creates the Supabase staging project; the owner creates a dedicated AI provider project with
-    its own key and a small prepaid amount or hard spend limit, the server's ceilings set below it; the owner sets the
-    secrets (`MOBILE_SUPABASE_SECRET_KEY`, `MOBILE_AI_API_KEY` and the rest of production-plan.md §4.7, names only,
-    never in the repository); `server/mobile/schema.sql` applied deliberately to staging, after review (AGENTS rule 3);
-    RLS proven there with two real test users; the kill switch, the ceilings and two concurrent requests at the last unit
-    of capacity tripped on purpose; alerts and the reconciliation against the provider's cost report; the real
-    evaluation of the Luna candidate with `node server/mobile/evals/run.js --live` (`MOBILE_AI_EVAL_LIVE=1` and a valid
-    server AI configuration), recorded against the thresholds written in 25A-05, with measured latency and cost; a
-    more expensive model only if Luna fails a required threshold. Provider billing per production-plan.md §6.6 (staging:
-  auto-recharge off, a tiny prepaid balance and a hard cap). A **repeat focused security audit** once real staging auth,
-  secrets and the provider integration exist (production-plan.md §14.1). The staging session and sign-in, the cloud
-    consent screen and the failure states on a real connection are scoped with it or right after (owner decision on the sign-in method, production-plan.md §12).
+    activation), in two phases with the checkpoints of [ai-staging-runbook.md](ai-staging-runbook.md) §0.2:
+    - **Phase A — the repository preflight** (this PR; code and documentation only, no service touched, no secret, no
+      paid call, no EAS build; «Producto 25A-06» below): the fail-closed environment identity (`MOBILE_ENVIRONMENT=staging`
+      with Vercel's `VERCEL_ENV=production`), the current Supabase key kinds only, a project-scoped provider key with its
+      project id, the bearer claim precheck, the database's environment binding, `vercel.json` (Previews skipped,
+      `gru1`, 60 s), the owner's staging scripts (`verify.sql`, `usage-report.sql`, `probe.js`, `reconcile.js`), the
+      live-evaluation gates (staging identity, price freshness, an approved worst case, `estimateExceededCount` = 0),
+      the runbook and decision 006.
+    - **Phase B — owner-led activation** (not started; after Phase A merges; the runbook's checkpoints B1–B11): the
+      owner records the existing remote resources (B1); the owner creates a dedicated AI provider project with its own
+      key and a small prepaid amount or hard spend limit, the server's ceilings set below it (B2); the owner creates the
+      Supabase staging project (B3); the owner sets the secrets (`MOBILE_SUPABASE_SECRET_KEY`, `MOBILE_AI_API_KEY` and
+      the rest of production-plan.md §4.7 and the runbook's §4.4, names only, never in the repository);
+      `server/mobile/schema.sql` applied deliberately to staging, after review (AGENTS rule 3), and verified by
+      `verify.sql` (B4); RLS proven there with two real test users (the boundary probe, B5); the Vercel staging project
+      deployed with AI off in the database (B6); the real evaluation of the Luna candidate with
+      `node server/mobile/evals/run.js --live` (`MOBILE_AI_EVAL_LIVE=1`, a valid staging AI configuration and an
+      owner-approved `--approve-micro-usd`), recorded against the thresholds written in 25A-05 and 25A-06, with measured
+      latency and cost; a more expensive model only if Luna fails a required threshold (B7); the kill switch, the
+      ceilings and two concurrent requests at the last unit of capacity tripped on purpose (the drills and the race,
+      B8); alerts and the reconciliation against the provider's cost report (B9). Provider billing per
+      production-plan.md §6.6 (staging: auto-recharge off, a tiny prepaid balance and a hard cap). A **repeat focused
+      security audit** once real staging auth, secrets and the provider integration exist (production-plan.md §14.1):
+      `/security_audit`, then `/security_review` (B10); results recorded (B11). Staging uses owner-created e-mail test
+      people with public sign-ups disabled; no product sign-in and no app build points at staging.
+  - **The session slice — Sign in with Apple** ([decision 006](decisions/006-cloud-identity.md); its own later slice,
+    after 25A-06 and before any build calls the cloud Assistant; not built, not numbered yet): Expo Apple
+    Authentication with Supabase's `signInWithIdToken`, the session in the Keychain, refresh, sign-out and in-app
+    account deletion with Apple token revocation, with its own security review. The cloud consent screen and the
+    failure states on a real connection are scoped with it or right after (production-plan.md §12).
   - **25A-07 — Real Assistant product contract and polish:** real conversational clarifications before the review sheet
     (the contract «Producto 25A-05» pins); expanded grounded local evidence; the actual review-sheet flow from a real
     proposal on the device; the groundwork for evidence navigation into filtered Movimientos (25C's filters); later, as
     scoped, the voice and several-drafts contracts.
+    - **Exact date and date-range scope, before any visual calendar (owner, 2026-10-05; required in 25A-07).** A
+      question scoped to an exact calendar date or range («¿Qué gasté el 20 de septiembre?», «¿cuánto gasté del 1 al
+      15?») is answered from **deterministic local evidence**:
+      1. the scope is a typed value resolved and validated on the device: `{ kind: day | range, startISO, endISO }`,
+         local calendar days, inclusive. A date without a year is its most recent occurrence not after today; a
+         future date for spending is a clarification.
+      2. the device queries the local ledger for exactly that scope, with the same domain code that computes the
+         screens' figures;
+      3. the request carries only bounded, typed, aggregated evidence for that scope (totals and counts per
+         currency, never summed across currencies; category totals), each fact with its id and its own
+         `startISO`/`endISO`, within §5.4's caps of production-plan.md. Individual movements or merchants are a new
+         fact kind, added only with a reason and in the consent text;
+      4. the model answers only from that evidence, citing it. A day with no movements is an answer («no hay gastos
+         registrados»), never an invented figure.
+
+      How the scope is identified, by a local parser of the person's words or by a typed scope request from the model
+      that the device validates and executes, and whether the new fact ids need a protocol version, is decided in
+      25A-07's contract. Either way the model never computes or chooses the figures. The visual financial calendar is
+      **not** needed for this, and stays Producto 25C2.
   Then: the inbox consumer; voice last, after the text path is proven on the iPhone. Numbering beyond 25A-07 is
   indicative; each slice records its own section here.
 - **Device gate.** Owner, 2026-10-02: the targeted 24T3 device pass (checklist section Producto 24T3, §2) had to be done
@@ -4443,7 +4532,7 @@ nothing of it is on a screen yet.
   `i18n:check -- --strict` 0 errors, 0 stale (English lock accepted); `check` OK; `export:ios` OK. No EAS build, no
   remote provider call, no iPhone run by the agent.
 
-### Producto 25A-05 — AI Security, Provider Contract & Eval Harness (this PR)
+### Producto 25A-05 — AI Security, Provider Contract & Eval Harness (PR #86, merged)
 
 - **Goal.** Make the real Assistant safe to connect before anything is connected: a closed contract between the app,
   the server and any model; a provider boundary with nothing dangerous in it; cost and abuse controls in money,
@@ -4548,10 +4637,10 @@ nothing of it is on a screen yet.
   export is Hermes bytecode that `grep -I` skips as binary; a server secret name, a Supabase secret key or a provider
   key (`sk-…`) fails, and the scan fails too unless it found a string the app is known to contain, so it cannot pass
   without reading the bundle. It names the file and the kind, never the value.
-- **Security audit follow-up (2026-10-05, in this PR; the 25A-05 audit of production-plan.md §14.1, completed).** A
-  focused AI/backend audit of this PR found no path from a client, a
+- **Security audit follow-up (2026-10-05, in PR #86; the 25A-05 audit of production-plan.md §14.1, completed).** A
+  focused AI/backend audit of PR #86 found no path from a client, a
   model reply or an injected text to a privileged function, the ledger, a tool or past the reservation. Fixed: (1) the
-  CI bundle step added earlier in this PR used `grep -rI`, which never read the `.hbc` bundle, so it could not fail;
+  CI bundle step added earlier in PR #86 used `grep -rI`, which never read the `.hbc` bundle, so it could not fail;
   replaced by the script above, with tests; (2) a per-user **daily** money ceiling (`user_day_ceiling_micro_usd`,
   placeholder USD 0.25), checked with the month in the same reservation, because one account could use up the USD 1
   global day and stop the Assistant for everyone (a planted fault that disables the check fails `schema.test.sql`).
@@ -4561,7 +4650,7 @@ nothing of it is on a screen yet.
   corpus; a price-table freshness check and the reconciliation against the provider's cost report; a dedicated
   Supabase secret key for this API. A follow-up `/security-review` of the whole PR found no High or Medium
   vulnerability.
-- **Codex review (2026-10-05, in this PR).** The evaluation now applies the server's served-model rule (a reply served
+- **Codex review (2026-10-05, in PR #86).** The evaluation now applies the server's served-model rule (a reply served
   by another model or tier is flagged, costed at the maximum and fails `servedAsConfiguredRate` = 1, so a fallback model
   is never adopted as the candidate), and a small integer in an answer is checked when it is money («$20», «20 pesos»)
   instead of being ignored as a day or a count. Each fix has a test, and each test fails with its fix reverted.
@@ -4590,7 +4679,7 @@ nothing of it is on a screen yet.
   currencies), 25A-07's product flow, 25A-11, 25A-12, voice.
 - **Device QA.** Nothing to check on the iPhone now (checklist section «Producto 25A-05»); its items join 25A-06/25A-07
   and the release gate.
-- **Status.** This PR; not merged.
+- **Status.** Merged as PR #86, merge commit bd133a3.
 - **Gates.** 2026-10-05, local, Linux (after the audit follow-up). Root `npm test` 34 files, 645 passed, 1
   todo; `check:repo` OK (441 tracked files). `apps/mobile`: `typecheck` OK; `test:storage` 1342 passed of 1342 (real
   SQLite included); `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0 errors, 0 stale; `check` (expo
@@ -4600,6 +4689,181 @@ nothing of it is on a screen yet.
   test. `node server/mobile/evals/run.js` (fixture mode, 103 cases)
   passes every threshold (not a model result). No EAS build, no remote provider call, no schema applied anywhere, no
   iPhone run by the agent.
+
+### Producto 25A-06 — AI Staging Activation, Phase A (this PR)
+
+- **Goal.** Prepare the repository so the owner can bring up the Assistant's **staging** backend safely and in order:
+  every guard that does not need a credential written and tested first, every owner step written down once, with who
+  acts and when it passes. The durable checklist is [ai-staging-runbook.md](ai-staging-runbook.md); the cloud identity
+  is [decision 006](decisions/006-cloud-identity.md). Production detail: production-plan.md §2–§6 and §14.1.
+- **Scope.** Branch `feat/producto-25a-06-staging-activation` from master bd133a3 (25A-05 merged as PR #86). Phase A
+  only: code, tests and documentation, CI only. **Nothing is deployed, applied or configured on any service; no key or
+  secret exists; no provider was called; no remote SQL was run.** No EAS build. No ledger schema (14), backup (v14) or
+  review schema (1) change; no visible change in a disconnected build. The version line reads «FinanzApp 0.1.0
+  (25A-06)». Phase B (the owner-led activation, the runbook's checkpoints B1–B11) starts only after this PR is
+  reviewed and merged and the owner has read the runbook.
+- **Environment contract** (runbook §3). `server/mobile/runtime.js`: `ENABLED_ENVIRONMENTS = ['staging']`, and
+  `environmentOf(env, { deployed })` returns the environment or null (fail closed). A route runs only with
+  `MOBILE_ENVIRONMENT=staging` **and** Vercel's own `VERCEL_ENV=production` (staging is the Production environment of
+  its own Vercel project), so a Preview deployment, `vercel dev` or a deployment that hides Vercel's system variables
+  stays closed whatever it holds; off Vercel (the evaluation and probe scripts) `VERCEL_ENV` must be absent. Production
+  joins the list only by a reviewed code change, never by configuration. Key kinds: only `sb_publishable_…` and
+  `sb_secret_…` Supabase keys, each in its own slot (a legacy `anon` or `service_role` JWT, or a swapped pair, is
+  refused); only a project-scoped OpenAI key (`sk-proj-…`, or a project service account's `sk-svcacct-…`) together
+  with `MOBILE_AI_PROVIDER_PROJECT` (`proj_…`), sent as the `OpenAI-Project` header (`openai.js`), so a key of another
+  project is refused by the provider and a user, legacy or admin key by the server. A missing or unknown environment, a
+  wrong `VERCEL_ENV`, a legacy or swapped key, a non-project key or a missing project id each return 503 and call
+  nothing (`handlers.test.js`, «environment identity and key kinds fail closed»). Never shared between staging and
+  production: the Supabase project and database, any Supabase secret key, the provider project and key, the quota and
+  budget state.
+- **Vercel** (runbook §4). DECIDED: staging is the **Production** environment of a second Vercel project,
+  `finanzapp-api-staging`, connected to this repository with production branch `master`; `finanzapp-v2` stays the
+  planned production host and keeps no AI or Supabase variable until a production release decision. `vercel.json`:
+  `ignoreCommand` `[ "$VERCEL_ENV" != production ]` (Previews are skipped), `regions` `["gru1"]` (São Paulo, with Supabase in
+  sa-east-1: owner decision 2026-10-05, Argentina-first, compute next to its database and representative of the initial
+  production topology; not a legal requirement and no data-residency claim), `functions` `api/mobile/*.js` `maxDuration` 60
+  (above the handler's 34 s budget and the app's 35 s); root `package.json` `engines.node` `24.x`. `staging.test.js`
+  pins them. Variables only in the Production scope of `finanzapp-api-staging`, the secrets marked Sensitive (OWNER
+  ACTION at B6, runbook §4.3–§4.4); never a variable in a Preview or Development scope of any project.
+- **Supabase auth** (runbook §5, decision 006). Recommended for launch: **Sign in with Apple** as the one cloud
+  identity (Supabase's native `signInWithIdToken`, provider `apple`, with a nonce), requested only when the person turns
+  on a cloud feature, never for the local core; no e-mail or password, magic link, anonymous user or social provider
+  at launch. The owner **accepts decision 006 by merging this PR**, or amends it here. It is **not built in 25A-06**: it
+  needs a new development build, Apple Developer configuration and in-app account deletion with Apple token
+  revocation, so it is its own later slice (the session slice, «Producto 25A», «Slices»). For staging, two or three
+  test people created by the owner in the dashboard (e-mail and password, confirmed on creation), with public sign-ups,
+  anonymous sign-ins and every other provider off (OWNER ACTION at B3, runbook §5.3). Anonymous users are insufficient
+  for abuse resistance and stay refused by the server and the database.
+- **Schema preflight and verification** (runbook §6). `server/mobile/schema.sql`: `mobile_ai_control.environment`
+  (`staging` | `production`, set once; the script inserts `staging`); `mobile_ai_reserve(…, p_environment)` and
+  `mobile_receive_capture(…, p_environment)` answer `{ error: 'environment' }` on a mismatch **first**, before the kill
+  switch, any budget or the inbox, and the handler maps it to 503, category `environment`; `schema.test.sql` (o) pins it.
+  The schema is not idempotent by design (one transaction; a second run rolls back whole), applied once to the new
+  empty staging project only (OWNER ACTION at B4). `server/mobile/staging/verify.sql`: the owner's check in the Supabase
+  SQL editor, plain SQL, which writes three throwaway people and undoes them by a deliberate rollback of its block and
+  prints `STAGING_VERIFY_OK`: AI installed disabled and bound to staging, RLS on every table, no client role able to
+  execute a function or touch a budget, every function `security definer` with an empty `search_path`, no chat-history
+  table, one person never reading another's inbox nor settling another's reservation, a duplicate request id refused,
+  and the per-user day and month and global day and month ceilings each fitting exactly and refusing at +1 µUSD. CI's
+  `mobile_api` job runs it and `usage-report.sql` on the same disposable PostgreSQL after `schema.test.sql`. Nine
+  planted faults were each caught while it was written (an execute grant to `authenticated`, a table grant to
+  `service_role`, AI enabled, RLS off, an open inbox policy, a chat table, a reset `search_path`, a `security invoker`
+  function, another environment's control row).
+- **Probe** (runbook §6.5, §6.6, §12). `server/mobile/staging/probe.js`, run by the owner with a local env file outside
+  the repository; refused unless staging, off Vercel, with the current key kinds; prints one PASS/FAIL line per check,
+  never a token, key, password or response body. `boundary` (one fixed, idempotent capture for test person B: the test
+  people sign in, anonymous sign-in refused for that reason, no client may execute a function or read the control row,
+  the reservations or the counters, B's capture visible to B only, the server path answers `disabled` and
+  `environment`); `api` (the deployed staging API with
+  AI off in the database) and `api --ai-enabled` (after B8, one or two billed requests); `race` (8 reservations at once,
+  PASS when exactly floor(ceiling / max) are granted). Tests use a fake network only (`staging.test.js`).
+- **OpenAI** (runbook §7). OWNER ACTION at B2: a project `finanzapp-staging`, model access limited to `gpt-6-luna` where
+  offered, two project-scoped keys (`finanzapp-staging-api` for Vercel only, `finanzapp-staging-eval` for the owner's
+  local eval file only), restricted permissions where offered, the smallest project budget or hard limit that covers
+  the evaluation and the drills, alerts at 50 % and 80 %. Never an organization admin key in any FinanzApp setting;
+  never a key in Expo, EAS, an `EXPO_PUBLIC_*` variable, a Preview or Development scope, the repository or a chat.
+- **Billing and scale operations** (runbook §8). Staging: a tiny prepaid balance, auto-recharge off, the smallest
+  provider hard limit, the server's ceilings below it (the global month ceiling at most 80 % of the provider limit,
+  set at B8). Production (later, not decided here): auto-recharge, if any, bounded in amount and frequency; the
+  internal ceilings always the first boundary; ceilings scaled from paying people, measured p50/p95 cost per person,
+  net proceeds and a target AI cost share, reviewed at least monthly. An automated owner alert is **NOT IMPLEMENTED**;
+  required before production, scoped with 25A-07 or 25F.
+- **Price freshness and reconciliation** (runbook §9). `server/mobile/pricing.js`: `PRICING_MAX_AGE_DAYS` = 30 and
+  `pricingAgeDays`; `run.js --live` refuses (exit 2, before any provider exists) a table older than 30 days or dated in
+  the future, and every report prints `pricing: { readOn, ageDays, maxAgeDays }`. A refresh is a re-read of the
+  provider's pages in a reviewed commit; a price is never changed to make a run pass. `usage-report.sql` (read-only;
+  counts, tokens and integer µUSD per day, no user id) and `reconcile.js` (offline: the owner's saved Costs API response
+  against our report, plus any live evaluation's cost, which bypasses the reservations): each day `ok`, `pending`,
+  `over_estimate` or `investigate` (the provider billed more than FinanzApp settled, or any `estimate_exceeded` row;
+  exit 1). The Costs API needs an organization admin key that only the owner holds, created for the reconciliation and
+  revoked after; `check-repo` now also forbids `OPENAI_ADMIN_KEY` and `STAGING_PROBE_[AB]_PASSWORD` in the app.
+- **Auth abuse** (runbook §10). `plausibleAccessToken`: a bearer that is not three base64url segments issued by this
+  project's Auth (`iss` = `<supabase>/auth/v1`) for the `authenticated` audience and role, not anonymous and unexpired,
+  is refused (401) without a network call; `/auth/v1/user` stays the only authority (signature, sign-out, deletion).
+  Local JWKS verification was **evaluated and not added**: it cannot see revocation, so it could only precede the remote
+  call; revisited if `/auth/v1/user` is a material share of p95 or forged-token traffic appears. Cheap multi-account
+  abuse: anonymous identities refused, sign-ups closed on staging, at launch one Sign in with Apple identity per Apple
+  Account, the per-person and global ceilings, later the Pro entitlement (25F). A Vercel firewall rate rule is optional
+  defense in depth (OWNER CHECK of the plan).
+- **Live eval** (runbook §11). New metrics in `server/mobile/evals/harness.js`: `estimateExceededCount` (a trusted cost
+  above the reservation's maximum), `servedModels`, `servedTiers`, token totals, `costTotalMicroUsd`; a new threshold
+  `estimateExceededCount` `max: 0` in `thresholds.js`, a tightening written before any real run. `run.js --live` now
+  also needs `MOBILE_ENVIRONMENT=staging` off Vercel, a project-scoped key and its project id, a fresh price table and
+  `--approve-micro-usd` at least the run's worst case (every case at its reservation maximum: 145 272 µUSD, about USD
+  0.15, for the 103 cases on `gpt-6-luna`; 321 388 µUSD on `gpt-5.6-luna`); the report adds `ranOnUTC`, `pricing`,
+  `approvedMicroUsd` and `worstCaseMicroUsd`. The adoption rule is unchanged: Luna is adopted only if every threshold
+  passes; thresholds are never lowered because a real model fails. The real run is an owner-approved spend at B7; none
+  was made.
+- **Failure drills** (runbook §12, OWNER at B8). Written, not run: the database and deployment switches, the kill switch
+  during testing, a bad or revoked provider key and Supabase secret, invalid tokens, each per-user and global money
+  ceiling, the rate and concurrency limits, a duplicate request id, unsettled reservations kept at their maximum and the
+  wrong environment, each with the expected status and telemetry category; the cases not inducible on staging (provider
+  timeout, invalid schema, model or tier mismatch) are recorded as unit and evaluation evidence only. No drill writes a
+  ledger: the API has none.
+- **Mobile staging connection** (runbook §13): **prepared, not published.** A development build will eventually know only
+  `EXPO_PUBLIC_MOBILE_API_ORIGIN` and, for the session slice, the staging Supabase URL and publishable key. Nothing is
+  set in EAS now; the app **stays disconnected** (`assistantForBuild` passes no session provider). Before any build
+  points at staging: the session slice (decision 006), the cloud consent screen and the literal
+  `EXPO_PUBLIC_MOBILE_API_ORIGIN` read verified in an exported bundle.
+- **Chat history (unchanged).** One ephemeral current conversation; `store: false` and no `previous_response_id` or
+  `conversation`; no chat-history table in Supabase (`verify.sql` and `staging.test.js` fail if one appears).
+- **Card network (unchanged).** Optional card network metadata stays 25A2's own reviewed storage and backup migration
+  («Producto 25A2», «Card Network Identity»); nothing here touches schema 14, backup v14 or review store 1.
+- **Inventory of existing remote resources** (runbook §2; from repository files and Git history only, dashboards
+  unknown; nothing deleted). Supabase: the current tree holds no Supabase URL, ref or key; **public Git history** holds a
+  legacy project ref (beginning `mtij`) and its legacy `anon` JWT (commits 0046425, ecfa529, 555e39f, d189b1e,
+  d18f8dc; removed in 2e63ef0; still reachable at the tag `web-frontend-final`); no `service_role` key was ever
+  committed. Vercel: the project `finanzapp-v2` deploys `api/mobile/*` and also hosted the retired PWA
+  (`finanzapp-v2.vercel.app` and a `-rho` alias in history). Git: 63 of 79 remote branches carry
+  `api/mobile/assistant.js`; one, `origin/feat/producto-24rep-native-first-web-retirement`, carries the pre-25A-05
+  runtime. OpenAI: no project id, key or organization referenced anywhere. OWNER CHECKS pending (B1, to be recorded
+  here): the legacy Supabase project (existence, plan, region, tables and row counts, real data, auth providers,
+  whether its legacy `anon` key is still active) and every other Supabase project; `finanzapp-v2`'s plan, Node
+  version, Fluid compute, variable names and scopes, domains and aliases, Deployment Protection, system-variable
+  exposure and Ignored Build Step; other Vercel projects; any variable in a Preview or Development scope; the OpenAI
+  organizations, projects, billing, keys, usage tier and `gpt-6-luna` access; EAS environment variable names; GitHub
+  secret names. What to do with the legacy Supabase project (ignore, retain, rotate its key, delete after an export) is
+  a separate owner decision, never «reuse as staging».
+- **What remains.** Phase B, owner-led, in the runbook's order, each checkpoint passing before the next: **B1** remote
+  inventory recorded; **B2** OpenAI staging project, keys and limits; **B3** Supabase staging project and auth
+  settings; **B4** schema applied and `verify.sql` printing `STAGING_VERIFY_OK`; **B5** the boundary probe; **B6**
+  `finanzapp-api-staging` deployed, AI off in the database, `probe.js api` all PASS; **B7** the real Luna evaluation
+  with an approved spend; **B8** AI enabled on staging, the failure drills and the race; **B9** the cost reconciliation
+  (no day `investigate`, `estimate_exceeded` = 0); **B10** focused `/security_audit`, then `/security_review`, no open
+  High or Medium; **B11** results recorded here and in production-plan.md, 25A-06 marked done. Only then 25A-07.
+  Later: the session slice (Sign in with Apple), the consent screen, the literal origin read and an EAS-built bundle
+  scan, protocol v3. 25A2 and production activation are not started.
+- **Device QA.** Nothing to check on the iPhone: no app change beyond the version line, and no build points at staging.
+- **Status.** This PR; not merged. Phase B not started.
+- **Owner refinements before accepting the runbook (2026-10-05, in this PR).**
+  - **Staging region:** Vercel Functions `gru1` (São Paulo) and the staging Supabase project in the specific region
+    `sa-east-1` (São Paulo), replacing `iad1` / us-east-1. The reasons: Argentina-first, the API compute next to its
+    database, lower client latency for the initial market, and a staging representative of the intended initial
+    production topology. It is not a legal requirement, and no provider data-residency claim changes. Vercel's
+    documentation (2026-10-05) lists `gru1` as a compute region and lets the Hobby plan pick any single region, so no
+    plan limitation applies (runbook §4.2).
+  - **Date-scoped Assistant questions:** 25A-07 must answer questions about an exact date or date range from
+    deterministic local evidence, before any visual calendar («Producto 25A», 25A-07; production-plan.md §5.4). The
+    visual financial calendar stays **Producto 25C2**, a presentation and navigation surface over the ledger, not a
+    data source the Assistant depends on. 25C and 25C2 share the same typed scope for evidence actions.
+  - **Theme packs:** checked, unchanged. A **pre-launch 25F Pro candidate**: Electric Lime is the default identity,
+    included without Pro; Forest, Sapphire or other approved packs come behind the later StoreKit entitlement; each
+    passes light, dark, accessibility and semantic-colour QA («Producto 25F»; app-store-launch.md §1.2; brand-brief.md).
+    Not implemented.
+- **Gates.** 2026-10-05, local, Linux. Root `npm test` 35 files, 670 passed, 1 todo; `check:repo` OK (448 tracked
+  files). `apps/mobile`: `typecheck` OK; `test:storage` 1342 passed of 1342 (real SQLite included); `currency:verify`,
+  `regions:verify` OK; `i18n:check -- --strict` 0 errors, 0 stale; `check` (expo install --check) OK; `export:ios` OK and
+  `scripts/check-bundle-secrets.mjs` over that export passes. The SQL suite on a local disposable PostgreSQL 17:
+  `schema.sql` + `schema.test.sql` (with test (o), the environment binding, and the `dblink` races), then
+  `staging/verify.sql` printing `STAGING_VERIFY_OK` and `staging/usage-report.sql`, as the CI job now runs them;
+  `verify.sql` caught each of 13 planted faults (grants by table and by column, TRUNCATE, RLS off, an open inbox policy,
+  AI enabled, another environment's row, a reset `search_path`, `security invoker`, a chat table). An adversarial review
+  of the code (five lenses, two skeptics per finding) left 12 findings, all fixed with tests (the reconciliation's
+  unsettled-day bypass, a project filter that matched nothing, non-numeric amounts; the probe's empty-inbox and
+  status-only checks; the evaluation keeping a failure's model and usage, unknown cache-write counts as null, the input
+  cap); 15 planted faults in the new guards were each caught by a test. `node server/mobile/evals/run.js` (fixture mode)
+  passes every threshold, including `estimateExceededCount` = 0 (not a model result). No EAS build, no remote SQL, no
+  provider call, no service configured, no iPhone run by the agent.
 
 ### Later notes recorded in 24UX6A (future; document only, not scheduled)
 
@@ -4655,6 +4919,10 @@ nothing of it is on a screen yet.
   the detail row, indexing in `selectEntries`, the Assistant's evidence (never sent without consent) and
   its VoiceOver order.
 - **Rules.** Every write through the validators; imports are drafts; no invented balances.
+- **The Assistant's typed scope (recorded 2026-10-05, 25A-06; built with 25A-07's evidence).** Movimientos' filters
+  (exact date, date range, category, account, merchant) take the **same typed scope** the Assistant's evidence uses,
+  so an evidence action opens Movimientos filtered to exactly the cited scope. The route and the filter are built on
+  the device from the validated scope, never from a name or a date the model wrote.
 - **Gates.** Domain tests per feature; schema/backup version bumps with rollback tests; the
   import preview on the iPhone with the owner's own CSV.
 - **Depends on.** Nothing outside 24M for currencies in imported rows.
@@ -4696,6 +4964,11 @@ docs/merchant-identity.md.
   backup tests if it needs a record.
 - **Rules.** The typed name stays; the category stays the classification; no ambiguous match; a
   scheduled payment is never a movement; no connection to a merchant or a bank is implied.
+- **The calendar and the Assistant (recorded 2026-10-05, 25A-06).** The financial calendar is a presentation and
+  navigation surface over the ledger, **not a data source the Assistant depends on**: the Assistant answers date
+  questions from the ledger already in 25A-07. When the calendar exists it reads the same typed scope (25C), so an
+  Assistant evidence action for a single day may open that day in Reportes → Calendario where appropriate, and
+  Movimientos filtered to the scope otherwise.
 - **Gates.** Domain tests (matching, suggestions never applied without confirmation, the calendar
   per currency), schema and backup versions with rollback tests if any record is added, the history
   and calendar on the iPhone with VoiceOver and large text.
@@ -4816,7 +5089,9 @@ tied to 25E's account are deferred to 25E or a follow-up after it (24T1C, 2026-0
   spending, amounts hidden by default, reading 25C2's commitments.
 - **Apple Watch (explicit future surface):** a focused capture and read experience, a WidgetKit
   complication / Smart Stack widget and App Intents; **not** a full replica of the iPhone app.
-- **Sign in with Apple — deferred to 25E or later, not part of 25D**, when an account exists; never required for the local core.
+- **Sign in with Apple — not part of 25D**; never required for the local core. It arrives earlier than 25E, with 25A's
+  session slice ([decision 006](decisions/006-cloud-identity.md), recommended in 25A-06 Phase A), when a cloud feature
+  first needs an account.
 - **FinanceKit and external financial transactions (reconciled 2026-10-02 in 24T3; documentation only, no
   entitlement or code).** FinanceKit is the future research and integration gate for financial accounts and
   transactions the person authorizes, only where Apple makes that data available and grants FinanzApp the required

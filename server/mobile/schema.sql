@@ -45,10 +45,13 @@ begin
   return true;
 end $$;
 
-create function public.mobile_receive_capture(p_user_id uuid, p_request_id text, p_source text, p_payload jsonb) returns jsonb
+create function public.mobile_receive_capture(p_user_id uuid, p_request_id text, p_source text, p_payload jsonb, p_environment text) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare existing public.mobile_capture_inbox; new_id uuid;
 begin
+  -- The deployment's environment must be this database's (mobile_ai_control.environment); otherwise nothing is touched.
+  if p_environment is null or p_environment is distinct from (select c.environment from public.mobile_ai_control c where c.id)
+    then return jsonb_build_object('error','environment'); end if;
   -- auth.uid() is null under service_role: the owner is the server-verified id, and must be a real, non-anonymous user.
   if p_user_id is null or not exists (select 1 from auth.users u where u.id = p_user_id and not u.is_anonymous)
     then raise exception 'Authentication required'; end if;
@@ -74,6 +77,9 @@ end $$;
 -- new reservation without a redeploy. Amounts in integer micro-USD (1 USD = 1 000 000 µUSD).
 create table public.mobile_ai_control (
   id boolean primary key default true check (id),
+  -- Which environment this database is. Every privileged call names its deployment's environment and is refused on a
+  -- mismatch, so a deployment pointed at another environment's project fails closed. Set once, here.
+  environment text not null check (environment in ('staging', 'production')),
   enabled boolean not null default false,
   user_month_ceiling_micro_usd bigint not null check (user_month_ceiling_micro_usd >= 0),
   -- Sized well below the global day, so one account (or a few) cannot use up the app-wide day for everyone.
@@ -96,10 +102,10 @@ revoke all on public.mobile_ai_control from public, anon, authenticated, service
 -- STAGING PLACEHOLDER values, disabled: production thresholds come from measured staging cost, not frozen here.
 -- $2 per user/month, $0.25 per user/day, $1 global/day, $5 global/month, $0.01 per request; 32 000/4 000 tokens;
 -- 6/min, 60/h, 200/day, 2 000/month per user; 2 concurrent per user, 10 global; a reservation counts as in flight for 120 s.
-insert into public.mobile_ai_control (user_month_ceiling_micro_usd, user_day_ceiling_micro_usd, global_day_ceiling_micro_usd, global_month_ceiling_micro_usd,
+insert into public.mobile_ai_control (environment, user_month_ceiling_micro_usd, user_day_ceiling_micro_usd, global_day_ceiling_micro_usd, global_month_ceiling_micro_usd,
   max_request_micro_usd, max_input_tokens, max_output_tokens, user_per_minute, user_per_hour, user_per_day, user_per_month,
   user_concurrency, global_concurrency, reservation_ttl_seconds)
-values (2000000, 250000, 1000000, 5000000, 10000, 32000, 4000, 6, 60, 200, 2000, 2, 10, 120);
+values ('staging', 2000000, 250000, 1000000, 5000000, 10000, 32000, 4000, 6, 60, 200, 2000, 2, 10, 120);
 
 -- One monetary reservation per Assistant request. charged_micro_usd is the maximum while reserved or unsettled and the
 -- actual cost once settled (never capped down: above the maximum it is recorded as 'estimate_exceeded'). Every row
@@ -132,10 +138,11 @@ alter table public.mobile_ai_reservations enable row level security;
 revoke all on public.mobile_ai_reservations from public, anon, authenticated, service_role;
 
 -- Reserve the request's maximum cost before the provider is called. Returns {id} or {error: code}, checked in this
--- order: disabled, duplicate, request_too_large, rate, busy, user_budget (the person's month or day), global_budget
+-- order: environment (the deployment names another environment than this database's), disabled, duplicate,
+-- request_too_large, rate, busy, user_budget (the person's month or day), global_budget
 -- (the monetary circuit breaker).
 create function public.mobile_ai_reserve(p_user_id uuid, p_request_id text, p_model text, p_max_micro_usd bigint,
-  p_input_tokens integer, p_output_tokens integer) returns jsonb
+  p_input_tokens integer, p_output_tokens integer, p_environment text) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
   c public.mobile_ai_control; today date := (now() at time zone 'UTC')::date;
@@ -149,6 +156,7 @@ begin
   -- ponytail: one global lock for every AI budget decision, fine at staging scale; per-budget row locks if throughput matters.
   perform pg_advisory_xact_lock(91720601, 2);
   select * into c from public.mobile_ai_control where id;
+  if found and (p_environment is null or p_environment is distinct from c.environment) then return jsonb_build_object('error','environment'); end if;
   if not found or not c.enabled then return jsonb_build_object('error','disabled'); end if;
   if exists (select 1 from public.mobile_ai_reservations where user_id = p_user_id and request_id = p_request_id)
     then return jsonb_build_object('error','duplicate'); end if;
@@ -200,11 +208,11 @@ begin
   return found;
 end $$;
 
-revoke all on function public.mobile_reserve_usage(uuid), public.mobile_receive_capture(uuid,text,text,jsonb),
-  public.mobile_ai_reserve(uuid,text,text,bigint,integer,integer),
+revoke all on function public.mobile_reserve_usage(uuid), public.mobile_receive_capture(uuid,text,text,jsonb,text),
+  public.mobile_ai_reserve(uuid,text,text,bigint,integer,integer,text),
   public.mobile_ai_settle(uuid,uuid,text,bigint,integer,integer,integer,integer,integer)
   from public, anon, authenticated, service_role;
-grant execute on function public.mobile_receive_capture(uuid,text,text,jsonb),
-  public.mobile_ai_reserve(uuid,text,text,bigint,integer,integer),
+grant execute on function public.mobile_receive_capture(uuid,text,text,jsonb,text),
+  public.mobile_ai_reserve(uuid,text,text,bigint,integer,integer,text),
   public.mobile_ai_settle(uuid,uuid,text,bigint,integer,integer,integer,integer,integer) to service_role;
 commit;

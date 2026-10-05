@@ -28,5 +28,5 @@ export function createProvider(config, fetcher = fetch) {
   // Resolved at call time: openai.js imports ProviderError from here, and a cycle read at load time could see nothing.
   const adapter = { openai: createOpenAIProvider }[config.provider];
   if (!adapter) throw new Error('Unknown provider');
-  return adapter({ apiKey: config.apiKey, model: config.model, serviceTier: config.serviceTier, timeoutMs: config.providerTimeoutMs, fetcher });
+  return adapter({ apiKey: config.apiKey, project: config.providerProject, model: config.model, serviceTier: config.serviceTier, timeoutMs: config.providerTimeoutMs, fetcher });
 }

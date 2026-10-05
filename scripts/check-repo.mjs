@@ -68,7 +68,7 @@ export const RETIRED_IMPORTS = [
    no tracked file may declare a public Expo variable that sounds like a secret or a provider key. Expo inlines every
    `EXPO_PUBLIC_*` value into the bundle anyone can unzip; a publishable key is public by design and allowed. */
 export const APP_TREE = /^apps\/mobile\//;
-export const SERVER_SECRET_NAMES = /\b(?:MOBILE_AI_API_KEY|MOBILE_SUPABASE_SECRET_KEY|MOBILE_OPENAI_API_KEY|OPENAI_API_KEY|ANTHROPIC_API_KEY|SUPABASE_SERVICE_ROLE_KEY)\b/;
+export const SERVER_SECRET_NAMES = /\b(?:MOBILE_AI_API_KEY|MOBILE_SUPABASE_SECRET_KEY|MOBILE_OPENAI_API_KEY|OPENAI_API_KEY|OPENAI_ADMIN_KEY|ANTHROPIC_API_KEY|SUPABASE_SERVICE_ROLE_KEY|STAGING_PROBE_[AB]_PASSWORD)\b/;
 export const PUBLIC_SECRET_NAME = /\bEXPO_PUBLIC_[A-Z0-9_]*(?:SECRET|PRIVATE|SERVICE_ROLE|API_KEY|OPENAI|ANTHROPIC|GEMINI|PROVIDER|PASSWORD)[A-Z0-9_]*\b/;
 
 export function findExposureOffenders(file, text) {

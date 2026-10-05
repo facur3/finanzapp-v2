@@ -2,7 +2,11 @@
 
 **Status.** Planning document, written 2026-10-02 in Producto 25OPS1; updated 2026-10-05 in Producto 25A-05 (the AI
 security, provider contract and evaluation harness: §4.2, §4.6, §4.7, §5, §6, §13, §14; after its security audit, the
-billing principle §6.6 and the audit cadence §14.1). Nothing described here is
+billing principle §6.6 and the audit cadence §14.1); updated 2026-10-05 in Producto 25A-06 Phase A (the repository
+preflight of the staging activation: the environment identity and binding §2, §4.2, §4.7; the staging host §2.4, §3.4;
+the staging verification and probe scripts §4.4, §4.5; the token precheck §4.6; the live-run gates §5.8; alerts and
+scaling operations §6; the cloud identity §12.2, [decision 006](decisions/006-cloud-identity.md)). The step-by-step
+staging procedure is [ai-staging-runbook.md](ai-staging-runbook.md). Nothing described here is
 implemented unless it is marked **EXISTS TODAY**. No environment was created, no remote migration was run, no EAS build
 was made, no model was evaluated and no paid provider was called to write it.
 
@@ -13,14 +17,14 @@ was made, no model was evaluated and no paid provider was called to write it.
   analytics, ASO, market localization, the release pipeline, App Review and the legal deliverables.
 - Sequencing stays in [mobile-roadmap.md](mobile-roadmap.md) (§3 «Next deliveries», §4 «Launch»). This document
   explains the architecture and the gates behind those phases; it does not reorder them. The binding rules are
-  [AGENTS.md](../AGENTS.md) and [decisions/](decisions/) 001 to 005. When this document and one of those disagree,
+  [AGENTS.md](../AGENTS.md) and [decisions/](decisions/) 001 to 006. When this document and one of those disagree,
   they win and this document is corrected.
 
 ## Labels
 
 | Label | Meaning |
 | --- | --- |
-| **EXISTS TODAY** | In the repository at Producto 25OPS1, or at the later Producto the text names (25A-05 for the server and protocol work), with the file named. "Exists" is code and tests on Linux, not device evidence, not a deployment and not an applied schema. |
+| **EXISTS TODAY** | In the repository at Producto 25OPS1, or at the later Producto the text names (25A-05 for the server and protocol work, 25A-06 Phase A for the staging preflight), with the file named. "Exists" is code and tests on Linux, not device evidence, not a deployment and not an applied schema. |
 | **DECIDED** | A binding rule already in AGENTS.md, a decision record or the roadmap, or stated as binding in the owner's 25OPS1 brief. The source is cited. |
 | **RESEARCH GATE** | Unknown until an experiment or a physical-device proof settles it. Nothing may be built on the assumed answer. |
 | **IMPLEMENTATION GATE** | Must be built and tested before the next step may start. |
@@ -48,7 +52,7 @@ on the device before success is shown, and never dependent on a connection, an a
 | Rate cache | `finanzapp-rates-v1.sqlite`, version 1 (`apps/mobile/src/storage/rates-database.ts`) | Reference exchange rates per day, base USD. Reference data anyone can download again. | No |
 | Preferences | expo-sqlite's key-value store | Language, region, recent choices, appearance, display currency and mode, the first-opening mark. | No |
 | Backup files | A JSON document built on demand (`apps/mobile/app/backup.tsx`, `packages/domain/recovery.ts`) | The ledger archive, lowest schema that fits (v8 to v14), 5 MB cap. Plain, unencrypted. | It is the backup |
-| Assistant conversation | Memory only (`apps/mobile/src/assistant/session.ts`) | The current session's messages and one parked draft. Closing the app erases it. | No |
+| Assistant conversation | Memory only (`apps/mobile/src/assistant/session.ts`) | The current session's messages and at most one draft parked behind a clarification. Closing the app erases it. A proposal is not kept here: since 25A-04 it is captured into the review store. | No |
 
 Not present today (**NOT IMPLEMENTED**): Keychain or SecureStore use, any session or token, an outbox or sync queue,
 an encrypted database, an explicit iOS data-protection class, an automatic or cloud backup. The app holds no secret
@@ -133,10 +137,23 @@ No environment is created by this document. The matrix is the target; the "today
   `preview` (internal, bundled JavaScript) and `testflight` (store distribution). The `testflight` profile sets
   `APP_VARIANT=preview`, so today it would upload the `.preview` identity under the name "FinanzApp Preview". There is
   no `production` profile. Details and the fix are in [app-store-launch.md](app-store-launch.md) §11.
-- **EXISTS TODAY:** one Vercel project that serves the two mobile API routes (§3). Whether it has any environment
-  variable set was not inspected; unconfigured, both routes answer 503.
+- **EXISTS TODAY:** one Vercel project that serves the two mobile API routes (§3), `finanzapp-v2`, the same project
+  that hosted the retired PWA (`finanzapp-v2.vercel.app` and a `-rho` alias in history). Whether it has any environment
+  variable set was not inspected (an **OWNER CHECK** of [runbook](ai-staging-runbook.md) §2.2); unconfigured, both
+  routes answer 503.
+- **EXISTS TODAY (25A-06 Phase A, in code): the environment identity.** `environmentOf` in `server/mobile/runtime.js`
+  lets a route run only when `MOBILE_ENVIRONMENT` names an enabled environment (`ENABLED_ENVIRONMENTS`: `staging` only;
+  production joins it only by a reviewed code change, never by configuration) **and** Vercel's own `VERCEL_ENV` is
+  `production`. A Vercel Preview, `vercel dev` or a deployment that hides Vercel's system variables stays closed (503,
+  no dependency) whatever variables it holds; off Vercel (the evaluation and probe scripts) `VERCEL_ENV` must be
+  absent. **The database binding:** `mobile_ai_control.environment` records the database's environment, and every
+  privileged call names the deployment's, refused on a mismatch (§4.2). Tests: `server/mobile/handlers.test.js`
+  («environment identity and key kinds fail closed») and `schema.test.sql` (o).
 - **NOT IMPLEMENTED, REMOTE SETUP:** no Supabase project is recorded in the repository, no AI provider project, no
-  staging or production backend, no StoreKit configuration, no analytics.
+  staging or production backend, no StoreKit configuration, no analytics. Git history (the repository is public) holds a
+  legacy Supabase project ref (beginning `mtij`) and its legacy `anon` JWT, reachable at the tag `web-frontend-final`;
+  no `service_role` key was ever committed. That project is never reused as staging; what it holds and its fate are an
+  **OWNER CHECK** and a separate owner decision (runbook §2.1).
 
 ### 2.2 Target matrix
 
@@ -145,7 +162,10 @@ No environment is created by this document. The matrix is the target; the "today
 | Purpose | Daily work on the owner's registered iPhone with Metro; CI on Linux. | The first place a network feature runs end to end, with test accounts only. | Real people. |
 | Expo / EAS profile | `development` (exists) | `preview` (exists) for ad hoc installs; an internal TestFlight build once the identity is decided | A `production` profile that does not exist yet (**IMPLEMENTATION GATE**, Producto 26) |
 | App identity | `com.facur3.finanzapp.dev` | `com.facur3.finanzapp.preview` | **OWNER DECISION** at Producto 26. `com.facur3.finanzapp` was registered by the retired Capacitor app and is not reassigned by default (decision 004; AGENTS rule 3). |
-| Backend origin | None, or a local server with fakes. Never production. | A staging origin of the mobile API (§2.4) | The production origin of the mobile API |
+| Backend origin | None, or a local server with fakes. Never production. | A staging origin of the mobile API: the production domain of the Vercel project `finanzapp-api-staging` (§2.4) | The production origin of the mobile API (`finanzapp-v2`, later) |
+| Vercel deployment | None (`vercel dev` stays closed: `VERCEL_ENV` is not `production`) | The **Production** environment of `finanzapp-api-staging` | The Production environment of `finanzapp-v2`, which keeps no AI or Supabase variable until a release decision |
+| `MOBILE_ENVIRONMENT` | Unset | `staging`, the only enabled value (**EXISTS TODAY**, 25A-06 Phase A) | `production`, refused by code today |
+| Database environment binding | None | `mobile_ai_control.environment = 'staging'`; a call naming another environment is refused (§4.2) | `'production'` in its own database (later) |
 | Supabase project | None, or the CI PostgreSQL job | A staging project of its own | A production project of its own |
 | AI project and key | Deterministic fakes; fixtures (`EXPO_PUBLIC_ASSISTANT_FIXTURES`, development bundles only) | A dedicated provider project or workspace with its own key and a very small hard cap | A separate dedicated project or workspace, key and cap |
 | StoreKit environment | StoreKit testing or none | Sandbox (TestFlight purchases are not charged) | Production |
@@ -154,7 +174,14 @@ No environment is created by this document. The matrix is the target; the "today
 | Request quotas | Not applicable | The rate, concurrency and request caps of `mobile_ai_control` (§4.2), at their staging placeholders | Set from measured staging use |
 | Monetary limits | None spent | A provider hard cap far below production; server ceiling lower still (§6) | Owner-approved ceilings (§6) |
 | Feature flags | Development-only preview flags, compiled out of release bundles | Server flags (`MOBILE_INTEGRATIONS_ENABLED`, `MOBILE_AI_ENABLED`) and the database switch `mobile_ai_control.enabled` | The same flags, with their own values |
-| Secrets | None in the repository; none in the app | Server environment of the staging deployment only | Server environment of the production deployment only |
+| Secrets | None in the repository; none in the app | Server environment of the staging deployment only, Production scope of `finanzapp-api-staging` | Server environment of the production deployment only |
+
+**Vercel Preview is not an environment** (runbook §3). A Preview deployment of any branch, in either project, gets **no
+variable** in its scope (never Preview, never Development: an **OWNER ACTION** checked at runbook B1), is **not built**
+(`vercel.json`'s `ignoreCommand` skips every non-production build, **EXISTS TODAY** since 25A-06 Phase A; the same
+command as the project's Ignored Build Step also stops Previews of older branches, an **OWNER ACTION**) and is
+**closed by code** (`VERCEL_ENV` must be `production`). «Preview» is also an app variant and an EAS profile; none of
+the three is a backend environment.
 
 ### 2.3 Rules
 
@@ -173,19 +200,26 @@ AI budget, StoreKit assumptions or admin data. The five rules below are this pla
 
 ### 2.4 Staging access on Vercel
 
-**RESEARCH GATE, OWNER DECISION.** Vercel's Standard Deployment Protection puts an authentication wall in front of
-every non-production URL, which a phone app cannot pass. The options (the last three are Vercel's documented staging
-patterns as read on 2026-10-02; the first is this plan's own proposal, to be confirmed against plan limits and cost):
+**DECIDED for staging (25A-06 Phase A; [runbook](ai-staging-runbook.md) §4.1): the second-project option.** Staging
+is the **Production** environment of a second Vercel project, **`finanzapp-api-staging`**, connected to this same
+repository with production branch `master`; its production domain is the staging API origin. `finanzapp-v2` stays the
+planned production host and keeps no AI or Supabase variable until a production release decision (its final role is
+recorded after the runbook's B11). Creating the project, its settings and its Production-only variables are **OWNER
+ACTIONS** at the runbook's B6 (§4.3, §4.4); nothing is created by this document. Vercel's Standard Deployment
+Protection puts an authentication wall in front of every non-production URL, which a phone app cannot pass; the
+staging production domain is therefore public by necessity, safe because every route requires a verified session and
+nothing runs without the database's own switch. The options compared (the last three are Vercel's documented staging
+patterns as read on 2026-10-02; the first is this plan's own proposal):
 
 | Option | Trade-off |
 | --- | --- |
-| A second Vercel project for staging, with its own production domain and variables | Cleanest isolation. One more project to keep. |
+| A second Vercel project for staging, with its own production domain and variables | Cleanest isolation: its own variable store, logs, domain and settings. One more project to keep. Works on the Hobby plan, and a phone reaches it without a bypass secret (runbook §4.1). **Chosen.** |
 | A custom environment named `staging` on the same project | Needs the Pro plan (one custom environment per project). The URL still needs a protection decision. |
 | A preview branch with a protection-bypass secret | The secret would ship inside a staging binary. Rejected unless nothing else works. |
 | A "staged production deployment" | Uses production variables, so it can reach production data. **Not allowed** for staging. |
 
-The first option is the default recommendation because it makes rule 3 structural. It is the owner's call because it
-may carry a plan cost (§3.4).
+The first option was the default recommendation because it makes rule 3 structural, and 25A-06 Phase A adopts it for
+staging. Production's own arrangement, and the plan the commercial backend needs, stay the owner's call (§3.4).
 
 ### 2.5 Promotion and rollback
 
@@ -243,7 +277,10 @@ The ledger is not in this picture. It stays on the iPhone.
 repository or in the platform limits read on 2026-10-02 is a concrete blocker: the handlers already run there, the
 tests and CI already cover them, and the documented limits (300 s default duration, 4.5 MB body) are far above this
 workload (a 34 s handler budget with a 20 s provider timeout, a 24 KB body). Nothing is deleted or migrated in 25OPS1. No migration is made merely
-to reduce the number of providers.
+to reduce the number of providers. **EXISTS TODAY (25A-06 Phase A):** `vercel.json` sets `maxDuration` **60 s** for
+`api/mobile/*.js`, above the 34 s budget and the app's 35 s wait, and within every plan's maximum (Hobby allows 300 s with
+Fluid compute; the older non-Fluid Hobby limit was 60 s), so it holds on any plan (runbook §4.5; `staging.test.js` pins it). A function killed mid-request leaves its reservation
+`reserved` at its maximum, which keeps counting (§6.3).
 
 ### 3.3 Vercel Functions and Supabase Edge Functions compared
 
@@ -271,19 +308,31 @@ bill. The choice turns on porting cost, plan cost and measured latency.
 
 - **OWNER ACTION, LAUNCH BLOCKER — plan.** Vercel's fair-use guidelines restrict the Hobby plan to "non-commercial
   personal use only". A backend for an app that sells a subscription is commercial use; that needs the Pro plan before
-  monetisation. Which plan the project is on today was not inspected. Supabase's Free plan pauses a project after a week
-  without activity and has no backups, so it is not a production backend either. Each is a paid subscription and needs
-  the owner's authorization (AGENTS rule 3).
-- **OWNER ACTION — Node version.** Vercel disabled Node.js 20 for new deployments on 2026-10-01. The root
-  `package.json` (what the Vercel project reads) declares no `engines` (`apps/mobile/package.json` declares one for the
-  app's tooling only), so the project setting decides. Check it before the next deployment; adding `engines.node` to
-  the root `package.json` is the durable fix and belongs to the next server slice.
-- **Supabase keys (designed in 25A-05).** Supabase states it is deprecating the `anon` and `service_role` keys by the
-  end of 2026 in favour of publishable and secret keys. The server reads only the new kinds: a publishable key
-  (`MOBILE_SUPABASE_PUBLISHABLE_KEY`) to verify sessions and a secret key (`MOBILE_SUPABASE_SECRET_KEY`) for the
-  `service_role`-only functions (§4.6). Neither exists until the owner creates the staging project (25A-06).
-- **OWNER ACTION — region.** No region is set in `vercel.json`, so functions run in Vercel's default region. The region
-  must be set to the one nearest the Supabase project when that project is created.
+  monetisation. Which plan the project is on today was not inspected (an **OWNER CHECK** at runbook B1, §2.2). Supabase's Free plan pauses a project after a week
+  without activity and has no backups, so it is not a production backend either (acceptable for staging, runbook §6.1).
+  Each is a paid subscription and needs the owner's authorization (AGENTS rule 3).
+- **Node version.** Vercel disabled Node.js 20 for new deployments on 2026-10-01. **EXISTS TODAY (25A-06 Phase A):**
+  the root `package.json` (what the Vercel project reads) declares `engines.node` **`24.x`** (`apps/mobile/package.json`
+  declares its own for the app's tooling only). **OWNER ACTION:** record the Node.js version set on `finanzapp-v2`
+  (runbook B1) and choose 24.x when creating `finanzapp-api-staging` (runbook §4.3).
+- **Supabase keys (designed in 25A-05; key kinds enforced since 25A-06 Phase A).** Supabase states it is deprecating the
+  `anon` and `service_role` keys by the end of 2026 in favour of publishable and secret keys. The server reads only the
+  new kinds: a publishable key (`MOBILE_SUPABASE_PUBLISHABLE_KEY`, `sb_publishable_…`) to verify sessions and a secret
+  key (`MOBILE_SUPABASE_SECRET_KEY`, `sb_secret_…`) for the `service_role`-only functions (§4.6); a legacy JWT or a
+  swapped pair closes the route. Neither exists until the owner creates the staging project (runbook B3).
+- **Region.** **DECIDED (owner, 2026-10-05); EXISTS TODAY in the repository (25A-06 Phase A):** `vercel.json` sets
+  `regions: ["gru1"]` (São Paulo) for both projects, next to a staging Supabase project in the specific region
+  **`sa-east-1`** (São Paulo). The reasons:
+  - the product is Argentina-first;
+  - the API compute stays next to its database (three sequential Supabase calls per request);
+  - the person's round trip is shorter for the initial Argentina market;
+  - staging represents the intended initial production topology.
+
+  The one provider call per request leaves South America; staging measures p50/p95 by leg (§3.5). This is not a legal
+  requirement and changes no data-residency claim (§5.7). `gru1` is a compute-capable Vercel region, and Hobby may
+  select any single region (Vercel's documentation, 2026-10-05). **OWNER ACTION:** create the staging Supabase project
+  in South America (São Paulo) (runbook §6.1); if it is created elsewhere, `vercel.json`'s region changes to match in
+  a reviewed PR before the runbook's B6.
 
 ### 3.5 Exit criteria: when to re-evaluate Vercel
 
@@ -316,8 +365,9 @@ its own decision record only if at least one criterion below fails and the spike
 
 ### 4.2 What exists today
 
-**EXISTS TODAY** (rewritten in Producto 25A-05): `server/mobile/schema.sql`, headed "STAGING ONLY", the single initial
-staging script. It has **never been applied to any project**; its first remote application is 25A-06, by the owner,
+**EXISTS TODAY** (rewritten in Producto 25A-05; the environment binding added in 25A-06 Phase A):
+`server/mobile/schema.sql`, headed "STAGING ONLY", the single initial staging script. It has **never been applied to
+any project**; its first remote application is 25A-06, by the owner,
 after review, and it never runs from app startup or a build. Every later change is an ordered migration, never an edit of
 that file. It defines four tables and four functions:
 
@@ -327,7 +377,8 @@ that file. It defines four tables and four functions:
 - `mobile_ai_control`: one row, the Assistant's limits and its **database kill switch**. RLS on, no grant to any API
   role (not even `service_role`): only the database owner edits it, with SQL. `enabled` is **false** by default, so AI is
   off in the database too; `update public.mobile_ai_control set enabled = false` stops every new reservation without a
-  redeploy. The inserted values are **STAGING PLACEHOLDERS, not production numbers** (§6.2).
+  redeploy. The inserted values are **STAGING PLACEHOLDERS, not production numbers** (§6.2). Its `environment` column
+  (`staging` or `production`, set once; the script inserts `staging`) records which environment this database is.
 - `mobile_ai_reservations`: one monetary reservation per Assistant request (§6.3), unique per user and request id.
   `user_id` is `on delete set null`, so deleting an account never frees global spend.
 - `mobile_reserve_usage(p_user_id)`: the serialised daily capture counter (120 per user, 2 000 for the whole app per UTC
@@ -337,18 +388,38 @@ that file. It defines four tables and four functions:
   empty `search_path`, executable **only by `service_role`**. The server verifies the session itself (§4.6) and passes
   the verified owner id; each function refuses a null, unknown or anonymous user. No client role (`anon`,
   `authenticated`) may execute any function or write any table in the script.
+- **The environment binding (25A-06 Phase A).** `mobile_receive_capture(…, p_environment)` and
+  `mobile_ai_reserve(…, p_environment)` receive the deployment's environment (`environmentOf`, §2.1) and answer
+  `{error: 'environment'}` when it is null or differs from `mobile_ai_control.environment`, **before** anything else:
+  the kill switch, any budget or the inbox. The server maps it to 503, category `environment`. A staging deployment
+  wired to another environment's database is closed there too.
 
 The CI job `mobile_api` applies the schema to a disposable PostgreSQL 17, with Supabase's default privileges simulated
 (every new table and function granted to the API roles, so a missing `revoke` would show), and runs
 `server/mobile/schema.test.sql`: deduplication and conflict, direct insert refused, cross-user isolation, every client
 role refused on every function, capture limits, and for the Assistant the kill switch, idempotency, the request caps,
 the rate and concurrency windows, the per-user and global ceilings, settlement exactly once, an unsettled or stale
-reservation counting at its maximum, `estimate_exceeded`, and an account deletion keeping global spend. Two
+reservation counting at its maximum, `estimate_exceeded`, an account deletion keeping global spend and, since 25A-06
+Phase A, the environment binding (test (o)). Two
 **true two-connection concurrency proofs** (`dblink`: the second connection blocks on the budget lock and then sees the
 first one's reservation) cover the last unit of capacity; 17 planted faults (a removed lock, revoke, check or
 condition) were each caught by the suite while it was written. That proves the SQL, not any real Supabase project.
 **No agent and no CI job has applied this schema to a remote project**, and the repository holds no migration history
 or Supabase configuration.
+
+**EXISTS TODAY (25A-06 Phase A): the owner's staging verification**, `server/mobile/staging/verify.sql`. Plain SQL for
+the staging project's SQL editor, run right after the schema and with AI still disabled; it writes three throwaway
+people and their rows inside one block and undoes them by a deliberate rollback, so it keeps nothing. Its result is
+one row, `STAGING_VERIFY_OK`; any failure stops with «FAIL: …». It proves, on the real roles and grants: AI installed
+disabled and bound to `staging`; RLS on every table; no table privilege for `anon` or `service_role` and, for
+`authenticated`, only reading their own inbox; no client role executing any function (by grant and by actually calling
+them) or flipping the kill switch; every function `security definer` with an empty `search_path`; no chat-history
+table; the server path refusing while disabled, for another environment and for an anonymous owner; cross-person
+isolation of the inbox and of settlement; a duplicate request id refused; and the per-user day and month and global day
+and month ceilings each fitting exactly and refusing at +1 µUSD. Concurrency stays with the CI `dblink` race and the
+probe's race on staging (§4.5), because the editor holds one connection. The CI job `mobile_api` runs `verify.sql` and
+`server/mobile/staging/usage-report.sql` (§6.1) after `schema.test.sql` on every push; 13 planted faults were each
+caught while `verify.sql` was written. Nobody has run it on a remote project.
 
 **Fixed in the repository, not applied anywhere** (the known weakness of 25OPS1): `mobile_reserve_usage` used to be
 granted to every authenticated user, so a signed-in client could call it through PostgREST and burn its own and the
@@ -373,8 +444,11 @@ never by an agent on its own initiative. The procedure when a project exists:
 2. CI applies it to disposable PostgreSQL and runs the SQL tests, including the negative cases, before anyone applies
    it anywhere.
 3. The owner, or a person the owner authorizes, applies it to **staging** deliberately. It never runs from app start,
-   from a build or from a deployment hook.
-4. Staging is verified (§4.5) with the server build that will ship.
+   from a build or from a deployment hook. For the initial script: the whole of `schema.sql` from the merged `master`,
+   pasted into the staging SQL editor (runbook §6.3); it is one transaction and not idempotent by design, so a second
+   run changes nothing; `schema.test.sql` never runs on Supabase.
+4. Staging is verified (§4.5) with the server build that will ship: first `server/mobile/staging/verify.sql`, which must
+   print `STAGING_VERIFY_OK` (§4.2; runbook §6.4), then the network probe.
 5. The same file is applied to **production** as a recorded release step, after a backup exists. Production migrations
    are additive and compatible with the currently deployed server (§2.5).
 6. The roadmap records what was applied, where and by whom.
@@ -390,6 +464,23 @@ never by an agent on its own initiative. The procedure when a project exists:
 - every `security definer` function is reviewed for what a hostile authenticated caller can do by calling it directly;
 - the negative cases live in the SQL tests so CI keeps them.
 
+**EXISTS TODAY (25A-06 Phase A), run on no remote project:** the tools for this gate on staging.
+- `server/mobile/staging/verify.sql` (§4.2) proves the grants, RLS and ceilings inside the database.
+- `server/mobile/staging/probe.js boundary` proves them from the network, through Supabase's real API gateway, and
+  writes one fixed capture for test person B (idempotent): the two test people sign in; anonymous sign-in is refused for
+  that reason; neither the publishable key alone nor a signed-in person can execute any function or read the control
+  row, the reservations or the counters; B's probe capture is visible to B only, never to A or the publishable key; the
+  secret key alone answers `disabled`, and `environment` for another name.
+- `probe.js api` checks the deployed staging API with AI off in the database (and `--ai-enabled` after the owner
+  enables it: one or two billed requests); `probe.js race` sends eight concurrent reservations against a ceiling sized
+  for three, through the real PostgREST, with no provider call (runbook §6.6).
+- The probe reads a local env file outside the repository, staging only and off Vercel, and prints one PASS/FAIL line
+  per check, never a token, key, password or response body. Its tests (`staging.test.js`) use a fake network only.
+
+The test people will be two or three owner-created e-mail and password accounts in the staging dashboard, with public
+sign-ups and anonymous sign-ins off (runbook §5.3); they are never a product sign-in method (§12.2). **OWNER ACTION**
+at the runbook's B3 to B5.
+
 ### 4.6 Secrets, retention, deletion, logging
 
 - **Service-role isolation.** **DECIDED** (decision 001): no secret or service-role key is ever in the app.
@@ -402,10 +493,26 @@ never by an agent on its own initiative. The procedure when a project exists:
     person's token**, so the call runs as `service_role` and cannot be confused with the person's session;
   - it is never an `EXPO_PUBLIC_*` value and is never named in `apps/mobile` (`npm run check:repo` fails on either);
   - one key per backend component and environment (this API's staging key is not the account-deletion function's, and
-    never production's), so revoking one never disables another;
-  - it is never logged (the telemetry below has no field for it, and error bodies are fixed sentences).
+    never production's), so revoking one never disables another; on staging the API's key (`mobile-api-staging`) is
+    not the owner's probe key (`owner-probe-staging`, runbook §6.2);
+  - it is never logged (the telemetry below has no field for it, and error bodies are fixed sentences);
+  - since 25A-06 Phase A only the current key kinds are accepted, each in its own slot (`sb_publishable_…`,
+    `sb_secret_…`); a legacy `anon` or `service_role` JWT, or a swapped pair, closes the route.
   Account deletion (Supabase's admin `deleteUser`) will need a key of its own in one narrowly scoped function; it is
-  not built. Supabase's newer asymmetric session verification (JWKS) is a later option, not used.
+  not built.
+- **Cheap token rejection (EXISTS TODAY, 25A-06 Phase A).** Before `/auth/v1/user`, `plausibleAccessToken`
+  (`server/mobile/runtime.js`) reads, without verifying, the bearer's claims: three base64url segments, `iss` equal to
+  this project's `<supabase>/auth/v1`, `aud` and `role` `authenticated`, not anonymous, a `sub`, unexpired. Anything
+  else answers 401 with no network call. `/auth/v1/user` stays the **only authority**: it checks the signature and that
+  the session still exists.
+- **Local JWKS verification: evaluated, not added (25A-06 Phase A; runbook §10.2).** Supabase can sign access tokens
+  with asymmetric keys published at `/auth/v1/.well-known/jwks.json`, but a local signature check does **not**
+  preserve revocation: a signed-out session, a deleted account or a banned person keeps a validly signed token until it
+  expires (one hour by default). It could only come before the remote call, never replace it, and after the claim
+  precheck what remains is a well-formed forged token costing one Supabase call, bounded by Vercel's and Supabase's own
+  limits and never reaching a reservation. Revisited with staging measurements only if `/auth/v1/user` is a material
+  share of p95 (§3.5) or forged-token traffic appears (`category: auth` at volume); if added, it needs a JWKS cache with
+  rotation, ES256 verification and the remote check kept after it.
 - **Data retention (OWNER DECISION, IMPLEMENTATION GATE).** Capture payloads, usage counters and Assistant
   reservations (ids, model, token counts and charges, never content) need a written retention period and a purge job.
   Today nothing purges them; a reservation purge must keep the current periods' charges, or the ceilings would reopen.
@@ -414,8 +521,8 @@ never by an agent on its own initiative. The procedure when a project exists:
   which lets people create an account also lets them delete it in the app. Deleting the account removes the identity
   and, by `on delete cascade`, the inbox and usage rows; Assistant reservations lose their owner (`on delete set null`)
   but keep their charges, so a deleted account never frees global spend. Supabase notes that a deleted user's token stays valid until
-  it expires; the server's per-request session check covers that. Export of server-side data is an endpoint the app
-  defines; none exists.
+  it expires; the server's per-request session check (`/auth/v1/user`, never replaced by a local check) covers that.
+  Export of server-side data is an endpoint the app defines; none exists.
 - **Logging privacy (DECIDED: roadmap «Producto 25F», "consumption telemetry (usage and cost, not content)"; owner's
   25OPS1 brief, logging privacy).** No prompt text, amount, merchant, token or provider body is logged. **EXISTS TODAY
   (25A-05):** each request writes one JSON line built by `telemetryEvent` (`server/mobile/handlers.js`) from an
@@ -437,23 +544,27 @@ Values are never written in the repository, in a document or in a chat.
 
 | Name | Where it is read | Status |
 | --- | --- | --- |
+| `MOBILE_ENVIRONMENT` | `server/mobile/runtime.js` (`environmentOf`), `server/mobile/staging/probe.js`, `server/mobile/evals/run.js` | **EXISTS TODAY (25A-06 Phase A).** Must name an enabled environment: `staging` only (`ENABLED_ENVIRONMENTS`). Missing, unknown or `production` closes both routes (503). The privileged calls pass it to the database, which refuses another environment (§4.2). Plain, not a secret. |
+| `VERCEL_ENV` | `server/mobile/runtime.js` (`environmentOf`) | **EXISTS TODAY (25A-06 Phase A), read only.** Vercel's own system variable, never set by hand ("Automatically expose System Environment Variables" on, runbook §4.3). A route runs only when it is `production`; the eval and probe scripts refuse to run when it is present at all. |
 | `MOBILE_INTEGRATIONS_ENABLED` | `server/mobile/runtime.js` | **EXISTS TODAY.** Master switch for both routes. |
 | `MOBILE_SUPABASE_URL` | `server/mobile/runtime.js` | **EXISTS TODAY.** Must be a bare https origin. |
-| `MOBILE_SUPABASE_PUBLISHABLE_KEY` | `server/mobile/runtime.js` | **EXISTS TODAY.** A publishable key, safe to expose but kept server-side. Verifies the person's session only. |
-| `MOBILE_SUPABASE_SECRET_KEY` | `server/mobile/runtime.js` | **EXISTS TODAY (25A-05).** A secret, server only, required by both routes: the `apikey` header of the privileged RPCs (§4.6), never with a person's token. |
+| `MOBILE_SUPABASE_PUBLISHABLE_KEY` | `server/mobile/runtime.js` | **EXISTS TODAY.** A publishable key, safe to expose but kept server-side. Verifies the person's session only. Since 25A-06 Phase A it must be a `sb_publishable_…` key; a legacy `anon` JWT (or the secret key in this slot) closes the route. |
+| `MOBILE_SUPABASE_SECRET_KEY` | `server/mobile/runtime.js` | **EXISTS TODAY (25A-05).** A secret, server only, required by both routes: the `apikey` header of the privileged RPCs (§4.6), never with a person's token. Since 25A-06 Phase A it must be a `sb_secret_…` key; a legacy `service_role` JWT (or the publishable key in this slot) closes the route. |
 | `MOBILE_AI_ENABLED` | `server/mobile/runtime.js` | **EXISTS TODAY.** Assistant route only; must be `true`. The deployment's kill switch (the database's is `mobile_ai_control.enabled`, §6.2). |
 | `MOBILE_AI_PROVIDER` | `server/mobile/runtime.js` | **EXISTS TODAY (25A-05).** Allowlist: `openai`. Anything else disables the route. |
 | `MOBILE_AI_MODEL` | `server/mobile/runtime.js` | **EXISTS TODAY (25A-05).** Required, no code default; it must have a price in `server/mobile/pricing.js` (`gpt-6-luna` or `gpt-5.6-luna` today), otherwise the route is off. A model change is a server configuration change, never an app build. |
-| `MOBILE_AI_API_KEY` | `server/mobile/runtime.js` | **EXISTS TODAY (25A-05).** A secret, server only. The neutral name that replaced `MOBILE_OPENAI_API_KEY`. |
+| `MOBILE_AI_API_KEY` | `server/mobile/runtime.js` | **EXISTS TODAY (25A-05).** A secret, server only. The neutral name that replaced `MOBILE_OPENAI_API_KEY`. Since 25A-06 Phase A it must be project-scoped (`sk-proj-…`, or a project service account's `sk-svcacct-…`); a user, legacy or admin key closes the route. |
+| `MOBILE_AI_PROVIDER_PROJECT` | `server/mobile/runtime.js`, `server/mobile/openai.js` | **EXISTS TODAY (25A-06 Phase A).** Required with the key: the provider project id (`proj_…`), sent as the `OpenAI-Project` header, so a key of any other project is refused by OpenAI (401 `mismatched_project`). An id, not a secret. |
 | `MOBILE_AI_REASONING_EFFORT` | `server/mobile/runtime.js` | **EXISTS TODAY (25A-05).** Default `low`; must be in the model's allowlist in `pricing.js` (`gpt-6-luna`: `none`, `low`). |
 | `MOBILE_AI_MAX_INPUT_TOKENS` | `server/mobile/runtime.js` | **EXISTS TODAY (25A-05).** Default 32 000 (above the largest valid request, about 25 500), accepted 6 000–32 000 and below the model's short-context limit; the request's input bound above it answers 413. |
 | `MOBILE_AI_MAX_OUTPUT_TOKENS` | `server/mobile/runtime.js` | **EXISTS TODAY (25A-05).** Default 1 500, accepted 256–4 000; includes reasoning tokens. |
-| `MOBILE_AI_EVAL_LIVE` | `server/mobile/evals/run.js` | **EXISTS TODAY (25A-05).** Only `1` together with a complete Assistant configuration lets `run.js --live` create a provider; for 25A-06's staging evaluation, never set on a deployment. |
+| `MOBILE_AI_EVAL_LIVE` | `server/mobile/evals/run.js` | **EXISTS TODAY (25A-05; gates added in 25A-06 Phase A).** Only `1` lets `run.js --live` create a provider, and only together with a complete **staging** Assistant configuration off Vercel (`MOBILE_ENVIRONMENT=staging`, no `VERCEL_ENV`, a project-scoped key and its project id), a price table read within `PRICING_MAX_AGE_DAYS` (30) and `--approve-micro-usd` at least the run's worst case (§5.8); otherwise exit 2 before any provider exists. For 25A-06's staging evaluation from the owner's machine; never set on any deployment. |
+| `STAGING_API_ORIGIN`, `STAGING_PROBE_A_EMAIL`, `STAGING_PROBE_A_PASSWORD`, `STAGING_PROBE_B_EMAIL`, `STAGING_PROBE_B_PASSWORD` | `server/mobile/staging/probe.js` | **EXISTS TODAY (25A-06 Phase A).** Probe only, in the owner's local env file outside the repository (runbook §0.3), never on a deployment: the staging API's https origin and the two owner-created test people (§4.5). The passwords are secrets; `npm run check:repo` fails if a probe password name, or the reconciliation's `OPENAI_ADMIN_KEY` name, appears in the app. The organization admin key for the provider's Costs API is read by no script and held in no FinanzApp setting (runbook §9.3). |
 | `EXPO_PUBLIC_MOBILE_API_ORIGIN` | `apps/mobile/src/assistant/client.ts` | **EXISTS TODAY** as a name, read through a passed `env` object, not a literal `process.env.EXPO_PUBLIC_MOBILE_API_ORIGIN`; Expo inlines only literal reads into a release bundle, so rule 1 of §2.3 needs the literal read (**IMPLEMENTATION GATE**, roadmap 25A server lane, "literal env reads"), verified in an exported release bundle. Public by construction; unset means disconnected. |
 | `APP_VARIANT`, `EXPO_PUBLIC_EAS_PROJECT_ID` | `apps/mobile/app.config.ts`, `eas.json` | **EXISTS TODAY.** Build identity; not secrets. |
 | Service tier | `server/mobile/runtime.js` | **EXISTS TODAY (25A-05)** as a constant, not a variable: pinned to `default` (the only priced tier). |
 | Monetary ceilings, rate and concurrency limits, the AI kill switch | `public.mobile_ai_control` (§4.2) | **EXISTS TODAY (25A-05)** in the schema, **not** in the environment: one owner-only row, edited with SQL, read on every reservation, so a change needs no redeploy. Staging placeholders only (§6.2). |
-| Alert thresholds | to be added | **NOT IMPLEMENTED** (§6, 25A-06). |
+| Alert thresholds | to be added | **NOT IMPLEMENTED.** Staging relies on the provider's budget e-mails (§6.1); an automated owner alert is required before production (§6.2). |
 | A Supabase secret key for account deletion | to be added | **NOT IMPLEMENTED.** A key of its own, server only; see §4.6. |
 
 ---
@@ -569,7 +680,7 @@ that matches none or several is asked, never replaced by the only eligible accou
 25A-05 the model's proposal is a protocol v2 `ProposalDraft` validated on the server and again on the device before
 `resolveDraft`, and a payment reference drops a leading preposition and article or possessive («con la Visa», "my
 Visa") before the whole-word match (a reference that is only such a word, «con la», names no destination). Still open: the wire protocol knows only ARS and USD (protocol v2), and the
-Assistant stays disconnected in every build until its own slices (25A-06 connects a staging build); the deferred 24T3
+Assistant stays disconnected in every build until its own slices (no build points at staging in 25A-06: the session slice of decision 006 and the consent screen come first, runbook §13); the deferred 24T3
 device pass is a release blocker, not a merge gate (owner decision, 2026-10-04: roadmap §2).
 
 ### 5.4 Minimal context: what leaves the device
@@ -588,6 +699,18 @@ without its version and id (`modelInput`). The region is sent because it is the 
 Using AI does not upload the ledger. A custom category name is the most personal thing an `explain` request carries.
 The consent screen must say exactly this. New fact kinds (budgets, cards, commitments) are added one at a time, each
 with a reason, each visible in the consent text; "send everything and let the model sort it out" is not an option.
+
+**Exact date and date-range questions (DECIDED by the owner, 2026-10-05; IMPLEMENTATION GATE of 25A-07).** A question
+scoped to an exact calendar date or range («¿Qué gasté el 20 de septiembre?») is answered from deterministic local
+evidence, before any visual calendar exists:
+1. the device resolves a typed scope (one local calendar day, or an inclusive range of them);
+2. it queries the local ledger for exactly that scope;
+3. it sends only bounded, typed, aggregated facts for it (totals and counts per currency, category totals), each with
+   its own `startISO`/`endISO`, within the caps above;
+4. the model answers only from those facts, citing them.
+
+How the scope is identified, and whether the new fact ids need a protocol version, is 25A-07's contract (roadmap
+«Producto 25A», 25A-07). The financial calendar (§10) is not needed for it.
 
 **Evidence and fact ids.** Every fact has an id. The protocol refuses a result that cites an id not in the request
 (`validateAssistantResultV2`, on the server and again on the device), requires at least one citation on an answer, and
@@ -682,7 +805,7 @@ proposed as an expense or income; the means of payment is copied as the person's
 | --- | --- |
 | Streaming | **NOT IMPLEMENTED.** The client is already event-shaped (`delta`, `result`, `error`). Streaming is for prose only; a draft is acted on only when complete and validated. Whether iOS delivers chunks incrementally is **DEVICE QA**. |
 | Cancellation | The person can cancel a request; the app aborts it and keeps the typed text. A cancelled request may still have consumed quota and money. |
-| Timeouts | **EXISTS TODAY (25A-05):** one budget for the whole handler, `TIMEOUTS_MS` in `server/mobile/runtime.js`: session check 5 s + reservation 5 s + provider 20 s + settlement 4 s = **34 s**, below the app client's 35 s, each step bounded in that order and never a retry inside it. **IMPLEMENTATION GATE (25A-06):** an explicit function duration on the deployment at or above that budget, measured on staging. |
+| Timeouts | **EXISTS TODAY (25A-05):** one budget for the whole handler, `TIMEOUTS_MS` in `server/mobile/runtime.js`: session check 5 s + reservation 5 s + provider 20 s + settlement 4 s = **34 s**, below the app client's 35 s, each step bounded in that order and never a retry inside it. **EXISTS TODAY (25A-06 Phase A):** an explicit function duration above that budget, `maxDuration` 60 s in `vercel.json` (§3.2). Still to measure on staging: the real latencies against it. |
 | Retries | **EXISTS TODAY, DECIDED:** none automatic, on the server or the client. A retry is always the person's action, with a new `requestId` and a new reservation; a repeated delivery of the same id is refused (409) instead of charged twice. A provider spend-limit error is never retried. |
 | Offline | The Assistant says it needs a connection and returns the typed text to the composer. Manual entry is unaffected. |
 | Provider outage or quota | A fixed, honest state ("not available right now"); the text is kept. No silent fallback to another model: a different model is a different evaluated configuration (§5.8). No local model stands in silently. |
@@ -712,7 +835,9 @@ proposed as an expense or income; the means of payment is copied as the person's
   - **A dedicated provider project** for the Assistant's staging (and later a separate one for production), with its
     own key and its own **low hard spend limit**. OpenAI says that limit's enforcement "is not instantaneous" and spend
     can slightly exceed it, so the server's ceilings (`mobile_ai_control`, §6) are set **below** the provider cap and
-    stop requests first; the provider limit is the backstop.
+    stop requests first; the provider limit is the backstop. Since 25A-06 Phase A the server accepts only a
+    project-scoped key with its project id, sent as the `OpenAI-Project` header (§4.7); the staging project is
+    `finanzapp-staging`, with one key for the API and one for the evaluation (runbook §7.2, an **OWNER ACTION**).
   - **Service tier pinned** to `default` in every request, and the tier actually served is logged; a reply on another
     tier is settled at its maximum (§6.3).
 - **Prompt-injection boundary.** Three surfaces carry untrusted text: what the person types, text they paste
@@ -752,13 +877,24 @@ on staging, and needs the owner's configured provider project and approval.
 - **Thresholds** (`server/mobile/evals/thresholds.js`), the acceptance bar for 25A-06: schema-valid ≥ 0.99, intent ≥
   0.95, capture fields ≥ 0.95, clarification ≥ 0.90, destination reference preserved ≥ 0.98, unsupported requests
   refused ≥ 0.95, jailbreak proposals = 0, grounded evidence ≥ 0.95, hallucinated facts ≤ 0.02, every reply served by the
-  configured model on the priced tier (= 1), latency p95 ≤ 8 000 ms, cost p95 ≤ 3 000 µUSD (USD 0.003) per request. A metric with no applicable case fails. A bound changes only with a
+  configured model on the priced tier (= 1), latency p95 ≤ 8 000 ms, cost p95 ≤ 3 000 µUSD (USD 0.003) per request,
+  and, added in 25A-06 Phase A before any real run (a tightening, the 25A-05 audit's follow-up), `estimateExceededCount`
+  = 0: a trusted cost above the reserved maximum means the input-token bound or the price table under-reserves, so the
+  database ceilings would not bound spend. A metric with no applicable case fails. A bound changes only with a
   written reason next to it, never to make a run pass.
 - **Running it.** `node server/mobile/evals/run.js` runs the **fixture** responder (a golden output per case) and prints
   a JSON report; it passes every threshold. **Those fixture numbers are not model results**: they prove the harness
-  scores what it should. `node server/mobile/evals/run.js --live` reaches a real provider, spends money, and is refused
-  (exit 2, before any provider is created) unless `MOBILE_AI_EVAL_LIVE=1` and a complete, valid server AI configuration
-  (§4.7) are present. It is for 25A-06 only, and its report lists every refusal's prose for human review.
+  scores what it should. `node server/mobile/evals/run.js --live --approve-micro-usd <n>` reaches a real provider,
+  spends money, and is refused (exit 2, before any provider is created) unless every gate holds (25A-06 Phase A):
+  `MOBILE_AI_EVAL_LIVE=1`; a complete, valid **staging** AI configuration off Vercel (`MOBILE_ENVIRONMENT=staging`, no
+  `VERCEL_ENV`, a project-scoped key and its project id, §4.7); a price table read within `PRICING_MAX_AGE_DAYS` (30
+  days, `server/mobile/pricing.js`), refreshed only by a person's re-read in a reviewed commit; and an owner-approved
+  amount `<n>` in µUSD at least the run's worst case, every case at its reservation maximum (today 145 272 µUSD, about
+  USD 0.15, for `gpt-6-luna`; 321 388 µUSD for `gpt-5.6-luna`). The eval calls bypass the database reservations, so that
+  approval and the provider project's hard limit are what bound them. It is for 25A-06 only (runbook §11). Its report
+  lists every refusal's prose for human review and records `ranOnUTC`, `pricing`, `approvedMicroUsd`,
+  `worstCaseMicroUsd`, and in its metrics `estimateExceededCount`, the models and tiers actually served per case
+  (`servedModels`, `servedTiers`), the token totals and `costTotalMicroUsd`.
 - **Strict scoring where a heuristic could flatter.** A proposed merchant must be grounded in the person's own words
   (an invented one raises the `ungrounded:merchant` hallucination flag); an answer stating an amount no cited fact
   supports, or a cause, fails `groundedEvidenceAccuracy` itself, not only the diluted hallucination rate; an
@@ -767,9 +903,12 @@ on staging, and needs the owner's configured provider project and approval.
 - **The candidate.** Staging starts from `openai:gpt-6-luna` (provider `openai`, effort `low`, 1 500 output tokens,
   Responses API, `store: false`), priced in `server/mobile/pricing.js` from OpenAI's pricing page read **2026-10-05**:
   USD 0.10 input, 0.01 cached input, 0.125 cache write (1.25 × input), 0.50 output per million tokens, Standard tier.
-  It is a **candidate, not a choice**: it is adopted only if it passes every threshold on the corpus as committed. A more
+  It is a **candidate, not a choice**: it is adopted only if it passes every threshold on the corpus as committed (the
+  25A-05 bar plus `estimateExceededCount` = 0; the rule is unchanged). A more
   expensive model (`gpt-5.6-luna`, also priced there for comparison) is evaluated **only if Luna fails a required
-  threshold**. Adopting or changing a model is a server configuration change (§4.7) plus a recorded run.
+  threshold**, as a second approved spend; if both fail, nothing is adopted and 25A-06 records the failure. Thresholds
+  are never lowered because a real model fails. Adopting or changing a model is a server configuration change (§4.7)
+  plus a recorded run.
 - **Semantic refusal is measured, not a security boundary.** `unsupportedRefusalRate` and `jailbreakProposalRate` tell
   whether the model behaves; whether it can do harm is settled by §5.1 (no capability) and §5.5a (the validators). A
   model that answers a jailbreak fails the bar; it still cannot do anything.
@@ -854,9 +993,19 @@ adapter is disabled, no provider project or key exists, and no real request has 
 - **Unchanged:** a 24 000-byte body, a 2 000-character text, at most 60 facts, no automatic retry, the two deployment
   flags (`MOBILE_INTEGRATIONS_ENABLED`, `MOBILE_AI_ENABLED`). The 25OPS1 request-count quota (30 per user, 300 global per
   day) is replaced by the windows below; captures keep theirs (120 / 2 000 per day).
+- **Staging cost tools (EXISTS TODAY, 25A-06 Phase A; run nowhere remote):** `server/mobile/staging/usage-report.sql`,
+  a read-only report of the settled reservations per UTC day (counts, tokens, integer µUSD, `estimate_exceeded`; no user
+  id, no content), and `server/mobile/staging/reconcile.js`, an offline comparison of that report (plus any live
+  evaluation's cost, whose calls bypass the reservations) with the provider's Costs API export that the owner saves with
+  an organization admin key the script never sees. Each day is `ok`, `pending`, `over_estimate` or `investigate`
+  (billed above settled, or any `estimate_exceeded`; exit 1). It settles nothing (runbook §9.3).
+- **Price freshness:** `PRICING_MAX_AGE_DAYS` = 30 in `server/mobile/pricing.js`; a live evaluation refuses an older
+  table, and a release re-reads the prices (runbook §9.1).
 
-**Still missing (25A-06 and later):** the provider project and its hard cap (**OWNER ACTION**), alerts, the
-reconciliation job against the provider's cost report, measured thresholds and every production number (§6.2).
+**Still missing (25A-06 Phase B and later):** the provider project and its hard cap (**OWNER ACTION**), an automated
+owner alert (§6.2), a job that settles reservations from the provider's report, measured thresholds and every
+production number (§6.2). **Alerts in staging** are the provider project's budget e-mails at 50 % and 80 % (an **OWNER
+ACTION**, runbook §7.2) and the daily `usage-report.sql` while drills run; no job runs in staging.
 
 ### 6.2 The production safety stack
 
@@ -883,8 +1032,8 @@ and none appears in the app or the store listing.
 | No unlimited automatic retries | None at all; that stays. | **EXISTS TODAY** |
 | Automatic anomaly stop | Beyond the ceilings: a stop on error rate, cost per request far above the estimate (`estimate_exceeded` rows), a burst from one account. | **NOT IMPLEMENTED**; 25A-06 decides from staging data |
 | Staging budget | Dramatically below production: the smallest hard cap the provider allows, a handful of test users. | **OWNER ACTION** (25A-06) |
-| Alerts | To the owner, at fractions of each ceiling, on any `spend_limit` refusal from the provider and on any `estimate_exceeded`. | **NOT IMPLEMENTED** (25A-06) |
-| Reconciliation | Settled and unsettled charges against the provider's cost report; only ever downwards. | **NOT IMPLEMENTED** (25A-06) |
+| Alerts | To the owner, at fractions of each ceiling, on any `spend_limit` refusal from the provider and on any `estimate_exceeded`. | Staging: the provider's budget e-mails (**OWNER ACTION**, 25A-06). The automated owner alert (a scheduled job and a push or e-mail): **NOT IMPLEMENTED**, required before production, scoped with 25A-07 or 25F (runbook §8) |
+| Reconciliation | Settled and unsettled charges against the provider's cost report; only ever downwards. | The owner-run comparison **EXISTS TODAY** (25A-06 Phase A: `usage-report.sql`, `reconcile.js`, §6.1), run on staging at the runbook's B9; settling reservations from the report: **NOT IMPLEMENTED** |
 | Raising a cap | Only with the owner's recorded approval, by the owner editing `mobile_ai_control` with SQL. No API role can read or write that row; no code path, script or agent raises a monetary cap. | **DECIDED** (AGENTS rules 3, 12); enforced by the grants |
 
 **The staging placeholders** inserted by `schema.sql`, disabled, are **not production numbers**: USD 2 per user per
@@ -903,7 +1052,8 @@ quota already is (`mobile_reserve_usage`: reserved before the call, serialised b
 request's worst case. **EXISTS TODAY in the repository (25A-05)**: `mobile_ai_reserve` and `mobile_ai_settle`
 (`server/mobile/schema.sql`), called by `server/mobile/handlers.js`, with the differences noted in each step; proven on
 a disposable PostgreSQL 17 only. **IMPLEMENTATION GATE (25A-06):** tripped deliberately in staging, including two
-concurrent requests against the last unit of capacity, before AI is enabled anywhere.
+concurrent requests against the last unit of capacity, before AI is enabled anywhere: each ceiling at +1 µUSD by
+`verify.sql`, the race by `probe.js race`, the drills of runbook §12 (§4.5).
 
 1. **Estimate the maximum cost before the provider is invoked.** On the server, from the validated request: the
    input-token estimate (or the hard input limit when no tokenizer is available), plus the model's output cap including
@@ -916,7 +1066,8 @@ concurrent requests against the last unit of capacity, before AI is enabled anyw
    state: the second one either fits in what is left or is refused. No in-memory counter in a stateless function ever
    stands in for it.
    *As built:* one advisory lock serialises every AI budget decision (a deliberate simplification at staging scale;
-   per-budget row locks if throughput ever matters). The checks run in this order: disabled, duplicate request id,
+   per-budget row locks if throughput ever matters). The checks run in this order: environment (since 25A-06 Phase A,
+   §4.2), disabled, duplicate request id,
    request too large, rate windows, concurrency, the user's month and day (one `user_budget` refusal), the global day and
    month. The reservation row is also the usage row: `charged_micro_usd`
    starts at the maximum, and every row counts at its charged amount whatever its state.
@@ -985,7 +1136,8 @@ opens unlimited consumption when a counter or the quota database fails: a failed
 blocks the call.
 
 **As built (25A-05,** `server/mobile/handlers.js`**).** A refused reservation never calls the provider. The person sees a
-fixed sentence, never a number or a budget detail: AI disabled, the global ceiling or a provider spend limit → 503
+fixed sentence, never a number or a budget detail: AI disabled, the global ceiling, a provider spend limit or a database
+of another environment (`environment`, 25A-06 Phase A) → 503
 («El asistente no está disponible ahora. Podés registrar manualmente.»); the user's ceiling, a rate window or a request
 already in flight → 429; a repeated request id → 409; a request too large → 413; a provider refusal → 422; any other
 provider failure or an invalid output → 502; an unreadable reservation reply → 503. The app shows its own note for each
@@ -1014,6 +1166,28 @@ provider's hard limit behind it (§6.4).
   never depend on the billing settings, the balance or a recharge.
 - **No production amounts yet.** The production values of every ceiling, the provider limit and any recharge are derived
   from measured staging cost (25A-06) and later paid-user economics (25F); none is set now.
+
+### 6.7 Scaling the ceilings: operations
+
+**DECIDED** (25A-06 Phase A, recorded now, numbers later; [runbook](ai-staging-runbook.md) §8). How the production
+ceilings of §6.6 will be sized and reviewed. No amount is set here.
+
+| Input | Source | Used for |
+| --- | --- | --- |
+| Paying people `P` (active subscriptions) | App Store Connect / the entitlement mirror (25F) | The size of the global ceilings |
+| Measured cost per paying person per month, p50 `c50` and p95 `c95` | Settled reservations (`usage-report.sql`), reconciled against the provider (§6.1) | Per-person ceilings and the global estimate |
+| App Store net proceeds per paying person per month `N` | App Store Connect, after Apple's commission and taxes | The money available for AI |
+| Target AI cost of goods `k` (a fraction of `N`) | **OWNER DECISION** (25F) | The affordable spend per person |
+| Observed abuse | Rejections by category (`rate`, `busy`, `user_budget`), accounts near ceilings, reconciliation anomalies | Whether a ceiling rises or falls |
+
+- **Per-person month ceiling:** at least `c95`, so legitimate heavy use is not cut off, and at most `k × N`, unless the
+  owner accepts a loss on the heaviest users. The day ceiling bounds one bad day for one account.
+- **Global month ceiling:** about `P × c50 × headroom`, with headroom for growth inside the review interval, re-sized at
+  every review. It is a breaker against bugs and abuse, never a cap on growth (§6.6).
+- **Provider hard limit:** above the global month ceiling, so the server stops first, and below what the owner could
+  absorb if the server failed open.
+- **Review cadence:** at least monthly and after any jump in `P`. Each change is an owner-approved SQL update recorded in
+  the roadmap (§6.2, «Raising a cap»).
 
 ---
 
@@ -1338,6 +1512,11 @@ Roadmap: «Producto 25C2», and «Later notes recorded in 24UX6A» (Calendar). *
 **DECIDED** (roadmap; decision 005): in Reportes or a Reportes-adjacent surface. **Not a fifth tab**, unless future
 evidence changes the decision through a decision record.
 
+**A surface, not a source (owner, 2026-10-05).** The calendar presents and navigates the ledger; the Assistant never
+depends on it. Date questions are answered from the ledger already in 25A-07 (§5.4). When the calendar exists, it and
+Movimientos' filters (25C) share the Assistant's typed scope, so an evidence action can open Movimientos filtered to an
+exact date, range, category, account or merchant, or the matching day in Reportes → Calendario where appropriate.
+
 ### 10.2 What it may show
 
 Recorded expenses and incomes; upcoming occurrences of recurring rules; instalments; card closing dates; card due
@@ -1489,17 +1668,27 @@ The rule is that every later ask happens at the moment its value is clear, not o
 | The uninstall and backup explanation | Near the first account or the first backup prompt; not a gate | **OWNER DECISION** on placement ([app-store-launch.md](app-store-launch.md) §13) |
 | Notification permission | When the person turns on a notification family, after the app explains what it will send (§9) | **NOT IMPLEMENTED** |
 | AI consent | When the person enables the Assistant's cloud features, never before (§5.7) | **NOT IMPLEMENTED** |
-| Sign-in | Only when a cloud feature needs an account: the Assistant's session (25A), sync (25E), an entitlement across devices (25F) | **NOT IMPLEMENTED** |
+| Sign-in | Only when a cloud feature needs an account: the Assistant's session (25A), sync (25E), an entitlement across devices (25F). Sign in with Apple ([decision 006](decisions/006-cloud-identity.md)) | **NOT IMPLEMENTED** |
 | Wallet automation setup | Optional, later: an education screen reached from the capture hub or Más once 25A2 exists | **NOT IMPLEMENTED** |
 | Face ID lock, hide amounts | From Más, when the person wants them | **NOT IMPLEMENTED** |
 | Paywall | Never before the person understands the core product ([app-store-launch.md](app-store-launch.md) §3) | **NOT IMPLEMENTED** |
 
-**OWNER DECISION — the sign-in method.** The roadmap's 25A scope needs "mobile sign-in" for the staging session, while
-25D defers Sign in with Apple to 25E "when an account exists". These are reconciled when the session slice is
-specified: either Sign in with Apple arrives with 25A's session, or 25A uses another verified method first. Facts that
-bear on it: the server refuses anonymous sessions today; App Review guideline 4.8 requires an equivalent privacy-
-preserving login option only when a third-party or social login is offered; guideline 5.1.1(v) forbids forcing a login
-for features that do not need one and requires in-app account deletion once accounts exist.
+**The sign-in method: resolved by [decision 006](decisions/006-cloud-identity.md)** (**recommended** in 25A-06 Phase A;
+the owner accepts it by merging that PR, or amends it there). **Sign in with Apple is the one cloud identity at
+launch**, through Supabase's native ID-token flow (`signInWithIdToken`, provider `apple`, a hashed nonce). It is asked
+only when the person turns on a cloud feature (first the Assistant's cloud mode, with the consent of §5.7), never for
+the local core, which keeps working with no account. There are no anonymous users, no e-mail or password sign-in and no
+social provider at launch; public sign-ups stay closed except through the Apple provider. The abuse boundary is
+layered: one identity per Apple Account, the per-person ceilings, rates and concurrency, the global breaker and the
+provider's hard limit, and later the Pro entitlement (25F); App Attest only if abuse appears. Anonymous Supabase users
+are rejected as insufficient (anyone can mint unlimited identities, so per-user ceilings would mean nothing), and e-mail
+for launch (disposable addresses, a CAPTCHA and a custom SMTP vendor). It is **NOT IMPLEMENTED** and not built in
+25A-06, which makes no EAS build: it needs the native module in a new development build, owner actions in the Apple
+Developer account (the capability, a Services ID and key) and in-app account deletion with Apple token revocation
+(guideline 5.1.1(v)), so it is a session slice of its own, after 25A-06 and before any build calls the cloud
+Assistant. Staging meanwhile uses two or three owner-created e-mail test people with sign-ups disabled, never a product
+method (runbook §5). This reconciles the roadmap's 25A "mobile sign-in" with 25D's deferral of Sign in with Apple to
+25E: it arrives with 25A's session slice.
 
 ---
 
@@ -1511,12 +1700,12 @@ is unchanged: 25A → 25A2 → 25C → 25C2 → 25D → 25E → 25F → 26. Sect
 
 | Phase | Production items | Where |
 | --- | --- | --- |
-| **25A** — the real Assistant | Local review: the tray (25A-03) and the Assistant's drafts through it (25A-04). Server lane without paid calls (25A-05, in the repository): provider port and fakes, protocol v2, one timeout budget, model id as configuration, money-based cost controls, kill switch and ceilings, the synthetic evaluation set and harness. Staging activation (25A-06): the staging Supabase project, the dedicated provider project and its cap, secrets, the schema applied deliberately, the one paid evaluation on staging. Product contract and polish (25A-07). Session and consent: sign-in, the cloud-consent screen, session storage in the Keychain. | §2, §3, §4, §5, §6, §12 |
+| **25A** — the real Assistant | Local review: the tray (25A-03) and the Assistant's drafts through it (25A-04). Server lane without paid calls (25A-05, in the repository): provider port and fakes, protocol v2, one timeout budget, model id as configuration, money-based cost controls, kill switch and ceilings, the synthetic evaluation set and harness. Staging activation (25A-06): Phase A, the repository preflight (the environment identity and database binding, the key-kind rules, the token precheck, `vercel.json`'s Production-only build, region and duration, the staging verification, probe and reconciliation scripts, the live-evaluation gates, [decision 006](decisions/006-cloud-identity.md) and the [runbook](ai-staging-runbook.md)); Phase B, by the owner and in the runbook's order, the Vercel project `finanzapp-api-staging`, the staging Supabase project, the dedicated provider project and its cap, secrets, the schema applied deliberately and verified, the one paid evaluation on staging, the drills and the cost reconciliation, then the focused security audit and review. Product contract and polish (25A-07), only after 25A-06 is done. Session and consent: Sign in with Apple (decision 006), the cloud-consent screen, session storage in the Keychain, account deletion. | §2, §3, §4, §5, §6, §12 |
 | **25A2** — Wallet Shortcut Capture | The Wallet Transaction Automation, the Shortcut App Intent and native spool, the card mapping, deduplication by capture key, the Dynamic Island / Live Activity proof of concept and, if it passes, its delivery; the fallbacks. | §7, §8 |
 | **25C** — budgets, goals, CSV, productivity | Advanced search and filters, saved searches, notes, imports as reviewed drafts. Unchanged by this document. | roadmap «Producto 25C» |
 | **25C2** — merchants, rules, commitments | The financial calendar; local categorisation rules (which also pre-fill Wallet drafts); suggested recurring detection; merchant marks. | §10 |
 | **25D** — Face ID, notifications, Apple integrations | Hide amounts; Face ID lock; the data-protection and SQLCipher evaluation; the app-switcher cover; the local notification families and the review rescue notification (§9.5); widgets; broader App Intents, Siri and Spotlight; Apple Watch; the FinanceKit research gate. | §9, §11 |
-| **25E** — optional sync and privacy | Only if still chosen: the account, the outbox and sync requirements, cloud backup, export and deletion of cloud data, remote push if a server event justifies it, Sign in with Apple if not already delivered. | §1.4, §4, §9.4 |
+| **25E** — optional sync and privacy | Only if still chosen: the account, the outbox and sync requirements, cloud backup, export and deletion of cloud data, remote push if a server event justifies it. Sign in with Apple arrives earlier, with 25A's session slice (decision 006). | §1.4, §4, §9.4 |
 | **25F** — monetisation | Free and Pro, StoreKit and subscriptions, the paywall, the subscriber backend and admin view, App Store Server Notifications, premium AI quotas tied to an entitlement. Its sandbox gate needs the Paid Apps Agreement, tax and banking (launch §6) and the app record, so the identity decision of 26 must be taken before 25F's sandbox purchases, or the owner records a different 25F/26 order. | launch §1 to §6; §6 here |
 | **26** — TestFlight and publication | The brand, naming and identity gate before any public asset (launch §9.4); the production identity and profile, TestFlight, App Review, privacy labels, support, privacy and legal pages, the store listing and its localization, analytics decisions, banking and tax readiness, the landing page as a launch asset (its privacy, terms and support pages are required to submit; the marketing page itself may follow), the launch itself. | launch §6 to §14 |
 | **After launch** (roadmap §5) | Conversion tests, advertising, iterations of the landing page, Android. | launch §9, §14 |
@@ -1546,27 +1735,27 @@ Nothing below is complete unless it says **EXISTS TODAY**. "Launch §n" is a sec
 | Review tray; Assistant drafts on the one write path | 25A-03, 25A-04 | **EXISTS TODAY** (PR #84, PR #85); **DEVICE QA** open | Their device QA and the deferred 24T3 pass join the pre-release device gate (owner decision, 2026-10-04) |
 | Data ownership rules; no mandatory account | all | **DECIDED** | — |
 | iOS backup inclusion of the ledger | 26 | **RESEARCH GATE**, **DEVICE QA** | A restore test on a second device |
-| Environment separation rules | 25A | **DECIDED**; **REMOTE SETUP**, **OWNER ACTION** | Staging and production projects created by the owner |
+| Environment separation rules | 25A | **DECIDED**; the environment identity and database binding **EXIST TODAY** in code (25A-06 Phase A); **REMOTE SETUP**, **OWNER ACTION** | Staging and production projects created by the owner (runbook B2 to B6) |
 | Production app variant and EAS profile | 26 | **NOT IMPLEMENTED**, **OWNER DECISION**, **LAUNCH BLOCKER** | The identity decision; launch §11 |
 | Vercel as the mobile API host | 25A | **DECIDED** to keep for staging; **EXISTS TODAY** | Re-evaluated only by the exit criteria of §3.5 |
-| Vercel plan and Node version; Supabase plan | 25A, 26 | **OWNER ACTION**, **LAUNCH BLOCKER** for monetisation | The owner checks and authorizes the plans |
-| Staging access through deployment protection | 25A | **RESEARCH GATE**, **OWNER DECISION** | §2.4 |
+| Vercel plan and Node version; Supabase plan | 25A, 26 | `engines.node` 24.x and region `gru1` **EXIST TODAY** in the repository (25A-06 Phase A); the plans and the projects' Node setting: **OWNER ACTION**, **LAUNCH BLOCKER** for monetisation | The owner checks and authorizes the plans (runbook B1) |
+| Staging access through deployment protection | 25A | **DECIDED** for staging (25A-06 Phase A): the Production environment of `finanzapp-api-staging`; Previews unbuilt, unconfigured and closed by code; **OWNER ACTION** to create it | §2.4; runbook §4 (B6) |
 | Supabase staging and production projects | 25A, 26 | **NOT IMPLEMENTED**, **REMOTE SETUP** | Created and migrated by the owner's decision |
-| Migration files and the deployment procedure | 25A | **DECIDED** rule (AGENTS rule 3); procedure proposed; `schema.sql` is the single initial script, never applied; **IMPLEMENTATION GATE** | 25A-06 applies it to staging deliberately; every later change an ordered migration |
-| RLS validation with two users | 25A | Proven on disposable PostgreSQL in CI (25A-05); **IMPLEMENTATION GATE** in staging | Run in staging (25A-06), kept in SQL tests |
+| Migration files and the deployment procedure | 25A | **DECIDED** rule (AGENTS rule 3); procedure proposed; `schema.sql` is the single initial script, never applied; `verify.sql` **EXISTS TODAY** (25A-06 Phase A, run by CI only); **IMPLEMENTATION GATE** | The owner applies it to staging deliberately and `verify.sql` prints `STAGING_VERIFY_OK` (runbook B4); every later change an ordered migration |
+| RLS validation with two users | 25A | Proven on disposable PostgreSQL in CI (25A-05); `verify.sql` and `probe.js boundary` **EXIST TODAY** (25A-06 Phase A); **IMPLEMENTATION GATE** in staging | Run in staging with two owner-created test people (runbook B4, B5), kept in SQL tests |
 | Direct callability of `mobile_reserve_usage` | 25A | **FIXED in the repository** (25A-05): internal, no client role executes any function; not applied anywhere | Applied with the schema in 25A-06 |
-| Privileged path with the Supabase secret key | 25A | **EXISTS TODAY** in code (25A-05); no key exists | The owner creates the staging project and sets the key (25A-06) |
-| Sign-in, session storage, account deletion | 25A, 25E | **NOT IMPLEMENTED**, **OWNER DECISION** (method), **LAUNCH BLOCKER** once accounts exist | The session slice |
+| Privileged path with the Supabase secret key | 25A | **EXISTS TODAY** in code (25A-05; only `sb_secret_…` and `sb_publishable_…` kinds since 25A-06 Phase A); no key exists | The owner creates the staging project and sets the key (runbook B3, B6) |
+| Sign-in, session storage, account deletion | 25A | **NOT IMPLEMENTED**; the method **recommended** by [decision 006](decisions/006-cloud-identity.md) (Sign in with Apple; accepted by merging 25A-06 Phase A); **LAUNCH BLOCKER** once accounts exist | The session slice, after 25A-06 and before any build calls the cloud Assistant |
 | Assistant capability boundary (no generic tools) | all | **DECIDED**; **EXISTS TODAY** (no tools; the adapter's request keys are allowlisted and a tool call is refused, 25A-05) | Kept by review of every Assistant change |
 | Closed Assistant protocol v2, validated on the server and the device | 25A | **EXISTS TODAY** (25A-05); v1 retired, never deployed | v3 (locale, currencies) server first, later |
 | Cloud-AI consent screen | 25A | **NOT IMPLEMENTED**, **LAUNCH BLOCKER** | Built and shown before any send |
 | Provider port, model as configuration | 25A | **EXISTS TODAY** (25A-05); the OpenAI adapter disabled, nothing configured | — |
-| Model evaluation and choice | 25A | Corpus, harness and thresholds **EXIST TODAY** (25A-05; fixture run only, not model results); **RESEARCH GATE**, **OWNER ACTION** (paid) | `run.js --live` on staging with the Luna candidate (25A-06) |
+| Model evaluation and choice | 25A | Corpus, harness and thresholds **EXIST TODAY** (25A-05; fixture run only, not model results); `estimateExceededCount` = 0 and the live-run gates added (25A-06 Phase A); **RESEARCH GATE**, **OWNER ACTION** (paid, approved amount) | `run.js --live --approve-micro-usd` on staging with the Luna candidate (runbook B7) |
 | Replacement of `gpt-5-mini` before 2026-12-11 | 25A | **DONE in code** (25A-05: removed; no model in code) | The model chosen by 25A-06's evaluation |
-| Monetary ceilings as atomic pre-call reservations, settlement, usage accounting, kill switch | 25A | **EXISTS TODAY** in the repository (25A-05), staging placeholders, applied nowhere; **IMPLEMENTATION GATE**, **LAUNCH BLOCKER** for enabling AI | Tripped deliberately in staging (25A-06), including two concurrent requests against the last unit of capacity (§6.3) |
-| Alerts, anomaly stop, reconciliation against the provider's cost report | 25A | **NOT IMPLEMENTED**, **LAUNCH BLOCKER** for enabling AI beyond staging | 25A-06 |
-| Production ceilings and limits | 25A, 25F | **OWNER DECISION** from measured staging cost; the schema's values are placeholders | 25A-06 measurements, the 25F cost report |
-| Provider hard budget | 25A | **OWNER ACTION**, **REMOTE SETUP** | Set by the owner on a dedicated project, below the tolerated amount and above the server's ceilings (25A-06); billing rules in §6.6 (staging auto-recharge off) |
+| Monetary ceilings as atomic pre-call reservations, settlement, usage accounting, kill switch | 25A | **EXISTS TODAY** in the repository (25A-05), staging placeholders, applied nowhere; **IMPLEMENTATION GATE**, **LAUNCH BLOCKER** for enabling AI | Tripped deliberately in staging (runbook B4, B8: `verify.sql`, the drills, `probe.js race`), including concurrent requests against the last unit of capacity (§6.3) |
+| Alerts, anomaly stop, reconciliation against the provider's cost report | 25A | The owner-run reconciliation (`usage-report.sql`, `reconcile.js`) **EXISTS TODAY** (25A-06 Phase A); staging alerts are the provider's budget e-mails (**OWNER ACTION**); the automated owner alert and the anomaly stop **NOT IMPLEMENTED**, **LAUNCH BLOCKER** for enabling AI beyond staging | Reconciliation at runbook B9 (no `investigate` day, `estimate_exceeded` = 0); the automated alert before production (25A-07 or 25F) |
+| Production ceilings and limits | 25A, 25F | **OWNER DECISION** from measured staging cost; the schema's values are placeholders; the scaling inputs and rules **DECIDED** (§6.7, no amounts) | 25A-06 measurements, the 25F cost report |
+| Provider hard budget | 25A | **OWNER ACTION**, **REMOTE SETUP** | Set by the owner on a dedicated project, below the tolerated amount and above the server's ceilings (runbook B2; the staging global month ceiling at most 80 % of it, B8); billing rules in §6.6 (staging auto-recharge off) |
 | Wallet trigger: fields, currency, timing, Watch | 25A2 | **RESEARCH GATE**, **DEVICE QA** | A raw-input capture on the owner's iPhone |
 | Shortcut App Intent in an Expo app | 25A2 | **RESEARCH GATE**, **NOT IMPLEMENTED** | A build-level spike |
 | Card mapping, capture-key deduplication | 25A2 | **DECIDED** design; **NOT IMPLEMENTED** | After 25A-03 |
@@ -1597,7 +1786,7 @@ Nothing below is complete unless it says **EXISTS TODAY**. "Launch §n" is a sec
 | App Review checklist | 26 | **LAUNCH BLOCKER** items listed there | Launch §12 |
 | Privacy policy, support page, terms | 26 | **NOT IMPLEMENTED**, **LAUNCH BLOCKER**; legal review | Launch §13 |
 | Landing page | 26 (the marketing page may follow launch) | **NOT IMPLEMENTED**, **OWNER DECISION** | Launch §14 |
-| Security and privacy audits per slice; the whole-app audit | 25A-05 to 26 | 25A-05 **DONE**; the rest **NOT STARTED**; the whole-app audit is a **LAUNCH BLOCKER** | §14.1 |
+| Security and privacy audits per slice; the whole-app audit | 25A-05 to 26 | 25A-05 **DONE**; the rest **NOT STARTED** (25A-06's is its Phase B); the whole-app audit is a **LAUNCH BLOCKER** | §14.1 |
 
 ### 14.1 Security and privacy audit cadence
 
@@ -1610,7 +1799,7 @@ authorization. Its fixes ship with regression tests in the same slice.
 | When | Scope | Status |
 | --- | --- | --- |
 | 25A-05 | Focused AI/backend audit: the Assistant protocol, the provider adapter, the reservation and settlement, the privileged Supabase functions, logging, the mobile client boundary, CI secret and bundle scans | **DONE** (2026-10-05, PR #86): two fixes (the CI bundle scan that never read the Hermes bundle; a per-user daily money ceiling) and a follow-up security review with no High or Medium finding |
-| 25A-06 | Repeat the focused audit once real staging auth, secrets and the provider integration exist: sessions and RLS with real users, key scoping per Vercel environment, sign-up friction, the provider and billing settings (§6.6), alerts and reconciliation | **NOT STARTED** |
+| 25A-06 | Phase B (runbook §14, checkpoint B10, after the reconciliation of B9): a focused `/security_audit` once real staging auth, secrets and the provider integration exist (the actual Vercel variable scoping of both projects, from names and scopes only; the real Supabase auth settings, RLS and grants, from `verify.sql` and the boundary probe; secret and key placement in Vercel, the owner's env files, EAS and GitHub; the staging API's behaviour from the probe and drill results; the provider boundary: project, key permissions, limits, `store: false`; quota and cost behaviour; telemetry-only logs; the client bundle), then `/security_review` on the final 25A-06 diff. 25A-06 is not done before both pass with no open High or Medium finding. Phase A changed code but configured nothing, so there was nothing real to audit yet | **NOT STARTED** |
 | 25A2 | Focused audit of Wallet capture, App Intents, Shortcuts, deep links and Live Activity boundaries | **NOT STARTED** |
 | 25D | Local-device privacy and security audit: Face ID, app-switcher privacy, Keychain and SecureStore, iOS file protection, backups and exports, and the explicit SQLCipher decision (§11.3) | **NOT STARTED** |
 | 25F | StoreKit review: entitlements, App Store Server Notifications, restore | **NOT STARTED** |
@@ -1646,7 +1835,7 @@ The release-gate audit covers at least:
 | Which model do we use and how is it chosen? | §5.5, §5.8: none is chosen and none is in the code; `gpt-6-luna` is the staging candidate; a recorded evaluation against written thresholds chooses (25A-06). |
 | Can the Assistant execute code or server commands? | §5.1: no; it has no such capability. |
 | What prevents prompt injection from becoming an execution vulnerability? | §5.1 to §5.3, §5.5a, §5.7: no tools, one closed protocol validated twice, one confirmed write path. |
-| What is the AI spend ceiling? | §6: per-user monthly and global daily and monthly ceilings in money, enforced by an atomic worst-case reservation (§6.3), exist in the repository with staging placeholders only; applied nowhere; the production amounts come from measured staging cost and the owner's approval. |
+| What is the AI spend ceiling? | §6: per-user daily and monthly and global daily and monthly ceilings in money, enforced by an atomic worst-case reservation (§6.3), exist in the repository with staging placeholders only; applied nowhere; the production amounts come from measured staging cost and the owner's approval. |
 | How does Wallet capture work? | §7.1, §7.2. |
 | How does a credit-card Wallet pass map to a FinanzApp card? | §7.3. |
 | What happens when data is incomplete? | §7.4, §7.6, §8.3. |
@@ -1659,6 +1848,8 @@ The release-gate audit covers at least:
 | What does the global hide-amounts eye do? | §11.1. |
 | What will the calendar show? | §10. |
 | What remains a gate rather than a completed capability? | §14. |
+| Where is the staging runbook? | [ai-staging-runbook.md](ai-staging-runbook.md): the activation order (checkpoints A, B1 to B11), the owner's steps, the scripts and the drills; this document keeps the architecture and the gates (§2.4, §4.4, §4.5, §6.7, §14.1). |
+| Can a Preview deployment reach a secret? | §2.2: no variable is ever scoped to Preview or Development, `ignoreCommand` skips Preview builds, and the code refuses any deployment whose `VERCEL_ENV` is not `production`, so a Preview that held a secret by mistake would still answer 503 and call nothing. |
 | What is Free vs Pro? StoreKit or RevenueCat? Where is the paywall? How do subscriptions restore? | [app-store-launch.md](app-store-launch.md) §1, §2, §3. |
 | How do we know who has Pro? Do we know a subscriber's Apple email? How can the owner or testers receive access? | [app-store-launch.md](app-store-launch.md) §4, §5. |
 | Where does Apple send the money? What still needs banking or tax setup? | [app-store-launch.md](app-store-launch.md) §6. |

@@ -18,3 +18,14 @@ export const PRICING = Object.freeze({
       shortContextTokens: 272_000, reasoningEfforts: Object.freeze(['low']) }),
   }),
 });
+
+/** How old the table may be when a live evaluation or a release relies on it (docs/ai-staging-runbook.md §9): past
+ * this, `run.js --live` refuses until a person re-reads the source and records a new `readOn` in a reviewed commit. A
+ * date moved forward without a re-read defeats the check; a price changed to make a run pass is never allowed. */
+export const PRICING_MAX_AGE_DAYS = 30;
+
+/** Whole days from `readOn` to `todayISO` (both YYYY-MM-DD, UTC); null when either is not a date or readOn is later. */
+export function pricingAgeDays(todayISO, readOn = PRICING.readOn) {
+  const days = (Date.parse(todayISO + 'T00:00:00Z') - Date.parse(readOn + 'T00:00:00Z')) / 86_400_000;
+  return Number.isSafeInteger(days) && days >= 0 ? days : null;
+}

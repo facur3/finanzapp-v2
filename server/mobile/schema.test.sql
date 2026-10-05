@@ -30,9 +30,9 @@ create function pg_temp.server(stmt text) returns jsonb language plpgsql as $$
 declare r jsonb;
 begin perform set_config('role','service_role',true); execute stmt into r; perform set_config('role','none',true); return r; end $$;
 create function pg_temp.capture(n integer, rid text, payload jsonb) returns jsonb language sql as $$
-  select pg_temp.server(format('select public.mobile_receive_capture(%L,%L,%L,%L)', pg_temp.u(n), rid, 'shortcut', payload)) $$;
+  select pg_temp.server(format('select public.mobile_receive_capture(%L,%L,%L,%L,''staging'')', pg_temp.u(n), rid, 'shortcut', payload)) $$;
 create function pg_temp.reserve(n integer, rid text, max bigint, input integer default 100, output integer default 100) returns jsonb language sql as $$
-  select pg_temp.server(format('select public.mobile_ai_reserve(%L,%L,%L,%s,%s,%s)', pg_temp.u(n), rid, 'openai:fixture-model', max, input, output)) $$;
+  select pg_temp.server(format('select public.mobile_ai_reserve(%L,%L,%L,%s,%s,%s,''staging'')', pg_temp.u(n), rid, 'openai:fixture-model', max, input, output)) $$;
 create function pg_temp.settle(n integer, id uuid, state text, charged bigint) returns boolean language sql as $$
   select pg_temp.server(format('select to_jsonb(public.mobile_ai_settle(%L,%L,%L,%s,10,2,1,5,3))', pg_temp.u(n), id, state, coalesce(charged::text,'null')))::boolean $$;
 create function pg_temp.denied(stmt text) returns boolean language plpgsql as $$
@@ -44,9 +44,9 @@ declare s text;
 begin foreach s in array stmts loop if not pg_temp.denied(s) then raise exception '% was allowed: %', who, s; end if; end loop; end $$;
 -- What no client role may do (the first three are the server's functions): every function, and any read or write of the budget, the counters or the reservations.
 create function pg_temp.client_forbidden() returns text[] language sql as $$ select array[
-  'select public.mobile_ai_reserve(''00000000-0000-4000-8000-000000000001'',''fixture-ai-client-01'',''openai:x'',1,1,1)',
+  'select public.mobile_ai_reserve(''00000000-0000-4000-8000-000000000001'',''fixture-ai-client-01'',''openai:x'',1,1,1,''staging'')',
   'select public.mobile_ai_settle(''00000000-0000-4000-8000-000000000001'',gen_random_uuid(),''settled'',0,null,null,null,null,null)',
-  'select public.mobile_receive_capture(''00000000-0000-4000-8000-000000000001'',''fixture-event-client'',''shortcut'',''{}'')',
+  'select public.mobile_receive_capture(''00000000-0000-4000-8000-000000000001'',''fixture-event-client'',''shortcut'',''{}'',''staging'')',
   'select public.mobile_reserve_usage(''00000000-0000-4000-8000-000000000001'')',
   'select * from public.mobile_ai_control',
   'insert into public.mobile_ai_control default values',
@@ -69,6 +69,7 @@ begin;
 -- Installed fail closed: one control row, disabled.
 do $$ begin
   if (select count(*) from public.mobile_ai_control) <> 1 or (select enabled from public.mobile_ai_control) then raise exception 'AI control not installed disabled'; end if;
+  if (select environment from public.mobile_ai_control) is distinct from 'staging' then raise exception 'The staging script did not record staging'; end if;
 end $$;
 
 -- (a) (b) (c) Client roles execute nothing and touch no budget, counter or reservation.
@@ -92,10 +93,10 @@ begin
   if (select count(*) from public.mobile_capture_inbox) <> 1 then raise exception 'Unexpected count'; end if;
   if pg_temp.capture(1, 'fixture-event-0001', '{"amountMinor":200}')->>'error' is distinct from 'conflict' then raise exception 'Conflict accepted'; end if;
   if pg_temp.capture(2, 'fixture-event-0001', '{"amountMinor":100}')->>'duplicate' is distinct from 'false' then raise exception 'User scopes share receipts'; end if;
-  if not pg_temp.raises(format('select public.mobile_receive_capture(%L,%L,%L,%L)', gen_random_uuid(), 'fixture-event-0002', 'shortcut', '{}')) then raise exception 'Unknown owner captured'; end if;
-  if not pg_temp.raises(format('select public.mobile_receive_capture(%L,%L,%L,%L)', pg_temp.u(99), 'fixture-event-0002', 'shortcut', '{}')) then raise exception 'Anonymous owner captured'; end if;
-  if not pg_temp.raises('select public.mobile_receive_capture(null,''fixture-event-0002'',''shortcut'',''{}'')') then raise exception 'Null owner captured'; end if;
-  if not pg_temp.raises(format('select public.mobile_receive_capture(%L,%L,%L,%L)', pg_temp.u(1), 'short', 'shortcut', '{}')) then raise exception 'Bad request id captured'; end if;
+  if not pg_temp.raises(format('select public.mobile_receive_capture(%L,%L,%L,%L,''staging'')', gen_random_uuid(), 'fixture-event-0002', 'shortcut', '{}')) then raise exception 'Unknown owner captured'; end if;
+  if not pg_temp.raises(format('select public.mobile_receive_capture(%L,%L,%L,%L,''staging'')', pg_temp.u(99), 'fixture-event-0002', 'shortcut', '{}')) then raise exception 'Anonymous owner captured'; end if;
+  if not pg_temp.raises('select public.mobile_receive_capture(null,''fixture-event-0002'',''shortcut'',''{}'',''staging'')') then raise exception 'Null owner captured'; end if;
+  if not pg_temp.raises(format('select public.mobile_receive_capture(%L,%L,%L,%L,''staging'')', pg_temp.u(1), 'short', 'shortcut', '{}')) then raise exception 'Bad request id captured'; end if;
 end $$;
 
 -- (e) A signed-in person reads only their own inbox.
@@ -132,7 +133,7 @@ do $$ begin
   delete from public.mobile_ai_control;
   if pg_temp.reserve(1, 'fixture-ai-kill-0002', 10)->>'error' is distinct from 'disabled' then raise exception 'Missing control row reserved'; end if;
   if exists (select 1 from public.mobile_ai_reservations) then raise exception 'Kill switch recorded a reservation'; end if;
-  insert into public.mobile_ai_control values (true, true, 1000000, 1000000, 1000000, 1000000, 500, 1000, 100, 1000, 1000, 1000, 1000, 1000, 1000, 120);
+  insert into public.mobile_ai_control values (true, 'staging', true, 1000000, 1000000, 1000000, 1000000, 500, 1000, 100, 1000, 1000, 1000, 1000, 1000, 1000, 120);
 end $$;
 
 -- (h) Idempotency, (i) request_too_large and argument validation.
@@ -149,15 +150,15 @@ begin
     or pg_temp.reserve(1, 'fixture-ai-big-00003', 501)->>'error' is distinct from 'request_too_large' then raise exception 'Oversized request reserved'; end if;
   if pg_temp.reserve(1, 'fixture-ai-big-00004', 500, 1000, 100)->>'id' is null then raise exception 'Request at the caps refused'; end if;
   if exists (select 1 from public.mobile_ai_reservations where request_id in ('fixture-ai-big-00001','fixture-ai-big-00002','fixture-ai-big-00003')) then raise exception 'Refusal recorded a row'; end if;
-  if not pg_temp.raises('select public.mobile_ai_reserve(null,''fixture-ai-bad-00001'',''m'',1,1,1)')
-    or not pg_temp.raises(format('select public.mobile_ai_reserve(%L,''fixture-ai-bad-00001'',''m'',1,1,1)', gen_random_uuid()))
-    or not pg_temp.raises(format('select public.mobile_ai_reserve(%L,''fixture-ai-bad-00001'',''m'',1,1,1)', pg_temp.u(99)))
-    or not pg_temp.raises(format('select public.mobile_ai_reserve(%L,''bad id'',''m'',1,1,1)', pg_temp.u(1)))
-    or not pg_temp.raises(format('select public.mobile_ai_reserve(%L,''fixture-ai-bad-00001'','''',1,1,1)', pg_temp.u(1)))
-    or not pg_temp.raises(format('select public.mobile_ai_reserve(%L,''fixture-ai-bad-00001'',%L,1,1,1)', pg_temp.u(1), repeat('m',101)))
-    or not pg_temp.raises(format('select public.mobile_ai_reserve(%L,''fixture-ai-bad-00001'',''m'',0,1,1)', pg_temp.u(1)))
-    or not pg_temp.raises(format('select public.mobile_ai_reserve(%L,''fixture-ai-bad-00001'',''m'',1,0,1)', pg_temp.u(1)))
-    or not pg_temp.raises(format('select public.mobile_ai_reserve(%L,''fixture-ai-bad-00001'',''m'',1,1,0)', pg_temp.u(1)))
+  if not pg_temp.raises('select public.mobile_ai_reserve(null,''fixture-ai-bad-00001'',''m'',1,1,1,''staging'')')
+    or not pg_temp.raises(format('select public.mobile_ai_reserve(%L,''fixture-ai-bad-00001'',''m'',1,1,1,''staging'')', gen_random_uuid()))
+    or not pg_temp.raises(format('select public.mobile_ai_reserve(%L,''fixture-ai-bad-00001'',''m'',1,1,1,''staging'')', pg_temp.u(99)))
+    or not pg_temp.raises(format('select public.mobile_ai_reserve(%L,''bad id'',''m'',1,1,1,''staging'')', pg_temp.u(1)))
+    or not pg_temp.raises(format('select public.mobile_ai_reserve(%L,''fixture-ai-bad-00001'','''',1,1,1,''staging'')', pg_temp.u(1)))
+    or not pg_temp.raises(format('select public.mobile_ai_reserve(%L,''fixture-ai-bad-00001'',%L,1,1,1,''staging'')', pg_temp.u(1), repeat('m',101)))
+    or not pg_temp.raises(format('select public.mobile_ai_reserve(%L,''fixture-ai-bad-00001'',''m'',0,1,1,''staging'')', pg_temp.u(1)))
+    or not pg_temp.raises(format('select public.mobile_ai_reserve(%L,''fixture-ai-bad-00001'',''m'',1,0,1,''staging'')', pg_temp.u(1)))
+    or not pg_temp.raises(format('select public.mobile_ai_reserve(%L,''fixture-ai-bad-00001'',''m'',1,1,0,''staging'')', pg_temp.u(1)))
     then raise exception 'Nonsense reservation accepted'; end if;
 end $$;
 
@@ -271,6 +272,26 @@ do $$ begin
   update public.mobile_ai_control set user_month_ceiling_micro_usd = 1500;
   if pg_temp.reserve(10, 'fixture-ai-uday-0006', 1)->>'error' is distinct from 'user_budget' then raise exception 'An earlier day left the month'; end if;
 end $$;
+
+-- (o) Environment binding: a deployment naming another environment (or none) is refused first, before the kill switch,
+-- the budget or the inbox, and records nothing; the column accepts only the two names.
+do $$
+declare inbox bigint := (select count(*) from public.mobile_capture_inbox); counted bigint := (select coalesce(sum(u.used),0) from public.mobile_api_usage u);
+begin
+  delete from public.mobile_ai_reservations;
+  update public.mobile_ai_control set enabled = true, user_month_ceiling_micro_usd = 1000000, user_day_ceiling_micro_usd = 1000000;
+  if pg_temp.server(format('select public.mobile_ai_reserve(%L,%L,%L,1,1,1,%L)', pg_temp.u(12), 'fixture-ai-env-00001', 'm', 'production'))->>'error' is distinct from 'environment'
+    or pg_temp.server(format('select public.mobile_ai_reserve(%L,%L,%L,1,1,1,null)', pg_temp.u(12), 'fixture-ai-env-00002', 'm'))->>'error' is distinct from 'environment'
+    then raise exception 'Another environment reserved'; end if;
+  if pg_temp.server(format('select public.mobile_receive_capture(%L,%L,%L,%L,%L)', pg_temp.u(12), 'fixture-event-env-01', 'shortcut', '{}', 'production'))->>'error' is distinct from 'environment'
+    or pg_temp.server(format('select public.mobile_receive_capture(%L,%L,%L,%L,null)', pg_temp.u(12), 'fixture-event-env-02', 'shortcut', '{}'))->>'error' is distinct from 'environment'
+    then raise exception 'Another environment captured'; end if;
+  if exists (select 1 from public.mobile_ai_reservations) or (select count(*) from public.mobile_capture_inbox) <> inbox
+    or (select coalesce(sum(u.used),0) from public.mobile_api_usage u) <> counted then raise exception 'A refused environment recorded a row'; end if;
+  if pg_temp.reserve(12, 'fixture-ai-env-00003', 1)->>'id' is null then raise exception 'Own environment refused'; end if;
+  begin update public.mobile_ai_control set environment = 'preview'; raise exception 'Unknown environment accepted';
+  exception when check_violation then null; end;
+end $$;
 rollback;
 
 -- (m) True concurrency: two connections race for the last budget that fits one request; the second waits on the lock
@@ -283,9 +304,9 @@ begin
   perform dblink_connect('race_a', conn); perform dblink_connect('race_b', conn);
   perform dblink_exec('race_a', 'set role service_role'); perform dblink_exec('race_b', 'set role service_role');
   perform dblink_exec('race_a', 'begin');
-  select r into a from dblink('race_a', format('select public.mobile_ai_reserve(%L,%L,''m'',600,1,1)', pg_temp.u(1), 'fixture-race-' || expected || '-a')) as t(r jsonb);
+  select r into a from dblink('race_a', format('select public.mobile_ai_reserve(%L,%L,''m'',600,1,1,''staging'')', pg_temp.u(1), 'fixture-race-' || expected || '-a')) as t(r jsonb);
   if a->>'id' is null then raise exception 'Race %: first connection refused: %', expected, a; end if;
-  perform dblink_send_query('race_b', format('select public.mobile_ai_reserve(%L,%L,''m'',600,1,1)', pg_temp.u(second_owner), 'fixture-race-' || expected || '-b'));
+  perform dblink_send_query('race_b', format('select public.mobile_ai_reserve(%L,%L,''m'',600,1,1,''staging'')', pg_temp.u(second_owner), 'fixture-race-' || expected || '-b'));
   perform pg_sleep(0.3);
   if dblink_is_busy('race_b') <> 1 then raise exception 'Race %: second connection was not blocked by the budget lock', expected; end if;
   perform dblink_exec('race_a', 'commit');
