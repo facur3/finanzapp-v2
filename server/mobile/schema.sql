@@ -76,6 +76,8 @@ create table public.mobile_ai_control (
   id boolean primary key default true check (id),
   enabled boolean not null default false,
   user_month_ceiling_micro_usd bigint not null check (user_month_ceiling_micro_usd >= 0),
+  -- Sized well below the global day, so one account (or a few) cannot use up the app-wide day for everyone.
+  user_day_ceiling_micro_usd bigint not null check (user_day_ceiling_micro_usd >= 0),
   global_day_ceiling_micro_usd bigint not null check (global_day_ceiling_micro_usd >= 0),
   global_month_ceiling_micro_usd bigint not null check (global_month_ceiling_micro_usd >= 0),
   max_request_micro_usd bigint not null check (max_request_micro_usd > 0),
@@ -92,12 +94,12 @@ create table public.mobile_ai_control (
 alter table public.mobile_ai_control enable row level security;
 revoke all on public.mobile_ai_control from public, anon, authenticated, service_role;
 -- STAGING PLACEHOLDER values, disabled: production thresholds come from measured staging cost, not frozen here.
--- $2 per user/month, $1 global/day, $5 global/month, $0.01 per request; 32 000/4 000 tokens; 6/min, 60/h, 200/day,
--- 2 000/month per user; 2 concurrent per user, 10 global; a reservation counts as in flight for 120 s.
-insert into public.mobile_ai_control (user_month_ceiling_micro_usd, global_day_ceiling_micro_usd, global_month_ceiling_micro_usd,
+-- $2 per user/month, $0.25 per user/day, $1 global/day, $5 global/month, $0.01 per request; 32 000/4 000 tokens;
+-- 6/min, 60/h, 200/day, 2 000/month per user; 2 concurrent per user, 10 global; a reservation counts as in flight for 120 s.
+insert into public.mobile_ai_control (user_month_ceiling_micro_usd, user_day_ceiling_micro_usd, global_day_ceiling_micro_usd, global_month_ceiling_micro_usd,
   max_request_micro_usd, max_input_tokens, max_output_tokens, user_per_minute, user_per_hour, user_per_day, user_per_month,
   user_concurrency, global_concurrency, reservation_ttl_seconds)
-values (2000000, 1000000, 5000000, 10000, 32000, 4000, 6, 60, 200, 2000, 2, 10, 120);
+values (2000000, 250000, 1000000, 5000000, 10000, 32000, 4000, 6, 60, 200, 2000, 2, 10, 120);
 
 -- One monetary reservation per Assistant request. charged_micro_usd is the maximum while reserved or unsettled and the
 -- actual cost once settled (never capped down: above the maximum it is recorded as 'estimate_exceeded'). Every row
@@ -130,7 +132,8 @@ alter table public.mobile_ai_reservations enable row level security;
 revoke all on public.mobile_ai_reservations from public, anon, authenticated, service_role;
 
 -- Reserve the request's maximum cost before the provider is called. Returns {id} or {error: code}, checked in this
--- order: disabled, duplicate, request_too_large, rate, busy, user_budget, global_budget (the monetary circuit breaker).
+-- order: disabled, duplicate, request_too_large, rate, busy, user_budget (the person's month or day), global_budget
+-- (the monetary circuit breaker).
 create function public.mobile_ai_reserve(p_user_id uuid, p_request_id text, p_model text, p_max_micro_usd bigint,
   p_input_tokens integer, p_output_tokens integer) returns jsonb
 language plpgsql security definer set search_path = '' as $$
@@ -163,7 +166,9 @@ begin
     then return jsonb_build_object('error','busy'); end if;
   -- Stale 'reserved' and 'unsettled' rows keep counting at their maximum: no sweep ever releases them.
   if (select coalesce(sum(charged_micro_usd),0) from public.mobile_ai_reservations where user_id = p_user_id and month_key = this_month)
-    + p_max_micro_usd > c.user_month_ceiling_micro_usd then return jsonb_build_object('error','user_budget'); end if;
+    + p_max_micro_usd > c.user_month_ceiling_micro_usd
+    or (select coalesce(sum(charged_micro_usd),0) from public.mobile_ai_reservations where user_id = p_user_id and day_key = today)
+    + p_max_micro_usd > c.user_day_ceiling_micro_usd then return jsonb_build_object('error','user_budget'); end if;
   if (select coalesce(sum(charged_micro_usd),0) from public.mobile_ai_reservations where day_key = today)
     + p_max_micro_usd > c.global_day_ceiling_micro_usd
     or (select coalesce(sum(charged_micro_usd),0) from public.mobile_ai_reservations where month_key = this_month)

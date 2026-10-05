@@ -871,7 +871,7 @@ and none appears in the app or the store listing.
 | Per-user rate windows | Requests per minute, hour, UTC day and UTC month, counted from the reservations themselves. | **EXISTS TODAY** in the repository |
 | Concurrency | In-flight reservations per user and app-wide, counted while `reserved` and younger than `reservation_ttl_seconds`. | **EXISTS TODAY** in the repository |
 | Idempotency | One reservation per user and `requestId`; a repeat is refused (409), never charged twice. | **EXISTS TODAY** in the repository |
-| Per-user monetary ceiling | A budget per user per UTC month. Each request **reserves its maximum possible cost atomically** against it before the provider is called, and the reservation is settled afterwards (§6.3). A per-user daily money ceiling is not built; the daily request window bounds a day. | **EXISTS TODAY** in the repository (monthly) |
+| Per-user monetary ceiling | A budget per user per UTC month and per UTC day. Each request **reserves its maximum possible cost atomically** against both before the provider is called, and the reservation is settled afterwards (§6.3). The day ceiling is sized well below the global day, so one account (or a few) cannot use up the app-wide day for everyone: the request-count window alone does not bound a day's money, because a request's cost depends on its size. | **EXISTS TODAY** in the repository |
 | Global daily and monthly monetary ceiling | The same reservation against the app-wide day and month, in the same transaction: the **monetary circuit breaker**. When the request's maximum does not fit, the route answers "not available" (503) until the period ends or the owner raises the ceiling; it never admits a request that could cross it. | **EXISTS TODAY** in the repository |
 | Kill switches | `MOBILE_AI_ENABLED` and `MOBILE_INTEGRATIONS_ENABLED` (a redeploy on Vercel), and the **database switch** `mobile_ai_control.enabled`, which stops every new reservation at once without a redeploy and ships **off**. | **EXISTS TODAY** in the repository |
 | Provider-project hard budget and alert | A dedicated project or workspace and key for the Assistant only, with the provider's hard limit set **below** the owner's tolerated monthly amount, and the server's ceilings set **below** that limit; alerts at lower thresholds. | **OWNER ACTION, REMOTE SETUP** (25A-06) |
@@ -884,7 +884,7 @@ and none appears in the app or the store listing.
 | Raising a cap | Only with the owner's recorded approval, by the owner editing `mobile_ai_control` with SQL. No API role can read or write that row; no code path, script or agent raises a monetary cap. | **DECIDED** (AGENTS rules 3, 12); enforced by the grants |
 
 **The staging placeholders** inserted by `schema.sql`, disabled, are **not production numbers**: USD 2 per user per
-month, USD 1 app-wide per day, USD 5 app-wide per month, USD 0.01 per request; 32 000 input / 4 000 output tokens per
+month, USD 0.25 per user per day, USD 1 app-wide per day, USD 5 app-wide per month, USD 0.01 per request; 32 000 input / 4 000 output tokens per
 request; 6 per minute, 60 per hour, 200 per day and 2 000 per month per user; 2 in flight per user and 10 app-wide; a
 reservation counts as in flight for 120 s. **Production numbers come from measured staging cost** (25A-06 and the
 measured-cost report of 25F), each raised only with the owner's recorded approval. No permanent free allowance and no
@@ -913,8 +913,8 @@ concurrent requests against the last unit of capacity, before AI is enabled anyw
    stands in for it.
    *As built:* one advisory lock serialises every AI budget decision (a deliberate simplification at staging scale;
    per-budget row locks if throughput ever matters). The checks run in this order: disabled, duplicate request id,
-   request too large, rate windows, concurrency, the user's month, the global day and month. There is no per-user daily
-   money ceiling; the daily request window bounds a day. The reservation row is also the usage row: `charged_micro_usd`
+   request too large, rate windows, concurrency, the user's month and day (one `user_budget` refusal), the global day and
+   month. The reservation row is also the usage row: `charged_micro_usd`
    starts at the maximum, and every row counts at its charged amount whatever its state.
 3. **Refuse when capacity cannot be reserved.** The route answers the "not available" state of §6.5; nothing is sent to
    the provider, no quota count is consumed for that request, and nothing queues it for later.

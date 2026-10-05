@@ -132,7 +132,7 @@ do $$ begin
   delete from public.mobile_ai_control;
   if pg_temp.reserve(1, 'fixture-ai-kill-0002', 10)->>'error' is distinct from 'disabled' then raise exception 'Missing control row reserved'; end if;
   if exists (select 1 from public.mobile_ai_reservations) then raise exception 'Kill switch recorded a reservation'; end if;
-  insert into public.mobile_ai_control values (true, true, 1000000, 1000000, 1000000, 500, 1000, 100, 1000, 1000, 1000, 1000, 1000, 1000, 120);
+  insert into public.mobile_ai_control values (true, true, 1000000, 1000000, 1000000, 1000000, 500, 1000, 100, 1000, 1000, 1000, 1000, 1000, 1000, 120);
 end $$;
 
 -- (h) Idempotency, (i) request_too_large and argument validation.
@@ -253,6 +253,23 @@ do $$ begin
   delete from auth.users where id = pg_temp.u(8);
   if (select count(*) from public.mobile_ai_reservations where user_id is null and charged_micro_usd = 1000) <> 1 then raise exception 'Account deletion dropped its spend'; end if;
   if pg_temp.reserve(9, 'fixture-ai-del-00002', 1)->>'error' is distinct from 'global_budget' then raise exception 'Account deletion freed global budget'; end if;
+end $$;
+
+-- (n) Per-user daily ceiling: fits at sum + max = ceiling, refused at +1 (as user_budget), never shared between people;
+-- an earlier day of the month frees the person's day but still counts in their month.
+do $$ begin
+  delete from public.mobile_ai_reservations;
+  update public.mobile_ai_control set user_month_ceiling_micro_usd = 5000, user_day_ceiling_micro_usd = 1000,
+    global_day_ceiling_micro_usd = 1000000, global_month_ceiling_micro_usd = 1000000;
+  if pg_temp.reserve(10, 'fixture-ai-uday-0001', 600)->>'id' is null then raise exception 'User day denied too early'; end if;
+  if pg_temp.reserve(10, 'fixture-ai-uday-0002', 401)->>'error' is distinct from 'user_budget' then raise exception 'User day ceiling exceeded by 1'; end if;
+  if pg_temp.reserve(10, 'fixture-ai-uday-0003', 400)->>'id' is null then raise exception 'User day refused an exact fit'; end if;
+  if pg_temp.reserve(11, 'fixture-ai-uday-0004', 1000)->>'id' is null then raise exception 'User day shared across people'; end if;
+  if exists (select 1 from public.mobile_ai_reservations where request_id = 'fixture-ai-uday-0002') then raise exception 'Refusal recorded a row'; end if;
+  update public.mobile_ai_reservations set day_key = day_key - 1 where user_id = pg_temp.u(10);
+  if pg_temp.reserve(10, 'fixture-ai-uday-0005', 500)->>'id' is null then raise exception 'User day never frees'; end if;
+  update public.mobile_ai_control set user_month_ceiling_micro_usd = 1500;
+  if pg_temp.reserve(10, 'fixture-ai-uday-0006', 1)->>'error' is distinct from 'user_budget' then raise exception 'An earlier day left the month'; end if;
 end $$;
 rollback;
 

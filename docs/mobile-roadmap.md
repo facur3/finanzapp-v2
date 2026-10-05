@@ -1729,8 +1729,8 @@ Assistant's capability boundary and model evaluation, monetary safety).
     allowlisted configuration, one timeout budget, integer micro-USD worst-case reservation and settlement, the
     `service_role`-only privileged functions, rate, concurrency and monetary ceilings with a database kill switch,
     telemetry without content, the repository's secret-exposure guards, the evaluation corpus, harness and thresholds.
-    Still open from the 2026-10-02 server lane: the literal `EXPO_PUBLIC_MOBILE_API_ORIGIN` read and an automated
-    scan of the exported bundle in CI (the 25A-05 guard scans sources; the bundle was scanned once by hand), the inbox lifecycle and the revocable capture-token foundation,
+    Still open from the 2026-10-02 server lane: the literal `EXPO_PUBLIC_MOBILE_API_ORIGIN` read, a scan of the bundle
+    an EAS build produces with its real environment (25A-05 scans the CI export), the inbox lifecycle and the revocable capture-token foundation,
     analytical facts v3.
   - **25A-06 — Staging activation** (the first network slice; owner setup and authorization required; no production
     activation): the owner creates the Supabase staging project; the owner creates a dedicated AI provider project with
@@ -4505,7 +4505,7 @@ nothing of it is on a screen yet.
   `mobile_ai_control.enabled`, **false by default**, editable only by the database owner, which stops every new
   reservation without a redeploy. The global daily and monthly ceilings are the monetary circuit breaker.
 - **Limits: staging placeholders, not production numbers** (`mobile_ai_control`, disabled): USD 2 per user per month,
-  USD 1 app-wide per day, USD 5 app-wide per month, USD 0.01 per request; 32 000 / 4 000 tokens; 6 per minute, 60 per
+  USD 0.25 per user per day, USD 1 app-wide per day, USD 5 app-wide per month, USD 0.01 per request; 32 000 / 4 000 tokens; 6 per minute, 60 per
   hour, 200 per day, 2 000 per month per user; 2 in flight per user, 10 app-wide; a 120 s in-flight TTL. Rate limits are
   anti-abuse controls, never marketing copy; no permanent counter (owner, 2026-10-04); the final production numbers
   come from measured staging cost.
@@ -4540,7 +4540,22 @@ nothing of it is on a screen yet.
   clarification never completes the draft parked behind a newer question.
 - **Repository guards** (`scripts/check-repo.mjs`): a server secret name (`MOBILE_AI_API_KEY`,
   `MOBILE_SUPABASE_SECRET_KEY`, `OPENAI_API_KEY`, …) anywhere under `apps/mobile`, or any `EXPO_PUBLIC_` name that sounds
-  like a secret or a provider key anywhere, fails `npm run check:repo` (a publishable key is allowed).
+  like a secret or a provider key anywhere, fails `npm run check:repo` (a publishable key is allowed). CI scans the
+  exported bundle itself (`scripts/check-bundle-secrets.mjs`, after `export:ios`): every file read as bytes, because the
+  export is Hermes bytecode that `grep -I` skips as binary; a server secret name, a Supabase secret key or a provider
+  key (`sk-…`) fails, and the scan fails too unless it found a string the app is known to contain, so it cannot pass
+  without reading the bundle. It names the file and the kind, never the value.
+- **Security audit follow-up (2026-10-05, in this PR).** A focused audit of this PR found no path from a client, a
+  model reply or an injected text to a privileged function, the ledger, a tool or past the reservation. Fixed: (1) the
+  CI bundle step added earlier in this PR used `grep -rI`, which never read the `.hbc` bundle, so it could not fail;
+  replaced by the script above, with tests; (2) a per-user **daily** money ceiling (`user_day_ceiling_micro_usd`,
+  placeholder USD 0.25), checked with the month in the same reservation, because one account could use up the USD 1
+  global day and stop the Assistant for everyone (a planted fault that disables the check fails `schema.test.sql`).
+  Recorded for 25A-06 (owner setup, not code): Supabase Auth sign-up friction (email confirmation, CAPTCHA), since
+  per-user limits are only as strong as account creation; the provider and Supabase secret keys scoped to the reviewed
+  Vercel environments, never Preview; `estimate_exceeded` rows checked against the input-token bound on the evaluation
+  corpus; a price-table freshness check and the reconciliation against the provider's cost report; a dedicated
+  Supabase secret key for this API.
 - **The conversational financial contract, pinned for the later real-AI activation (25A-06/25A-07; the device rules
   below already hold where noted).**
   - An unstated date is the current local day (the 25A-04 capture rule); an explicit date wins; a relative date
@@ -4562,17 +4577,18 @@ nothing of it is on a screen yet.
 - **What remains.** 25A-06: the owner's staging setup (OWNER ACTIONS in production-plan.md §4, §5.7, §6), the schema
   applied deliberately, RLS with two real users, the kill switch, ceilings and concurrency tripped on staging, alerts,
   the reconciliation job, the live evaluation and measured thresholds, an explicit function duration. Later: the literal
-  `EXPO_PUBLIC_MOBILE_API_ORIGIN` read and an automated bundle scan in CI, the session and consent screens, protocol v3 (locale,
+  `EXPO_PUBLIC_MOBILE_API_ORIGIN` read and a scan of the EAS-built bundle, the session and consent screens, protocol v3 (locale,
   currencies), 25A-07's product flow, 25A-11, 25A-12, voice.
 - **Device QA.** Nothing to check on the iPhone now (checklist section «Producto 25A-05»); its items join 25A-06/25A-07
   and the release gate.
 - **Status.** This PR; not merged.
-- **Gates.** 2026-10-05, local, Linux (head 57b3fa9 plus this documentation). Root `npm test` 33 files, 636 passed, 1
-  todo; `check:repo` OK (439 tracked files). `apps/mobile`: `typecheck` OK; `test:storage` 1342 passed of 1342 (real
+- **Gates.** 2026-10-05, local, Linux (after the audit follow-up). Root `npm test` 34 files, 642 passed, 1
+  todo; `check:repo` OK (441 tracked files). `apps/mobile`: `typecheck` OK; `test:storage` 1342 passed of 1342 (real
   SQLite included); `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0 errors, 0 stale; `check` (expo
-  install --check) OK; `export:ios` OK, and the exported iOS bundle was scanned once for this PR: no server secret name in
-  it. The SQL suite (`schema.sql` + `schema.test.sql`) prints SQL_OK on a local disposable PostgreSQL 17, with the
-  `dblink` concurrency proofs and 17 planted faults caught. `node server/mobile/evals/run.js` (fixture mode, 103 cases)
+  install --check) OK; `export:ios` OK, and `scripts/check-bundle-secrets.mjs` over that export passes (canary found; the same
+  export with a fixture `sb_secret_…` appended to its `.hbc` fails). The SQL suite (`schema.sql` + `schema.test.sql`) prints SQL_OK on a local disposable PostgreSQL 17, with the
+  `dblink` concurrency proofs, 17 planted faults caught, and an 18th (the per-user day check disabled) caught by the new
+  test. `node server/mobile/evals/run.js` (fixture mode, 103 cases)
   passes every threshold (not a model result). No EAS build, no remote provider call, no schema applied anywhere, no
   iPhone run by the agent.
 
