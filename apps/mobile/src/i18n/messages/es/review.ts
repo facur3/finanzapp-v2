@@ -78,6 +78,17 @@ export const review = {
       dismissDetail: 'No se registra nada y no vuelve a aparecer. Tus movimientos no cambian.',
       recordedLater: 'Registrado. La propuesta se marcará como confirmada la próxima vez que se abra la app.',
     },
+    /** 25A-04: the review sheet a producer presents over itself, right after a capture. */
+    sheet: {
+      titleExpense: 'Confirmá el gasto',
+      titleIncome: 'Confirmá el ingreso',
+      titleUnknown: 'Revisá la propuesta',
+      /** The close button's name: closing keeps the proposal pending. */
+      close: 'Ahora no',
+      discard: 'Descartar propuesta',
+      /** Under the actions: closing is not discarding. */
+      later: 'Si la cerrás, queda pendiente en Para revisar.',
+    },
     edit: {
       noDestination: 'No tenés una cuenta o tarjeta disponible en {currency} para este movimiento.',
       amountNeedsDestination: 'Elegí dónde se registra para cargar el monto en su moneda.',

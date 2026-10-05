@@ -13,6 +13,9 @@ import type { AssistantClient, AssistantEvent } from '../src/assistant/client.ts
 import { disconnectedAssistant } from '../src/assistant/client.ts';
 import { FIXTURE_ANSWER, FIXTURE_DRAFT, FIXTURE_DRAFT_NO_ACCOUNT, FIXTURE_FACTS, fixtureAssistant } from '../src/assistant/fixtures.ts';
 import * as sessionModule from '../src/assistant/session.ts';
+import * as reviewProposal from '../src/assistant/review-proposal.ts';
+import { loadReviewTray, type ReviewCapture, type ReviewItem, type ReviewStore, type ReviewTray } from '../src/storage/review-database.ts';
+import { reviewFiles } from './review-sqlite.ts';
 import { createConversationSession, type ConversationSession } from '../src/assistant/session.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
@@ -60,8 +63,51 @@ function scriptedClient(mode: AssistantClient['mode'] = 'remote') {
     get waiting() { return release !== null; } };
 }
 
-function harness({ client, accounts = [visa, cash, usd], data = entries, params = {}, reduced = false, addEntry, locale = 'es-AR', deviceLanguage = null, session = createConversationSession() }: {
-  client: AssistantClient; accounts?: domain.Account[]; data?: domain.Entry[]; params?: Record<string, string>; reduced?: boolean; addEntry?: (entry: domain.Entry) => Promise<void>; locale?: AppLocale;
+/** 25A-04: what the screen's `useLedger()` offers of the review store: the tray it reads, its capture and its lookup. The
+ * default keeps items in memory (as the store does: a repeat of a capture returns the item already there, never a second
+ * one); `sqliteReview` puts a real store on real SQLite behind the same three calls. */
+interface ReviewBacking { tray: () => ReviewTray | 'unavailable' | null; capture: (input: ReviewCapture) => Promise<ReviewItem>; get: (id: string) => Promise<ReviewItem | null>;
+  captures: ReviewCapture[]; failNext: (count?: number) => void;
+  /** The provider's count of review operations (default 0). */
+  version?: () => number }
+function memoryReview(): ReviewBacking {
+  const items = new Map<string, ReviewItem>();
+  const captures: ReviewCapture[] = [];
+  let failures = 0;
+  return { captures, failNext: (count = 1) => { failures = count; },
+    tray: () => ({ writable: true, items: [...items.values()].filter(item => item.status === 'pending'), unreadable: [], conflicts: [] }),
+    capture: async input => {
+      captures.push(input);
+      if (failures > 0) { failures--; throw new Error('disk I/O error'); }
+      const existing = items.get(input.id);
+      if (existing) return existing;
+      const item: ReviewItem = { id: input.id, source: 'assistant', captureKey: input.captureKey, draft: input.draft as domain.ReviewDraft, writeId: input.writeId,
+        status: 'pending', attempt: null, receipt: null, createdAt: input.at, updatedAt: input.at, revision: 0 };
+      items.set(input.id, item);
+      return item;
+    },
+    get: async id => items.get(id) ?? null };
+}
+async function sqliteReview(store: () => ReviewStore): Promise<ReviewBacking & { refresh: () => Promise<void>; gets: string[] }> {
+  const gets: string[] = [];
+  let tray: ReviewTray = await loadReviewTray(store(), new Date().toISOString());
+  const captures: ReviewCapture[] = [];
+  let failures = 0;
+  const refresh = async () => { tray = await loadReviewTray(store(), new Date().toISOString()); };
+  return { captures, refresh, failNext: (count = 1) => { failures = count; }, tray: () => tray,
+    capture: async input => {
+      captures.push(input);
+      if (failures > 0) { failures--; throw new Error('disk I/O error'); }
+      const { item } = await store().capture(input);
+      await refresh();
+      return item;
+    },
+    get: id => { gets.push(id); return store().get(id); }, gets };
+}
+
+function harness({ client, accounts = [visa, cash, usd], cards = [], data = entries, params = {}, reduced = false, review = memoryReview(), refreshReview = async () => {}, locale = 'es-AR', deviceLanguage = null, session = createConversationSession() }: {
+  client: AssistantClient; accounts?: domain.Account[]; cards?: domain.CreditCardProfile[]; data?: domain.Entry[]; params?: Record<string, string>; reduced?: boolean; review?: ReviewBacking; locale?: AppLocale;
+  refreshReview?: () => Promise<void>;
   /** The device's first language, for `speechLanguage` (null: nothing read, so it is never set). */
   deviceLanguage?: string | null;
   /** The app session the screen reads (`conversationSession()`): a fresh real one by default, so tests are isolated. */
@@ -74,11 +120,12 @@ function harness({ client, accounts = [visa, cash, usd], data = entries, params 
   const jsx = (type: unknown, props: Record<string, unknown>) => ({ type, props });
   const state: unknown[] = [];
   const pushed: any[] = [];
+  const storeAtPush: string[] = [];
+  const focusEffects = new Set<() => unknown>();
   const navigated: any[] = [];
   const dismissed: any[] = [];
   let uuids = 0;
   const subscriptions: unknown[] = [];
-  const written: domain.Entry[] = [];
   const scrolled: any[] = [];
   const haptics: string[] = [];
   const effects: (() => void)[] = [];
@@ -108,23 +155,37 @@ function harness({ client, accounts = [visa, cash, usd], data = entries, params 
     },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': { View: 'View', FlatList: 'FlatList' },
+    // 25A-04: the screen is in front from its first render until it unmounts (a pushed screen over it is not modelled: the
+    // presentation itself drops the flag). Each push records what the review store held at that moment.
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, useLocalSearchParams: () => params,
-      router: { push: (to: unknown) => pushed.push(to), navigate: (to: unknown) => navigated.push(to), dismissTo: (to: unknown) => dismissed.push(to) } },
-    // A fresh id on every call, independent of how many entries were written: a retry that called randomUUID again
-    // would get a different id, so only the session's cached Entry (session.writes) keeps the retry idempotent.
-    'expo-crypto': { randomUUID: () => 'uuid-' + (++uuids) },
+      // Focus is gained once per mount, as on arriving at the screen; `refocus()` models coming back to it (a sheet closed).
+      useFocusEffect: (effect: () => unknown) => {
+        const index = slot(() => ({ ran: false }));
+        const cell = state[index] as { ran: boolean };
+        focusEffects.add(effect);
+        if (cell.ran) return;
+        cell.ran = true;
+        const cleanup = effect();
+        if (typeof cleanup === 'function') effects.push(cleanup as () => void);
+      },
+      router: { push: (to: unknown) => { pushed.push(to); storeAtPush.push(JSON.stringify(review.tray())); }, navigate: (to: unknown) => navigated.push(to), dismissTo: (to: unknown) => dismissed.push(to) } },
+    // A fresh id on every call: a retry that called randomUUID again would get other ids, so only the proposal's frozen
+    // capture keeps a retry idempotent.
+    'expo-crypto': { randomUUID: () => '00000000-0000-4000-8000-' + String(++uuids).padStart(12, '0') },
     '@finanzapp/domain': domain,
     '../src/assistant/runtime': { assistantForBuild: () => client },
     '../src/assistant/conversation': conversation,
     '../src/assistant/session': { ...sessionModule, conversationSession: () => session },
     '../src/integrations/evidence': evidence,
-    '../src/storage/LedgerProvider': { useLedger: () => ({ snapshot, archive: { accounts, records: [], debts: [] }, addEntry: addEntry ?? (async (entry: domain.Entry) => { written.push(entry); }) }) },
+    '../src/assistant/review-proposal': reviewProposal,
+    // No ledger write is offered to the screen at all: only the review store's capture and lookup.
+    '../src/storage/LedgerProvider': { useLedger: () => ({ snapshot, archive: { accounts, records: [], debts: [], cards }, review: review.tray(), reviewVersion: review.version?.() ?? 0, captureReview: review.capture, getReviewItem: review.get, refreshReview }) },
     '../src/ui/assistant-composer': { AssistantComposer: 'AssistantComposer' },
-    '../src/ui/assistant-messages': Object.fromEntries(['AnswerEvidence', 'AssistantText', 'ClarificationChoices', 'DraftCard', 'Suggestions', 'SystemNote', 'UserMessage'].map(n => [n, n])),
+    '../src/ui/assistant-messages': Object.fromEntries(['AnswerEvidence', 'AssistantText', 'ClarificationChoices', 'ProposalCard', 'Suggestions', 'SystemNote', 'UserMessage'].map(n => [n, n])),
     '../src/ui/components': { AppText: 'AppText', IconButton: 'IconButton' },
     '../src/ui/liability-presentation': liabilityPresentation,
     '../src/ui/money-input': moneyInput,
-    '../src/ui/motion': { Appear: 'Appear', impactHaptic: () => haptics.push('impact'), successHaptic: () => haptics.push('success') },
+    '../src/ui/motion': { Appear: 'Appear', impactHaptic: () => haptics.push('impact') },
     '../src/ui/presentation': presentation,
     '../src/ui/theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, useCurrentDay: () => '2026-09-21', useReduceMotion: () => reduced,
       usePalette: () => ({ background: '#F2F2F6', warning: '#B45309', warningSoft: '#FCF1E0', isDark: false }) },
@@ -147,7 +208,8 @@ function harness({ client, accounts = [visa, cash, usd], data = entries, params 
   };
   /** Leave the screen: React runs the effects' cleanups and drops the component's state; the app session stays. */
   const unmount = () => { for (const cleanup of effects.splice(0)) cleanup(); state.length = 0; };
-  return { render, unmount, session, subscriptions, pushed, navigated, dismissed, written, scrolled, haptics, effects, setLocale: (next: AppLocale) => { i18n = bindLocale(next, 'none', deviceLanguage); } };
+  const refocus = () => { for (const effect of focusEffects) { const cleanup = effect(); if (typeof cleanup === 'function') effects.push(cleanup as () => void); } };
+  return { render, unmount, refocus, session, review, subscriptions, pushed, storeAtPush, navigated, dismissed, scrolled, haptics, effects, setLocale: (next: AppLocale) => { i18n = bindLocale(next, 'none', deviceLanguage); } };
 }
 function nodes(value: any): Node[] {
   if (!value || typeof value !== 'object') return [];
@@ -210,7 +272,7 @@ test('in the disconnected build a suggestion or a typed message never leaves the
   screen = view.render();
   assert.equal(screen.composer.props.value, '  Gasté 500 en el kiosco ');
   assert.deepEqual(screen.messages.map(message => message.role), ['system', 'system']);
-  assert.equal(view.written.length, 0);
+  assert.equal(view.review.captures.length, 0);
   assert.equal(view.pushed.length, 0);
 });
 
@@ -299,98 +361,359 @@ test('an answer renders its text and evidence rows/links from the cited facts, a
   assert.equal(view2.navigated.length, 0);
 });
 
-test('a structured draft renders as a card and writes nothing until Confirmar; confirming validates with the domain and writes exactly once', async () => {
-  const scripted = scriptedClient();
-  const view = harness({ client: scripted.client });
-  let screen = view.render();
-  screen.composer.props.onChange('Gasté 18.500 en Carrefour con la Visa');
-  screen = view.render();
-  screen.composer.props.onSend();
-  await tick();
-  assert.equal(scripted.asks[0].action, 'parse', 'a sentence is parsed');
-  assert.equal(scripted.asks[0].facts.length, 0, 'parse sends no evidence');
-  scripted.reply([{ type: 'result', result: FIXTURE_DRAFT, facts: [] }]);
-  await settle();
-  screen = view.render();
-  const card = find([screen.items[1]], 'DraftCard')[0];
-  assert.ok(card, 'the draft card is rendered');
-  assert.equal(card.props.content.status, 'pending');
-  assert.equal(JSON.stringify(card.props.content.draft), JSON.stringify({ kind: 'expense', amountMinor: 1850000, currency: 'ARS', merchant: 'Carrefour', category: 'Supermercado', dateISO: '2026-09-21', accountId: 'visa' }));
-  assert.deepEqual(card.props.accounts.map((account: domain.Account) => account.id), ['visa', 'cash', 'usd']);
-  assert.equal(view.written.length, 0, 'rendering a draft never writes');
-  assert.equal(card.props.busy, false);
-  card.props.onConfirm();
-  await settle();
-  screen = view.render();
-  assert.equal(view.written.length, 1, 'confirm wrote exactly one entry');
-  const entry = view.written[0];
-  assert.doesNotThrow(() => domain.validateEntry(entry, [visa, cash, usd]));
-  assert.equal(entry.accountId, 'visa');
-  assert.equal(entry.amountMinor, 1850000);
-  assert.equal(entry.merchant, 'Carrefour');
-  assert.equal(entry.dateISO, '2026-09-21');
-  assert.deepEqual(view.haptics, ['impact', 'success']);
-  const confirmed = find([screen.items[1]], 'DraftCard')[0];
-  assert.equal(confirmed.props.content.status, 'confirmed');
-  assert.equal(confirmed.props.content.entryId, entry.id);
-  confirmed.props.onOpenEntry(entry.id);
-  assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/entry/[id]', params: { id: entry.id } }));
-  // A second confirm on the same card is a no-op: the reducer refuses a status change and the screen wrote once.
-  confirmed.props.onConfirm();
-  await settle();
-  assert.equal(view.written.length, 1);
+test('25A-04: a resolved draft becomes a proposal captured into «Para revisar» on real SQLite: one item, the source assistant, nothing in the ledger, and the card leads to the review', async () => {
+  const files = await reviewFiles([visa, cash, usd]);
+  try {
+    const review = await sqliteReview(() => files.store);
+    const scripted = scriptedClient();
+    const view = harness({ client: scripted.client, review });
+    let screen = view.render();
+    screen.composer.props.onChange('Gasté 18.500 en Carrefour con la Visa');
+    view.render().composer.props.onSend();
+    await tick();
+    assert.equal(scripted.asks[0].action, 'parse', 'a sentence is parsed');
+    assert.equal(scripted.asks[0].facts.length, 0, 'parse sends no evidence');
+    scripted.reply([{ type: 'result', result: FIXTURE_DRAFT, facts: [] }]);
+    await settle();
+    screen = view.render();
+    const card = find([screen.items[1]], 'ProposalCard')[0];
+    assert.equal(card.props.content.status, 'captured');
+    const { capture } = card.props.content as conversation.ProposalContent;
+    assert.match(capture.id, domain.REVIEW_WRITE_ID);
+    assert.notEqual(capture.id, capture.writeId);
+    assert.equal(capture.captureKey, 'assistant:' + capture.id);
+    // The review item is what the card reads, and it is in the tray (and so in the count and the Más badge).
+    const tray = await files.tray();
+    assert.deepEqual(tray.items.map(item => item.id), [capture.id]);
+    assert.equal(card.props.state.kind, 'pending');
+    assert.equal(card.props.state.item.id, capture.id);
+    const item = tray.items[0];
+    assert.deepEqual([item.source, item.writeId, item.status, item.draft.kind, item.draft.amountMinor, item.draft.merchant, item.draft.category, item.draft.destinationId],
+      ['assistant', capture.writeId, 'pending', 'expense', 1850000, 'Carrefour', 'Supermercado', 'visa']);
+    assert.deepEqual([item.draft.currency, item.draft.dateISO], ['ARS', domain.todayKey()],
+      'the currency the model stated; no date stated: the capture rule, today on the device');
+    assert.deepEqual(await files.entries(), [], 'a proposal never writes the ledger');
+    // The review sheet was presented automatically, once, and only after the item was durably stored.
+    assert.equal(JSON.stringify(view.pushed), JSON.stringify([{ pathname: '/review-sheet/[id]', params: { id: capture.id } }]));
+    assert.ok(view.storeAtPush[0].includes(capture.id), 'the item existed in the store when the sheet was presented');
+    // Closed for later, the card reopens the same sheet for the same item.
+    card.props.onReview(capture.id);
+    assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/review-sheet/[id]', params: { id: capture.id } }));
+    assert.equal(Object.hasOwn(card.props, 'onConfirm'), false, 'no Assistant-specific confirmation');
+  } finally { await files.dispose(); }
 });
 
-test('a failed confirm keeps the draft pending and a retry reuses the same Entry id; Descartar collapses it without writing', async () => {
-  let fail = true;
-  const attempts: domain.Entry[] = [];
-  const scripted = scriptedClient();
-  const view = harness({ client: scripted.client, addEntry: async entry => { attempts.push(entry); if (fail) throw new Error('No se pudo guardar. Reintentá.'); } });
-  view.render().empty.props.onPick('Gasté 18.500 en Carrefour con la Visa');
-  await tick();
-  scripted.reply([{ type: 'result', result: FIXTURE_DRAFT, facts: [] }]);
-  await settle();
-  let screen = view.render();
-  find([screen.items[1]], 'DraftCard')[0].props.onConfirm();
-  await settle();
-  screen = view.render();
-  assert.equal(attempts.length, 1);
-  assert.equal(find([screen.items[1]], 'DraftCard')[0].props.content.status, 'pending', 'a failed write leaves the draft to retry');
-  assert.equal(screen.messages.at(-1)?.role, 'system');
-  assert.match(String(screen.messages.at(-1)?.text), /No se pudo guardar/);
-  assert.equal(view.haptics.includes('success'), false);
-  fail = false;
-  find([screen.items[1]], 'DraftCard')[0].props.onConfirm();
-  await settle();
-  screen = view.render();
-  assert.equal(attempts.length, 2);
-  assert.equal(attempts[1].id, attempts[0].id, 'the retry repeats the same command, never a second movement');
-  assert.equal(find([screen.items[1]], 'DraftCard')[0].props.content.status, 'confirmed');
-  // Discarding another draft writes nothing.
-  const other = scriptedClient();
-  const view2 = harness({ client: other.client });
-  view2.render().empty.props.onPick('Gasté 18.500 en Carrefour con la Visa');
-  await tick();
-  other.reply([{ type: 'result', result: FIXTURE_DRAFT, facts: [] }]);
-  await settle();
-  find([view2.render().items[1]], 'DraftCard')[0].props.onCancel();
-  const cancelled = find([view2.render().items[1]], 'DraftCard')[0];
-  assert.equal(cancelled.props.content.status, 'cancelled');
-  assert.equal(view2.written.length, 0);
-});
-
-test('Editar hands the draft to the entry form prefilled and marks the card as edited, so the form\'s save is the only write', async () => {
+test('25A-04: one review sheet at a time: a capture that lands while a sheet is open waits as a pending card; back in the Assistant, its card reopens it', async () => {
   const scripted = scriptedClient();
   const view = harness({ client: scripted.client });
   view.render().empty.props.onPick('Gasté 18.500 en Carrefour con la Visa');
   await tick();
   scripted.reply([{ type: 'result', result: FIXTURE_DRAFT, facts: [] }]);
   await settle();
-  find([view.render().items[1]], 'DraftCard')[0].props.onEdit();
-  // 24B2: the amount travels as minor units with its currency, never as a two-decimal string.
-  assert.equal(JSON.stringify(view.pushed), JSON.stringify([{ pathname: '/new-entry', params: { kind: 'expense', currency: 'ARS', accountId: 'visa', amountMinor: '1850000', merchant: 'Carrefour', category: 'Supermercado', date: '2026-09-21' } }]));
-  assert.equal(find([view.render().items[1]], 'DraftCard')[0].props.content.status, 'edited');
-  assert.equal(view.written.length, 0);
+  assert.equal(view.pushed.length, 1, 'the first proposal is presented');
+  // The sheet is open over the Assistant: another proposal captured now is not presented over it.
+  view.render().composer.props.onChange('Gasté 18.500 en Carrefour con la Visa');
+  view.render().composer.props.onSend();
+  await tick();
+  scripted.reply([{ type: 'result', result: FIXTURE_DRAFT, facts: [] }]);
+  await settle();
+  const second = find([view.render().items[3]], 'ProposalCard')[0];
+  assert.deepEqual([second.props.content.status, second.props.state.kind, view.pushed.length], ['captured', 'pending', 1]);
+  assert.equal(view.review.captures.length, 2, 'both are stored');
+  // Back in the Assistant (the sheet closed): the card reopens it on request; nothing is presented by itself for it.
+  view.refocus();
+  assert.equal(view.pushed.length, 1);
+  second.props.onReview(second.props.content.capture.id);
+  assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/review-sheet/[id]', params: { id: second.props.content.capture.id } }));
+  // A new proposal captured once the Assistant is in front again is presented by itself, once.
+  view.refocus();
+  const before = view.pushed.length;
+  view.render().composer.props.onChange('Gasté 18.500 en Carrefour con la Visa');
+  view.render().composer.props.onSend();
+  await tick();
+  scripted.reply([{ type: 'result', result: FIXTURE_DRAFT, facts: [] }]);
+  await settle();
+  const third = find([view.render().items[5]], 'ProposalCard')[0];
+  assert.equal(view.pushed.length, before + 1);
+  assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/review-sheet/[id]', params: { id: third.props.content.capture.id } }));
+});
+
+test('25A-04: an answer that lands after the Assistant was left and reopened presents the sheet over the Assistant now in front', async () => {
+  const scripted = scriptedClient();
+  const review = memoryReview();
+  const first = harness({ client: scripted.client, review });
+  first.render().empty.props.onPick('Gasté 18.500 en Carrefour con la Visa');
+  await tick();
+  first.unmount();
+  // «+» → Asistente again: a new mount over the same session, in front, while the first request is still open.
+  const again = harness({ client: scripted.client, review, session: first.session });
+  again.render();
+  scripted.reply([{ type: 'result', result: FIXTURE_DRAFT, facts: [] }]);
+  await settle();
+  const card = find([again.render().items[1]], 'ProposalCard')[0];
+  assert.equal(card.props.content.status, 'captured');
+  assert.equal(first.pushed.length, 0, 'never over the closed screen');
+  assert.equal(JSON.stringify(again.pushed), JSON.stringify([{ pathname: '/review-sheet/[id]', params: { id: card.props.content.capture.id } }]));
+  assert.equal(first.session.presenter.current, null, 'taken: one sheet at a time');
+  again.unmount();
+  assert.equal(first.session.presenter.current, null, 'a screen that leaves takes its presenter with it');
+});
+
+test('25A-04: a capture that fails writes nothing anywhere and says so; Reintentar resends the same frozen capture, and a repeat never makes a second item (real SQLite)', async () => {
+  const files = await reviewFiles([visa, cash, usd]);
+  try {
+    const review = await sqliteReview(() => files.store);
+    review.failNext();
+    const scripted = scriptedClient();
+    const view = harness({ client: scripted.client, review });
+    view.render().empty.props.onPick('Gasté 18.500 en Carrefour con la Visa');
+    await tick();
+    scripted.reply([{ type: 'result', result: FIXTURE_DRAFT, facts: [] }]);
+    await settle();
+    let card = find([view.render().items[1]], 'ProposalCard')[0];
+    assert.deepEqual([card.props.content.status, card.props.state.kind], ['failed', 'failed'], 'never reported as saved');
+    assert.equal(view.pushed.length, 0, 'no review sheet without a stored item');
+    assert.equal((await files.tray()).items.length, 0);
+    assert.deepEqual(await files.entries(), []);
+    card.props.onRetry();
+    await settle();
+    card = find([view.render().items[1]], 'ProposalCard')[0];
+    assert.equal(card.props.content.status, 'captured');
+    assert.equal(review.captures.length, 2);
+    assert.equal(JSON.stringify(view.pushed), JSON.stringify([{ pathname: '/review-sheet/[id]', params: { id: review.captures[0].id } }]),
+      'stored by the retry: the sheet is presented then, once');
+    assert.equal(JSON.stringify(review.captures[1]), JSON.stringify(review.captures[0]), 'the retry is the same capture: same ids, same draft, same time');
+    // The store answers a repeat of a capture that already landed with that item: still one.
+    await files.store.capture(review.captures[0]);
+    card.props.onRetry();
+    await settle();
+    assert.equal(review.captures.length, 2, 'a captured proposal is never sent again');
+    assert.equal((await files.tray()).items.length, 1);
+    assert.deepEqual(await files.entries(), []);
+  } finally { await files.dispose(); }
+});
+
+test('25A-04: an edit in «Para revisar» is what the card shows, and nothing from the chat can overwrite it; a confirmed or dismissed proposal says so and offers nothing to write (real SQLite)', async () => {
+  const files = await reviewFiles([visa, cash, usd]);
+  try {
+    const review = await sqliteReview(() => files.store);
+    const scripted = scriptedClient();
+    const view = harness({ client: scripted.client, review });
+    view.render().empty.props.onPick('Gasté 18.500 en Carrefour con la Visa');
+    await tick();
+    scripted.reply([{ type: 'result', result: FIXTURE_DRAFT, facts: [] }]);
+    await settle();
+    const { capture } = find([view.render().items[1]], 'ProposalCard')[0].props.content as conversation.ProposalContent;
+    // Editar in the review UI (the store's update at the shown revision): a date and another merchant.
+    const edited = await files.store.updateDraft(capture.id, 0, { ...capture.draft, merchant: 'Carrefour Palermo', dateISO: '2026-09-20' }, new Date().toISOString());
+    await review.refresh();
+    let card = find([view.render().items[1]], 'ProposalCard')[0];
+    assert.equal(card.props.state.item.draft.merchant, 'Carrefour Palermo', 'the card reads the item, not the conversation snapshot');
+    assert.equal(card.props.content.capture.draft.merchant, 'Carrefour', 'the snapshot is never edited and never sent again');
+    card.props.onRetry();
+    await files.store.capture(review.captures[0]); // Even a repeat of the original capture keeps the edit.
+    await settle();
+    assert.equal((await files.store.get(capture.id))!.draft.merchant, 'Carrefour Palermo');
+    assert.equal(review.captures.length, 1);
+    // Confirmed in «Para revisar»: one movement, the card says so and links to it; nothing can write it again from the chat.
+    await files.store.confirm(capture.id, { expectedRevision: edited.revision, todayISO: domain.todayKey(), at: new Date().toISOString() });
+    await review.refresh();
+    view.render();
+    await settle();
+    card = find([view.render().items[1]], 'ProposalCard')[0];
+    assert.deepEqual([card.props.state.kind, card.props.state.record, card.props.state.item.status, card.props.state.item.writeId], ['confirmed', 'entry', 'confirmed', capture.writeId]);
+    assert.equal(card.props.state.item.draft.merchant, 'Carrefour Palermo', 'the confirmed card draws what was recorded, not the capture');
+    card.props.onOpenRecord('entry', capture.writeId);
+    assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/entry/[id]', params: { id: capture.writeId } }));
+    card.props.onRetry();
+    await settle();
+    assert.deepEqual(await files.entries(), [capture.writeId], 'exactly one movement, under the frozen write id');
+    for (let i = 0; i < 4; i++) { view.render(); await settle(); }
+    assert.equal(review.gets.filter(id => id === capture.id).length, 1, 'a proposal that left the tray is looked up once, never in a render loop');
+    // Another proposal dismissed there: the card says it was discarded.
+    view.render().composer.props.onChange('Gasté 18.500 en Carrefour con la Visa');
+    view.render().composer.props.onSend();
+    await tick();
+    scripted.reply([{ type: 'result', result: FIXTURE_DRAFT, facts: [] }]);
+    await settle();
+    const second = (find([view.render().items[3]], 'ProposalCard')[0].props.content as conversation.ProposalContent).capture;
+    await files.store.dismiss(second.id, 0, new Date().toISOString());
+    await review.refresh();
+    view.render();
+    await settle();
+    assert.equal(find([view.render().items[3]], 'ProposalCard')[0].props.state.kind, 'dismissed');
+    assert.deepEqual(await files.entries(), [capture.writeId]);
+  } finally { await files.dispose(); }
+});
+
+test('25A-04 (Codex review of #85): edited in «Para revisar» (amount, merchant, category, account, date) and confirmed, the card shows exactly what was recorded; one write (real SQLite)', async () => {
+  const files = await reviewFiles([visa, cash, usd]);
+  try {
+    const review = await sqliteReview(() => files.store);
+    const scripted = scriptedClient();
+    const view = harness({ client: scripted.client, review });
+    view.render().empty.props.onPick('Gasté 18.500 en Carrefour con la Visa');
+    await tick();
+    scripted.reply([{ type: 'result', result: FIXTURE_DRAFT, facts: [] }]);
+    await settle();
+    const { capture } = find([view.render().items[1]], 'ProposalCard')[0].props.content as conversation.ProposalContent;
+    const archive = { accounts: [visa, cash, usd], records: [] } as domain.ReviewArchive;
+    const changed = { ...capture.draft, amountMinor: 990000, merchant: 'Kiosco Pepe', category: 'Transporte', destinationId: cash.id, dateISO: '2026-09-19' };
+    const edited = await files.store.updateDraft(capture.id, 0, { ...changed, basis: domain.reviewBasis(changed, archive) }, new Date().toISOString());
+    await files.store.confirm(capture.id, { expectedRevision: edited.revision, todayISO: domain.todayKey(), at: new Date().toISOString() });
+    await review.refresh();
+    view.unmount();
+    // Back in the Assistant: the card is read from the confirmed item.
+    const back = harness({ client: scripted.client, review, session: view.session });
+    back.render();
+    await settle();
+    const card = find([back.render().items[1]], 'ProposalCard')[0];
+    assert.equal(card.props.state.kind, 'confirmed');
+    const shown = card.props.state.item.draft as domain.ReviewDraft;
+    assert.deepEqual([shown.amountMinor, shown.merchant, shown.category, shown.destinationId, shown.dateISO], [990000, 'Kiosco Pepe', 'Transporte', cash.id, '2026-09-19']);
+    const recorded = (await files.store.get(capture.id))!;
+    assert.equal(JSON.stringify(shown), JSON.stringify(recorded.draft), 'exactly the stored draft');
+    assert.deepEqual(await files.entries(), [capture.writeId], 'one movement');
+    card.props.onRetry();
+    await settle();
+    assert.deepEqual(await files.entries(), [capture.writeId], 'nothing in the chat can write it again');
+    assert.equal(review.captures.length, 1);
+  } finally { await files.dispose(); }
+});
+
+test('25A-04 (Codex review of #85): a capture that committed while the tray could not be read again is shown from the store, «Revisar» opens it, and the tray is asked to reload (real SQLite)', async () => {
+  const files = await reviewFiles([visa, cash, usd]);
+  try {
+    const review = await sqliteReview(() => files.store);
+    const before = review.tray();
+    const stale: ReviewBacking = { ...review, tray: () => before };
+    let refreshes = 0;
+    const scripted = scriptedClient();
+    const view = harness({ client: scripted.client, review: stale, refreshReview: async () => { refreshes++; } });
+    view.render().empty.props.onPick('Gasté 18.500 en Carrefour con la Visa');
+    await tick();
+    scripted.reply([{ type: 'result', result: FIXTURE_DRAFT, facts: [] }]);
+    await settle();
+    view.render();
+    await settle();
+    const card = find([view.render().items[1]], 'ProposalCard')[0];
+    const { capture } = card.props.content as conversation.ProposalContent;
+    assert.equal(card.props.content.status, 'captured');
+    assert.deepEqual([card.props.state.kind, card.props.state.item.id, card.props.state.item.status], ['pending', capture.id, 'pending'], 'the stored item, not «unknown» or «gone»');
+    assert.ok(refreshes >= 1, 'the tray is asked to reload');
+    card.props.onReview(capture.id);
+    assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/review-sheet/[id]', params: { id: capture.id } }), 'the sheet reads the store too (tests/review-routes.node.ts)');
+    // Rendering again does not read it again: one lookup while the tray is unchanged.
+    for (let i = 0; i < 3; i++) { view.render(); await settle(); }
+    assert.equal(review.gets.filter(id => id === capture.id).length, 1);
+    // Unreadable or failing reads keep «Revisar» (never «gone»).
+    const failing: ReviewBacking = { ...stale, get: async () => { throw new Error('disk I/O error'); } };
+    const other = harness({ client: scripted.client, review: failing, session: view.session, refreshReview: async () => {} });
+    other.render();
+    await settle();
+    assert.equal(find([other.render().items[1]], 'ProposalCard')[0].props.state.kind, 'unknown');
+    assert.deepEqual(await files.entries(), []);
+  } finally { await files.dispose(); }
+});
+
+test('25A-04: with a stale tray, a confirmation or an edit made in the sheet reaches the card (the provider counts the operation; real SQLite)', async () => {
+  const files = await reviewFiles([visa, cash, usd]);
+  try {
+    const review = await sqliteReview(() => files.store);
+    const before = review.tray();
+    let version = 0;
+    const stale: ReviewBacking = { ...review, tray: () => before, version: () => version };
+    const scripted = scriptedClient();
+    const view = harness({ client: scripted.client, review: stale });
+    view.render().empty.props.onPick('Gasté 18.500 en Carrefour con la Visa');
+    await tick();
+    scripted.reply([{ type: 'result', result: FIXTURE_DRAFT, facts: [] }]);
+    await settle();
+    view.render();
+    await settle();
+    let card = find([view.render().items[1]], 'ProposalCard')[0];
+    const { capture } = card.props.content as conversation.ProposalContent;
+    assert.equal(card.props.state.kind, 'pending');
+    // Edited in the sheet; the tray reload failed again; the provider still counts the operation.
+    const edited = await files.store.updateDraft(capture.id, 0, { ...capture.draft, merchant: 'Carrefour Express' }, new Date().toISOString());
+    version = 1;
+    view.render();
+    await settle();
+    card = find([view.render().items[1]], 'ProposalCard')[0];
+    assert.equal(card.props.state.item.draft.merchant, 'Carrefour Express', 'the edit, not the pre-edit read');
+    // Confirmed in the sheet, the reload failed again: the card says «Registrado» with the stored values.
+    await files.store.confirm(capture.id, { expectedRevision: edited.revision, todayISO: domain.todayKey(), at: new Date().toISOString() });
+    version = 2;
+    view.render();
+    await settle();
+    card = find([view.render().items[1]], 'ProposalCard')[0];
+    assert.deepEqual([card.props.state.kind, card.props.state.item.draft.merchant], ['confirmed', 'Carrefour Express']);
+    assert.deepEqual(await files.entries(), [capture.writeId]);
+  } finally { await files.dispose(); }
+});
+
+test('25A-04: an archived card is never offered or implied, so a capture never drops a destination the person chose', async () => {
+  const card: domain.CreditCardProfile = { id: 'visa-card', accountId: visa.id, issuer: 'Galicia', last4: '1111', creditLimitMinor: 0, closingDay: 20, dueDay: 5,
+    active: false, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
+  const scripted = scriptedClient();
+  const view = harness({ client: scripted.client, cards: [card] });
+  view.render().empty.props.onPick('Gasté 18 mil en el súper');
+  await tick();
+  scripted.reply([{ type: 'result', result: FIXTURE_DRAFT_NO_ACCOUNT, facts: [] }]);
+  await settle();
+  // Only Efectivo is an ARS destination now: implied, never asked about the archived Visa.
+  const proposal = find([view.render().items[1]], 'ProposalCard')[0];
+  assert.equal(proposal.props.content.capture.draft.destinationId, cash.id);
+  assert.equal(find([view.render().items[1]], 'ClarificationChoices').length, 0);
+});
+
+test('25A-04: an account the model named survives a kind clarification: it is matched again and lends its currency', async () => {
+  const scripted = scriptedClient();
+  const view = harness({ client: scripted.client });
+  view.render().empty.props.onPick('500 en efectivo');
+  await tick();
+  scripted.reply([{ type: 'result', result: { kind: 'draft', message: '', factIds: [], draft: { kind: null, amountMinor: 50000, currency: null, merchant: 'Kiosco',
+    category: 'Comida', dateISO: null, paymentMethodRef: 'Efectivo' } }, facts: [] }]);
+  await settle();
+  const choices = find([view.render().items[1]], 'ClarificationChoices')[0];
+  assert.equal(choices.props.options.map((option: { id: string }) => option.id).join(','), 'expense,income');
+  choices.props.onChoose(choices.props.options[0], 'Gasto');
+  await settle();
+  const proposal = find([view.render().items[3]], 'ProposalCard')[0];
+  assert.deepEqual([proposal.props.content.capture.draft.destinationId, proposal.props.content.capture.draft.currency], [cash.id, 'ARS'],
+    'named «Efectivo» before the kind was asked: still the destination, and its currency');
+});
+
+test('25A-04: New chat, leaving the screen and an app restart never remove a captured proposal (real SQLite)', async () => {
+  const files = await reviewFiles([visa, cash, usd]);
+  try {
+    const review = await sqliteReview(() => files.store);
+    const scripted = scriptedClient();
+    const view = harness({ client: scripted.client, review });
+    view.render().empty.props.onPick('Gasté 18.500 en Carrefour con la Visa');
+    await tick();
+    scripted.reply([{ type: 'result', result: FIXTURE_DRAFT, facts: [] }]);
+    await settle();
+    const { capture } = find([view.render().items[1]], 'ProposalCard')[0].props.content as conversation.ProposalContent;
+    view.unmount();
+    assert.deepEqual((await files.tray()).items.map(item => item.id), [capture.id], 'leaving the screen');
+    view.render().screen.props.options.headerRight().props.onPress();
+    assert.equal(view.session.getState().conversation.messages.length, 0, 'New chat clears the conversation');
+    assert.deepEqual((await files.tray()).items.map(item => item.id), [capture.id], 'and keeps the proposal in «Para revisar»');
+    const restarted = await files.reopen();
+    const item = await restarted.get(capture.id);
+    assert.deepEqual([item?.status, item?.writeId, item?.draft.merchant], ['pending', capture.writeId, 'Carrefour'], 'an app restart finds it');
+    assert.deepEqual(await files.entries(), []);
+  } finally { await files.dispose(); }
+});
+
+test('25A-04: the Assistant screen has no ledger write path left', () => {
+  const source = readFileSync(new URL('../app/assistant.tsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /addEntry|entryFromDraft|validateEntry|createEntry|addInstallmentPlan|confirmReview|session\.writes|setWriting|new-entry/);
+  assert.match(source, /captureReview\(\{ id: frozen\.id, writeId: frozen\.writeId, captureKey: frozen\.captureKey, draft: frozen\.draft, at: frozen\.at \}\)/);
+  for (const file of ['../src/assistant/session.ts', '../src/assistant/conversation.ts', '../src/assistant/review-proposal.ts', '../src/ui/assistant-messages.tsx']) {
+    assert.doesNotMatch(readFileSync(new URL(file, import.meta.url), 'utf8').replace(/\/\*\*[\s\S]*?\*\//g, ''), /addEntry|createEntry|validateEntry|confirmReview|store\.confirm/, file);
+  }
 });
 
 test('a draft without a payment method asks with the accounts of that currency; the choice becomes the user\'s words and completes the draft', async () => {
@@ -406,16 +729,19 @@ test('a draft without a payment method asks with the accounts of that currency; 
   const choices = find([question], 'ClarificationChoices')[0];
   assert.equal(JSON.stringify(choices.props.options), JSON.stringify([{ id: 'visa', label: 'Visa Galicia' }, { id: 'cash', label: 'Efectivo' }]), 'USD accounts are not offered for an ARS expense');
   assert.equal(choices.props.chosen, null);
-  assert.equal(find([question], 'DraftCard').length, 0, 'no card until the account is known');
+  assert.equal(find([question], 'ProposalCard').length, 0, 'no proposal until the account is known');
+  assert.equal(view.review.captures.length, 0, 'nothing captured while a question is open');
   choices.props.onChoose(choices.props.options[1]);
   screen = view.render();
   assert.deepEqual(screen.messages.map(message => message.role), ['user', 'assistant', 'user', 'assistant']);
   assert.equal(find([screen.items[1]], 'ClarificationChoices')[0].props.chosen, 'cash');
   assert.equal(find([screen.items[2]], 'UserMessage')[0].props.text, 'Efectivo');
-  const card = find([screen.items[3]], 'DraftCard')[0];
-  assert.equal(card.props.content.draft.accountId, 'cash');
-  assert.equal(card.props.content.status, 'pending');
-  assert.equal(view.written.length, 0);
+  await settle();
+  const card = find([view.render().items[3]], 'ProposalCard')[0];
+  assert.equal(card.props.content.capture.draft.destinationId, 'cash');
+  assert.deepEqual([card.props.content.capture.draft.currency, card.props.content.capture.draft.dateISO], ['ARS', domain.todayKey()], 'the currency the model stated; no date stated: today, the capture rule');
+  assert.equal(card.props.content.status, 'captured');
+  assert.equal(view.review.captures.length, 1);
   assert.equal(scripted.asks.length, 1, 'completing a clarification is local: no second request');
   // The model's own clarification (no draft) is a question the user answers by typing: text, no chips.
   const other = scriptedClient();
@@ -451,7 +777,7 @@ test('a remote failure keeps the user message, explains, and Reintentar sends th
   assert.equal(screen.messages.at(-1)?.text, 'Respuesta inválida del servidor.', 'a specific failure message is shown as-is');
 });
 
-test('the fixture client shows a visible test banner and a confirm never writes', async () => {
+test('the fixture client shows a visible test banner, and its proposal is a preview: never captured, never written', async () => {
   const view = harness({ client: fixtureAssistant(0) });
   let screen = view.render();
   const banner = nodes(screen.root).filter(node => node.type === 'AppText').map(node => String(node.props.children));
@@ -459,16 +785,13 @@ test('the fixture client shows a visible test banner and a confirm never writes'
   screen.empty.props.onPick('Gasté 18.500 en Carrefour con la Visa');
   await settle();
   screen = view.render();
-  const card = find([screen.items[1]], 'DraftCard')[0];
-  assert.ok(card);
-  card.props.onConfirm();
+  const card = find([screen.items[1]], 'ProposalCard')[0];
+  assert.deepEqual([card.props.content.status, card.props.state.kind], ['preview', 'preview']);
+  card.props.onRetry();
   await settle();
-  screen = view.render();
-  assert.equal(view.written.length, 0, 'fixture drafts are examples, never records');
-  assert.equal(find([screen.items[1]], 'DraftCard')[0].props.content.status, 'pending');
-  assert.equal(screen.messages.at(-1)?.text, 'assistant.fixtureConfirmRefused', 'the note is stored as its key');
-  assert.match(es.errorText(String(screen.messages.at(-1)?.text)), /Vista de prueba/);
-  assert.equal(view.haptics.includes('success'), false);
+  assert.equal(view.review.captures.length, 0, 'fixture proposals never reach the review file');
+  assert.equal(view.pushed.length, 0, 'and no review sheet is presented for them');
+  assert.equal(find([view.render().items[1]], 'ProposalCard')[0].props.content.status, 'preview');
 });
 
 test('autoscroll follows only a reader who is near the end, and Reduce Motion scrolls without animation', () => {
@@ -571,7 +894,7 @@ test('leaving the screen does not lose the conversation: mounted again over the 
   assert.equal(JSON.stringify(first.scrolled[0]), JSON.stringify({ animated: true }), 'the short empty content followed as usual, not the returning jump');
 });
 
-test('an answer streaming while the screen is closed still lands in the session, and a confirm that finishes while it is closed is recorded once', async () => {
+test('an answer streaming while the screen is closed still lands in the session, and a capture that finishes while it is closed lands once', async () => {
   const scripted = scriptedClient();
   const view = harness({ client: scripted.client });
   view.render().empty.props.onPick('¿Por qué gasté más este mes?');
@@ -606,36 +929,48 @@ test('an answer streaming while the screen is closed still lands in the session,
   assert.equal(find([screen.items[1]], 'AnswerEvidence')[0].props.content.links[0].id, 'movements');
   assert.equal(screen.composer.props.busy, false);
 
-  // A confirm that is still writing when the person leaves: the session holds the write, the remounted card shows it busy,
-  // a second tap from the new mount writes nothing, and the result lands in the session.
+  // A capture still in flight when the person leaves: it lands in the session, once, and the remounted card shows it.
   const drafts = scriptedClient();
   let finish: (() => void) | null = null;
-  const attempts: domain.Entry[] = [];
-  const slow = async (entry: domain.Entry) => { attempts.push(entry); await new Promise<void>(resolve => { finish = resolve; }); };
-  const writer = harness({ client: drafts.client, addEntry: slow });
+  const base = memoryReview();
+  const slow: ReviewBacking = { ...base, capture: async input => { const pending = base.capture(input); await new Promise<void>(resolve => { finish = resolve; }); return pending; } };
+  const writer = harness({ client: drafts.client, review: slow });
   writer.render().empty.props.onPick('Gasté 18.500 en Carrefour con la Visa');
   await tick();
   drafts.reply([{ type: 'result', result: FIXTURE_DRAFT, facts: [] }]);
   await settle();
-  find([writer.render().items[1]], 'DraftCard')[0].props.onConfirm();
-  await tick();
-  assert.equal(attempts.length, 1);
-  assert.equal(writer.session.getState().writing, 'a-2');
+  assert.equal(base.captures.length, 1);
   writer.unmount();
-  const back = harness({ client: drafts.client, session: writer.session, addEntry: slow });
-  const busyCard = find([back.render().items[1]], 'DraftCard')[0];
-  assert.equal(busyCard.props.busy, true, 'the write in progress shows on the card after coming back');
-  busyCard.props.onConfirm();
+  const back = harness({ client: drafts.client, session: writer.session, review: slow });
+  const busyCard = find([back.render().items[1]], 'ProposalCard')[0];
+  assert.equal(busyCard.props.state.kind, 'capturing', 'the capture in progress shows on the card after coming back');
+  busyCard.props.onRetry();
   await settle();
-  assert.equal(attempts.length, 1, 'one write at a time, whether or not the screen is open');
+  assert.equal(base.captures.length, 1, 'one capture at a time, whether or not the screen is open');
   finish!();
   await settle();
-  assert.equal(writer.session.getState().writing, null);
-  const done = find([back.render().items[1]], 'DraftCard')[0];
-  assert.equal(done.props.content.status, 'confirmed');
-  assert.equal(done.props.content.entryId, attempts[0].id);
-  assert.equal(done.props.busy, false);
-  assert.equal(writer.session.writes.size, 0, 'a finished write leaves nothing to retry');
+  const done = find([back.render().items[1]], 'ProposalCard')[0];
+  assert.equal(done.props.content.status, 'captured');
+  assert.equal(done.props.state.kind, 'pending');
+  assert.equal(writer.session.capturing.size, 0);
+  assert.equal(writer.pushed.length, 0, 'never over the screen that was left');
+  assert.equal(back.pushed.length, 1, 'the person came back: the sheet is presented over the Assistant now in front');
+  // Nobody in front: a capture that lands then presents nothing, and the card offers «Revisar».
+  back.unmount();
+  const late = scriptedClient();
+  let release: (() => void) | null = null;
+  const held = memoryReview();
+  const slowCapture: ReviewBacking = { ...held, capture: async input => { const done = held.capture(input); await new Promise<void>(resolve => { release = resolve; }); return done; } };
+  const away = harness({ client: late.client, review: slowCapture });
+  away.render().empty.props.onPick('Gasté 18.500 en Carrefour con la Visa');
+  await tick();
+  late.reply([{ type: 'result', result: FIXTURE_DRAFT, facts: [] }]);
+  await settle();
+  away.unmount();
+  release!();
+  await settle();
+  assert.equal(away.pushed.length, 0);
+  assert.equal(away.session.presenter.current, null);
 });
 
 test('the Assistant is a root stack route reached from the capture hub; there is no Assistant tab and no tab route file', () => {
@@ -661,7 +996,7 @@ test('the Assistant is a root stack route reached from the capture hub; there is
   assert.equal(/CaptureButton|home-capture/.test(home), false);
 });
 
-test('English: the screen\'s own words are English, the model\'s answer and the user\'s words are untouched, and a confirmed draft writes the same Entry', async () => {
+test('English: the screen\'s own words are English, the model\'s answer and the user\'s words are untouched, and a proposal captures the same review draft', async () => {
   const scripted = scriptedClient();
   const view = harness({ client: scripted.client, locale: 'en-AR' });
   let screen = view.render();
@@ -695,17 +1030,16 @@ test('English: the screen\'s own words are English, the model\'s answer and the 
   choices.props.onChoose(choices.props.options[0], 'Visa Galicia');
   items = english.render().items;
   assert.equal(find([items[2]], 'UserMessage')[0].props.text, 'Visa Galicia');
-  assert.equal(find([items[3]], 'AssistantText')[0].props.text, 'Review the draft before saving it.');
+  assert.equal(find([items[3]], 'AssistantText')[0].props.text, 'Review the proposal before recording it.');
   assert.deepEqual([find([items[1]], 'AssistantText')[0].props.ownWords, find([items[3]], 'AssistantText')[0].props.ownWords], [true, true],
     'the app\'s own questions are marked so VoiceOver reads them in the interface language, not as the model\'s Spanish prose');
   // The same question follows a language change already on screen: it is stored as a key.
   english.setLocale('es-AR');
   assert.equal(find([english.render().items[1]], 'AssistantText')[0].props.text, '¿Con qué lo pagaste?');
   english.setLocale('en-AR');
-  find([english.render().items[3]], 'DraftCard')[0].props.onConfirm();
   await settle();
-  assert.equal(english.written.length, 1);
-  // The same flow in Spanish writes the identical Entry: language never reaches the ledger.
+  assert.equal(english.review.captures.length, 1);
+  // The same flow in Spanish captures the identical review draft: language never reaches the proposal.
   const spanishAsk = scriptedClient();
   const spanish = harness({ client: spanishAsk.client });
   spanish.render().empty.props.onPick('Gasté 18 mil en el súper');
@@ -714,11 +1048,10 @@ test('English: the screen\'s own words are English, the model\'s answer and the 
   await settle();
   const spanishChoices = find([spanish.render().items[1]], 'ClarificationChoices')[0];
   spanishChoices.props.onChoose(spanishChoices.props.options[0], 'Visa Galicia');
-  find([spanish.render().items[3]], 'DraftCard')[0].props.onConfirm();
   await settle();
-  const stable = (written: domain.Entry[]) => JSON.stringify(written.map(({ createdAt: _stamp, ...entry }) => entry));
-  assert.equal(stable(english.written), stable(spanish.written), 'identical except the write timestamp');
-  assert.equal(english.written[0].category, 'Supermercado', 'the stored category stays the stored string');
+  const stable = (captures: ReviewCapture[]) => JSON.stringify(captures.map(({ draft }) => ({ ...(draft as domain.ReviewDraft), capturedAt: '' })));
+  assert.equal(stable(english.review.captures), stable(spanish.review.captures), 'identical except the capture time');
+  assert.equal((english.review.captures[0].draft as domain.ReviewDraft).category, 'Supermercado', 'the stored category stays the stored string');
   // Notes are stored as keys and read in English; a remote failure's specific message is shown through errorText.
   const offline = scriptedClient();
   const noted = harness({ client: offline.client, locale: 'en-AR' });

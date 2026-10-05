@@ -1,13 +1,14 @@
-import { useRef, useState, type MutableRefObject } from 'react';
-import { Alert, View } from 'react-native';
+import { useRef, type MutableRefObject } from 'react';
+import { View } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import { todayKey, type ReviewArchive } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import type { ReviewItem } from '../../src/storage/review-database';
 import { ActionButton, AppText, DetailRow, EmptyState, ErrorMessage, LifecycleNote, Money, Screen, SectionTitle, Surface } from '../../src/ui/components';
 import { useAccountNameOf, useCategoryLabel } from '../../src/ui/category-hues';
 import { reviewFacts, stateTone, type ReviewFacts } from '../../src/ui/review-presentation';
+import { useReviewActions } from '../../src/ui/review-actions';
+import { useReviewItem } from '../../src/ui/use-review-item';
 import { space, usePalette } from '../../src/ui/theme';
 import { useI18n } from '../../src/i18n/provider';
 
@@ -18,69 +19,35 @@ import { useI18n } from '../../src/i18n/provider';
  * write. A confirmed, dismissed or unreadable item is not here: the screen says it is no longer pending. */
 export default function ReviewItemScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { review } = useLedger();
   const { t } = useI18n();
-  const item = review && review !== 'unavailable' ? review.items.find(row => row.id === id) : undefined;
+  // 25A-04: the tray's item, or the store's own when the tray could not be read again (a capture that committed).
+  const { item, resolving, refreshing, reload } = useReviewItem(id);
   // A proposal this screen just confirmed or dismissed leaves the tray before the screen pops: it is drawn as it was (its
   // actions held) while it leaves, never as «no longer pending». Any other disappearance says so.
   const seen = useRef<ReviewItem | undefined>(undefined);
   const leaving = useRef(false);
   if (item) seen.current = item;
   const shown = item ?? (leaving.current ? seen.current : undefined);
+  if (!shown && resolving) return <Screen>{null}</Screen>;
   if (!shown) return <Screen><EmptyState icon="file-tray-outline" title={t('review.detail.notFoundTitle')} detail={t('review.detail.notFoundDetail')} /></Screen>;
-  return <ReviewDetail item={shown} leaving={leaving} />;
+  return <ReviewDetail item={shown} leaving={leaving} reload={reload} refreshing={refreshing} />;
 }
 
-/** The shape of a store call `run` takes (an async step). */
-const idle = async () => {};
-
-function ReviewDetail({ item, leaving }: { item: ReviewItem; leaving: MutableRefObject<boolean> }) {
-  const { archive, review, confirmReview, dismissReview } = useLedger();
+function ReviewDetail({ item, leaving, reload, refreshing }: { item: ReviewItem; leaving: MutableRefObject<boolean>; reload: () => void; refreshing: boolean }) {
+  const { archive, review } = useLedger();
   const p = usePalette();
   const { t, formatDate, spokenMoney, moneyText } = useI18n();
   const nameOf = useAccountNameOf();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const working = useRef(false);
+  // Opened from a link with nothing under it, the tray replaces it instead.
+  const leave = () => { if (router.canGoBack()) router.back(); else router.replace('/review'); };
+  // 25A-04: the same Confirmar and Descartar as the review sheet (src/ui/review-actions.ts).
+  const { busy, error, confirm, dismiss } = useReviewActions(item, { leaving, reload, leave });
   const tray = review && review !== 'unavailable' ? review : null;
   const facts: ReviewFacts | null = archive && tray ? reviewFacts(item, archive as ReviewArchive, { todayISO: todayKey(), writable: tray.writable, conflicts: tray.conflicts }) : null;
   const categoryLabel = useCategoryLabel(item.draft.category ?? '', item.draft.kind ?? 'expense');
   if (!facts || !tray) return <Screen>{null}</Screen>;
   const missing = t('review.missing');
   const conflict = facts.state === 'conflict';
-
-  /** One store call at a time; the revision is the one on screen, so a proposal that changed since is refused, never overwritten. */
-  async function run(work: typeof idle) {
-    if (working.current) return;
-    working.current = true;
-    leaving.current = true;
-    setBusy(true);
-    setError(null);
-    try { await work(); } catch (cause) {
-      leaving.current = false;
-      setError(cause instanceof Error ? cause.message : 'review.unavailable');
-    } finally {
-      // Done: the screen is popping and its actions stay held. Refused: everything is offered again.
-      if (!leaving.current) { working.current = false; setBusy(false); }
-    }
-  }
-  // Opened from a link with nothing under it, the tray replaces it instead.
-  const leave = () => { if (router.canGoBack()) router.back(); else router.replace('/review'); };
-  const confirm = () => run(async () => {
-    await confirmReview(item.id, item.revision);
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    leave();
-  });
-  const dismiss = () => {
-    if (working.current) return;
-    Alert.alert(t('review.detail.dismissQuestion'), t('review.detail.dismissDetail'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      { text: t('review.detail.dismiss'), style: 'destructive', onPress: () => void run(async () => {
-        await dismissReview(item.id, item.revision);
-        leave();
-      }) },
-    ], { cancelable: true });
-  };
 
   const kindTitle = t(facts.kind === null ? 'review.kind.unknown' : `review.kind.${facts.kind}`);
   const plan = facts.purchase?.mode === 'installments' ? facts.purchase : null;
@@ -134,10 +101,10 @@ function ReviewDetail({ item, leaving }: { item: ReviewItem; leaving: MutableRef
     <ErrorMessage message={error} />
     {/* A conflict cannot be confirmed or edited (the store refuses both); it can be dismissed while no write is frozen on it. */}
     {tray.writable && <View style={{ gap: 10 }}>
-      {!conflict && <ActionButton label={confirmText.text} spokenLabel={confirmText.spoken} icon="checkmark" onPress={confirm} busy={busy} disabled={!facts.canConfirm} />}
-      {!conflict && <ActionButton label={t('review.detail.edit')} icon="create-outline" secondary disabled={busy}
+      {!conflict && <ActionButton label={confirmText.text} spokenLabel={confirmText.spoken} icon="checkmark" onPress={confirm} busy={busy} disabled={!facts.canConfirm || refreshing} />}
+      {!conflict && <ActionButton label={t('review.detail.edit')} icon="create-outline" secondary disabled={busy || refreshing}
         onPress={() => router.push({ pathname: '/edit-review/[id]', params: { id: item.id } })} />}
-      {(!conflict || item.attempt === null) && <ActionButton label={t('review.detail.dismiss')} icon="close" secondary disabled={busy} onPress={dismiss} />}
+      {(!conflict || item.attempt === null) && <ActionButton label={t('review.detail.dismiss')} icon="close" secondary disabled={busy || refreshing} onPress={dismiss} />}
     </View>}
   </Screen>;
 }

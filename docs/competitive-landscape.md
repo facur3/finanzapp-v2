@@ -283,7 +283,7 @@ Notes.
 
 Notes.
 - **Shapes of pricing.** Subscription-only with no free tier (Copilot, Monarch, YNAB, at USD 95 to 200 a year); freemium with volume caps (MonAi 20 transactions a month; Splitwise four expenses a day; Finy 100 movements, 10 AI queries and 2 scans a month with ads; Piggy six months of history, caps on wallets and automations); freemium with automation and convenience behind Pro (Kesef: Mercado Pago, unlimited voice, tags and budgets, insights, exports; MoneyCoach: category budgets, multi-currency, credit cards, sync and bank sync; Wallet: bank sync, unlimited accounts, export). Lifetime prices: Kesef 99.99, Finy 99.99, MoneyCoach 179.99 to 199.99, Wallet 24.99 to 29.99, Settle Up per group.
-- **Metered AI.** Finy and MonAi price AI by monthly quotas (queries, scans, credits); Copilot and Monarch include it in the subscription as a beta. FinanzApp's rule (launch §1.2): the Assistant is the one capability with a real marginal cost and the natural Pro boundary, with the allowance and the quota set from measured costs; data safety, recovery and privacy are never behind the paywall. The trend confirms the plan.
+- **Metered AI.** Finy and MonAi price AI by monthly quotas (queries, scans, credits); Copilot and Monarch include it in the subscription as a beta. FinanzApp's rule (launch §1.2): the Assistant is the one capability with a real marginal cost and the natural Pro boundary (owner, 2026-10-04: a Pro candidate with generous fair use, no permanent free allowance and no message counter, limits set from measured costs); data safety, recovery and privacy are never behind the paywall. The trend confirms the plan.
 
 
 ### 3.10 Future finance
@@ -409,7 +409,7 @@ it follows from an existing rule.
 | Split modes, groups, invitations, household, simplification | **LAUNCH CANDIDATE / POST-LAUNCH** | §9.3. | §9.2. |
 | Notification-based automation (reading bank or payment notifications) | **DELIBERATELY EXCLUDED** | iOS gives a third-party app no way to read another app's notifications; MonAi does it on Android only and on iOS falls back to Shortcuts automations over SMS and email. FinanzApp's equivalents are the Wallet capture (25A2) and, later, Shortcuts that hand text to the Assistant (25D). Android, when it exists, would need its own decision. | AGENTS rule 12 (no arbitrary history reads); draft-first. |
 | CSV export | **LAUNCH CANDIDATE** | 25C beside CSV import: a plain export of movements (date, type, account, merchant, category, amount, currency, note) in the person's region's separators. Kesef, MonAi, Copilot, Wallet and MoneyCoach export CSV; data safety and the way out are never behind a paywall (launch §1.1), so it stays free. | The JSON backup remains the recovery format; a CSV is a reading, never a backup. |
-| Excel (XLSX) | **POST-LAUNCH** | Kesef imports XLSX and exports a three-sheet workbook; CSV opens in Excel and Numbers and needs no dependency. Revisit only if asked. | — |
+| Excel (XLSX) / advanced report export | **ACTIVE ROADMAP** · 25F Pro candidate (owner, 2026-10-04) | Kesef imports XLSX and exports a three-sheet workbook. Basic CSV (it opens in Excel and Numbers) stays free; the advanced Excel-friendly export and report package is in the Pro candidate bundle (app-store-launch.md §1.2). | Data portability is never hostage to Pro. |
 | CloudKit as a sync engine | **RESEARCH GATE** | 25E: MonAi stores data in the person's own iCloud with no developer server, which is the privacy story closest to FinanzApp's; 25E specifies Supabase for sync and identity. Whether CloudKit (no account of ours, no server cost, Apple's privacy posture, but no Android and weaker conflict tooling) is a better engine for the one-person multi-device case is a research question for 25E, not a decision here. | Operation ids, conflict handling, deletion records (AGENTS rule 9) whichever engine. |
 | Lifetime price | **LAUNCH CANDIDATE** | 25F owner decision: Kesef (USD 99.99), Wallet, MoneyCoach, Finy («Pro para siempre») and Settle Up sell one; it conflicts with a Pro whose main cost is per-request AI unless the lifetime tier excludes or caps AI. | Measured costs before any price (roadmap 25F). |
 | Amortising loans, mortgages; assets (property, vehicles); investments; net worth | **POST-LAUNCH** | §11.3; Copilot, Monarch and Wallet have them, the expense-first products do not. | Decision 002. |
@@ -485,7 +485,7 @@ Mercado Pago authorisation (OAuth Authorization Code with PKCE, on Mercado Pago'
   → ReviewDraft (packages/domain/review-drafts.ts): amount, currency, merchant or counterpart, date, the mapped
     FinanzApp account; a gap for anything missing, never a guess
   → the review tray (25A-03), through the remote capture inbox (`/api/mobile/captures`) as the durable hand-over
-  → optional alert that a movement awaits review (a 25D review alert, or a Live Activity if 25A2 proves one)
+  → a Live Activity if 25A2 proves one; a 25D review rescue notification only if that presentation is missed and the item stays pending (production-plan.md §9.5)
   → the person's explicit Confirmar
   → the local ledger, one write per draft
 ```
@@ -508,8 +508,11 @@ external financial transactions»; production-plan §5.3):
 - **Original currency kept.** A movement in another currency keeps its currency; nothing is converted on import.
 - **Revocation** from the Mercado Pago account (the `mp-connect` deauthorised event) stops the sync and deletes the
   token; the drafts already in the tray stay the person's.
-- **The notification** that a movement awaits review is a product decision for later: a local or remote notification
-  or a Live Activity are candidates; none is chosen here.
+- **The review notification** is decided (owner, 2026-10-04; production-plan.md §9.5): the review surface is the
+  primary presentation (a Live Activity if 25A2 proves one); a 25D local **rescue** notification follows only if that
+  presentation was missed and the item stays pending, never for every movement, never alongside an active review
+  surface, cancelled on confirmation or dismissal, deep-linking to that item, with no amount, merchant or account by
+  default.
 - Manual capture, the Wallet capture of 25A2 and the person's own export remain complete without any of this.
 
 ### 7.4 What can be offered before the gate

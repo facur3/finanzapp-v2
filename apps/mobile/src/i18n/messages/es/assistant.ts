@@ -9,10 +9,6 @@ export const assistant = {
     newChat: 'Nuevo chat',
     /** Banner of the development-only scripted replies. */
     fixtureBanner: 'Vista de prueba: respuestas de ejemplo, nada se guarda.',
-    /** Note after Confirmar on a scripted (development) draft. */
-    fixtureConfirmRefused: 'Vista de prueba: este borrador es de ejemplo y no se guarda.',
-    /** Note when a confirmed draft could not be written; the draft stays pending. */
-    saveFailed: 'No pudimos guardar el movimiento. El borrador sigue acá para reintentar.',
     /** Heading of the empty conversation, above the suggestions. */
     emptyTitle: '¿En qué te ayudo?',
     /** Prompt chips of an empty conversation. Tapping one sends its text, in the interface language, as the user's message. */
@@ -57,7 +53,7 @@ export const assistant = {
       receivedIn: '¿En qué cuenta ingresó?',
       category: '¿En qué categoría lo anoto?',
       /** After the last clarification, above the completed draft card. */
-      reviewDraft: 'Revisá el borrador antes de guardarlo.',
+      reviewDraft: 'Revisá la propuesta antes de registrarla.',
     },
     /** Rows of the numbers an answer rests on, named from the local evidence. */
     evidence: {
@@ -76,29 +72,32 @@ export const assistant = {
       category: 'Ver categoría',
       budget: 'Ver presupuesto',
     },
-    draft: {
-      /** Eyebrow of the card: "Borrador · Gasto", "Guardado · Ingreso". */
+    /** 25A-04: a financial proposal of the Assistant, captured as a review item; reviewed in the review sheet (or later in «Para revisar»). */
+    proposal: {
+      /** Eyebrow of the card: "Pendiente · Gasto". */
       eyebrow: '{status} · {kind}',
-      pending: 'Borrador',
-      saved: 'Guardado',
+      status: { preview: 'Vista de prueba', capturing: 'Propuesta', failed: 'Propuesta', pending: 'Pendiente', unknown: 'Pendiente', confirmed: 'Registrado' },
       merchant: 'Comercio',
       source: 'Origen',
+      destination: 'Dónde se registra',
+      payment: 'Pago',
       /** VoiceOver reading of one card row: "Comercio: Carrefour". */
       row: '{label}: {value}',
-      missingText: 'Falta completar',
-      missingChoice: 'Falta elegir',
-      /** Why Confirmar is disabled; count is the number of missing fields. */
-      gaps: { one: 'Completá el dato que falta con Editar antes de confirmar.', other: 'Completá los datos que faltan con Editar antes de confirmar.' },
-      confirm: 'Confirmar',
-      edit: 'Editar',
-      discard: 'Descartar',
-      discardLabel: 'Descartar borrador',
+      missing: 'Falta completar',
+      noAmount: 'Sin monto',
+      preview: 'Vista de prueba: esta propuesta no se guarda ni se puede registrar.',
+      capturing: 'Guardando la propuesta…',
+      failed: 'No se pudo guardar la propuesta. No se registró nada.',
+      retry: 'Reintentar',
+      ready: 'Lista para confirmar.',
+      incomplete: { one: 'Falta {count} dato para confirmar.', other: 'Faltan {count} datos para confirmar.' },
+      unknown: 'Pendiente de confirmar. También está en Para revisar.',
+      review: 'Revisar',
+      confirmed: 'Registrado.',
       viewEntry: 'Ver movimiento',
-      cancelledLabel: 'Borrador descartado',
-      cancelled: 'Borrador descartado. No se registró nada.',
-      editedLabel: 'Borrador abierto en el formulario',
-      edited: 'Seguiste en el formulario. Guardá desde ahí.',
-      accountRequired: 'Elegí con qué cuenta se pagó antes de confirmar.',
+      viewPlan: 'Ver plan',
+      dismissed: 'Propuesta descartada. No se registró nada.',
+      gone: 'Esta propuesta ya no está pendiente.',
     },
     /** Errors of the server integration client (Assistant and capture). */
     integration: {

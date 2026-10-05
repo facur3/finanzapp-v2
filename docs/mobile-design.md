@@ -855,6 +855,33 @@ barras de Día a día y una cabecera fija sólida. Siguen permitidos para una pa
 vinculante del roadmap no cambia: la próxima entrega de producto es 24T3; 24UX6C (Movimientos y Más) y 24UX6D
 (Tarjetas) siguen a 24UX6B en el carril UX, y su lugar frente a 24T3 lo decide el dueño (ver `docs/mobile-roadmap.md`).
 
+## Producto 25A-04 — Asistente → hoja de revisión
+
+El Asistente ya no registra nada por su cuenta. Cada propuesta suya se guarda primero como un ítem de revisión y, recién
+entonces, se presenta **una hoja de revisión nativa** sobre el Asistente: se confirma ahí, sin salir. «Para revisar» es la
+bandeja duradera para lo que queda pendiente, no un paso obligatorio.
+
+- **La hoja** (`/review-sheet/[id]`): una hoja de iOS ajustada a su contenido, con la manija arriba (en tamaños de texto de
+  accesibilidad abre a pantalla completa y se desplaza). Compacta y tranquila: «Confirmá el gasto», el monto, el comercio,
+  y en filas Categoría, Cuenta o Tarjeta, Pago (en una tarjeta) y Fecha; lo que falta, nombrado, en gris; abajo
+  **Confirmar** (la única acción lima, repite el monto), **Editar** (secundario) y **«Descartar propuesta»** como texto en
+  el tono negativo, con su pregunta; al pie, «Si la cerrás, queda pendiente en Para revisar.»
+- **Cerrar no es descartar.** La «X» («Ahora no»), deslizar hacia abajo o volver solo cierran la hoja: la propuesta queda
+  pendiente, con «Revisar» en la tarjeta del chat, en Más → Para revisar y en el número de Más.
+- **Editar** abre el editor de «Para revisar» sobre la hoja; al guardar vuelve a la hoja con lo editado.
+- **La tarjeta del chat** es compacta: «Pendiente · Gasto», el monto (o «Sin monto»), comercio, categoría, dónde se
+  registra, el pago en una tarjeta y la fecha (lo que falta dice «Falta completar», en gris), una línea («Lista para
+  confirmar.», «Faltan 2 datos para confirmar.», ámbar si está desactualizada o interrumpida) y, mientras está
+  pendiente, **una sola acción secundaria, «Revisar»**, que vuelve a abrir la hoja. No repite los controles de la hoja.
+- **Lee el ítem, no el chat.** Lo editado es lo que muestran la hoja y la tarjeta; confirmada, la tarjeta muestra los
+  valores registrados con «Registrado» y «Ver movimiento» (o «Ver plan»); descartada, «Propuesta descartada».
+- **Guardando y error.** «Guardando la propuesta…»; si falla, «No se pudo guardar la propuesta. No se registró nada.» con
+  «Reintentar»; la hoja solo aparece cuando la propuesta ya quedó guardada.
+- **Fecha.** Si el pedido no dice fecha, es hoy (el día del teléfono al guardar la propuesta); una fecha dicha («ayer», «el
+  2 de octubre») manda.
+- **Vista de prueba:** la tarjeta se ve, dice que no se guarda, no abre la hoja y no tiene acciones.
+- **Nuevo chat** borra la conversación, nunca una propuesta guardada.
+
 ## Producto 25A-03 — Para revisar
 
 La primera interfaz sobre las propuestas guardadas en el dispositivo (25A-02). Sin rediseño: las piezas son las de
@@ -961,10 +988,12 @@ brillante + verde bosque como sistema de marca, su logo, su tipografía, sus íc
 sus textos ni sus composiciones. La revisión final de nombre, logo, marca registrada y similitud confusa sigue en la
 compuerta de identidad de marca existente ([brand-brief.md](brand-brief.md)); esto no es una opinión legal.
 
-**Temas a futuro (solo documentado).** Paquetes de tema opcionales (por ejemplo Forest, Lime, Sapphire) quedan solo como
-un candidato documentado para después del lanzamiento si el producto quiere personalización: no se prometen para el lanzamiento
-ni forman parte de la monetización actual, y no hay selector. Cada tema multiplica la QA visual y de accesibilidad, y
-el lanzamiento necesita una identidad por defecto reconocible.
+**Paquetes de tema: candidato Pro de 25F antes del lanzamiento (decisión del dueño, 2026-10-04).** Electric Lime sigue
+siendo el tema por defecto y la identidad actual. Paquetes opcionales como Forest y Sapphire se podrán elegir con el
+mismo entitlement de Pro una vez que existan StoreKit y el paywall (roadmap, «Producto 25F»; app-store-launch.md §1.2).
+Van después de la arquitectura central de IA y Apple (25A, 25A2, 25D), antes del lanzamiento si el calendario lo
+permite y antes de la investigación opcional de sincronización con Mercado Pago. Cada tema pasa QA de claro, oscuro,
+accesibilidad y color semántico antes del lanzamiento; no hay selector todavía.
 
 **Veredicto del dueño (2026-10-03, iPhone físico, claro y oscuro): se queda.** Quedan como están el campo lima de
 Inicio; el segmento no elegido de `Gastado | Disponible`; la jerarquía del importe (dígitos en tinta, símbolo de moneda y centavos como están); Próximos compromisos
@@ -3009,6 +3038,13 @@ crédito, marca elegida) y los filetes de las píldoras, el chip y el compositor
 color propio.
 
 ## Pendiente de revisión en iPhone
+
+- Producto 25A-04 (en su rama; sin build de EAS; diferida al control previo al lanzamiento): la tarjeta de vista de prueba
+  sin acciones ni hoja y «Para revisar» vacío después; con el Asistente conectado (más adelante), la hoja de revisión que
+  aparece sola después de guardar la propuesta, su tamaño ajustado y con texto grande, deslizarla hacia abajo sin
+  descartar, Editar y volver a la hoja, Confirmar con un solo registro, «Descartar propuesta» con su pregunta, «Revisar»
+  desde la tarjeta, «Registrado» y «Propuesta descartada». La lista exacta está en docs/mobile-device-checklist.md
+  («Producto 25A-04»).
 
 - Producto 25A-03 (en su rama; sin build de EAS; nada revisado en el iPhone): la fila «Para revisar» de Más y la bandeja
   vacía, en claro y oscuro; el símbolo y los centavos del monto de Inicio en grafito, en claro y oscuro; VoiceOver, texto

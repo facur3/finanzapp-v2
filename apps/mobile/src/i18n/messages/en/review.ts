@@ -73,6 +73,14 @@ export const review: Pick<Messages, 'review'> = {
       dismissDetail: 'Nothing is recorded and it won’t appear again. Your transactions don’t change.',
       recordedLater: 'Recorded. The proposal will be marked as confirmed the next time the app opens.',
     },
+    sheet: {
+      titleExpense: 'Confirm the expense',
+      titleIncome: 'Confirm the income',
+      titleUnknown: 'Review the proposal',
+      close: 'Not now',
+      discard: 'Discard proposal',
+      later: 'If you close it, it stays pending in To review.',
+    },
     edit: {
       noDestination: 'You have no available account or card in {currency} for this transaction.',
       amountNeedsDestination: 'Choose where it’s recorded to enter the amount in its currency.',

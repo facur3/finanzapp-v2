@@ -1,10 +1,21 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-04 (Producto 25A-03, on its branch: «Para revisar», the first screens over the local review store of
+Updated: 2026-10-05 (Producto 25A-04, on its branch: Assistant → review sheet. The Assistant no longer writes the
+ledger: its direct path (`entryFromDraft` → `validateEntry` → `addEntry`) is gone; every resolved Assistant draft is
+adapted to the canonical review draft (`reviewDraftFromAssistant`: an unstated date is today by the capture rule, an
+unstated currency comes only from a stated destination, a card gets «Una vez», an income never a card) and durably
+captured with an item id and a write id fixed once; only then a native review sheet is presented over the Assistant,
+where it is confirmed (the review store's one dispatcher), edited or explicitly discarded; closing the sheet leaves it
+pending, and «Para revisar» is the durable inbox, not a required step; New chat never touches it; the fixture view
+captures nothing; a named payment method is matched by whole words and, unmatched, is asked, never replaced by the
+only eligible account (owner fixture test, 2026-10-05). Owner decisions recorded: theme packs as a pre-launch 25F Pro candidate, the Pro candidate bundle and
+generous AI fair use (§3, «Producto 25F»).
+No cloud, provider, Supabase, server, voice, Wallet, notification, schema (14) or backup (v14) change; the version line
+reads «FinanzApp 0.1.0 (25A-04)». Producto 25A-03 merged as PR #84, merge commit aef2edf: «Para revisar», the first screens over the local review store of
 25A-02: a tray of pending proposals reached from Más (a pending count on the dock's Más tab), a proposal's detail with
 Confirmar, Editar and Descartar, confirmation only through the store's frozen write and reconciliation; no cloud, provider,
 Supabase, Wallet, notification, schema (14) or backup (v14) change; plus the owner-observed follow-up of 25VIS1: the hero
-amount's currency symbol and cents in solid neutral graphite on the lime field; the version line reads «FinanzApp 0.1.0
+amount's currency symbol and cents in solid neutral graphite on the lime field; the version line read «FinanzApp 0.1.0
 (25A-03)». The targeted 24T3 device pass was not performed; by owner decision (2026-10-04) it is **deferred and a release
 blocker**: it no longer blocks development merges of 25A-03, 25A-04, later 25A slices or 25A2, and is consolidated
 into the physical-device release gate that must pass before the first external or public TestFlight candidate and
@@ -249,7 +260,16 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
 `LEDGER_CURRENCIES`): what a build offers, verified on Linux; nothing is distributed to people yet
 (§4).
 
-- **«Para revisar» (25A-03, on its branch; device QA pending).** §3, «Producto 25A-03». The first screens over the
+- **Assistant → review sheet (25A-04, on its branch; device QA deferred to the release gate).** §3, «Producto 25A-04».
+  The Assistant has no ledger write path: a resolved draft becomes a proposal durably captured into the review store
+  (`src/assistant/review-proposal.ts`, `captureReview`), then a native review sheet (`app/review-sheet/[id].tsx`) is
+  presented over the Assistant with Confirmar (the review store's one dispatcher, shared with the «Para revisar» detail
+  through `src/ui/review-actions.ts`), Editar (the 25A-03 editor) and an explicit Descartar; closing it leaves the item
+  pending. The chat card (`ProposalCard`) reads the review item and offers «Revisar» to reopen the sheet, Reintentar
+  after a failed capture, and what became of it. «Para revisar» is the durable inbox. The conversation stays memory-only;
+  the proposal survives New chat, leaving the screen and a restart.
+  The version line reads «FinanzApp 0.1.0 (25A-04)».
+- **«Para revisar» (25A-03, PR #84, merge commit aef2edf; device QA deferred to the release gate).** §3, «Producto 25A-03». The first screens over the
   review store of 25A-02: `/review` lists the pending proposals oldest first, each row saying what it would record (gasto
   or ingreso, amount and currency, merchant, category, account or card, day, source, cuotas) and what it still lacks,
   never inventing a fact; `/review/[id]` is the authoritative surface (what Confirmar writes, where and when, the purchase
@@ -263,7 +283,7 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   never listed. No in-app producer exists yet (synthetic proposals live only in tests; 25A-04 brings the first real
   one). Inicio's hero amount: the symbol and cents in solid graphite
   (`heroMoneySymbol` #3A3C3F, `heroMoneyCents` #505255, `Money onField`) instead of the ink at an alpha. No schema (14),
-  backup (v14), review-schema (1), cloud or native change. The version line reads «FinanzApp 0.1.0 (25A-03)».
+  backup (v14), review-schema (1), cloud or native change. The version line read «FinanzApp 0.1.0 (25A-03)».
 - **Electric Lime, the current product palette (25VIS1, PR #83, merge commit 0ff9859; the owner kept it after the iPhone review of
   2026-10-03; the rest of its device checklist open).** Electric Lime is the selected product visual direction; it is
   not a finished public name, logo or brand identity, whose naming, trademark and confusing-similarity gate stays
@@ -695,7 +715,14 @@ it was checked in). Metro from `master` (or a delivery's branch) on the installe
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
-- **25A-03 — «Para revisar» (on its branch; no EAS build; nothing device-verified):** the checklist section Producto
+- **25A-04 — Assistant → review sheet (on its branch; no EAS build; nothing device-verified; joins the release gate):**
+  the checklist section Producto 25A-04. The Assistant is disconnected in every build, so a real proposal, and with it the
+  review sheet, cannot be produced on the iPhone yet; the fixture view (a development bundle with
+  `EXPO_PUBLIC_ASSISTANT_FIXTURES=1`) shows the preview card, presents no sheet and must save nothing. The sheet's
+  presentation, swipe-to-close, detents, Dynamic Type, VoiceOver and keyboard over the editor, and the capture, retry,
+  restart, New chat, edit and confirmation states, are evidenced by the automated suite until the Assistant connects
+  (a later 25A slice), then join the release gate.
+- **25A-03 — «Para revisar» (merged as PR #84, merge commit aef2edf; no EAS build; nothing device-verified):** the checklist section Producto
   25A-03: the Más row and the empty tray in a development build, light and dark; the hero amount's graphite symbol and
   cents on Inicio's field, light and dark; VoiceOver, large text, Reduce Motion and Reduce Transparency. No producer of
   proposals exists in the app yet and synthetic ones belong only in tests, so the pending → Editar → Confirmar /
@@ -915,8 +942,8 @@ launch plan, documentation, plus the dock's last-row clearance found on the owne
 [competitive-landscape.md](competitive-landscape.md) and [brand-brief.md](brand-brief.md), documentation only) merged
 as PR #82 (merge commit 227942c) and changes no order either; **25VIS1** (Electric Lime, colour tokens only, «Producto
 25VIS1» below) merged as PR #83 (merge commit 0ff9859), accepted by the owner on the iPhone as the current product palette, and changed no order (25DISC1's suggested priority changes are owner decisions listed under «Producto 25DISC1»
-below, none applied); **25A-03** (the «Para revisar» tray, «Producto 25A-03» below) is this PR; then 25A-04 (the
-Assistant's drafts into the tray) and the rest of 25A, with no paid provider call before its own approved slice. **25A2** (Wallet Shortcut Capture) still
+below, none applied); **25A-03** (the «Para revisar» tray, «Producto 25A-03» below) merged as PR #84 (merge commit aef2edf); **25A-04** (the
+Assistant's proposals as durable review items, confirmed in a review sheet over the Assistant, «Producto 25A-04» below) is this PR; then the rest of 25A, with no paid provider call before its own approved slice. **25A2** (Wallet Shortcut Capture) still
 follows the review-tray foundation: it may begin once 25A-03 has merged, without waiting for 25A's cloud, paid, live or
 voice slices. The targeted 24T3 device pass was not performed and is deferred to the pre-release device gate (owner
 decision, 2026-10-04; §2): a release blocker, not a merge blocker for 25A or 25A2. After 25A: **25C** (with
@@ -1613,7 +1640,8 @@ Assistant's capability boundary and model evaluation, monetary safety).
   an income, a card purchase «Una vez» or in cuotas (the count always the person's, never inferred), a transfer or card
   payment, and a devolución (24T3), each written by the same domain builders as its form; the cost and abuse controls before the
   first paid call (per-model cost evaluation with owned data, daily and monthly limits per user
-  shown before they are hit, a token budget per request and conversation with a hard stop,
+  with no permanent counter and a warning only near a real limit (owner, 2026-10-04), a token budget per request and
+  conversation with a hard stop,
   provider quotas mapped to graceful states, per-user and per-device rate limits, request
   signing, anomaly cut-offs, the owner's kill switch, a monthly spend ceiling with alerts);
   staging Supabase, mobile sign-in and cloud-data consent (no login for the local core); the
@@ -1641,12 +1669,14 @@ Assistant's capability boundary and model evaluation, monetary safety).
   review item's write is frozen after an unknown outcome, as the purchase form freezes its submission, and storage refuses
   one id used as both a movement and a plan, which today `createEntry` and `createInstallmentPlan` do not cross-check);
   **25A-03** the «Para revisar» tray (Confirmar / Editar / Descartar; Editar keeps the same write id and never presets a
-  count) (this PR); **25A-04** the Assistant's drafts go into the tray; **25A-11** transfer, card payment and devolución drafts;
+  count) (PR #84, merged); **25A-04** the Assistant's drafts become review items, confirmed in a review sheet presented over the Assistant, with «Para revisar» as the durable inbox (this PR); **25A-11** transfer, card payment and devolución drafts;
   **25A-12** edits of an existing movement. Server lane, CI only, no paid call: literal env reads and a bundle secret scan;
   a provider port with deterministic fakes (no provider chosen by familiarity); handler order, error codes and one timeout
   budget; request contract v2 (server first); money-based cost, rate and token controls with a kill switch and a monthly
   ceiling; analytical facts v2 computed on the device; the inbox lifecycle and the revocable capture-token foundation.
-  Then: the app sends v2 with an offline end-to-end loop and evaluation harness; cloud consent and failure states; the
+  Then: the app sends v2 with an offline end-to-end loop and evaluation harness, including the conversational
+  clarification contract (free-text questions such as a missing merchant, ambiguous destinations and currencies asked
+  before the review sheet; owner decision 2026-10-04, «Producto 25A-04»); cloud consent and failure states; the
   staging session (the first network slice, owner setup and authorization required); the inbox consumer; **one** paid
   slice, the live provider on staging, only after the owner configures and approves it; voice last, after the text path is
   proven on the iPhone. Numbering beyond 25A-04 is indicative; each slice records its own section here.
@@ -1666,8 +1696,10 @@ delivery that pulls the Wallet capture forward from 25D: it needs 25A's draft mo
 25A-03), not FinanceKit, and may begin once 25A-03 has merged.
 
 - **Path.** The person's own iOS Shortcuts personal automation on a Wallet transaction («Transacción» / "Transaction")
-  → a FinanzApp App Intent on the device (handing over through a small native spool) → a **draft in the local review
-  tray** → Confirm / Edit. No FinanceKit entitlement is needed for this path, and it depends on no paid AI provider, no
+  → a FinanzApp App Intent on the device (handing over through a small native spool) → a **durable review item** →
+  Confirm / Edit in the Dynamic Island / Live Activity when available (25A-04, owner decision 2026-10-04: a presentation
+  layer over the same item and the same confirmation dispatcher as the Assistant's review sheet); ignored, or if the
+  presentation fails, the item stays in «Para revisar», the durable inbox. No FinanceKit entitlement is needed for this path, and it depends on no paid AI provider, no
   login, no network and no remote capture inbox: it works offline like manual entry. The person
   sets it up once (FinanzApp explains the steps; it cannot create the automation for them).
 - **Explicit mapping.** One Wallet payment card / pass → one FinanzApp destination, chosen by the person and editable:
@@ -1701,7 +1733,9 @@ delivery that pulls the Wallet capture forward from 25D: it needs 25A's draft mo
   a local review draft → a **Dynamic Island / Live Activity** with Confirmar / Editar. That path is **not a normal
   notification**. When a complete, immediate confirmation cannot run there (an incomplete capture, a missing mapping,
   a gap, a device or setting where the Live Activity is not available), it falls back safely: the draft stays in the
-  review tray, and a review alert (25D) may point to it; nothing is ever written without the person's Confirmar.
+  review tray, and if the Dynamic Island presentation was missed, dismissed or ended with the item still pending, one
+  review rescue notification (25D; production-plan.md §9.5) may follow, never at the same time as the activity; nothing
+  is ever written without the person's Confirmar.
 - **Manual capture stays the core**, offline and complete without any of this.
 - **Gates.** Device evidence on an iPhone and, separately, on an Apple Watch payment; a denied or missing automation;
   repeated and late deliveries; the mapping for a credit card and for a debit card; an incomplete capture.
@@ -4025,9 +4059,11 @@ nothing of it is on a screen yet.
   `spending-home`: the status bar is dark over the lime field in both schemes; the commitments' surface carries no
   fill. `capture-hub`: uses the real light palette; the Assistant circle. A slightly darker dark `tertiary` keeps the
   idle month bars at 3:1.
-- **Future themes (document only).** Optional theme packs (Forest, Lime, Sapphire) remain only a documented
-  post-launch candidate, not a launch commitment, not part of the monetisation, no selector (brand-brief §4.8): each
-  theme multiplies visual and accessibility QA, and the launch needs one recognisable identity. The Wise
+- **Future themes (as recorded at 25VIS1; superseded 2026-10-04).** At 25VIS1 optional theme packs were a documented
+  post-launch candidate with no selector. The owner has since made them a **pre-launch 25F Pro candidate**: Electric
+  Lime stays the default, Forest and Sapphire packs gated by the same entitlement, after the core AI and Apple
+  architecture, before launch if the schedule allows and before the optional Mercado Pago consumer-sync research
+  («Producto 25F»; brand-brief §4.8); each theme still multiplies visual and accessibility QA. The Wise
   differentiation note and the reminder that naming, logo and similarity screening stay in launch §9.4 are in
   brand-brief §4.8.
 - **25OPS1 device record.** The owner's pass of 2026-10-03 is recorded in the checklist: the final content stays above
@@ -4049,7 +4085,7 @@ nothing of it is on a screen yet.
   OK; `test:storage` 1259 passed, 0 failed; `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0 errors,
   0 stale (no app string changed); `check` OK; `export:ios` OK. No EAS build, no iPhone run by the agent.
 
-### Producto 25A-03 — Para revisar (this PR)
+### Producto 25A-03 — Para revisar (PR #84, merged)
 
 - **Goal.** The first UI over the durable local review store (25A-02): pending proposals the person confirms, edits or
   discards, with every financial judgement left to the domain (25A-01) and every write to the store's one path.
@@ -4098,7 +4134,7 @@ nothing of it is on a screen yet.
 - **No in-app producer (Codex review of #84).** A first iteration had a development-only «Agregar propuesta de prueba»
   that stored a synthetic proposal in the real review file, from which it could be confirmed into the owner's
   development ledger, against AGENTS.md rule 6. It was removed with its strings; the store's `capture` API stays for
-  25A-04 and 25A2. Until 25A-04 exists, the pending → Editar → Confirmar / Descartar states are evidenced by the
+  25A-04 and 25A2. Until 25A-04 existed, the pending → Editar → Confirmar / Descartar states are evidenced by the
   automated tests (real SQLite for the store and the tray, route harnesses for the screens); the iPhone can check the
   empty tray, the navigation and the visual shell.
 - **Hero money quiet tones (25VIS1 follow-up, owner-observed).** Inicio's hero drew its symbol and cents as the ink at
@@ -4117,11 +4153,194 @@ nothing of it is on a screen yet.
   `more-routes.node.ts` (the badge and the Más row); `theme.node.ts` and `typography.node.ts` (the graphite tones and
   contrast in both palettes, `Money onField`); `spending-home.node.ts` (Inicio asks for it).
 - **Device QA.** The checklist section «Producto 25A-03».
-- **Status.** This PR; not merged.
+- **Status.** Merged as PR #84 (merge commit aef2edf), with the review fixes of 1f85adb and the documentation of 116a8cf.
 - **Gates.** 2026-10-04, local, Linux. Root `npm test` 590 passed, 1 todo; `check:repo` OK. `apps/mobile`: `typecheck`
   OK; `test:storage` 1300 passed, 0 failed (real SQLite included); `currency:verify`, `regions:verify` OK;
   `i18n:check -- --strict` 0 errors, 0 stale (English lock accepted); `check` OK; `export:ios` OK. No EAS build, no
   iPhone run by the agent.
+
+### Producto 25A-04 — Assistant → review sheet, with «Para revisar» as the durable inbox (this PR)
+
+- **Goal.** The Assistant stops owning a financial write: every proposal it produces enters the same durable review
+  draft and review item as any other producer (25A-01, 25A-02, 25A-03). The conversation stays memory-only; the
+  proposal does not. **Owner decision (2026-10-04, same PR): «Para revisar» is the durable fallback inbox, not the normal
+  step.** A person using the Assistant reviews and confirms the proposal without leaving it, in a review sheet presented
+  right after the capture.
+- **Scope.** Branch `feat/producto-25a-04-assistant-review-store` from master aef2edf (25A-03 merged as PR #84). No cloud
+  AI, provider, Supabase, server or contract change, voice, Wallet, Shortcuts, Dynamic Island, ActivityKit or
+  notification; no ledger schema (14), backup (v14) or review schema (1) change; no EAS build.
+- **Removed: the direct write.** `app/assistant.tsx` lost `confirm` (`entryFromDraft` → `validateEntry` → `addEntry`, with
+  the `session.writes` retry map of Entries and `session.writing`), `edit` (a push to `/new-entry` prefilled from the
+  chat) and the card's inline Confirmar, Editar and Descartar; `conversation.ts` lost `entryFromDraft`, `draftGaps`, the
+  `DraftContent` statuses and the `draft-confirmed` / `draft-cancelled` / `draft-edited` actions; `session.ts` holds no
+  write; the strings `assistant.draft.*`, `assistant.fixtureConfirmRefused` and `assistant.saveFailed` are gone. The
+  manual entry forms are untouched.
+- **The flow.** A record command («Gasté 18.500 en Carrefour con la Visa») → the usual clarifications (kind, amount,
+  account, category; unchanged) → the resolved draft is adapted and **durably captured** as a review item (frozen ids)
+  → only then, if the Assistant is still in front, the **review sheet** is presented over it (`/review-sheet/[id]`) →
+  Confirmar, Editar or Descartar there. The card in the thread reads the item from then on. If the app dies after the
+  capture and before or during the presentation, the item is pending in «Para revisar».
+- **The review sheet.** `app/review-sheet/[id].tsx`, a native iOS form sheet (`presentation: 'formSheet'`, fitted to its
+  content, grabber; the large detent and a scrolling body at the stacked text sizes or on a short screen, an SE or mini
+  class phone: `reviewSheetScrolls` in `src/ui/geometry.ts`, read by the registration and the sheet alike). While
+  Confirmar or Descartar is in flight it holds (no swipe, «Ahora no» disabled), and a result that lands after the sheet
+  was closed anyway closes nothing else. Generic over a review item (the
+  tray's, or the store's own when the tray is stale: `useReviewItem`), so 25A2 and a future queue present the same
+  route. Compact: «Confirmá el gasto», the amount, the merchant, then Categoría, Cuenta or Tarjeta, Pago on a card,
+  Fecha, every missing fact named (neutral), and stale, interrupted or conflict notes; Confirmar (the one lime action,
+  echoing the amount), Editar, an explicit «Descartar propuesta», and «Si la cerrás, queda pendiente en Para revisar.»
+  - **Confirmar** goes through `src/ui/review-actions.ts` (`useReviewActions`), the same hook the «Para revisar» detail now
+    uses, which calls the provider's one dispatcher (`confirmReview` → the store's frozen write, conflict and stale
+    checks, reconciliation and receipt) at the revision on screen; one call at a time; the success haptic, then the
+    sheet closes and the card shows «Registrado» with «Ver movimiento» / «Ver plan». At most one write per proposal.
+  - **Editar** opens the 25A-03 editor (`/edit-review/[id]`) over the sheet: the same item id, write id, capture and
+    revision guarantees; saving returns to the sheet, which draws the edited item.
+  - **Closing is not discarding.** The close button («Ahora no»), a swipe down or back only dismiss the sheet: no
+    dismissal handler exists, nothing reaches the store, the item stays pending, reachable from the card's «Revisar»,
+    Más → Para revisar and the Más badge.
+  - **Descartar** is explicit, asks first (the system's destructive button) and is the store's pending → dismissed; the
+    ledger is never touched.
+  - One sheet at a time, and only over an Assistant in front: the focused Assistant registers a presenter on the session
+    (`session.presenter`); a capture takes it once its item is stored, so a second capture meanwhile waits as a pending
+    card, and an answer that lands after the Assistant was left and reopened presents over the one now in front, never
+    over a closed screen. Coming back re-registers it.
+- **The role of «Para revisar».** Not a required step of the Assistant flow: the durable inbox and recovery surface for
+  every proposal that stays pending (an Assistant proposal closed for later; several drafts of one future voice or text
+  command; a Wallet capture ignored in the Dynamic Island, 25A2; an incomplete capture; an app terminated during a
+  presentation; future authorised integrations). In a release build its Más row appears only while something waits (and
+  the badge with it). The review store and the tray stay as they are.
+- **Future Apple presentation (documentation only, 25A2).** Wallet / Apple Pay Shortcut → review item → Dynamic Island /
+  Live Activity. Ignored, or if the presentation fails, the item stays in «Para revisar». The Dynamic Island and the
+  Assistant's sheet are presentation layers over the same review item and the same confirmation dispatcher; nothing of
+  ActivityKit is built here.
+- **The adapter.** `src/assistant/review-proposal.ts`, `reviewDraftFromAssistant(resolved, archive, at, todayISO)`: kind,
+  amount, merchant and category as the conversation resolved them (empty is missing); the destination only when the
+  person named it, chose it, or it was the one account that fits, through `withDestination` (a card gets «Una vez»,
+  never cuotas; a destination the domain does not offer for the kind, an income on a card, is left unchosen); the basis
+  from `reviewBasis`; the source `assistant`; parsed strictly (a value the draft cannot hold, a merchant over 120
+  characters or a hidden character, is missing, never cut).
+  - **Date: the capture rule (owner decision, 2026-10-04).** An Assistant command that asks to record a movement and states
+    no date happens today: the device's local calendar day at capture (`todayKey()` when the capture is frozen). A
+    deterministic product rule, not a model guess; a stated day («el 2 de octubre») or a relative one the model resolves
+    («ayer») wins; the review draft always stores an explicit day (a stated future day stays a gap). Wallet and other
+    producers keep their own date semantics.
+  - **Currency.** The currency the model stated is kept; with none stated, a destination the person named («con la Visa»)
+    or chose in a clarification lends its own (`destinationStated`); an implied destination (the one account of the
+    screen's currency) lends none and the currency is a gap, completed in Editar. The display currency is never captured.
+- **Currency language for the later real-AI contract (documentation only).** An explicit ISO code or currency name → that
+  currency; a regional, ambiguous word such as «pesos» may resolve through the person's configured product region only
+  when that mapping is unambiguous (Argentina → ARS); an explicit destination carries its own currency; anything else is
+  ambiguous and needs a clarification or an edit. The server contract is unchanged now (v1 knows ARS and USD).
+- **Capture and idempotency.** When a draft resolves, the screen fixes two fresh UUIDs (the item id and the write id) and
+  freezes the whole capture (`AssistantCapture`: ids, the capture key `assistant:<item id>`, the time and the review
+  draft) on the proposal before anything is sent; `captureReview` (the store's capture, in the ledger's queue, then the
+  tray is read again, so the list, the count and the Más badge show it at once) stores it. A retry resends exactly that
+  capture; the store answers a repeat with the item it holds (an item edited since keeps the edit), so no retry makes a
+  second item, and nothing compares amounts or merchants. A failure is said on the card («No se pudo guardar la
+  propuesta. No se registró nada.») with Reintentar, and no sheet is presented; nothing is written anywhere. The capture
+  runs from the session, so it finishes if the screen closes (then no sheet: the card offers «Revisar»); one capture per
+  proposal at a time (`session.capturing`).
+- **One source of truth.** A captured proposal is the review item: the card and the sheet read it (an edit made anywhere
+  is what they show); the frozen snapshot is only drawn before the capture lands, and is never sent again once
+  captured. Confirmed, dismissed or gone from the tray, it is looked up once (`getReviewItem`): a confirmed card draws the
+  stored item («Registrado», «Ver movimiento» / «Ver plan»), a dismissed one says «Propuesta descartada»; nothing in the
+  card can write it again.
+- **The card.** `ProposalCard`: compact, «Pendiente · Gasto», the amount (or «Sin monto»), merchant, category, where it is
+  recorded, the purchase mode on a card, the date (missing ones «Falta completar», neutral), one line («Lista para
+  confirmar.», «Faltan 2 datos para confirmar.», stale or interrupted in amber), and while pending one secondary action,
+  «Revisar», which reopens the review sheet. It never repeats the sheet's controls.
+- **New chat and the session.** New chat clears the conversation only; closing the sheet, leaving the screen, killing the
+  app and a restart keep every captured proposal pending in Más → Para revisar. Chat history is still not a feature.
+- **Fixture view.** Presentation only: its proposal is a `preview` («Vista de prueba: esta propuesta no se guarda ni se
+  puede registrar.»), never captured into the review file, never presented in the sheet and never written (AGENTS.md
+  rule 6).
+- **Answers and evidence.** Unchanged: analytical answers, local evidence rows and links, the client boundary,
+  streaming, cancellation and the disconnected state; no more ledger data leaves the device.
+- **Clarifications before the sheet (owner decision 2026-10-04; a future 25A AI / provider contract, not implemented).**
+  For the conversational Assistant, required financial gaps are normally resolved in the conversation before the review
+  sheet is presented, when the person can answer naturally: a missing merchant or description is asked; an ambiguous
+  account or card is asked with the compatible real destinations; a genuinely ambiguous currency is asked; a missing or
+  uncertain category is asked or offered from known categories. Nothing is silently guessed. Deterministic product rules
+  are not guesses: a record command with no stated date uses today's local day; a stated or relative date wins; an
+  unambiguous regional currency word may resolve through the configured region; an explicitly named destination is
+  used with its own currency. A single compatible destination may be resolved deterministically only if the later AI
+  contract defines it explicitly; the «last used account» is never used silently. The review sheet keeps supporting
+  incomplete items, since non-conversational producers (Wallet) may lack information. The current contract cannot yet
+  ask every free-text clarification (a merchant, for one): completing that conversational contract belongs to the
+  upcoming 25A AI / provider slices.
+- **An explicit destination is never replaced (owner fixture test, 2026-10-05).** The owner's cards are named «b» and
+  «sksk» and the cash account «a»; «Gasté 18.500 en Carrefour con la Visa» showed account «a», because the name match
+  tested containment both ways on raw text and the letter «a» is inside «visa». `resolveDraft` now matches
+  `paymentMethodRef` in one direction only, by whole words: a destination matches when its name holds all the
+  reference's words, in order (accent- and case-insensitive; «Visa» matches «Visa Galicia»; «Visa», «la Visa» or «Visa a
+  crédito» never match «a», since a destination's name inside the reference no longer counts). With a reference: one
+  match is that destination; none or several ask the existing «¿Con qué lo pagaste?» / «¿Dónde lo recibiste?» with the
+  compatible destinations; the only eligible account is **never** implied in its place, even when the reference has no
+  letter or digit («💳»). Without a reference (none, or blank), exactly one compatible destination is still implied, as
+  before. An income is never matched or implied to a card. No last-used account, no fuzzy or semantic matching, no
+  card-network field and no schema change: a false clarification is safer than a wrong destination («la Visa» with a
+  card named «Visa Galicia» is now asked). Tests: `tests/assistant.node.ts` («25A-04: a named payment method…» and the
+  updated 24B6 case); `tests/assistant-review.node.ts`' date test no longer names a destination it relied on implying.
+- **Destination identity for the later 25A AI / provider contract (documentation only).** The model may understand that
+  words such as «Visa» or «Mastercard» refer to a card or payment method, and passes that reference on; it never decides
+  which FinanzApp destination the person meant. Identity is resolved on the device against the local deterministic
+  candidates (the rule above); when no candidate is identified uniquely, the Assistant asks. Account and card names and
+  details stay on the device unless a later privacy-reviewed contract proves sending them necessary. Natural aliases
+  or card-network metadata on a destination, if wanted, get their own reviewed domain and storage decision, not 25A-04.
+- **Review rescue notification (owner decision 2026-10-04; 25D and 25A2, not implemented, no notification code here).**
+  The review sheet is the primary presentation; if it is missed (a background transition or a termination) and the item
+  stays pending, one short-delay local rescue notification may follow, never alongside an active review surface and
+  never for «Ahora no». Details, privacy copy and the deep link: «Producto 25D», «Notification families», and
+  production-plan.md §9.5.
+- **Later contract: several drafts (decision recorded, not implemented).** One message or utterance may later produce
+  several drafts (competitive-landscape.md §8.1, voice in 25A): each becomes its own review item with its own item id,
+  write id, revision and explicit confirmation, reviewed one by one or in a small review stack or queue over the same
+  sheet route. Nothing here assumes one proposal per conversation (a thread holds any number of proposal messages, each
+  with its own frozen capture; one sheet is presented at a time and the rest wait as pending cards); the protocol
+  expansion is a later 25A contract slice, and the server contract is unchanged now.
+- **Device QA.** Deferred to the physical-device release gate (owner decision, 2026-10-04); the checklist section
+  «Producto 25A-04» lists what joins it. The Assistant is disconnected in every build, so a real proposal, and with it
+  the sheet, cannot be produced on the iPhone yet.
+- **Tests.** `tests/assistant-review.node.ts` (the adapter: mapping, basis, card «Una vez», income never a card, the
+  capture date rule with stated and relative dates winning, the currency rule for stated, chosen and implied
+  destinations, frozen ids; real SQLite: a repeated capture is one item, a failed one stores and writes nothing, an
+  edit is never overwritten, confirmation writes once); `tests/assistant-routes.node.ts` (on real SQLite: the sheet
+  presented once and only after the item is stored, no sheet after a failed capture until the retry stores it, none
+  after leaving, one sheet at a time, «Revisar» reopening it, the edit read from the item, confirmed and dismissed cards
+  drawn from the stored item, the stale-tray recovery, New chat, unmount and restart; the fixture preview; no write
+  path left in the screen); `tests/review-routes.node.ts` (the sheet: compact facts, Confirmar through the shared
+  dispatcher once at the shown revision, closing never reaching the store, Descartar asking first, Editar returning to
+  the edited item, incomplete, stale, conflict and read-only states, accessibility sizes, English, and on real SQLite
+  close-then-edit-then-confirm writing once; the detail on the shared hook unchanged); `assistant-ui.node.ts`,
+  `assistant.node.ts`, `assistant-session.node.ts`.
+- **Review (before the PR).** An adversarial pass found no high-confidence defect; two lower ones were fixed: a captured
+  proposal missing from a tray that could not be read again stays reachable, and the basis is taken from the ledger when
+  the answer arrives, not when the request was sent.
+- **Review of the sheet flow (multi-agent, 2026-10-04: 7 risk dimensions, every finding put to two independent skeptics;
+  13 of 14 survived, all fixed).** (1) Closing the sheet while Confirmar or Descartar was in flight let the late success
+  pop the Assistant too: the sheet now holds while busy and its `leave` acts only while it is in front. (2) An answer
+  landing after the Assistant was reopened never presented: the presenter lives on the session. (3) With a stale tray,
+  an edit or a confirmation made in the sheet did not reach the sheet or the card: the provider counts review operations
+  (`reviewVersion`) and both read the store again. (4) A refusal on a store-read item blanked the sheet and lost its
+  message: the hook keeps its last read while re-reading. (5) The Assistant offered and implied archived cards, which
+  the capture then dropped: its expense destinations are `postingAccountsFor('expense', …)`. (6) An account the model
+  named was forgotten across a kind clarification: `paymentMethodRef` is carried. (7) Tall content could be clipped in
+  a fitted sheet on a short screen: the large detent and scrolling there. Plus tests that could not fail (the sheet's
+  hold-while-leaving and its stale-tray path) made real.
+  A second round (one verifier per fix, each confirming a test fails without it, plus two regression critics) found
+  four regressions in those fixes, all fixed: the swipe hold is owned by the sheet screen and released whenever its
+  content is not shown; a sheet covered while a call runs closes when it is in front again (never stuck held); an item
+  being read again from the store is drawn but offers no action until the store answers (`refreshing`), so nothing is
+  sent at an outdated revision; and a tray row always replaces an older store read.
+- **Codex review of #85 (two P2, fixed).** (1) A confirmed card drew the capture's snapshot: the closed state now keeps the
+  stored review item and the card draws its draft. (2) A capture that committed while the tray could not be read again
+  was unreachable: `src/ui/use-review-item.ts` gives the detail, the editor and now the sheet the tray's item or the
+  store's own (`getReviewItem`), asking the tray to reload (`refreshReview`). The store stays the one source.
+- **Status.** This PR; not merged.
+- **Gates.** 2026-10-04, local, Linux. Root `npm test` 590 passed, 1 todo; `check:repo` OK. `apps/mobile`: `typecheck`
+  OK; `test:storage` 1329 passed, 0 failed (real SQLite included); `currency:verify`, `regions:verify` OK;
+  `i18n:check -- --strict` 0 errors, 0 stale (English lock accepted); `check` OK; `export:ios` OK. No EAS build, no
+  remote provider call, no iPhone run by the agent.
 
 ### Later notes recorded in 24UX6A (future; document only, not scheduled)
 
@@ -4250,8 +4469,15 @@ tied to 25E's account are deferred to 25E or a follow-up after it (24T1C, 2026-0
     decided and verified on its own.
 - **Notification families (owner, 2026-10-02; recorded in 25UX1, a future product decision, nothing implemented).** 25D's
   notifications separately cover: recurring due reminders; credit-card closing, due and payment reminders; optional
-  end-of-day expense-entry reminders; and the fallback review alerts of 25A2 (a capture left for review when the Live
-  Activity path could not confirm it). The Wallet capture's Dynamic Island / Live Activity is 25A2's, not one of these.
+  end-of-day expense-entry reminders; and the **review rescue notification** (owner refinement, 2026-10-04;
+  production-plan.md §9.5): a rescue, never a notice for every proposal. It follows only when a durably stored review
+  item stays pending because its primary presentation was missed (the Assistant's review sheet, by a background
+  transition or a termination; 25A2's Dynamic Island, missed, dismissed or ended), never at the same time as an active
+  review surface, never for «Ahora no» (the tray and badge are that fallback; a later reminder policy is 25D's), cancelled
+  when the item is confirmed or dismissed, deep-linking to that item's review sheet (its current state said calmly if it
+  is no longer pending), with no amount, merchant or account by default («Tenés una revisión pendiente» / «Abrí
+  FinanzApp para revisarla.») and its permission asked in context, never at first launch. The Wallet capture's Dynamic
+  Island / Live Activity is 25A2's, not one of these.
   **Financial values in lock-screen notifications stay private by default** (no amount or merchant unless the person
   turns it on).
 - **Local notifications** (opt-in, configurable, time-zone aware, deduplicated): card closing and due
@@ -4383,11 +4609,31 @@ Production detail (25OPS1): [app-store-launch.md](app-store-launch.md) §1–§5
   server-side, the free local core untouched; a paywall with testimonials only from real,
   verifiable users with consent; the App Store rating request only after a satisfying moment
   through Apple's prompt, never on first launch and never required; no silent telemetry.
-- **Gates.** Sandbox purchases and restores on the iPhone; the quota and ceiling states shown
-  before they are hit; a measured-cost report (cost per request, per active person and per month,
+- **Gates.** Sandbox purchases and restores on the iPhone; the near-limit warning and the ceiling states (no permanent
+  message counter); a measured-cost report (cost per request, per active person and per month,
   by model, from real usage in 25A) and a privacy review of what each request carries, before the
   owner's pricing decision.
 - **Depends on.** 25A in production use with measured costs.
+- **Owner decisions recorded 2026-10-04 (not implemented; no pricing or entitlement decided here):**
+  - **Theme packs: a pre-launch 25F Pro launch candidate** (promoted from a post-launch idea; confirmed 2026-10-04).
+    Electric Lime stays the default and current identity; additional packs such as Forest and Sapphire are gated behind
+    the same entitlement once StoreKit and the paywall exist. Each theme passes light, dark, accessibility and
+    semantic-colour QA before launch. Not built now and not blocking 25A: placed after the core AI and Apple
+    architecture (25A, 25A2, 25D) and before launch if the schedule allows, and before the optional Mercado Pago
+    consumer-sync research.
+  - **The Pro candidate bundle.** The Assistant / AI and future voice AI; theme packs; an advanced Excel-friendly export
+    and report package; future cloud sync or advanced automation where appropriate. The useful manual financial core stays
+    free. Basic data portability is never hostage to Pro: basic CSV / export stays free, the advanced Excel / report
+    presentation may be Pro. Face ID, «Ocultar importes» and essential privacy and safety controls are never paywalled.
+  - **AI fair use.** No fixed small monthly message count is a product limit. The intended Pro experience is generous fair
+    use with invisible anti-abuse controls and a near-limit warning only when relevant; the final limits come from 25A's
+    AI evaluation and measured-cost work.
+  - **No permanent free AI allowance (confirmed 2026-10-04).** The Assistant / AI and future voice AI are Pro
+    candidates; no permanent free message allowance and no permanent message counter are promised. Whether acquisition
+    uses no trial, a StoreKit introductory Pro trial or another compliant introductory offer is a 25F product /
+    experiment **OWNER DECISION**, not decided by 25A-04. The paywall stays contextual: it appears only because the
+    person intentionally asked for a Pro capability, never on first launch, between tabs or as an unrelated interruption
+    (app-store-launch.md §3.1).
 
 ## 4. Launch
 

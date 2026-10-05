@@ -2,14 +2,16 @@ import { useEffect, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import type { Account } from '@finanzapp/domain';
-import type { AnswerContent, ClarificationOption, DraftContent, Message } from '../assistant/conversation';
-import { draftGaps, evidenceLabel, optionText } from '../assistant/conversation';
+import { todayKey, type ReviewArchive } from '@finanzapp/domain';
+import type { AnswerContent, ClarificationOption, Message, ProposalContent } from '../assistant/conversation';
+import { evidenceLabel, optionText } from '../assistant/conversation';
+import type { ReviewItem } from '../storage/review-database';
 import { useI18n } from '../i18n/provider';
 import { useCategoryLook, useCategoryLookOf } from './category-hues';
 import { AccountBadge, ActionButton, AppText, CategoryBadge, Money, PressFeedback, Surface, type IconName } from './components';
 import { Appear, Reflow, selectionHaptic } from './motion';
 import { activityDateLabel } from './presentation';
+import { reviewFacts } from './review-presentation';
 import { radius, space, useCurrentDay, usePalette, useReduceMotion } from './theme';
 
 /** The conversation, visually quiet. A user message is a compact grey pill on
@@ -172,68 +174,93 @@ export function AnswerEvidence({ content, onOpen }: { content: AnswerContent; on
  * then confirms or edits. Confirming is the only path to a write and it is
  * the caller's, not this card's. A confirmed draft turns into a receipt with
  * a link to the movement; a cancelled or edited one collapses to a line. */
-export function DraftCard({ content, accounts, onConfirm, onEdit, onCancel, onOpenEntry, busy = false }: {
-  content: DraftContent; accounts: Account[]; onConfirm: () => void; onEdit: () => void; onCancel: () => void; onOpenEntry: (entryId: string) => void; busy?: boolean;
+/** 25A-04: where a proposal stands, as the screen knows it: its capture (`preview`, `capturing`, `failed`), the live
+ * review item while it is pending, or what became of it once it left the tray. */
+export type ProposalState =
+  | { kind: 'preview' | 'capturing' | 'failed' | 'unknown' | 'dismissed' | 'gone' }
+  | { kind: 'pending'; item: ReviewItem; conflict: boolean; writable: boolean }
+  /** The recorded item itself: the card draws what was confirmed (edits made in «Para revisar» included). */
+  | { kind: 'confirmed'; item: ReviewItem; record: 'entry' | 'plan' };
+
+/** A financial proposal of the Assistant (25A-04), compact: it is never confirmed in the card. Once captured it is a
+ * review item: the card reads that item (an edit made in the review sheet or «Para revisar» is what it shows) and, while
+ * it is pending (the review sheet was closed for later), offers «Revisar», which reopens the review sheet. Before the
+ * capture lands it shows the frozen snapshot and says so; a failed capture offers Reintentar (the same capture again); a
+ * confirmed proposal shows the stored values with «Registrado» and the link to the record; a discarded one, one line.
+ * Nothing in it can write. The fixture view shows the card and says nothing is saved. */
+export function ProposalCard({ content, state, archive, onReview, onRetry, onOpenRecord }: {
+  content: ProposalContent; state: ProposalState; archive: ReviewArchive | null; onReview: (itemId: string) => void; onRetry: () => void;
+  onOpenRecord: (record: 'entry' | 'plan', writeId: string) => void;
 }) {
   const p = usePalette();
   const day = useCurrentDay();
-  const { t, locale, speechLanguage } = useI18n();
-  const { draft } = content;
-  // The stored category is never changed; a built-in one only reads in the interface language.
-  const categoryName = useCategoryLook(draft.category.trim(), draft.kind).label;
-  const account = accounts.find(item => item.id === draft.accountId);
-  const gaps = draftGaps(draft);
-  const expense = draft.kind === 'expense';
-  if (content.status === 'cancelled' || content.status === 'edited') {
-    return <View accessible accessibilityLabel={t(content.status === 'cancelled' ? 'assistant.draft.cancelledLabel' : 'assistant.draft.editedLabel')} accessibilityLanguage={speechLanguage}
-      style={[styles.assistantRow, styles.collapsed]}>
-      <Ionicons name={content.status === 'cancelled' ? 'close-circle-outline' : 'create-outline'} size={16} color={p.tertiary} accessible={false} />
-      <AppText tertiary variant="footnote">{t(content.status === 'cancelled' ? 'assistant.draft.cancelled' : 'assistant.draft.edited')}</AppText>
+  const { t, locale, speechLanguage, formatDate } = useI18n();
+  // Once the item exists it is the source of truth: pending or confirmed, the card draws the stored draft; the capture's
+  // snapshot only until then.
+  const draft = state.kind === 'pending' || state.kind === 'confirmed' ? state.item.draft : content.capture.draft;
+  const categoryName = useCategoryLook(draft.category ?? '', draft.kind ?? 'expense').label;
+  if (state.kind === 'dismissed' || state.kind === 'gone') {
+    const text = t(state.kind === 'dismissed' ? 'assistant.proposal.dismissed' : 'assistant.proposal.gone');
+    return <View accessible accessibilityLabel={text} accessibilityLanguage={speechLanguage} style={[styles.assistantRow, styles.collapsed]}>
+      <Ionicons name={state.kind === 'dismissed' ? 'close-circle-outline' : 'file-tray-outline'} size={16} color={p.tertiary} accessible={false} />
+      <AppText tertiary variant="footnote">{text}</AppText>
     </View>;
   }
-  const confirmed = content.status === 'confirmed';
+  const missing = t('assistant.proposal.missing');
+  const expense = draft.kind !== 'income';
+  const account = draft.destinationId ? archive?.accounts.find(item => item.id === draft.destinationId) : undefined;
+  const card = account ? (archive?.cards ?? []).find(item => item.accountId === account.id) : undefined;
+  const purchase = !card || draft.kind === 'income' ? null : draft.purchase === null ? missing : draft.purchase.mode === 'once' ? t('review.purchase.once')
+    : draft.purchase.count === null ? t('review.purchase.installmentsOpen') : t('review.purchase.installments', { count: draft.purchase.count });
+  const facts = state.kind === 'pending' && archive ? reviewFacts(state.item, archive, { todayISO: todayKey(), writable: state.writable, conflicts: state.conflict ? [state.item.id] : [] }) : null;
+  const statusKey = state.kind === 'pending' ? 'pending' : state.kind;
+  const kind = t(draft.kind === null ? 'review.kind.unknown' : draft.kind === 'expense' ? 'movement.expense' : 'movement.income');
+  // What the proposal needs, in the review's own words: neutral when merely incomplete, never an error.
+  const line = state.kind === 'preview' ? t('assistant.proposal.preview') : state.kind === 'capturing' ? t('assistant.proposal.capturing')
+    : state.kind === 'failed' ? t('assistant.proposal.failed') : state.kind === 'confirmed' ? t('assistant.proposal.confirmed')
+    : state.kind === 'unknown' || !facts ? t('assistant.proposal.unknown')
+    : facts.state === 'ready' ? t('assistant.proposal.ready') : facts.state === 'incomplete' ? t('assistant.proposal.incomplete', { count: facts.gaps.length })
+    : t(`review.state.${facts.state}`);
+  const lineColor = state.kind === 'failed' || (facts && (facts.state === 'stale' || facts.state === 'interrupted' || facts.state === 'conflict')) ? p.warning : p.secondary;
   return <Appear style={styles.assistantRow}>
     <Surface style={{ gap: space.m }}>
       <View style={{ gap: 2 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          {confirmed && <Ionicons name="checkmark-circle" size={16} color={p.income} accessible={false} />}
-          <AppText secondary variant="eyebrow">{t('assistant.draft.eyebrow', { status: t(confirmed ? 'assistant.draft.saved' : 'assistant.draft.pending'), kind: t(expense ? 'movement.expense' : 'movement.income') })}</AppText>
+          {state.kind === 'confirmed' && <Ionicons name="checkmark-circle" size={16} color={p.income} accessible={false} />}
+          <AppText secondary variant="eyebrow">{t('assistant.proposal.eyebrow', { status: t(`assistant.proposal.status.${statusKey}`), kind })}</AppText>
         </View>
-        {/* 24UX6C: the draft's kind is known: no sign on an expense, «+» on an income (movement-amount.ts). */}
-        <Money minor={draft.amountMinor} currency={draft.currency} size={30} tone={expense ? 'expense' : 'income'} signed={!expense} />
+        {draft.amountMinor !== null && draft.currency !== null
+          ? <Money minor={draft.amountMinor} currency={draft.currency} size={30} tone={expense ? 'expense' : 'income'} signed={!expense} />
+          : <AppText variant="title2" style={{ color: p.secondary }}>{t('assistant.proposal.noAmount')}</AppText>}
       </View>
       <View style={{ gap: 0 }}>
-        <DraftRow label={t(expense ? 'assistant.draft.merchant' : 'assistant.draft.source')} value={draft.merchant.trim() || t('assistant.draft.missingText')} missing={!draft.merchant.trim()} />
-        <DraftRow label={t('selection.category')} value={draft.category.trim() ? categoryName : t('assistant.draft.missingChoice')} missing={!draft.category.trim()}
-          leading={draft.category.trim() ? <CategoryBadge category={draft.category} kind={draft.kind} size={28} /> : undefined} />
-        <DraftRow label={t(expense ? 'entryForm.paidWith' : 'entryForm.receivedIn')} value={account?.name ?? t('assistant.draft.missingChoice')} missing={!account}
-          leading={account ? <AccountBadge accountId={account.id} size={28} /> : undefined} />
-        <DraftRow label={t('selection.date')} value={activityDateLabel(draft.dateISO, day, locale)} last />
+        <ProposalRow label={t(expense ? 'assistant.proposal.merchant' : 'assistant.proposal.source')} value={draft.merchant ?? missing} missing={draft.merchant === null} />
+        <ProposalRow label={t('selection.category')} value={draft.category ? categoryName : missing} missing={!draft.category}
+          leading={draft.category ? <CategoryBadge category={draft.category} kind={draft.kind ?? 'expense'} size={28} /> : undefined} />
+        <ProposalRow label={t('assistant.proposal.destination')} value={account?.name ?? missing} missing={!account}
+          leading={account && !card ? <AccountBadge accountId={account.id} size={28} /> : undefined} />
+        {purchase !== null && <ProposalRow label={t('assistant.proposal.payment')} value={purchase} missing={draft.purchase === null} />}
+        <ProposalRow label={t('selection.date')} value={draft.dateISO ? activityDateLabel(draft.dateISO, day, locale) : missing} missing={!draft.dateISO}
+          spoken={draft.dateISO ? formatDate(draft.dateISO, 'long') : undefined} last />
       </View>
-      {confirmed
-        ? <ActionButton label={t('assistant.draft.viewEntry')} secondary compact onPress={() => content.entryId && onOpenEntry(content.entryId)} />
-        : <View style={{ gap: space.s }}>
-          {gaps.length > 0 && <AppText secondary variant="footnote">{t('assistant.draft.gaps', { count: gaps.length })}</AppText>}
-          <View style={{ flexDirection: 'row', gap: space.s }}>
-            <ActionButton label={t('assistant.draft.confirm')} onPress={onConfirm} busy={busy} disabled={gaps.length > 0} containerStyle={{ flex: 1 }} compact />
-            <ActionButton label={t('assistant.draft.edit')} secondary onPress={onEdit} disabled={busy} containerStyle={{ flex: 1 }} compact />
-          </View>
-          <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('assistant.draft.discardLabel')} onPress={onCancel} disabled={busy} style={{ alignSelf: 'center', minHeight: 36, paddingHorizontal: 12 }}>
-            <AppText secondary variant="footnote" style={{ fontWeight: '500' }}>{t('assistant.draft.discard')}</AppText>
-          </PressFeedback>
-        </View>}
+      <AppText accessibilityLiveRegion="polite" variant="footnote" style={{ color: lineColor }}>{line}</AppText>
+      {state.kind === 'failed' && <ActionButton label={t('assistant.proposal.retry')} icon="refresh" secondary compact onPress={onRetry} />}
+      {(state.kind === 'pending' || state.kind === 'unknown') && <ActionButton label={t('assistant.proposal.review')} icon="file-tray-full-outline" secondary compact
+        onPress={() => onReview(content.capture.id)} />}
+      {state.kind === 'confirmed' && <ActionButton label={t(state.record === 'plan' ? 'assistant.proposal.viewPlan' : 'assistant.proposal.viewEntry')} secondary compact
+        onPress={() => onOpenRecord(state.record, state.item.writeId)} />}
     </Surface>
   </Appear>;
 }
 
-function DraftRow({ label, value, leading, missing = false, last = false }: { label: string; value: string; leading?: ReactNode; missing?: boolean; last?: boolean }) {
+function ProposalRow({ label, value, spoken, leading, missing = false, last = false }: { label: string; value: string; spoken?: string; leading?: ReactNode; missing?: boolean; last?: boolean }) {
   const p = usePalette();
   const { t, speechLanguage } = useI18n();
-  return <View accessible accessibilityLabel={t('assistant.draft.row', { label, value })} accessibilityLanguage={speechLanguage} style={[styles.draftRow, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
+  return <View accessible accessibilityLabel={t('assistant.proposal.row', { label, value: spoken ?? value })} accessibilityLanguage={speechLanguage} style={[styles.draftRow, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
     <AppText secondary variant="subhead" style={{ minWidth: 96, flexShrink: 1 }}>{label}</AppText>
     <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'flex-end' }}>
       {leading}
-      <AppText numberOfLines={2} style={{ flexShrink: 1, textAlign: 'right', fontWeight: '500', color: missing ? p.warning : p.text }}>{value}</AppText>
+      <AppText numberOfLines={2} style={{ flexShrink: 1, textAlign: 'right', fontWeight: '500', color: missing ? p.secondary : p.text }}>{value}</AppText>
     </View>
   </View>;
 }

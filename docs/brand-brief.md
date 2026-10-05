@@ -249,10 +249,11 @@ name, logo or brand identity: the naming, trademark and confusing-similarity gat
   confusing-similarity screening stay in the existing brand, naming and identity launch gate (§3 and
   [app-store-launch.md §9.4](app-store-launch.md)); nothing
   here is a legal assessment.
-- **Theme packs later, maybe.** Optional visual themes (for example Forest, Lime, Sapphire) remain only a documented
-  post-launch candidate if the product later wants customisation: not a launch commitment, not part of the
-  current monetisation, no selector built. Every theme multiplies visual and accessibility QA, and the launch needs one
-  recognisable default identity.
+- **Theme packs: a pre-launch 25F Pro candidate (owner decision, 2026-10-04).** Promoted from a post-launch idea:
+  optional visual themes (for example Forest and Sapphire) may become selectable once the StoreKit entitlement and
+  paywall exist (roadmap, «Producto 25F»; app-store-launch.md §1.2). Electric Lime stays the default and current
+  identity; no selector is built now. Every theme multiplies visual and accessibility QA and must pass light, dark,
+  accessibility and semantic-colour QA before launch; the launch still needs one recognisable default identity.
 
 ## 5. What the identity must stay away from
 
