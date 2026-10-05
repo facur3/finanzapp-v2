@@ -585,7 +585,7 @@ expected draft, the expected clarification, or the expected refusal:
 | Spanish from Argentina | Voseo, "lucas", "k", "mangos", comma decimals, "ayer", "el finde". |
 | English | The same intents in English; mixed-language sentences; names and custom categories kept verbatim. |
 | Malformed amounts | "1.234,56" and "1,234.56", "mil quinientos", a missing amount, two candidate amounts. |
-| Ambiguous currencies | "30" with no currency, "dólares" with no dollar account, a symbol shared by several currencies. Expected: a gap, never a guess. |
+| Ambiguous currencies | "30" with no currency, "dólares" with no dollar account, a symbol shared by several currencies. Expected: the conversational Assistant asks for the currency (or the destination) before the review sheet, never a guess; an unambiguous regional word resolved through the configured region and a named destination's own currency are deterministic rules, not guesses (owner, 2026-10-04); a non-conversational producer leaves a gap. |
 | Negations | "no gasté nada", "al final no lo compré". Expected: no draft. |
 | Multiple expenses | Two purchases in one message. |
 | Card versus cash | "con la Visa", "en efectivo", an unnamed means of payment. |
@@ -642,8 +642,9 @@ request cost.
 
 ### 6.2 The production safety stack
 
-Every layer is server-side. **No client-side limit is a security boundary**: the app may show a counter for
-convenience, but a modified client must not be able to spend more.
+Every layer is server-side. **No client-side limit is a security boundary**: the app shows no permanent counter (a
+warning appears only near a real limit, owner decision 2026-10-04), and a modified client must not be able to spend
+more.
 
 | Layer | Rule | Status |
 | --- | --- | --- |
@@ -705,8 +706,8 @@ staging before AI is enabled anywhere.
    (§6.4). The monthly reconciliation of settled costs against the provider's cost report catches drift in the price
    table and the estimator.
 
-A reservation also fixes the per-request worst case the person sees: the app may show the remaining allowance, but the
-server's reservation is the only thing that decides.
+A reservation also fixes the per-request worst case: the app shows no permanent message counter and warns only near a
+real limit (owner decision, 2026-10-04), and the server's reservation is the only thing that decides.
 
 ### 6.4 Why the server's own accounting is the primary control
 
@@ -897,7 +898,7 @@ Concretely, with the app terminated, suspended and freshly unlocked, each repeat
 2. Before the activity is requested, with the app terminated, the JavaScript runtime parses the spooled capture into a
    `ReviewDraft` in the review store (`parseReviewDraft`, `captureReviewItem`), so what the activity shows and whether
    it may offer Confirmar come from the domain, never from Swift. If that cannot run in time, no activity content or
-   Confirmar is derived in Swift: the fallback is the review alert or the tray.
+   Confirmar is derived in Swift: the fallback is the review rescue notification (§9.5) or the tray.
 3. The Confirmar button's intent launches the app process, React Native's JavaScript runtime starts, the app's own
    TypeScript confirmation (`confirmReviewItem`, the same function the review card of 25A-03 will call; no screen calls
    it today) runs and commits to SQLite, and it finishes well inside the roughly 30 seconds Apple gives a background
@@ -943,13 +944,13 @@ The review tray **always** keeps the draft, whatever happens to the presentation
 | Situation | Behaviour |
 | --- | --- |
 | Device has no Dynamic Island | The Lock Screen presentation, or a brief banner when unlocked only if the start or update carries an alert configuration (**DEVICE QA**). No persistent control while the phone is in use; the tray holds the draft. |
-| Live Activities disabled in Settings | No activity. A review alert (§9) if notifications are permitted; otherwise the tray and its badge. |
+| Live Activities disabled in Settings | No activity. A review rescue notification (§9.5) if notifications are permitted; otherwise the tray and its badge. |
 | App terminated | The intent spools the capture; presentation depends on gates 1 and 2 above. The capture is kept in the spool regardless; the draft exists once the app drains it. |
 | Locked device | The activity appears on the Lock Screen with private content; buttons act only after the person authenticates. |
 | Authentication required | Confirmar always passes the device's authentication, and the app's own lock (§11) if enabled. Never a write from a locked phone. |
 | The person dismisses the activity | Nothing is written and nothing is discarded. The draft stays pending. |
 | Missing capture data | Editar only (§8.3). |
-| The Live Activity request fails | Logged without content; the fallback is the review alert or the tray. Never both an activity and a notification for one capture. |
+| The Live Activity request fails | Logged without content; the fallback is the review rescue notification (§9.5) or the tray. Never both an activity and a notification for one capture. |
 | Older supported iOS | The feature is absent; captures, if the automation exists there at all, go to the tray. |
 | Apple Watch payment | Not assumed to trigger anything (§7.2). |
 
@@ -968,8 +969,8 @@ which this section does not restate and never contradicts. **NOT IMPLEMENTED:** 
 ### 9.1 Live Activities are not notifications
 
 They have a separate system setting, a separate presentation and a separate purpose. The Wallet capture's Dynamic
-Island belongs to 25A2. The only link is the **review alert** below, which is the fallback when the activity cannot be
-shown, used *instead of* it, never *in addition*.
+Island belongs to 25A2. The only link is the **review rescue notification** (§9.5), which follows only when a review
+presentation was missed and the item is still pending, used *instead of* it, never *in addition*.
 
 ### 9.2 Local first
 
@@ -985,7 +986,7 @@ notifications, scheduled on the device, working with no server and no account.
 | Card payment reminder | The due date with nothing recorded as paid | Off |
 | Instalment or commitment reminder, where useful | The plan's schedule; a debt's due date | Off |
 | End-of-day "did you record today's spending?" | A time the person chooses | Off |
-| Review-draft fallback: something needs attention | A capture left pending when the Live Activity could not be shown (25A2) | Off |
+| Review rescue (§9.5) | A review item still pending after its primary presentation was missed: the Assistant's review sheet (background or termination) or 25A2's Dynamic Island (missed, dismissed or ended). Never for «Ahora no», never while a review surface is active | Off until the person allows it, asked in context |
 | Budget warning | A state change of the general budget | Only if the product later chooses it (roadmap 25D, «Budget state notification») |
 
 Requirements, each a gate of 25D:
@@ -1020,6 +1021,30 @@ on the device. Examples that would qualify, none of which exists today: a captur
 from another device, a sync conflict (25E), a subscription or entitlement event the phone cannot learn otherwise
 (25F). Push infrastructure is not built because it exists. Local reminders never depend on it. Adding it needs the
 push capability, a device token, a provider server and a privacy review, and belongs to 25E or later.
+
+### 9.5 Review rescue notification (owner decision, 2026-10-04)
+
+**DECIDED, NOT IMPLEMENTED** (25D, with 25A2 for the Wallet case). «Para revisar» is the durable fallback inbox, not
+the primary review surface, and a review notification is a **rescue**, not a notice for every proposal.
+
+- **Assistant.** The review item is durably stored and the review sheet is the primary presentation (25A-04). Only if
+  that immediate presentation was missed (the app went to the background or was terminated before or during it) and
+  the item is still pending, one local notification may follow after a short delay.
+- **Wallet / 25A2.** The review item is durably stored and the Dynamic Island / Live Activity is the primary
+  presentation. Only if that presentation was missed, dismissed or ended, or otherwise left the item pending, one local
+  rescue notification may follow.
+- **Never a duplicate.** No notification while a review surface is normally active for that item (the sheet, the
+  Dynamic Island); never an activity and a notification for one capture at the same time.
+- **«Ahora no» is not a trigger.** Closing the review sheet on purpose leaves the item pending with the tray and the
+  Más badge as its fallback; it schedules nothing now. Any later reminder policy for postponed items is decided in 25D.
+- **Cancelled on resolution.** Confirming or dismissing the item cancels its notification.
+- **Deep link.** A tap opens that exact review item in the review sheet (`/review-sheet/[id]`), never Más first. If
+  the item is no longer pending (confirmed or dismissed meanwhile, or unreadable), the app says its current state
+  calmly («ya no está pendiente», or the recorded movement) instead of an error.
+- **Lock Screen privacy.** By default the copy carries no amount, merchant, account or other financial detail, for
+  example «Tenés una revisión pendiente» / «Abrí FinanzApp para revisarla.»
+- **Permission.** Requested in context (when the person first enables the review family or when the rescue first
+  matters, with the reason shown first), never at first launch, and never required for the app to work.
 
 ---
 
@@ -1210,7 +1235,7 @@ is unchanged: 25A → 25A2 → 25C → 25C2 → 25D → 25E → 25F → 26. Sect
 | **25A2** — Wallet Shortcut Capture | The Wallet Transaction Automation, the Shortcut App Intent and native spool, the card mapping, deduplication by capture key, the Dynamic Island / Live Activity proof of concept and, if it passes, its delivery; the fallbacks. | §7, §8 |
 | **25C** — budgets, goals, CSV, productivity | Advanced search and filters, saved searches, notes, imports as reviewed drafts. Unchanged by this document. | roadmap «Producto 25C» |
 | **25C2** — merchants, rules, commitments | The financial calendar; local categorisation rules (which also pre-fill Wallet drafts); suggested recurring detection; merchant marks. | §10 |
-| **25D** — Face ID, notifications, Apple integrations | Hide amounts; Face ID lock; the data-protection and SQLCipher evaluation; the app-switcher cover; the local notification families and the review alert; widgets; broader App Intents, Siri and Spotlight; Apple Watch; the FinanceKit research gate. | §9, §11 |
+| **25D** — Face ID, notifications, Apple integrations | Hide amounts; Face ID lock; the data-protection and SQLCipher evaluation; the app-switcher cover; the local notification families and the review rescue notification (§9.5); widgets; broader App Intents, Siri and Spotlight; Apple Watch; the FinanceKit research gate. | §9, §11 |
 | **25E** — optional sync and privacy | Only if still chosen: the account, the outbox and sync requirements, cloud backup, export and deletion of cloud data, remote push if a server event justifies it, Sign in with Apple if not already delivered. | §1.4, §4, §9.4 |
 | **25F** — monetisation | Free and Pro, StoreKit and subscriptions, the paywall, the subscriber backend and admin view, App Store Server Notifications, premium AI quotas tied to an entitlement. Its sandbox gate needs the Paid Apps Agreement, tax and banking (launch §6) and the app record, so the identity decision of 26 must be taken before 25F's sandbox purchases, or the owner records a different 25F/26 order. | launch §1 to §6; §6 here |
 | **26** — TestFlight and publication | The brand, naming and identity gate before any public asset (launch §9.4); the production identity and profile, TestFlight, App Review, privacy labels, support, privacy and legal pages, the store listing and its localization, analytics decisions, banking and tax readiness, the landing page as a launch asset (its privacy, terms and support pages are required to submit; the marketing page itself may follow), the launch itself. | launch §6 to §14 |

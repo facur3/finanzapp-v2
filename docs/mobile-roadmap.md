@@ -1639,7 +1639,8 @@ Assistant's capability boundary and model evaluation, monetary safety).
   an income, a card purchase «Una vez» or in cuotas (the count always the person's, never inferred), a transfer or card
   payment, and a devolución (24T3), each written by the same domain builders as its form; the cost and abuse controls before the
   first paid call (per-model cost evaluation with owned data, daily and monthly limits per user
-  shown before they are hit, a token budget per request and conversation with a hard stop,
+  with no permanent counter and a warning only near a real limit (owner, 2026-10-04), a token budget per request and
+  conversation with a hard stop,
   provider quotas mapped to graceful states, per-user and per-device rate limits, request
   signing, anomaly cut-offs, the owner's kill switch, a monthly spend ceiling with alerts);
   staging Supabase, mobile sign-in and cloud-data consent (no login for the local core); the
@@ -1672,7 +1673,9 @@ Assistant's capability boundary and model evaluation, monetary safety).
   a provider port with deterministic fakes (no provider chosen by familiarity); handler order, error codes and one timeout
   budget; request contract v2 (server first); money-based cost, rate and token controls with a kill switch and a monthly
   ceiling; analytical facts v2 computed on the device; the inbox lifecycle and the revocable capture-token foundation.
-  Then: the app sends v2 with an offline end-to-end loop and evaluation harness; cloud consent and failure states; the
+  Then: the app sends v2 with an offline end-to-end loop and evaluation harness, including the conversational
+  clarification contract (free-text questions such as a missing merchant, ambiguous destinations and currencies asked
+  before the review sheet; owner decision 2026-10-04, «Producto 25A-04»); cloud consent and failure states; the
   staging session (the first network slice, owner setup and authorization required); the inbox consumer; **one** paid
   slice, the live provider on staging, only after the owner configures and approves it; voice last, after the text path is
   proven on the iPhone. Numbering beyond 25A-04 is indicative; each slice records its own section here.
@@ -1729,7 +1732,9 @@ delivery that pulls the Wallet capture forward from 25D: it needs 25A's draft mo
   a local review draft → a **Dynamic Island / Live Activity** with Confirmar / Editar. That path is **not a normal
   notification**. When a complete, immediate confirmation cannot run there (an incomplete capture, a missing mapping,
   a gap, a device or setting where the Live Activity is not available), it falls back safely: the draft stays in the
-  review tray, and a review alert (25D) may point to it; nothing is ever written without the person's Confirmar.
+  review tray, and if the Dynamic Island presentation was missed, dismissed or ended with the item still pending, one
+  review rescue notification (25D; production-plan.md §9.5) may follow, never at the same time as the activity; nothing
+  is ever written without the person's Confirmar.
 - **Manual capture stays the core**, offline and complete without any of this.
 - **Gates.** Device evidence on an iPhone and, separately, on an Apple Watch payment; a denied or missing automation;
   repeated and late deliveries; the mapping for a credit card and for a debit card; an incomplete capture.
@@ -4053,9 +4058,11 @@ nothing of it is on a screen yet.
   `spending-home`: the status bar is dark over the lime field in both schemes; the commitments' surface carries no
   fill. `capture-hub`: uses the real light palette; the Assistant circle. A slightly darker dark `tertiary` keeps the
   idle month bars at 3:1.
-- **Future themes (document only).** Optional theme packs (Forest, Lime, Sapphire) remain only a documented
-  post-launch candidate, not a launch commitment, not part of the monetisation, no selector (brand-brief §4.8): each
-  theme multiplies visual and accessibility QA, and the launch needs one recognisable identity. The Wise
+- **Future themes (as recorded at 25VIS1; superseded 2026-10-04).** At 25VIS1 optional theme packs were a documented
+  post-launch candidate with no selector. The owner has since made them a **pre-launch 25F Pro candidate**: Electric
+  Lime stays the default, Forest and Sapphire packs gated by the same entitlement, after the core AI and Apple
+  architecture, before launch if the schedule allows and before the optional Mercado Pago consumer-sync research
+  («Producto 25F»; brand-brief §4.8); each theme still multiplies visual and accessibility QA. The Wise
   differentiation note and the reminder that naming, logo and similarity screening stay in launch §9.4 are in
   brand-brief §4.8.
 - **25OPS1 device record.** The owner's pass of 2026-10-03 is recorded in the checklist: the final content stays above
@@ -4248,6 +4255,23 @@ nothing of it is on a screen yet.
   rule 6).
 - **Answers and evidence.** Unchanged: analytical answers, local evidence rows and links, the client boundary,
   streaming, cancellation and the disconnected state; no more ledger data leaves the device.
+- **Clarifications before the sheet (owner decision 2026-10-04; a future 25A AI / provider contract, not implemented).**
+  For the conversational Assistant, required financial gaps are normally resolved in the conversation before the review
+  sheet is presented, when the person can answer naturally: a missing merchant or description is asked; an ambiguous
+  account or card is asked with the compatible real destinations; a genuinely ambiguous currency is asked; a missing or
+  uncertain category is asked or offered from known categories. Nothing is silently guessed. Deterministic product rules
+  are not guesses: a record command with no stated date uses today's local day; a stated or relative date wins; an
+  unambiguous regional currency word may resolve through the configured region; an explicitly named destination is
+  used with its own currency. A single compatible destination may be resolved deterministically only if the later AI
+  contract defines it explicitly; the «last used account» is never used silently. The review sheet keeps supporting
+  incomplete items, since non-conversational producers (Wallet) may lack information. The current contract cannot yet
+  ask every free-text clarification (a merchant, for one): completing that conversational contract belongs to the
+  upcoming 25A AI / provider slices.
+- **Review rescue notification (owner decision 2026-10-04; 25D and 25A2, not implemented, no notification code here).**
+  The review sheet is the primary presentation; if it is missed (a background transition or a termination) and the item
+  stays pending, one short-delay local rescue notification may follow, never alongside an active review surface and
+  never for «Ahora no». Details, privacy copy and the deep link: «Producto 25D», «Notification families», and
+  production-plan.md §9.5.
 - **Later contract: several drafts (decision recorded, not implemented).** One message or utterance may later produce
   several drafts (competitive-landscape.md §8.1, voice in 25A): each becomes its own review item with its own item id,
   write id, revision and explicit confirmation, reviewed one by one or in a small review stack or queue over the same
@@ -4425,8 +4449,15 @@ tied to 25E's account are deferred to 25E or a follow-up after it (24T1C, 2026-0
     decided and verified on its own.
 - **Notification families (owner, 2026-10-02; recorded in 25UX1, a future product decision, nothing implemented).** 25D's
   notifications separately cover: recurring due reminders; credit-card closing, due and payment reminders; optional
-  end-of-day expense-entry reminders; and the fallback review alerts of 25A2 (a capture left for review when the Live
-  Activity path could not confirm it). The Wallet capture's Dynamic Island / Live Activity is 25A2's, not one of these.
+  end-of-day expense-entry reminders; and the **review rescue notification** (owner refinement, 2026-10-04;
+  production-plan.md §9.5): a rescue, never a notice for every proposal. It follows only when a durably stored review
+  item stays pending because its primary presentation was missed (the Assistant's review sheet, by a background
+  transition or a termination; 25A2's Dynamic Island, missed, dismissed or ended), never at the same time as an active
+  review surface, never for «Ahora no» (the tray and badge are that fallback; a later reminder policy is 25D's), cancelled
+  when the item is confirmed or dismissed, deep-linking to that item's review sheet (its current state said calmly if it
+  is no longer pending), with no amount, merchant or account by default («Tenés una revisión pendiente» / «Abrí
+  FinanzApp para revisarla.») and its permission asked in context, never at first launch. The Wallet capture's Dynamic
+  Island / Live Activity is 25A2's, not one of these.
   **Financial values in lock-screen notifications stay private by default** (no amount or merchant unless the person
   turns it on).
 - **Local notifications** (opt-in, configurable, time-zone aware, deduplicated): card closing and due
@@ -4558,17 +4589,18 @@ Production detail (25OPS1): [app-store-launch.md](app-store-launch.md) §1–§5
   server-side, the free local core untouched; a paywall with testimonials only from real,
   verifiable users with consent; the App Store rating request only after a satisfying moment
   through Apple's prompt, never on first launch and never required; no silent telemetry.
-- **Gates.** Sandbox purchases and restores on the iPhone; the quota and ceiling states shown
-  before they are hit; a measured-cost report (cost per request, per active person and per month,
+- **Gates.** Sandbox purchases and restores on the iPhone; the near-limit warning and the ceiling states (no permanent
+  message counter); a measured-cost report (cost per request, per active person and per month,
   by model, from real usage in 25A) and a privacy review of what each request carries, before the
   owner's pricing decision.
 - **Depends on.** 25A in production use with measured costs.
 - **Owner decisions recorded 2026-10-04 (not implemented; no pricing or entitlement decided here):**
-  - **Theme packs: a pre-launch 25F Pro launch candidate** (promoted from a post-launch idea). Electric Lime stays the
-    default and current identity; additional themes such as Forest and Sapphire may become selectable once the StoreKit
-    entitlement and paywall exist. Each theme passes light, dark, accessibility and semantic-colour QA before launch. Not
-    built now and not blocking 25A; scheduled before the Mercado Pago consumer-sync research if the launch schedule
-    allows.
+  - **Theme packs: a pre-launch 25F Pro launch candidate** (promoted from a post-launch idea; confirmed 2026-10-04).
+    Electric Lime stays the default and current identity; additional packs such as Forest and Sapphire are gated behind
+    the same entitlement once StoreKit and the paywall exist. Each theme passes light, dark, accessibility and
+    semantic-colour QA before launch. Not built now and not blocking 25A: placed after the core AI and Apple
+    architecture (25A, 25A2, 25D) and before launch if the schedule allows, and before the optional Mercado Pago
+    consumer-sync research.
   - **The Pro candidate bundle.** The Assistant / AI and future voice AI; theme packs; an advanced Excel-friendly export
     and report package; future cloud sync or advanced automation where appropriate. The useful manual financial core stays
     free. Basic data portability is never hostage to Pro: basic CSV / export stays free, the advanced Excel / report
@@ -4576,6 +4608,12 @@ Production detail (25OPS1): [app-store-launch.md](app-store-launch.md) §1–§5
   - **AI fair use.** No fixed small monthly message count is a product limit. The intended Pro experience is generous fair
     use with invisible anti-abuse controls and a near-limit warning only when relevant; the final limits come from 25A's
     AI evaluation and measured-cost work.
+  - **No permanent free AI allowance (confirmed 2026-10-04).** The Assistant / AI and future voice AI are Pro
+    candidates; no permanent free message allowance and no permanent message counter are promised. Whether acquisition
+    uses no trial, a StoreKit introductory Pro trial or another compliant introductory offer is a 25F product /
+    experiment **OWNER DECISION**, not decided by 25A-04. The paywall stays contextual: it appears only because the
+    person intentionally asked for a Pro capability, never on first launch, between tabs or as an unrelated interruption
+    (app-store-launch.md §3.1).
 
 ## 4. Launch
 

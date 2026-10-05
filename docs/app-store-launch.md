@@ -74,7 +74,7 @@ order of the work: "margins calculated from measured costs before any price" and
 | Local backup, export, import, undo, deletion | Always | Never | Data safety and recovery (rule above). |
 | Hide amounts, Face ID lock, app-switcher cover (25D) | Always | No (owner, 2026-10-04: essential privacy and safety are never paywalled) | Privacy protections, and guideline 4.10 for Face ID. |
 | Local reminders (25D) | Always | No | Guideline 4.10 (notifications); they run on the device at no cost. |
-| Assistant, cloud AI (25A) | A small allowance, if measured cost allows one | Usage above the allowance; Pro candidate (owner, 2026-10-04) | The one capability with a real marginal cost per request. The intended Pro experience is **generous fair use** with invisible anti-abuse controls and a near-limit warning only when relevant, never a fixed small monthly message count as the product's promise (owner decision, 2026-10-04). The allowance and the limits come from 25A's AI evaluation and the measured-cost report of 25F, never from a guess. Server-side ceilings apply to Free and Pro alike (production-plan.md §6). |
+| Assistant, cloud AI (25A) | No permanent free allowance is promised (owner, 2026-10-04); whether acquisition uses no trial, a StoreKit introductory Pro trial or another compliant introductory offer is a 25F **OWNER DECISION** | **Pro candidate** (owner, 2026-10-04) | The one capability with a real marginal cost per request. Pro is **generous fair use** with invisible anti-abuse controls and monetary ceilings: no permanent message counter, and a warning only near a real limit. The limits come from 25A's AI evaluation and the measured-cost report of 25F, never from a guess. Server-side ceilings apply to every request (production-plan.md §6). |
 | Voice input for the Assistant (25A, last slice) | **OWNER DECISION** | Candidate (owner, 2026-10-04: in the Pro candidate bundle) | A transcription provider adds its own cost per request. |
 | Theme packs (25F) | Electric Lime, the default and current identity | **Pre-launch Pro launch candidate** (owner, 2026-10-04) | Additional themes (for example Forest, Sapphire) selectable once the StoreKit entitlement and paywall exist; each passes light, dark, accessibility and semantic-colour QA before launch. Not built; does not block 25A; before the Mercado Pago consumer-sync research if the schedule allows. |
 | Advanced Excel-friendly export and report package | Basic CSV / export, always (data portability is never hostage to Pro) | Candidate (owner, 2026-10-04) | The advanced presentation is the Pro value; the person's data always leaves freely. |
@@ -83,6 +83,11 @@ order of the work: "margins calculated from measured costs before any price" and
 | Widgets, Apple Watch surface (25D) | **OWNER DECISION** | Candidate | No marginal cost. Check guideline 4.10 before charging for an OS surface. |
 | Financial calendar, saved searches, advanced filters, rollover budgets, goals, CSV import (25C, 25C2) | **OWNER DECISION** | Candidates ("advanced analytics and features") | Development cost only. Each one moved to Pro narrows the free product; none is required for the core to be useful. |
 | Authorised bank connections (25E, if they ever exist) | — | Candidate | An aggregator contract would carry a per-connection cost. None exists and none is implied. |
+
+**Current owner position (2026-10-04, candidates, not final entitlements or prices).** Free: the manual financial core,
+essential privacy and safety (Face ID, «Ocultar importes»), basic data portability and CSV. Pro candidates: the
+Assistant / AI and future voice AI; theme packs (pre-launch, 25F); the advanced Excel / report export; future paid sync
+or automation where justified. No permanent free AI allowance and no permanent message counter are promised.
 
 **OWNER DECISION.** Which candidates become Pro. The framework for choosing: (1) does it cost money per use (AI,
 cloud storage, an aggregator)? Those are the natural Pro capabilities and can carry the subscription alone. (2) Is it a
@@ -95,7 +100,7 @@ evidence of real use, after TestFlight.
 | --- | --- | --- |
 | Monthly | A standard duration (Schedule 2 §3.8: weekly, monthly, bi-monthly, tri-monthly, semi-annual, annual). | **OWNER DECISION:** offer it, and at what price. |
 | Annual | Same; shown with the monthly plan in one subscription group so a person holds only one. A monthly plan with a 12-month commitment also exists outside the US and Singapore since 2026-04-27; its payload fields are documented only as stubs (*unverified* details). | **OWNER DECISION:** annual price and its discount against monthly. |
-| Optional trial | Introductory offers: free trial, pay as you go or pay up front. "Customers can redeem one introductory offer per subscription group." Configured per subscription and territory in App Store Connect. | **OWNER DECISION:** a trial or none, and its length. With AI as the paid capability a trial has a real cost per trial user; the measured-cost report decides. |
+| Optional trial | Introductory offers: free trial, pay as you go or pay up front. "Customers can redeem one introductory offer per subscription group." Configured per subscription and territory in App Store Connect. | **OWNER DECISION (25F product/experiment):** no trial, a StoreKit introductory Pro trial, or another compliant introductory offer, and its length; not decided by 25A-04. With AI as the paid capability a trial has a real cost per trial user; the measured-cost report decides. |
 | Regional pricing | "Up to 800 price points"; a base storefront generates prices for "the other 174 storefronts and 43 currencies". For auto-renewable subscriptions "Apple will not make price adjustments" on its own after tax or FX movements. | **OWNER DECISION:** the base storefront and any manual prices per storefront (§10). Subscription prices need our own periodic review. |
 | Introductory, promotional and win-back offers | Introductory (new subscribers); promotional (existing or former subscribers, needs a server-generated signature); win-back (churned subscribers, eligibility set in App Store Connect); offer codes (§4.5). | Start with none or with one introductory offer. Promotional offers need server signing: **NOT IMPLEMENTED**, not needed for launch. |
 | Upgrade / downgrade | Within one subscription group Apple handles the change: an upgrade is immediate, a downgrade applies at the next renewal (`DID_CHANGE_RENEWAL_PREF`). Guideline 3.1.2(b): people "should not be able to inadvertently subscribe to multiple variations of the same thing". | One subscription group, one entitlement ("Pro"), monthly and annual as its two products. |
@@ -184,13 +189,14 @@ there.
 
 - **DECIDED (25OPS1 brief; production-plan.md §12).** Never during the first opening. The first opening explains the
   product and optionally creates an account (AGENTS rule 15); a paywall there would block understanding the core.
-- **Contextual, at the moment of value.** The paywall opens when the person asks for a Pro capability: the Assistant's
-  free allowance is used up (the quota state is "shown before it is hit", roadmap 25F), or they turn on a Pro feature in
-  Más. It is always the result of the person's own action.
+- **Contextual, at the moment of value.** The paywall opens only because the person intentionally asked for a Pro
+  capability (the Assistant or voice without Pro, a theme pack, the advanced export), or tapped the «FinanzApp Pro» row
+  in Más. It is always the result of the person's own action. There is no permanent free AI allowance or message
+  counter to run out (owner decision, 2026-10-04); a Pro subscriber is warned only near a real fair-use limit.
 - **One permanent, quiet entry:** a «FinanzApp Pro» row in Más, which shows the plans to a free user and the status to
   a subscriber.
-- **Never:** on launch, on a timer, between tabs, over a form in progress, as a full-screen interruption of manual
-  capture, or as a notification.
+- **Never:** on first launch, on a timer, between tabs, over a form in progress, as a full-screen interruption of manual
+  capture, as any unrelated interruption, or as a notification.
 - **Onboarding versus later.** Onboarding may mention, in one line at most, that the app is free and Pro exists; the
   offer itself is contextual and later. **OWNER DECISION** if even that line is wanted.
 
@@ -198,7 +204,9 @@ there.
 
 Apple's requirements (guideline 3.1.2(c), Schedule 2 §3.8, and "Clearly describing subscriptions"):
 
-- the subscription's name and what it includes, in concrete terms ("X consultas al Asistente por mes", not "Premium");
+- the subscription's name and what it includes, in concrete terms («El Asistente y la voz, con uso amplio», «Temas
+  adicionales», «Exportación avanzada para Excel», not "Premium"); never a monthly message count (§1.2: generous fair
+  use, no permanent counter);
 - each plan's duration and **full renewal price**, localized, as "the most prominent pricing element"; the annual
   plan's per-month equivalent, if shown, is subordinate in position and size;
 - for a trial: "how long the free trial lasts and the price billed once the free trial is over";
@@ -534,7 +542,7 @@ anything not named is not sent.
 | `review_confirmed` / `review_edited` / `review_dismissed` | A review item is resolved | source (assistant, wallet, inbox) |
 | `live_activity_shown` / `live_activity_fallback` | A capture is presented, or falls back to the tray | fallback reason (unavailable, disabled, incomplete, failed) |
 | `notification_permission` | The system prompt is answered | granted, denied, provisional; the reminder family that asked |
-| `paywall_viewed` | The paywall opens | trigger (quota, Más row, feature) |
+| `paywall_viewed` | The paywall opens | trigger (the Pro capability requested: Assistant, voice, theme pack, advanced export; or the Más row) |
 | `trial_started`, `subscription_purchased`, `subscription_restored` | From Apple's notifications, server side | product id, offer type; no client event needed |
 
 **Never sent:** an exact financial amount; merchant text; account, card or category names; transaction
@@ -609,7 +617,7 @@ TestFlight: App Analytics excludes sales from TestFlight builds; Sales and Trend
 without any code in the app and without any data leaving the device to us, and "You are not responsible for disclosing
 data collected by Apple" in the privacy label. Product analytics (§7), if ever enabled, answers only what Apple cannot
 see: what happens inside the app (was a first expense recorded, are review items confirmed or dismissed, does the
-paywall convert from the quota or from Más). Nothing Apple already reports (downloads, sessions, retention by day,
+paywall convert from an intentional Pro request (the Assistant, a theme pack, the advanced export) or from Más). Nothing Apple already reports (downloads, sessions, retention by day,
 subscription events) is collected a second time.
 
 ---

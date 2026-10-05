@@ -988,10 +988,12 @@ brillante + verde bosque como sistema de marca, su logo, su tipografía, sus íc
 sus textos ni sus composiciones. La revisión final de nombre, logo, marca registrada y similitud confusa sigue en la
 compuerta de identidad de marca existente ([brand-brief.md](brand-brief.md)); esto no es una opinión legal.
 
-**Temas a futuro (solo documentado).** Paquetes de tema opcionales (por ejemplo Forest, Lime, Sapphire) quedan solo como
-un candidato documentado para después del lanzamiento si el producto quiere personalización: no se prometen para el lanzamiento
-ni forman parte de la monetización actual, y no hay selector. Cada tema multiplica la QA visual y de accesibilidad, y
-el lanzamiento necesita una identidad por defecto reconocible.
+**Paquetes de tema: candidato Pro de 25F antes del lanzamiento (decisión del dueño, 2026-10-04).** Electric Lime sigue
+siendo el tema por defecto y la identidad actual. Paquetes opcionales como Forest y Sapphire se podrán elegir con el
+mismo entitlement de Pro una vez que existan StoreKit y el paywall (roadmap, «Producto 25F»; app-store-launch.md §1.2).
+Van después de la arquitectura central de IA y Apple (25A, 25A2, 25D), antes del lanzamiento si el calendario lo
+permite y antes de la investigación opcional de sincronización con Mercado Pago. Cada tema pasa QA de claro, oscuro,
+accesibilidad y color semántico antes del lanzamiento; no hay selector todavía.
 
 **Veredicto del dueño (2026-10-03, iPhone físico, claro y oscuro): se queda.** Quedan como están el campo lima de
 Inicio; el segmento no elegido de `Gastado | Disponible`; la jerarquía del importe (dígitos en tinta, símbolo de moneda y centavos como están); Próximos compromisos
