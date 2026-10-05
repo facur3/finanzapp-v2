@@ -495,7 +495,9 @@ draft never writes, an interrupted confirmation is reconciled from the ledger an
 confirmed in the review sheet presented over the Assistant (or later in «Para revisar»), through the store's frozen
 write. The reconciled differences: an unstated date is today by the capture rule (the device's local day at capture);
 an unstated currency comes only from a destination the person named or chose, otherwise it is a gap; a merchant or
-category the draft cannot hold is missing; a card gets «Una vez» and an income never a card. Still open: the wire contract knows only ARS and USD (contract v2), and the
+category the draft cannot hold is missing; a card gets «Una vez» and an income never a card. A destination the model
+names is resolved on the device against the compatible destinations (a name holding all its words), never by the model, and one
+that matches none or several is asked, never replaced by the only eligible account (roadmap «Producto 25A-04»). Still open: the wire contract knows only ARS and USD (contract v2), and the
 Assistant stays disconnected in every build until its own slices; the deferred 24T3 device pass is a release blocker,
 not a merge gate (owner decision, 2026-10-04: roadmap §2).
 

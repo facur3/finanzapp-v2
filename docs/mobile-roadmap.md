@@ -1,13 +1,14 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-04 (Producto 25A-04, on its branch: Assistant → review sheet. The Assistant no longer writes the
+Updated: 2026-10-05 (Producto 25A-04, on its branch: Assistant → review sheet. The Assistant no longer writes the
 ledger: its direct path (`entryFromDraft` → `validateEntry` → `addEntry`) is gone; every resolved Assistant draft is
 adapted to the canonical review draft (`reviewDraftFromAssistant`: an unstated date is today by the capture rule, an
 unstated currency comes only from a stated destination, a card gets «Una vez», an income never a card) and durably
 captured with an item id and a write id fixed once; only then a native review sheet is presented over the Assistant,
 where it is confirmed (the review store's one dispatcher), edited or explicitly discarded; closing the sheet leaves it
 pending, and «Para revisar» is the durable inbox, not a required step; New chat never touches it; the fixture view
-captures nothing. Owner decisions recorded: theme packs as a pre-launch 25F Pro candidate, the Pro candidate bundle and
+captures nothing; a named payment method is matched by whole words and, unmatched, is asked, never replaced by the
+only eligible account (owner fixture test, 2026-10-05). Owner decisions recorded: theme packs as a pre-launch 25F Pro candidate, the Pro candidate bundle and
 generous AI fair use (§3, «Producto 25F»).
 No cloud, provider, Supabase, server, voice, Wallet, notification, schema (14) or backup (v14) change; the version line
 reads «FinanzApp 0.1.0 (25A-04)». Producto 25A-03 merged as PR #84, merge commit aef2edf: «Para revisar», the first screens over the local review store of
@@ -4267,6 +4268,25 @@ nothing of it is on a screen yet.
   incomplete items, since non-conversational producers (Wallet) may lack information. The current contract cannot yet
   ask every free-text clarification (a merchant, for one): completing that conversational contract belongs to the
   upcoming 25A AI / provider slices.
+- **An explicit destination is never replaced (owner fixture test, 2026-10-05).** The owner's cards are named «b» and
+  «sksk» and the cash account «a»; «Gasté 18.500 en Carrefour con la Visa» showed account «a», because the name match
+  tested containment both ways on raw text and the letter «a» is inside «visa». `resolveDraft` now matches
+  `paymentMethodRef` in one direction only, by whole words: a destination matches when its name holds all the
+  reference's words, in order (accent- and case-insensitive; «Visa» matches «Visa Galicia»; «Visa», «la Visa» or «Visa a
+  crédito» never match «a», since a destination's name inside the reference no longer counts). With a reference: one
+  match is that destination; none or several ask the existing «¿Con qué lo pagaste?» / «¿Dónde lo recibiste?» with the
+  compatible destinations; the only eligible account is **never** implied in its place, even when the reference has no
+  letter or digit («💳»). Without a reference (none, or blank), exactly one compatible destination is still implied, as
+  before. An income is never matched or implied to a card. No last-used account, no fuzzy or semantic matching, no
+  card-network field and no schema change: a false clarification is safer than a wrong destination («la Visa» with a
+  card named «Visa Galicia» is now asked). Tests: `tests/assistant.node.ts` («25A-04: a named payment method…» and the
+  updated 24B6 case); `tests/assistant-review.node.ts`' date test no longer names a destination it relied on implying.
+- **Destination identity for the later 25A AI / provider contract (documentation only).** The model may understand that
+  words such as «Visa» or «Mastercard» refer to a card or payment method, and passes that reference on; it never decides
+  which FinanzApp destination the person meant. Identity is resolved on the device against the local deterministic
+  candidates (the rule above); when no candidate is identified uniquely, the Assistant asks. Account and card names and
+  details stay on the device unless a later privacy-reviewed contract proves sending them necessary. Natural aliases
+  or card-network metadata on a destination, if wanted, get their own reviewed domain and storage decision, not 25A-04.
 - **Review rescue notification (owner decision 2026-10-04; 25D and 25A2, not implemented, no notification code here).**
   The review sheet is the primary presentation; if it is missed (a background transition or a termination) and the item
   stays pending, one short-delay local rescue notification may follow, never alongside an active review surface and

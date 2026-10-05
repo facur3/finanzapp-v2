@@ -52,13 +52,14 @@ test('nothing is invented: an unstated currency, an unchosen account and an empt
 
 test('the capture date rule: an Assistant record command with no date happens today (the local day at capture); a stated or resolved date wins', () => {
   // «Gasté 10 mil pesos en el supermercado»: no date → the device's local day at capture, not the conversation's day.
-  const fromModel = resolveDraft({ ...FIXTURE_DRAFT.draft!, dateISO: null }, [cash], [], 'ARS', '2026-09-20');
+  // No destination named: the one cash account is implied (a named «Visa» would be asked, 25A-04).
+  const fromModel = resolveDraft({ ...FIXTURE_DRAFT.draft!, dateISO: null, paymentMethodRef: null }, [cash], [], 'ARS', '2026-09-20');
   const omitted = reviewDraftFromAssistant(fromModel.kind === 'draft' ? fromModel.draft : null!, archive, at, day);
   assert.equal(omitted.dateISO, day, 'captured on 21/09 after a conversation that started on 20/09: today at capture');
   assert.equal(domain.reviewGaps(omitted, archive, day).includes('date'), false, 'an explicit day is stored: no date gap');
   // «Gasté ayer…» (the model resolves «ayer») and «el 2 de octubre…»: the stated day, never replaced.
   for (const stated of ['2026-09-20', '2026-09-02']) {
-    const draft = resolveDraft({ ...FIXTURE_DRAFT.draft!, dateISO: stated }, [cash], [], 'ARS', '2026-09-21');
+    const draft = resolveDraft({ ...FIXTURE_DRAFT.draft!, dateISO: stated, paymentMethodRef: null }, [cash], [], 'ARS', '2026-09-21');
     assert.equal(reviewDraftFromAssistant(draft.kind === 'draft' ? draft.draft : null!, archive, at, day).dateISO, stated);
   }
   // A stated date after today is kept as stated, and the domain makes it a gap (never recorded in the future).

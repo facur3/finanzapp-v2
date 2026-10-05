@@ -216,6 +216,8 @@ export function shouldAutoscroll(offsetY: number, contentHeight: number, viewpor
 }
 
 const fold = (value: string) => value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+/** Folded words joined by one space, so a name is matched as whole words, never as a fragment of another word. */
+const words = (value: string) => fold(value).split(/[^\p{L}\p{M}\p{N}]+/u).filter(Boolean).join(' ');
 
 /** Categories the user has already recorded for that kind, most used first, as chips for a category clarification. */
 export function categoryOptions(entries: Entry[], kind: EntryKind, limit = 4): ClarificationOption[] {
@@ -233,9 +235,12 @@ export function categoryOptions(entries: Entry[], kind: EntryKind, limit = 4): C
 /** Turn a CaptureDraft (the server contract, every field nullable) into either a
  * confirmable draft or the one clarification that blocks it, in this order:
  * kind, amount, account, category. `accounts` are the ones that may carry a
- * posting in the draft's currency. A named payment method matches one account
- * by name (accent- and case-insensitive); with exactly one eligible account it
- * is implied; otherwise the user is asked, with the accounts as the options. */
+ * posting in the draft's currency. A named payment method matches an account
+ * whose name holds all its words, in order (accent- and case-insensitive:
+ * "Visa" is "Visa Galicia", never account "a", and "Visa a crédito" is not "a"
+ * either); one that matches none or several is asked, never replaced by the
+ * only eligible account. Only with nothing named is exactly one eligible
+ * account implied; otherwise the user is asked, with the accounts as the options. */
 export function resolveDraft(draft: CaptureDraft, accounts: Account[], entries: Entry[], currency: Currency, todayISO: string, incomeAccounts: Account[] = accounts):
   { kind: 'draft'; draft: ResolvedDraft } | { kind: 'clarification'; field: DraftField; question: MessageKey; options: ClarificationOption[]; partial: Partial<ResolvedDraft> } {
   const resolvedCurrency = draft.currency ?? currency;
@@ -247,8 +252,10 @@ export function resolveDraft(draft: CaptureDraft, accounts: Account[], entries: 
   if (!draft.amountMinor) return { kind: 'clarification', field: 'amount', question: 'assistant.clarify.amount', options: [], partial };
   // An income goes to a cash account (24B6): a card is never offered or implied for it.
   const eligible = (draft.kind === 'income' ? incomeAccounts : accounts).filter(account => account.currency === resolvedCurrency);
-  const named = draft.paymentMethodRef ? eligible.filter(account => fold(account.name).includes(fold(draft.paymentMethodRef!)) || fold(draft.paymentMethodRef!).includes(fold(account.name))) : [];
-  const accountId = named.length === 1 ? named[0].id : eligible.length === 1 ? eligible[0].id : null;
+  // Named but without a letter or digit ("💳") still names something: it matches nothing and is asked.
+  const ref = draft.paymentMethodRef?.trim() ? words(draft.paymentMethodRef) : null;
+  const named = ref ? eligible.filter(account => ` ${words(account.name)} `.includes(` ${ref} `)) : [];
+  const accountId = ref !== null ? (named.length === 1 ? named[0].id : null) : eligible.length === 1 ? eligible[0].id : null;
   const destinationStated = named.length === 1;
   if (!accountId) return { kind: 'clarification', field: 'paymentMethod', question: draft.kind === 'expense' ? 'assistant.clarify.paidWith' : 'assistant.clarify.receivedIn',
     options: eligible.map(account => ({ id: account.id, label: account.name })), partial: { ...partial, accountId: null } };

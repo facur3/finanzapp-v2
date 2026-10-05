@@ -11,8 +11,10 @@ automated suite (`tests/assistant-review.node.ts`, `tests/assistant-routes.node.
 SQLite where persistence matters). Synthetic proposals are never written to the real review file.
 
 - [ ] **Fixture view (development bundle with `EXPO_PUBLIC_ASSISTANT_FIXTURES=1`):** «Gasté 18.500 en Carrefour con la
-  Visa» shows a «Vista de prueba» proposal card with no action and **no review sheet**, and Más → Para revisar stays
-  empty («Nada pendiente», no badge) afterwards; Movimientos unchanged.
+  Visa» with no account or card whose name contains the word «Visa» asks «¿Con qué lo pagaste?» with the compatible
+  accounts and cards (never shows the cash account by itself); after a choice it shows a «Vista de prueba» proposal card
+  with no action and **no review sheet**, and Más → Para revisar stays empty («Nada pendiente», no badge) afterwards;
+  Movimientos unchanged.
 - [ ] **Disconnected build:** a typed message still returns to the composer with its note; nothing appears in Para revisar.
 - [ ] **When the Assistant connects (a later 25A slice), in the release gate:**
   - the review sheet appears by itself right after the proposal is saved, as a native form sheet fitted to its content

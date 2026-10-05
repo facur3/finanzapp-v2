@@ -382,7 +382,8 @@ test('24B6: an income draft is never implied to land on a card: with cash and a 
   assert.equal(expense.kind === 'clarification' && expense.field, 'paymentMethod', 'an expense may go to the card, so it asks');
   assert.deepEqual(expense.kind === 'clarification' ? expense.options.map(o => o.id) : [], ['visa', 'cash']);
   const named = resolveDraft({ ...income, paymentMethodRef: 'visa' }, [visa, cash], entries, 'ARS', today, [cash]);
-  assert.equal(named.kind === 'draft' && named.draft.accountId, 'cash', 'a card named for an income is not matched; the only cash account is implied');
+  assert.equal(named.kind === 'clarification' && named.field, 'paymentMethod', 'a card named for an income is not matched, and the only cash account is not implied in its place: it asks');
+  assert.deepEqual(named.kind === 'clarification' ? named.options.map(o => o.id) : [], ['cash'], 'and never offers the card');
   // Through the reducer path: kind asked first, "income" chosen, then no account question with a single cash account.
   const asked = contentFromResult({ ...FIXTURE_DRAFT_NO_ACCOUNT, draft: { ...FIXTURE_DRAFT_NO_ACCOUNT.draft!, kind: null } }, [], [visa, cash], entries, 'ARS', today, [cash]);
   const afterKind = completeDraft(asked.pending!, 'income', [visa, cash], entries, today, [cash]);
@@ -390,6 +391,57 @@ test('24B6: an income draft is never implied to land on a card: with cash and a 
   const afterExpense = completeDraft(asked.pending!, 'expense', [visa, cash], entries, today, [cash]);
   assert.equal(afterExpense.content.kind === 'clarification' && afterExpense.content.field, 'paymentMethod');
   assert.equal(resolveDraft(income, [visa, cash], entries, 'ARS', today).kind, 'clarification', 'without the income list (older callers) nothing changes');
+});
+
+test('25A-04: a named payment method is resolved only against the named destinations: no match or several ask, never the only eligible account', () => {
+  // The owner's fixture: «Gasté 18500 en Carrefour con la Visa» with a cash account «a» and cards «b» and «sksk»; nothing is the Visa.
+  const a: Account = { id: 'a', name: 'a', currency: 'ARS', openingMinor: 0, createdAt };
+  const b: Account = { id: 'b', name: 'b', currency: 'ARS', openingMinor: 0, createdAt };
+  const sksk: Account = { id: 'sksk', name: 'sksk', currency: 'ARS', openingMinor: 0, createdAt };
+  const fixture = resolveDraft(FIXTURE_DRAFT.draft!, [a, b, sksk], entries, 'ARS', today, [a]);
+  assert.equal(fixture.kind === 'clarification' && fixture.field, 'paymentMethod', '«a» is a letter inside «Visa», not a match');
+  assert.deepEqual(fixture.kind === 'clarification' ? fixture.options.map(o => o.id) : [], ['a', 'b', 'sksk']);
+  const onlyCash = resolveDraft(FIXTURE_DRAFT.draft!, [cash], entries, 'ARS', today);
+  assert.equal(onlyCash.kind === 'clarification' && onlyCash.field, 'paymentMethod', 'zero matches with one eligible cash account: asks, not the cash account');
+  assert.deepEqual(onlyCash.kind === 'clarification' ? onlyCash.options.map(o => o.id) : [], ['cash']);
+  assert.equal(onlyCash.kind === 'clarification' && onlyCash.partial.accountId, null);
+  for (const words of ['Visa a crédito', 'débito a cuenta', 'la Visa']) {
+    const extra = resolveDraft({ ...FIXTURE_DRAFT.draft!, paymentMethodRef: words }, [a, b, sksk], entries, 'ARS', today, [a]);
+    assert.equal(extra.kind === 'clarification' && extra.field, 'paymentMethod', `«${words}»: the word «a» inside the reference is not account «a»`);
+  }
+  for (const symbol of ['💳', '$']) {
+    const unnamed = resolveDraft({ ...FIXTURE_DRAFT.draft!, paymentMethodRef: symbol }, [a], entries, 'ARS', today, [a]);
+    assert.equal(unnamed.kind === 'clarification' && unnamed.field, 'paymentMethod', `«${symbol}» names something that matches nothing: asks`);
+  }
+  const marks = resolveDraft({ ...FIXTURE_DRAFT.draft!, paymentMethodRef: 'गैस' }, [{ ...a, name: 'ग' }, b], entries, 'ARS', today);
+  assert.equal(marks.kind === 'clarification' && marks.field, 'paymentMethod', 'a combining mark is part of the word, not a separator');
+  const one = resolveDraft({ ...FIXTURE_DRAFT.draft!, paymentMethodRef: 'visa  GALICIA' }, [visa, cash], entries, 'ARS', today);
+  assert.equal(one.kind === 'draft' && one.draft.accountId, 'visa', 'exactly one name match: that destination');
+  assert.equal(one.kind === 'draft' && one.draft.destinationStated, true);
+  const sole = resolveDraft({ ...FIXTURE_DRAFT.draft!, paymentMethodRef: 'Efectivo' }, [cash], entries, 'ARS', today);
+  assert.equal(sole.kind === 'draft' && sole.draft.accountId, 'cash', 'a named destination that is also the only one: used, as stated');
+  assert.equal(sole.kind === 'draft' && sole.draft.destinationStated, true);
+  const visaMacro: Account = { id: 'visa-macro', name: 'Visa Macro', currency: 'ARS', openingMinor: 0, createdAt };
+  const several = resolveDraft(FIXTURE_DRAFT.draft!, [visa, visaMacro, cash], entries, 'ARS', today);
+  assert.equal(several.kind === 'clarification' && several.field, 'paymentMethod', 'two matches: asks');
+  assert.deepEqual(several.kind === 'clarification' ? several.options.map(o => o.id) : [], ['visa', 'visa-macro', 'cash']);
+  const implied = resolveDraft(FIXTURE_DRAFT_NO_ACCOUNT.draft!, [cash], entries, 'ARS', today);
+  assert.equal(implied.kind === 'draft' && implied.draft.accountId, 'cash', 'nothing named and one eligible destination: still implied');
+  assert.equal(implied.kind === 'draft' && implied.draft.destinationStated, false, 'implied, not stated');
+  const blank = resolveDraft({ ...FIXTURE_DRAFT.draft!, paymentMethodRef: ' ' }, [cash], entries, 'ARS', today);
+  assert.equal(blank.kind === 'draft' && blank.draft.accountId, 'cash', 'a blank reference names nothing');
+  const income = resolveDraft({ ...FIXTURE_DRAFT.draft!, kind: 'income', paymentMethodRef: 'Visa Galicia' }, [visa, cash], entries, 'ARS', today, [cash]);
+  assert.equal(income.kind === 'clarification' && income.field, 'paymentMethod', 'an income never resolves to a card, even one named exactly');
+  assert.deepEqual(income.kind === 'clarification' ? income.options.map(o => o.id) : [], ['cash']);
+  // Through the screen path: the clarification is answered and the draft takes the chosen destination, as stated.
+  const asked = contentFromResult(FIXTURE_DRAFT, [], [a, b, sksk], entries, 'ARS', today, [a]);
+  const chosen = completeDraft(asked.pending!, 'b', [a, b, sksk], entries, today, [a]);
+  assert.equal(chosen.content.kind === 'draft' && chosen.content.draft.accountId, 'b');
+  assert.equal(chosen.content.kind === 'draft' && chosen.content.draft.destinationStated, true);
+  // A named destination survives an earlier question: kind asked first, the unmatched name still asks for the destination.
+  const noKind = contentFromResult({ ...FIXTURE_DRAFT, draft: { ...FIXTURE_DRAFT.draft!, kind: null } }, [], [cash], entries, 'ARS', today);
+  const afterKind = completeDraft(noKind.pending!, 'expense', [cash], entries, today);
+  assert.equal(afterKind.content.kind === 'clarification' && afterKind.content.field, 'paymentMethod');
 });
 
 // Producto 24T3 (A25): the evidence stays additive and never negative. Spending is sent gross (purchase lines), plus one
