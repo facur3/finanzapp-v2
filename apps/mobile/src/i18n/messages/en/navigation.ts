@@ -13,6 +13,9 @@ export const navigation: Pick<Messages, 'nav' | 'boot'> = {
     seeAccounts: 'View my accounts',
     recordMovement: 'Record a transaction',
     titles: {
+      review: 'To review',
+      reviewItem: 'Proposal',
+      editReview: 'Edit proposal',
       account: 'Account',
       accounts: 'Accounts',
       entry: 'Transaction',

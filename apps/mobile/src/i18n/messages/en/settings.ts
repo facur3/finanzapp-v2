@@ -8,6 +8,9 @@ export const settings: Pick<Messages, 'settings'> = {
       appData: 'App and data',
     },
     rows: {
+      review: 'To review',
+      reviewNone: 'Nothing pending',
+      reviewCount: { one: '{count} proposal', other: '{count} proposals' },
       accounts: 'Accounts',
       accountsSubtitle: 'Balances and transactions',
       cards: 'Cards',

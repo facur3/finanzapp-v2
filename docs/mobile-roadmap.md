@@ -1,8 +1,16 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-04 (Producto 25VIS1, PR #83, unmerged: Electric Lime, accepted by the owner on the iPhone as the current product palette, plus the owner-approved final polish of Inicio's chosen `Gastado | Disponible` thumb (white with ink), colour tokens only on the existing
+Updated: 2026-10-04 (Producto 25A-03, on its branch: «Para revisar», the first screens over the local review store of
+25A-02: a tray of pending proposals reached from Más (a pending count on the dock's Más tab), a proposal's detail with
+Confirmar, Editar and Descartar, confirmation only through the store's frozen write and reconciliation; no cloud, provider,
+Supabase, Wallet, notification, schema (14) or backup (v14) change; plus the owner-observed follow-up of 25VIS1: the hero
+amount's currency symbol and cents in solid neutral graphite on the lime field; the version line reads «FinanzApp 0.1.0
+(25A-03)». The targeted 24T3 device pass was not performed; by owner decision (2026-10-04) it is **deferred and a release
+blocker**: it no longer blocks development merges of 25A-03, 25A-04, later 25A slices or 25A2, and is consolidated
+into the physical-device release gate that must pass before the first external or public TestFlight candidate and
+before App Store submission (§2, «Producto 26»). Producto 25VIS1 merged as PR #83, merge commit 0ff9859: Electric Lime, accepted by the owner on the iPhone as the current product palette, plus the owner-approved final polish of Inicio's chosen `Gastado | Disponible` thumb (white with ink), colour tokens only on the existing
 product (`apps/mobile/src/ui/palette.ts`), no layout, navigation, financial, schema (14) or backup (v14) change; the
-version line reads «FinanzApp 0.1.0 (25VIS1)»; the owner's iPhone pass of 25OPS1 recorded (the last content now rests
+version line read «FinanzApp 0.1.0 (25VIS1)»; the owner's iPhone pass of 25OPS1 recorded (the last content now rests
 above the dock). Producto 25DISC1 merged as PR #82, merge commit 227942c, documentation only: the competitive capability map and gap map,
 [competitive-landscape.md](competitive-landscape.md) with its durable per-claim evidence record
 [competitive-evidence.md](competitive-evidence.md) and capability decision register (§12.5), the brand identity brief,
@@ -43,7 +51,7 @@ what already closed first and «Reactivar plan» undoes it, and a card holding a
 decisions B1–B3, 2026-10-01); SQLite schema 14 and backup v14; Reportes, Presupuestos, Inicio and the Assistant's
 evidence net devoluciones without negative slices or claims; plus the carry-in of Reportes' «Categorías | Día a día»
 switch at 15/20 with no shrink-to-fit; no EAS build; the owner merged it after targeted use and deferred the recorded device
-pass, which now gates 25A-03, 25A-04, 25A-11 and 25A-12 (§2). Producto 24UX6E merged as PR #75, merge commit d30b77f: more financial destinations in Forest, presentation and
+pass, which gated 25A-03, 25A-04, 25A-11 and 25A-12 until the owner deferred it to the pre-release device gate on 2026-10-04 (§2). Producto 24UX6E merged as PR #75, merge commit d30b77f: more financial destinations in Forest, presentation and
 lifecycle polish plus bug fixes; Cuentas, Presupuestos, Recurrentes, Deudas y cobros and Categorías with flat summaries
 on the canvas, one shared lifecycle note, colour marking state rather than direction or identity and no chevron on rows
 that open a modal editor; the Más utilities audited, with two bug fixes (the pinned chooser card, Movimientos deshechos
@@ -235,13 +243,28 @@ commit 5c73813), 24UX6C (PR #72, merge
 commit c673be6), 24UX6B (PR #71, merge
 commit ecfd1dc), 24UX6A (PR #70, merged 2026-10-01, merge commit ef24bb6), 24T2 (PR #69, merge commit 8951f6c), 24T1C
 (PR #68), 24T1 (PR #67) and 25B3 (PR #66), then Producto 25A-01 (PR #77, merge commit a4202bc) and 25A-02 (PR #78 and its follow-up PR #79, merge commit
-a1bd181), 25UX1 (PR #80, merge commit d45eca6), and 25OPS1 (PR #81, merge commit d0a0be8), and 25DISC1 (PR #82, merge commit 227942c, documentation only); Producto 25VIS1 (Electric Lime, the accepted current palette) as PR #83, unmerged. Per area,
+a1bd181), 25UX1 (PR #80, merge commit d45eca6), and 25OPS1 (PR #81, merge commit d0a0be8), and 25DISC1 (PR #82, merge commit 227942c, documentation only), and 25VIS1 (PR #83, merge commit 0ff9859, Electric Lime, the accepted current palette); Producto 25A-03 («Para revisar») on its branch. Per area,
 without test inventories (those are in apps/mobile/README.md and the history
 file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_REGIONS`,
 `LEDGER_CURRENCIES`): what a build offers, verified on Linux; nothing is distributed to people yet
 (§4).
 
-- **Electric Lime, the current product palette (25VIS1, PR #83, unmerged; the owner kept it after the iPhone review of
+- **«Para revisar» (25A-03, on its branch; device QA pending).** §3, «Producto 25A-03». The first screens over the
+  review store of 25A-02: `/review` lists the pending proposals oldest first, each row saying what it would record (gasto
+  or ingreso, amount and currency, merchant, category, account or card, day, source, cuotas) and what it still lacks,
+  never inventing a fact; `/review/[id]` is the authoritative surface (what Confirmar writes, where and when, the purchase
+  mode on a card, each missing field by name, a stale basis, an interrupted write, a conflict), with Confirmar (the one
+  lime action, offered only when the domain finds no gap and a current basis), Editar and Descartar (asked first);
+  `/edit-review/[id]` edits the draft in the app's own selectors, keeping the item's id, write id, source and capture,
+  at the revision it opened, and presets nothing (no kind, destination, purchase mode or instalment count). Confirmation
+  is the store's own path only (`confirmReview` → `store.confirm`, in the ledger's queue); the tray reconciles before
+  listing. Reached from Más (a «Para revisar» row first in Finanzas while something waits, always in a development build)
+  and a small neutral count on the dock's Más tab; Home and the four tabs are unchanged. Unreadable rows are counted apart,
+  never listed. No in-app producer exists yet (synthetic proposals live only in tests; 25A-04 brings the first real
+  one). Inicio's hero amount: the symbol and cents in solid graphite
+  (`heroMoneySymbol` #3A3C3F, `heroMoneyCents` #505255, `Money onField`) instead of the ink at an alpha. No schema (14),
+  backup (v14), review-schema (1), cloud or native change. The version line reads «FinanzApp 0.1.0 (25A-03)».
+- **Electric Lime, the current product palette (25VIS1, PR #83, merge commit 0ff9859; the owner kept it after the iPhone review of
   2026-10-03; the rest of its device checklist open).** Electric Lime is the selected product visual direction; it is
   not a finished public name, logo or brand identity, whose naming, trademark and confusing-similarity gate stays
   future work (brand-brief.md §3, app-store-launch.md §9.4).
@@ -252,8 +275,9 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   graphite; Próximos compromisos stays as neutral as Actividad reciente; category colours, card faces and every
   layout are unchanged; income keeps its own green, a transfer becomes a neutral slate. Two tokens added (`toggle`,
   `heroStatusBar`); no theme selector. Final polish (owner-approved 2026-10-04): Inicio's chosen `Gastado | Disponible`
-  thumb is the light surface's white with ink text in both schemes; the amount's hierarchy is unchanged on purpose.
-  Decision 005, «Enmienda 2026-10-03 — Producto 25VIS1» (accepted). The version line reads «FinanzApp 0.1.0 (25VIS1)».
+  thumb is the light surface's white with ink text in both schemes; the amount's hierarchy is unchanged on purpose
+  (its quiet tones became solid graphite in 25A-03). Decision 005, «Enmienda 2026-10-03 — Producto 25VIS1» (accepted).
+  The version line read «FinanzApp 0.1.0 (25VIS1)».
 - **Competitive capability and brand discovery (25DISC1, PR #82, merge commit 227942c; documentation only; nothing to
   check on the iPhone).** §3, «Producto 25DISC1». [competitive-landscape.md](competitive-landscape.md): ten products audited from
   their current App Store listings and official sites on 2026-10-02 and re-checked by a second reader, a capability
@@ -671,7 +695,13 @@ it was checked in). Metro from `master` (or a delivery's branch) on the installe
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
-- **25VIS1 — Electric Lime palette (PR #83, unmerged; no EAS build; owner's verdict 2026-10-03 on the iPhone, light and
+- **25A-03 — «Para revisar» (on its branch; no EAS build; nothing device-verified):** the checklist section Producto
+  25A-03: the Más row and the empty tray in a development build, light and dark; the hero amount's graphite symbol and
+  cents on Inicio's field, light and dark; VoiceOver, large text, Reduce Motion and Reduce Transparency. No producer of
+  proposals exists in the app yet and synthetic ones belong only in tests, so the pending → Editar → Confirmar /
+  Descartar flow, stale and conflicting proposals and crash reconciliation are evidenced by the automated suite and
+  join the consolidated pre-release device gate (the checklist's «Release gate»). Metro on the installed development build; no native dependency added.
+- **25VIS1 — Electric Lime palette (merged as PR #83, merge commit 0ff9859; no EAS build; owner's verdict 2026-10-03 on the iPhone, light and
   dark: keep it as the current palette, as implemented; the items below not reported one by one stay open):** the checklist section Producto
   25VIS1: the chosen `Gastado | Disponible` thumb, white with ink (2026-10-04 polish), light and dark; Inicio's lime field with ink and a dark status bar over it, light and dark; Próximos compromisos neutral like
   Actividad reciente; the graphite dock with the lime «+», with and without Reduce Transparency; the hub; a filled
@@ -696,10 +726,13 @@ item unless a section says a new native build is needed. The checklist sections 
   switching, with Reduce Motion and VoiceOver. Metro on the installed development build; no native dependency added.
 - **25A-02 — Durable local review store (merged as PR #78 and PR #79): nothing to check on the iPhone.**
 - **25A-01 — Review draft domain model (merged as PR #77): nothing to check on the iPhone.** Pure domain.
-- **24T3 — Refunds, early payoff and installment lifecycle (merged as PR #76, merge commit 399a1fa; none done; no EAS
-  build).** The owner merged #76 after targeted use and deliberately deferred the recorded pass; no item below is
-  checked. Binding (owner, 2026-10-02): 25A-01 and 25A-02 may proceed; **this targeted pass must be done before 25A-03,
-  25A-04, 25A-11 or 25A-12 merges**, since those begin to expose durable review of financial writes. The pass: the checklist section Producto 24T3: the schema 14 upgrade over the owner's data with a
+- **24T3 — Refunds, early payoff and installment lifecycle (merged as PR #76, merge commit 399a1fa; DEFERRED / RELEASE
+  BLOCKER; not performed; no EAS build).** The owner merged #76 after targeted use and deferred the recorded pass; no
+  item below is checked, and the owner confirmed on 2026-10-04 that the pass was not performed. Owner decision,
+  2026-10-04 (replacing the gate of 2026-10-02): the pass **no longer blocks development merges** of 25A-03, 25A-04,
+  later 25A slices or 25A2; it is consolidated, unchanged in its cases, into the physical-device release gate that must
+  pass **before the first external or public TestFlight candidate and before App Store submission** (the checklist's
+  «Release gate»). QA is deferred, not waived. The pass: the checklist section Producto 24T3: the schema 14 upgrade over the owner's data with a
   backup first; a cash devolución partial and full; a card purchase's devolución lowering the balance due; a plan
   devolución before and after a closing and the lowered last instalments; an over-refund refused; an adelanto with and
   without interest (both financing choices) and then Pagar tarjeta; «Dejar de seguir el plan» and «Reactivar plan»;
@@ -881,11 +914,12 @@ launch plan, documentation, plus the dock's last-row clearance found on the owne
 (merge commit d0a0be8) and changed no order; **25DISC1** (competitive capability and brand discovery,
 [competitive-landscape.md](competitive-landscape.md) and [brand-brief.md](brand-brief.md), documentation only) merged
 as PR #82 (merge commit 227942c) and changes no order either; **25VIS1** (Electric Lime, colour tokens only, «Producto
-25VIS1» below) is this PR, accepted by the owner on the iPhone as the current product palette, and changes no order (its suggested priority changes are owner decisions listed under «Producto 25DISC1»
-below, none applied); then 25A-03 (the «Para revisar» tray)
-and the rest of 25A, with no paid provider call before its own approved slice. **25A2** (Wallet Shortcut Capture) still
+25VIS1» below) merged as PR #83 (merge commit 0ff9859), accepted by the owner on the iPhone as the current product palette, and changed no order (25DISC1's suggested priority changes are owner decisions listed under «Producto 25DISC1»
+below, none applied); **25A-03** (the «Para revisar» tray, «Producto 25A-03» below) is this PR; then 25A-04 (the
+Assistant's drafts into the tray) and the rest of 25A, with no paid provider call before its own approved slice. **25A2** (Wallet Shortcut Capture) still
 follows the review-tray foundation: it may begin once 25A-03 has merged, without waiting for 25A's cloud, paid, live or
-voice slices. The targeted 24T3 device pass gates 25A-03, 25A-04, 25A-11 and 25A-12 (§2). After 25A: **25C** (with
+voice slices. The targeted 24T3 device pass was not performed and is deferred to the pre-release device gate (owner
+decision, 2026-10-04; §2): a release blocker, not a merge blocker for 25A or 25A2. After 25A: **25C** (with
 Movimientos' advanced filters), **25C2**, **25D**, **25E**, **25F** and **26**, unchanged; «Ocultar importes» stays future
 privacy work beside 25D, not scheduled.
 
@@ -1607,7 +1641,7 @@ Assistant's capability boundary and model evaluation, monetary safety).
   review item's write is frozen after an unknown outcome, as the purchase form freezes its submission, and storage refuses
   one id used as both a movement and a plan, which today `createEntry` and `createInstallmentPlan` do not cross-check);
   **25A-03** the «Para revisar» tray (Confirmar / Editar / Descartar; Editar keeps the same write id and never presets a
-  count); **25A-04** the Assistant's drafts go into the tray; **25A-11** transfer, card payment and devolución drafts;
+  count) (this PR); **25A-04** the Assistant's drafts go into the tray; **25A-11** transfer, card payment and devolución drafts;
   **25A-12** edits of an existing movement. Server lane, CI only, no paid call: literal env reads and a bundle secret scan;
   a provider port with deterministic fakes (no provider chosen by familiarity); handler order, error codes and one timeout
   budget; request contract v2 (server first); money-based cost, rate and token controls with a kill switch and a monthly
@@ -1616,9 +1650,11 @@ Assistant's capability boundary and model evaluation, monetary safety).
   staging session (the first network slice, owner setup and authorization required); the inbox consumer; **one** paid
   slice, the live provider on staging, only after the owner configures and approves it; voice last, after the text path is
   proven on the iPhone. Numbering beyond 25A-04 is indicative; each slice records its own section here.
-- **Device gate (owner, 2026-10-02).** 25A-01 and 25A-02 may proceed now. The targeted 24T3 device pass (checklist
-  section Producto 24T3, §2) must be done before 25A-03, 25A-04, 25A-11 or 25A-12 merges, because they begin to expose
-  durable review of financial writes.
+- **Device gate.** Owner, 2026-10-02: the targeted 24T3 device pass (checklist section Producto 24T3, §2) had to be done
+  before 25A-03, 25A-04, 25A-11 or 25A-12 merged. **Replaced by owner decision, 2026-10-04:** the pass was not performed
+  and is deferred to the physical-device release gate (before the first external or public TestFlight candidate and
+  before App Store submission); 25A slices and 25A2 merge on their automated evidence, and every slice's device items
+  join that release gate.
 
 ### Producto 25A2 — Wallet Shortcut Capture
 
@@ -3499,8 +3535,9 @@ nothing of it is on a screen yet.
   returns 0, an active plan with history offers three actions and a stopped one reads «Sin seguimiento» / «No se
   registra», the instalment components' figures gain the new fields with their 24T1 values unchanged.
 - **Status.** Merged as PR #76 (merge commit 399a1fa) after the owner's targeted use; the recorded device pass was
-  deliberately deferred and nothing in the checklist section Producto 24T3 is checked. It must pass before 25A-03,
-  25A-04, 25A-11 or 25A-12 merges (owner, 2026-10-02; the list in §2). No EAS build; no native dependency added;
+  deliberately deferred and nothing in the checklist section Producto 24T3 is checked; the owner confirmed on 2026-10-04
+  that it was not performed. **DEFERRED / RELEASE BLOCKER** (owner decision, 2026-10-04): no longer a merge gate for 25A
+  or 25A2; it must pass before the first external or public TestFlight candidate and before App Store submission (§2). No EAS build; no native dependency added;
   SQLite schema 14 and backup v14.
 - **Gates.** 2026-10-02, local. `apps/mobile`: typecheck OK; `node --experimental-strip-types --test tests/*.node.ts`
   1200 passed, 0 failed (real SQLite included); `i18n:check -- --strict` 0 errors, 0 stale (English lock accepted);
@@ -3937,7 +3974,7 @@ nothing of it is on a screen yet.
   nothing is implemented until the owner chooses; no shortlist name is approved and «FinanzApp» stays the working name.
 - **Open owner decisions.** Landscape §12.4, brand-brief §6 and go-to-market §12.
 - **Device QA.** Nothing to check on the iPhone.
-- **Status.** This PR; not merged.
+- **Status.** Merged as PR #82 (merge commit 227942c).
 - **Gates.** 2026-10-03, local, Linux. Root `npm test` 590 passed, 1 todo; `check:repo` OK. `apps/mobile`: `typecheck`
   OK; `test:storage` 1247 passed, 0 failed; `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0 errors,
   0 stale (no app string changed); `check` OK; `export:ios` OK. No EAS build, no iPhone, no remote migration, no
@@ -3946,7 +3983,7 @@ nothing of it is on a screen yet.
   passed, 0 failed; `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0 errors, 0 stale; `check` OK;
   `export:ios` OK. No account, handle, ad account or campaign created.
 
-### Producto 25VIS1 — Electric Lime palette, accepted as the current palette (this PR)
+### Producto 25VIS1 — Electric Lime palette, accepted as the current palette (PR #83, merged)
 
 - **Goal.** One production-quality Electric Lime colour direction on the existing product, so the owner can judge it
   on the real iPhone. Inspired by the owner's preferred Claude Design exploration, not copied from it. Started as a
@@ -3996,7 +4033,7 @@ nothing of it is on a screen yet.
 - **25OPS1 device record.** The owner's pass of 2026-10-03 is recorded in the checklist: the final content stays above
   the pill; the other 25OPS1 items were not reported and stay open.
 - **Device QA.** The checklist section «Producto 25VIS1».
-- **Status.** This PR; not merged. Follow-up commit (documentation and one code comment, no behaviour change): the
+- **Status.** Merged as PR #83 (merge commit 0ff9859, 2026-10-04). Follow-up commit (documentation and one code comment, no behaviour change): the
   owner's verdict recorded in the roadmap, mobile-design.md, decision 005, brand-brief §4.8, both READMEs and the
   checklist; the Home screen's comment corrected (the status bar is dark over the lime field in both schemes, as
   implemented). No token, component, domain, storage, schema, backup or native dependency changed.
@@ -4006,10 +4043,85 @@ nothing of it is on a screen yet.
   Final-polish commit (2026-10-04, the chosen `Gastado | Disponible` thumb only; local, Linux): root `npm test` 590
   passed, 1 todo; `check:repo` OK; `apps/mobile` `typecheck` OK, `test:storage` 1260 passed, 0 failed,
   `i18n:check -- --strict` 0 errors, 0 stale, `check` OK, `currency:verify` OK, `regions:verify` OK, `export:ios` OK.
-  The white thumb is not yet seen on the iPhone.
+  The white thumb is not yet seen on the iPhone. The amount's quiet tones were made solid graphite by 25A-03, at the
+  owner's request after the merge.
 - **Gates.** 2026-10-03, local, Linux. Root `npm test` 590 passed, 1 todo; `check:repo` OK. `apps/mobile`: `typecheck`
   OK; `test:storage` 1259 passed, 0 failed; `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0 errors,
   0 stale (no app string changed); `check` OK; `export:ios` OK. No EAS build, no iPhone run by the agent.
+
+### Producto 25A-03 — Para revisar (this PR)
+
+- **Goal.** The first UI over the durable local review store (25A-02): pending proposals the person confirms, edits or
+  discards, with every financial judgement left to the domain (25A-01) and every write to the store's one path.
+- **Scope.** Branch `feat/producto-25a-03-review-tray` from master 0ff9859 (25VIS1 merged as PR #83). The targeted 24T3
+  device pass was not performed; by owner decision (2026-10-04) it is deferred to the pre-release device gate and does
+  not block this PR (§2). New routes `app/review.tsx`, `app/review/[id].tsx` and
+  `app/edit-review/[id].tsx` (a modal); `src/ui/review-presentation.ts` (pure: `reviewFacts`, `stateTone`,
+  `editedReviewDraft`, `editorDestinations`); `loadReviewTray` in `review-database.ts`; the store opened
+  by `LedgerProvider` (`review`, `confirmReview`, `updateReview`, `dismissReview`; the store's `capture` stays for 25A-04 and 25A2, with no app producer yet); catalogue
+  `review.*` (es, en). Out of scope and untouched: cloud AI, a provider, Supabase, Wallet, Shortcuts, Dynamic Island,
+  notifications, Face ID, sync, StoreKit, EAS; no financial semantics, ledger schema (14), backup (v14) or review schema
+  (1) change.
+- **Entry point.** Más → Finanzas, a «Para revisar» row first (neutral tray tile, «2 propuestas») while a proposal waits
+  or a row cannot be read, and always in a development build; absent otherwise and while the review file is unavailable.
+  The dock's Más tab carries the pending count as a small badge (white with graphite, never lime or red; «Más, pestaña,
+  4 de 4, 2 para revisar» for VoiceOver; none at zero). No fifth tab, nothing on Inicio.
+- **Tray.** The pending items in the store's order (oldest first), each row: the kind's glyph, merchant or «Sin
+  comercio», the amount in its currency or «Sin monto», «Gasto · categoría · cuenta o tarjeta», «día · cuotas · origen»,
+  then its state: «Lista para confirmar» and «Faltan n datos» neutral (an incomplete draft is not an error), «Revisala de
+  nuevo» (stale) and «Registro sin verificar» (interrupted) amber, «Ya existe otro registro» (conflict) in the negative
+  tone. A missing fact reads «Falta completar», never a guess. Unreadable rows are one footnote («2 propuestas no se
+  pueden leer…»), never rows. One VoiceOver sentence per row with spoken amounts and dates.
+- **Detail.** What Confirmar writes («Al confirmar se registra un gasto / un gasto en la tarjeta / un ingreso / una compra
+  en 6 cuotas: cada cuota se suma al cerrar su resumen, no hoy»), the facts (Tipo, Monto, Comercio, Categoría, Cuenta or
+  Tarjeta, Pago on a card, Fecha, Origen), «Para confirmar falta» with each gap as its step, and a stale, interrupted or
+  conflict note. Confirmar (primary, lime, echoing the amount) is enabled only by `reviewFacts.canConfirm`: a writable
+  store, no conflict, and no gap and a current basis, or an interrupted write the store re-checks. Editar and Descartar
+  are secondary; a conflict offers only Descartar, and nothing with a frozen write (the store refuses both). A proposal
+  that leaves the tray because this screen confirmed or dismissed it stays drawn, actions held, while the screen pops.
+- **Confirm.** `confirmReview(id, revision on screen)` → `store.confirm` inside the ledger's queue (`mutate`), then the
+  archive and the tray are read again; the plan catch-up banner is kept as for the purchase form. The frozen write id,
+  cross-kind refusal, optimistic revision, crash reconciliation, same-id retry and receipt are the store's (25A-02); no
+  screen builds a write. A refusal (stale, incomplete, changed, conflict) re-reads the archive, is shown, and nothing navigates; a committed
+  operation whose view refresh failed is a success (the banner says to verify), never a failed confirmation.
+- **Edit.** The draft in the app's own controls: Gasto | Ingreso, the amount field, the category selector, the account
+  selector (destinations from `reviewDestinations`, in the draft's currency when it has one: never reinterpreted), the
+  merchant, the date (the category picker with `allowCreate={false}`: presets, stored definitions and categories in use
+  only, never a typed new name, which a draft could not confirm; Codex review of #84), and on an expense with an active card «Pago» («Una vez» | «En cuotas», the count 3/6/12/18/«Otra»,
+  the first statement). `Choices` now draws no thumb for a value no option holds, so nothing is preselected: no kind,
+  destination, purchase mode or count. Saved through `editedReviewDraft` (the person's fields, re-based with
+  `reviewBasis`, parsed strictly; a purchase mode dropped on an income or a cash account, never turned into cuotas) and
+  `updateReview(id, the revision the editor opened, draft)`: the id, write id, source and capture stay. No financing
+  from a draft (the purchase form records a financed purchase).
+- **Discard.** A native alert («¿Descartar esta propuesta?», «No se registra nada y no vuelve a aparecer…»), then
+  pending → dismissed; the ledger is never touched.
+- **No in-app producer (Codex review of #84).** A first iteration had a development-only «Agregar propuesta de prueba»
+  that stored a synthetic proposal in the real review file, from which it could be confirmed into the owner's
+  development ledger, against AGENTS.md rule 6. It was removed with its strings; the store's `capture` API stays for
+  25A-04 and 25A2. Until 25A-04 exists, the pending → Editar → Confirmar / Descartar states are evidenced by the
+  automated tests (real SQLite for the store and the tray, route harnesses for the screens); the iPhone can check the
+  empty tray, the navigation and the visual shell.
+- **Hero money quiet tones (25VIS1 follow-up, owner-observed).** Inicio's hero drew its symbol and cents as the ink at
+  70 % and 55 % alpha, which over the lime read olive. Two solid tokens, the same in both palettes because the field
+  stays light: `heroMoneySymbol` #3A3C3F (8.4:1 on the light field, 7.2:1 on the dark one) and `heroMoneyCents` #505255
+  (6.0:1 and 5.1:1); neutral graphite (channels within 8, blue never below green), symbol darker than cents, both below
+  `heroInk`. Only `Money onField` (Inicio's hero and its per-currency figures on the field) uses them; every other
+  `Money` is unchanged, and the digits, size, weight and layout are unchanged. The white `Gastado | Disponible` thumb is
+  untouched.
+- **Tests.** `tests/review-routes.node.ts` (28: order, rows, missing facts, tones, unreadable, unavailable, read only,
+  no in-app producer, detail, Confirm enabled and disabled, double tap, stale, conflict, interrupted, refusal, Entry versus
+  plan, Descartar, not pending, English, the editor's revision, refusal, no presets, currency, cuotas, income dropping
+  the mode, the pure derivation, one write path, a deep link's pop, an amount never rescaled to another currency); `review-store.node.ts` (+3 on real SQLite: the tray reconciles a crash
+  after the ledger write, lists oldest first with unreadable and conflicts apart and never brings back confirmed or
+  dismissed items, and only reads a newer build's file); `navigation.node.ts`, `floating-tab-bar.node.ts` and
+  `more-routes.node.ts` (the badge and the Más row); `theme.node.ts` and `typography.node.ts` (the graphite tones and
+  contrast in both palettes, `Money onField`); `spending-home.node.ts` (Inicio asks for it).
+- **Device QA.** The checklist section «Producto 25A-03».
+- **Status.** This PR; not merged.
+- **Gates.** 2026-10-04, local, Linux. Root `npm test` 590 passed, 1 todo; `check:repo` OK. `apps/mobile`: `typecheck`
+  OK; `test:storage` 1300 passed, 0 failed (real SQLite included); `currency:verify`, `regions:verify` OK;
+  `i18n:check -- --strict` 0 errors, 0 stale (English lock accepted); `check` OK; `export:ios` OK. No EAS build, no
+  iPhone run by the agent.
 
 ### Later notes recorded in 24UX6A (future; document only, not scheduled)
 
@@ -4295,7 +4407,11 @@ or marketing asset.
 - **Rules.** No submission, subscription or charge without the owner's authorisation; Apple's
   acceptance is separate from a submission; no claim of approval before it exists.
 - **Gates.** The release gate of the checklist; every open device gate above closed or
-  consciously deferred by the owner.
+  consciously deferred by the owner. **Physical-device release gate (owner decision, 2026-10-04):** before the first
+  external or public TestFlight candidate, and in any case before App Store submission, the exhaustive real-iPhone
+  regression of the accumulated high-risk native and financial flows passes: the deferred 24T3 pass with all its cases,
+  the 25A-03 review flows, and the device items of 25A-04, later 25A slices, 25A2 and the other open sections (the
+  checklist's «Release gate» lists them).
 
 ## 5. After launch
 

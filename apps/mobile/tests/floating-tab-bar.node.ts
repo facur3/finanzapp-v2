@@ -25,7 +25,7 @@ function harness(palette: typeof light = light, material: 'glass' | 'opaque' = '
   const jsx = (type: any, props: any) => ({ type, props });
   const modules: Record<string, any> = {
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
-    'react-native': { Platform: { OS: os }, StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 0.5 }, View: 'View' },
+    'react-native': { Platform: { OS: os }, StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 0.5 }, Text: 'Text', View: 'View' },
     '../i18n/provider': i18nProvider,
     './capture-hub': { CaptureAction: 'CaptureAction' },
     './components': { AppText: 'AppText', PressFeedback: 'PressFeedback' },
@@ -43,12 +43,12 @@ function harness(palette: typeof light = light, material: 'glass' | 'opaque' = '
 
 const names = ['index', 'activity', 'reports', 'settings'];
 const titles = ['Inicio', 'Movimientos', 'Reportes', 'Más'];
-function navigator(index: number, prevent = false) {
+function navigator(index: number, prevent = false, badges: Record<string, unknown> = {}) {
   const events: { type: string; target: string; canPreventDefault?: boolean }[] = [];
   const navigated: unknown[][] = [];
   const routes = names.map(name => ({ key: name + '-key', name, params: name === 'reports' ? { currency: 'USD' } : undefined }));
   const icons: unknown[] = [];
-  const descriptors = Object.fromEntries(routes.map((route, i) => [route.key, { options: { title: titles[i],
+  const descriptors = Object.fromEntries(routes.map((route, i) => [route.key, { options: { title: titles[i], tabBarBadge: badges[route.name],
     tabBarIcon: (props: unknown) => { icons.push({ name: route.name, ...(props as object) }); return { type: 'Ionicons', props }; } } }]));
   const navigation = {
     emit: (event: { type: string; target: string; canPreventDefault?: boolean }) => { events.push(event); return { defaultPrevented: prevent }; },
@@ -108,7 +108,7 @@ test('24UX6A: the tabs are icon-only to the eye; the name exists only for assist
     assert.equal(capsule.type, 'View');
     assert.equal(capsule.props.accessible, false);
     assert.equal(capsule.props.importantForAccessibility, 'no-hide-descendants', 'the glyph is decoration: the tab speaks once, through its label');
-    assert.equal(capsule.props.children.type, 'Ionicons', 'the glyph the layout supplied, inside the capsule');
+    assert.equal(childrenOf(capsule).map((child: any) => child.type).join(','), 'Ionicons', 'the glyph the layout supplied, inside the capsule (no badge without one)');
   }
 });
 
@@ -239,4 +239,27 @@ test('25UX1: the roots clear the floating dock by its exact height, inside the t
   // 25OPS1: how the roots take it (bottom padding on every platform, no native content inset) is pinned in
   // tests/dock-clearance.node.ts.
   assert.match(source, /if \(!clearance\) return \{ extraPadding: 0, indicator: undefined \}/, 'off the tabs: nothing');
+});
+
+test('25A-03: Más shows the pending count as a small neutral badge on its glyph, said after the tab\'s name; zero draws nothing', () => {
+  for (const palette of [light, dark]) {
+    const { FloatingTabBar } = harness(palette);
+    const { items } = dockOf(FloatingTabBar(navigator(0, false, { settings: 3 }).props));
+    const more = items[3].rendered;
+    assert.equal(more.props.accessibilityLabel, 'Más, pestaña, 4 de 4, 3 para revisar');
+    const [glyph, badge] = childrenOf(more.props.children);
+    assert.equal(glyph.type, 'Ionicons');
+    assert.equal(badge.type, 'View');
+    const style = Object.assign({}, ...[badge.props.style].flat());
+    assert.deepEqual([style.backgroundColor, badge.props.children.props.style[1].color], [palette.dockActiveInk, palette.dock], 'white with graphite: never lime, never red');
+    assert.notEqual(style.backgroundColor, palette.accent);
+    assert.equal(badge.props.children.props.children, 3);
+    assert.equal(badge.props.children.props.accessibilityLanguage, 'es');
+    for (const other of items.slice(0, 3)) assert.equal(childrenOf(other.rendered.props.children).length, 1, 'only the tab that carries a count');
+  }
+  const many = dockOf(harness().FloatingTabBar(navigator(0, false, { settings: 140 }).props)).items[3].rendered;
+  assert.equal(childrenOf(many.props.children)[1].props.children.props.children, '99+');
+  const none = dockOf(harness().FloatingTabBar(navigator(0, false, { settings: 0 }).props)).items[3].rendered;
+  assert.equal(childrenOf(none.props.children).length, 1);
+  assert.equal(none.props.accessibilityLabel, 'Más, pestaña, 4 de 4');
 });

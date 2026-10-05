@@ -47,6 +47,8 @@ const archive: domain.LedgerArchive = { accounts: [cash, debtAccount], records: 
 
 /** 24UX6E: what `useStacked` answers (Categorías rows) and the device hairline, a value no literal would match. */
 let stackedRows = false;
+/** 25A-03: the review store as LedgerProvider hands it; undefined (not provided) by default, as before 25A-03. */
+let reviewTray: unknown = undefined;
 const HAIRLINE = 0.33;
 /** The appearance preference the harness hands the screens (24UX6A); reset by every harness. */
 const appearanceState = { preference: 'system', system: 'light', saved: [] as string[], refuse: false };
@@ -59,7 +61,7 @@ function harness(file: string, data: domain.LedgerArchive = archive, released?: 
   const state: unknown[] = [];
   const pushed: any[] = [];
   let cursor = 0;
-  const ledger = { useLedger: () => ({ ...(gate ? { gate } : {}), archive: data, snapshot: domain.snapshotFromArchive(data) }) };
+  const ledger = { useLedger: () => ({ ...(gate ? { gate } : {}), archive: data, snapshot: domain.snapshotFromArchive(data), review: reviewTray }) };
   const names = ['ActionButton', 'AppText', 'CategoryBadge', 'DetailRow', 'EmptyState', 'ErrorMessage', 'GlyphTile', 'IconButton', 'NavigationRow', 'PressFeedback', 'Screen', 'SectionTitle', 'Surface'];
   const components = Object.fromEntries(names.map(name => [name, name]));
   // 24UX6E: Categorías wraps a name instead of cutting it when rows stack (accessibility text sizes).
@@ -147,7 +149,7 @@ test('Más groups permanent navigation into Finanzas and App y datos, with live 
   assert.equal(value('Apariencia'), 'Sistema', '24UX6A: the default follows the device');
   assert.equal(nodes(root).some(node => node.type === 'ActionButton'), false);
   const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
-  assert.match(texts, /FinanzApp 0\.1\.0 \(25VIS1\)/, 'the version line, like the About line of an iOS app');
+  assert.match(texts, /FinanzApp 0\.1\.0 \(25A-03\)/, 'the version line, like the About line of an iOS app');
   assert.match(texts, /Material opaco \(Expo Go\)/, 'a development build says which control material this session draws, so a tester can confirm the mode');
   assert.doesNotMatch(texts, /Piloto nativo|Producto 24/, '24UX5: no project vocabulary on the settings screen');
   assert.equal(value('Categorías'), 'Gastos e ingresos');
@@ -310,7 +312,7 @@ test('23.1B2 English Más: every row, count, note and the diagnostic footer are 
   for (const row of rows(root)) row.props.onPress();
   assert.equal(view.pushed.join(','), '/accounts,/cards,/budgets,/recurring,/debts,/categories,/backup,/undone-entries,/language,/region,/appearance');
   const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
-  assert.match(texts, /FinanzApp 0\.1\.0 \(25VIS1\)/);
+  assert.match(texts, /FinanzApp 0\.1\.0 \(25A-03\)/);
   assert.match(texts, /Opaque material \(Expo Go\) · Language: default/);
   assert.match(texts, /saved only on this device and work offline/);
   assert.doesNotMatch(texts, /Material opaco|Idioma|Región|sincronización/);
@@ -358,7 +360,7 @@ test('24UX5: a preview or store build shows the version and the local-storage no
   for (const locale of [null, 'en-AR'] as const) {
     const root = harness('(tabs)/settings.tsx', archive, undefined, locale, undefined, false).render();
     const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
-    assert.match(texts, /FinanzApp 0\.1\.0 \(25VIS1\)/);
+    assert.match(texts, /FinanzApp 0\.1\.0 \(25A-03\)/);
     assert.doesNotMatch(texts, /Material|material|Idioma:|Language:/, 'no material or locale diagnostics outside a development build');
     assert.match(texts, locale ? /saved only on this device/ : /se guardan solo en este dispositivo/, 'privacy and storage information stays');
   }
@@ -457,4 +459,34 @@ test('24UX6E: archived rows are not dimmed, lead with their kind, and the same p
   const english = harness('categories.tsx', { ...archive, categories: [expenseGifts, incomeGifts] }, undefined, 'en-AR').render();
   const englishRows = nodes((english.props.children as any[]).filter(Boolean).at(-1)).filter(node => node.type === 'PressFeedback');
   assert.deepEqual(englishRows.map(row => row.props.accessibilityLabel), ['Gifts, expense, Built-in · edited, archived', 'Gifts, income, Built-in · edited, archived']);
+});
+
+test('25A-03: «Para revisar» leads Finanzas with the pending count while proposals wait, opens the tray, and is absent when nothing waits in a release build', () => {
+  const item = (id: string) => ({ id, status: 'pending' });
+  try {
+    reviewTray = { writable: true, items: [item('a'), item('b')], unreadable: [], conflicts: [] };
+    for (const dev of [true, false]) {
+      const view = harness('(tabs)/settings.tsx', archive, undefined, null, undefined, dev);
+      const root = view.render();
+      const first = rows(root)[0];
+      assert.deepEqual([first.props.title, first.props.subtitle], ['Para revisar', '2 propuestas']);
+      first.props.onPress();
+      assert.deepEqual(view.pushed, ['/review']);
+      assert.equal(rows(root).slice(1).map(row => row.props.title).join(','), 'Cuentas,Tarjetas,Presupuestos,Recurrentes,Deudas y cobros,Categorías,Copia de seguridad,Movimientos deshechos,Idioma,Región,Apariencia',
+        'every other row, in the same order');
+    }
+    const english = rows(harness('(tabs)/settings.tsx', archive, undefined, 'en-US').render())[0];
+    assert.deepEqual([english.props.title, english.props.subtitle], ['To review', '2 proposals']);
+    // Nothing pending: a release build shows no row; a development build keeps it (its test proposal is added there).
+    reviewTray = { writable: true, items: [], unreadable: [], conflicts: [] };
+    assert.equal(rows(harness('(tabs)/settings.tsx', archive, undefined, null, undefined, false).render())[0].props.title, 'Cuentas');
+    assert.deepEqual([rows(harness('(tabs)/settings.tsx').render())[0].props.title, rows(harness('(tabs)/settings.tsx').render())[0].props.subtitle], ['Para revisar', 'Nada pendiente']);
+    // An unreadable row alone still brings the row (the tray says it cannot be read), never as a counted proposal.
+    reviewTray = { writable: true, items: [], unreadable: ['x'], conflicts: [] };
+    const unreadable = rows(harness('(tabs)/settings.tsx', archive, undefined, null, undefined, false).render())[0];
+    assert.deepEqual([unreadable.props.title, unreadable.props.subtitle], ['Para revisar', 'Nada pendiente']);
+    // The review file unavailable: the ledger's Más is unchanged.
+    reviewTray = 'unavailable';
+    assert.equal(rows(harness('(tabs)/settings.tsx').render())[0].props.title, 'Cuentas');
+  } finally { reviewTray = undefined; }
 });

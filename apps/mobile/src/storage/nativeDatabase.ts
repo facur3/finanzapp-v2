@@ -30,7 +30,7 @@ export async function openRatesDatabase(): Promise<RatesDatabase> {
   };
 }
 
-/** The review store (25A-02): its own file, apart from the ledger (review-database.ts). Not opened by any screen yet. */
+/** The review store (25A-02): its own file, apart from the ledger (review-database.ts). Opened by LedgerProvider since 25A-03. */
 export async function openReviewDatabase(): Promise<ReviewDatabase> {
   const connection = await openDatabaseAsync(REVIEW_DATABASE_NAME);
   const open = () => openDatabaseAsync(REVIEW_DATABASE_NAME, { useNewConnection: true });

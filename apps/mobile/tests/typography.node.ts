@@ -175,7 +175,7 @@ function loadComponents(locale: AppLocale = 'es-AR', deviceLanguage: string | nu
     '@finanzapp/domain': { formatMinorUnits: (minor: number) => (minor / 100).toLocaleString('es-AR', { minimumFractionDigits: 2 }), accountBalanceMinor: () => 0, labelFromISO: () => '',
       draftFitsCurrency: domain.draftFitsCurrency, editedDraftFits: domain.editedDraftFits },
     'expo-router': { router: {} },
-    './theme': { radius: {}, space: {}, type: { body: { fontSize: 17, lineHeight: 22 } }, useCurrentDay: () => '2026-09-20', useReduceMotion: () => true, usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', income: '#008800', transfer: '#03c', warning: '#a60' }) },
+    './theme': { radius: {}, space: {}, type: { body: { fontSize: 17, lineHeight: 22 } }, useCurrentDay: () => '2026-09-20', useReduceMotion: () => true, usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', income: '#008800', transfer: '#03c', warning: '#a60', heroInk: '#131411', heroMoneySymbol: '#3A3C3F', heroMoneyCents: '#505255' }) },
     './categories': { categoryIcon: () => 'pricetag-outline' },
     './dock-clearance': { useDockInset: () => ({ extraPadding: 0, indicator: undefined }) }, './category-color': { tintOf: (c: string) => c }, './category-hues': { useCategoryColor: () => '#111', useCategoryLook: (label: string) => ({ label, hex: '#111', glyph: 'pricetag-outline' }), useAccountLook: () => ({ glyph: 'wallet-outline', hex: '#2557D6' }) },
     './geometry': geometry, './merchant-mark': merchantMark, './money-input': moneyInput, './motion': { duration: {}, easeOut: {}, selectionHaptic: () => {}, timing: () => ({}) },
@@ -234,6 +234,21 @@ test('Money sizes a hero from its measured width and leaves rows to the native f
   assert.equal(row.props.minimumFontScale, 0.75);
   assert.equal(row.props.style.lineHeight, undefined, 'no fixed line height for the native fit');
   assert.equal(row.props.style.fontSize, 17);
+});
+
+test('25A-03: a hero on Inicio\'s field takes the solid graphite symbol and cents; size, weight and the whole units are unchanged', () => {
+  const { render } = loadComponents();
+  const field = render('Money', { minor: 123456, currency: 'ARS', large: true, size: 46, color: '#131411', onField: true }).props.children;
+  const plain = render('Money', { minor: 123456, currency: 'ARS', large: true, size: 46, color: '#131411' }).props.children;
+  const [symbol, , cents] = field.props.children.props.children;
+  assert.deepEqual([field.props.style.color, symbol.props.style.color, cents.props.style.color], ['#131411', '#3A3C3F', '#505255']);
+  assert.equal(JSON.stringify(field.props.style), JSON.stringify(plain.props.style), 'the amount\'s layout, size and weight are the same');
+  assert.deepEqual([symbol.props.style.fontWeight, cents.props.style.fontWeight], ['600', '600']);
+  // Without the flag nothing changes: another coloured hero keeps its own hue at an alpha, an ink one the canvas greys.
+  const [plainSymbol, , plainCents] = plain.props.children.props.children;
+  assert.deepEqual([plainSymbol.props.style.color, plainCents.props.style.color], ['#131411B3', '#1314118C']);
+  const canvas = render('Money', { minor: 123456, currency: 'ARS', large: true }).props.children.props.children.props.children;
+  assert.deepEqual([canvas[0].props.style.color, canvas[2].props.style.color], ['#666', '#999']);
 });
 
 test('Money in the four language × region combinations: the region writes the number and the symbol, the language speaks it', () => {

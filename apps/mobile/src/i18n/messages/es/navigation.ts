@@ -13,6 +13,9 @@ export const navigation = {
     seeAccounts: 'Ver mis cuentas',
     recordMovement: 'Registrar movimiento',
     titles: {
+      review: 'Para revisar',
+      reviewItem: 'Propuesta',
+      editReview: 'Editar propuesta',
       account: 'Cuenta',
       accounts: 'Cuentas',
       entry: 'Movimiento',

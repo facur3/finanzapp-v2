@@ -873,7 +873,9 @@ sandbox with daily renewals (§4.5). Sandbox notifications go to the staging bac
 - **Groups:** start with one internal group (the owner). An external group, if wanted, is a small invited list with
   its own "What to Test" notes; a public link is a later **OWNER DECISION**.
 - **Before the first TestFlight** (all already recorded in the roadmap and the device checklist): the checklist's
-  «Release gate»; the per-family iPhone sheet (`docs/region-families.md`); the 24C1, 24M and 24R2B sections; the
+  «Release gate», including the consolidated physical-device regression (the deferred 24T3 pass and the 25A / 25A2
+  device items; owner decision, 2026-10-04: required before the first external or public TestFlight candidate and
+  before App Store submission); the per-family iPhone sheet (`docs/region-families.md`); the 24C1, 24M and 24R2B sections; the
   privacy policy naming the exchange-rate provider (`docs/currency.md` §8.2); the encryption key in the config; every
   open device gate "closed or consciously deferred by the owner" (roadmap, «Producto 26»).
 - **Crash and performance validation:** TestFlight collects crash reports and screenshot feedback from testers. The

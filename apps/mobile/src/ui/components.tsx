@@ -415,8 +415,9 @@ function Choice({ label, spokenLabel, selected, disabled, onPress, compact = fal
  * above the black ground with a clearly brighter thumb (`thumb`), so the header
  * is quiet but its state is unmistakable, without cobalt. */
 export function Choices<T extends string>({ value, options, onChange, disabled, compact = false, onField = false, prominent = false }: {
-  /** An option's `spokenLabel` is what VoiceOver reads when its short label is not a sentence (a date written out). */
-  value: T; options: { value: T; label: string; spokenLabel?: string }[]; onChange: (value: T) => void; disabled?: boolean; compact?: boolean;
+  /** An option's `spokenLabel` is what VoiceOver reads when its short label is not a sentence (a date written out). `null`:
+   * nothing chosen yet, no thumb. */
+  value: T | null; options: { value: T; label: string; spokenLabel?: string }[]; onChange: (value: T) => void; disabled?: boolean; compact?: boolean;
   /** 24UX6A, Inicio's Gastado | Disponible on the field: a capsule track in the field's control fill, the field's
    * thumb (white with ink text since 25VIS1) for the chosen value and the field's secondary ink for the other. Same slide and haptic. */
   onField?: boolean;
@@ -427,7 +428,9 @@ export function Choices<T extends string>({ value, options, onChange, disabled, 
   const p = usePalette();
   const reduced = useReduceMotion();
   const [trackWidth, setTrackWidth] = useState(0);
-  const index = Math.max(0, options.findIndex(option => option.value === value));
+  // 25A-03: a value none of the options holds (a review draft's kind or count the person has not chosen) draws no thumb.
+  const found = options.findIndex(option => option.value === value);
+  const index = Math.max(0, found);
   const { width, offset } = segmentLayout(trackWidth, options.length, index);
   const x = useSharedValue(offset);
   const measured = useRef(false);
@@ -442,7 +445,7 @@ export function Choices<T extends string>({ value, options, onChange, disabled, 
   // The compact thumb carries a hairline edge in both themes, so the chosen segment reads as a state, not a tint.
   const thumbEdge = compact && !onField ? { borderWidth: StyleSheet.hairlineWidth, borderColor: p.isDark ? 'rgba(255,255,255,0.10)' : 'rgba(10,10,12,0.08)' } : {};
   return <View style={[styles.choices, onField && styles.choicesField, { backgroundColor: track }]} onLayout={event => setTrackWidth(event.nativeEvent.layout.width)}>
-    {width > 0 && <Animated.View pointerEvents="none" style={[styles.thumb, onField && styles.thumbField, { width, backgroundColor: thumb }, thumbEdge,
+    {width > 0 && found >= 0 && <Animated.View pointerEvents="none" style={[styles.thumb, onField && styles.thumbField, { width, backgroundColor: thumb }, thumbEdge,
       p.isDark || onField ? {} : { shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } }, thumbStyle]} />}
     {options.map(option => <Choice key={option.value} label={option.label} spokenLabel={option.spokenLabel} selected={value === option.value} compact={compact}
       onField={onField} prominent={prominent} disabled={disabled} onPress={() => { if (option.value !== value) { selectionHaptic(); onChange(option.value); } }} />)}
@@ -537,9 +540,12 @@ const AMOUNT_COLUMN = '56%';
  * measured height and collapsed long amounts to a few points. Row amounts keep
  * the native fit with a 3/4 floor and no fixed line height. Dynamic Type still
  * applies, capped so a hero cannot outgrow the screen. */
-export function Money({ minor, currency, large = false, color, signed = false, size, tone = 'neutral', weight, align = 'left' }: {
+export function Money({ minor, currency, large = false, color, signed = false, size, tone = 'neutral', weight, align = 'left', onField = false }: {
   minor: number; currency: Currency; large?: boolean; color?: string; signed?: boolean; size?: number; tone?: Tone; weight?: '500' | '600' | '700';
   align?: 'left' | 'center';
+  /** On Inicio's lime field (25A-03): a hero's symbol and cents take the field's solid graphite tones (`heroMoneySymbol`,
+   * `heroMoneyCents`) instead of the ink at an alpha. The whole units keep `color`. */
+  onField?: boolean;
 }) {
   const p = usePalette();
   const { fontScale } = useWindowDimensions();
@@ -558,7 +564,8 @@ export function Money({ minor, currency, large = false, color, signed = false, s
   // the cents step back so the whole units carry the number. Same size, same
   // baseline, one accessibility label; nested spans keep it one line.
   const parts = hero && safe ? splitAmount(text, amountFormat) : null;
-  const quiet = ink === p.text ? { symbol: p.secondary, cents: p.tertiary } : { symbol: ink + 'B3', cents: ink + '8C' };
+  const quiet = onField ? { symbol: p.heroMoneySymbol, cents: p.heroMoneyCents }
+    : ink === p.text ? { symbol: p.secondary, cents: p.tertiary } : { symbol: ink + 'B3', cents: ink + '8C' };
   const body = <Text accessibilityLabel={label} accessibilityLanguage={speechLanguage} numberOfLines={1} adjustsFontSizeToFit={!hero} minimumFontScale={0.75}
     maxFontSizeMultiplier={hero ? HERO_MAX_SCALE : ROW_MAX_SCALE}
     style={{ color: ink, fontSize, lineHeight: hero ? Math.round(fontSize * 1.18) : undefined, fontWeight: weight ?? (large ? '700' : '600'),

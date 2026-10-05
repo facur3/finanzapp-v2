@@ -493,8 +493,8 @@ draft never writes, an interrupted confirmation is reconciled from the ledger an
 through the older in-memory path (`resolveDraft` → `entryFromDraft` → `validateEntry` → `addEntry`), which defaults a
 missing currency and date, matches an account by name, cannot produce cuotas and keeps its retry id only in memory.
 It is safe today only because the Assistant is disconnected in every build and still requires Confirmar. Joining the
-two is 25A-03 (the «Para revisar» tray) and 25A-04 (the Assistant's drafts go into the tray), both gated by the 24T3
-device pass. Until 25A-04 merges, no real model may be connected. The differences to reconcile there: the wire
+two is 25A-03 (the «Para revisar» tray) and 25A-04 (the Assistant's drafts go into the tray); the deferred 24T3 device
+pass no longer gates them and is a release blocker instead (owner decision, 2026-10-04: roadmap §2). Until 25A-04 merges, no real model may be connected. The differences to reconcile there: the wire
 contract allows longer merchant and category text than `ReviewDraft`, knows only ARS and USD, and `resolveDraft`
 applies defaults that `ReviewDraft` forbids.
 
@@ -1232,7 +1232,7 @@ Nothing below is complete unless it says **EXISTS TODAY**. "Launch §n" is a sec
 | --- | --- | --- | --- |
 | Local ledger, offline core, backup and import | done | **EXISTS TODAY**; open **DEVICE QA** sections in the checklist | The pre-TestFlight device passes the roadmap lists |
 | Review-draft model and durable review store | 25A-01, 25A-02 | **EXISTS TODAY** (no screen uses the store) | 25A-03 |
-| Review tray; Assistant drafts on the one write path | 25A-03, 25A-04 | **NOT IMPLEMENTED**, **IMPLEMENTATION GATE**, **DEVICE QA** | The 24T3 device pass, then the slices |
+| Review tray; Assistant drafts on the one write path | 25A-03, 25A-04 | **NOT IMPLEMENTED**, **IMPLEMENTATION GATE**, **DEVICE QA** | The slices; their device QA and the deferred 24T3 pass join the pre-release device gate (owner decision, 2026-10-04) |
 | Data ownership rules; no mandatory account | all | **DECIDED** | — |
 | iOS backup inclusion of the ledger | 26 | **RESEARCH GATE**, **DEVICE QA** | A restore test on a second device |
 | Environment separation rules | 25A | **DECIDED**; **REMOTE SETUP**, **OWNER ACTION** | Staging and production projects created by the owner |

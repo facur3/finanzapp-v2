@@ -476,3 +476,14 @@ export async function openReviewStore(db: ReviewDatabase, ledger: LedgerDatabase
     reconcile: at => write(() => reconcileReviewItems(db, ledger, at)),
   };
 }
+
+/** Producto 25A-03: what «Para revisar» shows. A writable store reconciles first (a frozen write the ledger holds confirms
+ * its item, one it does not hold is released) so the tray never offers an item the ledger already has; then the pending
+ * items, oldest first, the unreadable rows set apart, and the ids the ledger holds with other content (`conflicts`). A
+ * read-only store (a newer build's file) is only read. */
+export interface ReviewTray { writable: boolean; items: ReviewItem[]; unreadable: string[]; conflicts: string[] }
+export async function loadReviewTray(store: ReviewStore, at: string): Promise<ReviewTray> {
+  const conflicts = store.writable ? (await store.reconcile(at)).conflicts : [];
+  const { items, unreadable } = await store.listPending();
+  return { writable: store.writable, items, unreadable, conflicts };
+}

@@ -1,6 +1,32 @@
 # Physical iPhone acceptance checklist
 
-## Producto 25VIS1 — Electric Lime palette (PR #83, unmerged; owner's palette verdict 2026-10-03: keep)
+## Producto 25A-03 — Para revisar (on its branch; nothing device-verified)
+
+Metro from this branch (`npm run start:dev-client -- --clear`) on the installed FinanzApp Dev build; JavaScript only, no
+native dependency, no EAS build, no schema (14) or backup (v14) change: the review file (`finanzapp-review-v1.sqlite`)
+already exists since 25A-02. Record the iPhone model, iOS version, theme and text size with the result.
+Rules: `app/review.tsx`, `app/review/[id].tsx`, `app/edit-review/[id].tsx`, `src/ui/review-presentation.ts`; design:
+mobile-design.md, «Producto 25A-03».
+
+**What this slice can and cannot show on the iPhone.** The app has no producer of proposals yet: 25A-04 (the
+Assistant's drafts) brings the first real one. Synthetic proposals belong only in tests (AGENTS.md rule 6), so this
+slice adds no in-app way to create one, and the pending → Editar → Confirmar / Descartar flow, a stale or conflicting
+proposal and the crash reconciliation cannot be generated safely on the physical app for this slice. Their evidence is
+the automated suite: real SQLite for the store and the tray (`tests/review-store.node.ts`) and route harnesses for the
+screens (`tests/review-routes.node.ts`). Those flows join the consolidated pre-release device gate («Release gate»,
+owner decision 2026-10-04), once 25A-04 gives the app a real producer.
+
+- [ ] **Entry (development build):** Más → Finanzas shows «Para revisar» first with «Nada pendiente»; the dock's Más tab
+  shows no badge; Inicio and the four tabs are otherwise unchanged.
+- [ ] **Empty tray, light and dark:** «Nada para revisar» with its one-line explanation; back gesture and header as any
+  pushed screen; no action button on the tray.
+- [ ] **Hero amount:** Inicio's number, light and dark: the digits ink as before; the currency symbol and the cents
+  neutral graphite (not olive), the symbol darker than the cents, both clearly readable on the lime; size and layout
+  unchanged; the white `Gastado | Disponible` thumb unchanged.
+- [ ] **Accessibility:** VoiceOver on the Más row and the empty tray; the largest Dynamic Type sizes; Reduce Motion and
+  Reduce Transparency on the dock; safe areas.
+
+## Producto 25VIS1 — Electric Lime palette (merged as PR #83, merge commit 0ff9859; owner's palette verdict 2026-10-03: keep)
 
 **Owner's palette verdict (2026-10-03, physical iPhone, FinanzApp Dev build from this branch; model, iOS version and
 text size not recorded).** The owner reviewed Electric Lime on the iPhone in light and dark and **keeps it as the current
@@ -188,12 +214,14 @@ version line at the end of Más: «FinanzApp 0.1.0 (25A-02)» on a build from th
 The review-draft domain model (`packages/domain/review-drafts.ts`) is pure domain: no screen, storage, schema or native
 change, and no EAS build.
 
-## Producto 24T3 — merged as PR #76; must pass before 25A-03, 25A-04, 25A-11 or 25A-12 merges
+## Producto 24T3 — merged as PR #76; DEFERRED / RELEASE BLOCKER (owner decision, 2026-10-04)
 
-**Gate (owner, 2026-10-02).** The owner merged PR #76 (merge commit 399a1fa) after targeted use and deliberately deferred
-this recorded pass: nothing below is checked. 25A-01 and 25A-02 may proceed; this pass must be done before 25A-03,
-25A-04, 25A-11 or 25A-12 merges, because those begin to expose durable review of financial writes (transfers,
-devoluciones, cuotas).
+**Status: not performed; deferred; release blocker.** The owner merged PR #76 (merge commit 399a1fa) after targeted use
+and deferred this recorded pass: nothing below is checked, and the owner confirmed on 2026-10-04 that the pass was not
+performed. The gate of 2026-10-02 (this pass before 25A-03, 25A-04, 25A-11 or 25A-12 merges) is **replaced by owner
+decision, 2026-10-04**: it no longer blocks development merges of 25A-03, 25A-04, later 25A slices or 25A2. Every case
+below is kept as it is and moves into the «Release gate» at the end of this file, which must pass before the first
+external or public TestFlight candidate and before App Store submission. Deferred, not waived.
 
 **Not done yet: no EAS build was made and the iPhone was not touched. Nothing below is device-verified.** This is a
 short, targeted pass for devoluciones, the adelanto de cuotas and the plan lifecycle, and the final device QA of
@@ -2533,6 +2561,16 @@ Face ID on iOS is not supported inside Expo Go; use our signed development build
 
 ## Release gate
 
+- [ ] **Consolidated physical-device regression (owner decision, 2026-10-04; release blocker).** Before the first
+  external or public TestFlight candidate, and in any case before App Store submission: an exhaustive pass on a real
+  iPhone of the accumulated high-risk native and financial flows, each in its own section above (not repeated here):
+  - Producto 24T3, every case: devoluciones (cash and card, partial and full, over-refund refused), plan devoluciones
+    before and after a closing, the adelanto de cuotas with both interest choices, «Dejar de seguir el plan» and
+    «Reactivar plan», the card archive and delete protections, undo and restore, Reportes, Movimientos and Movimientos
+    deshechos, Deudas, light and dark;
+  - Producto 25A-03 and the later 25A slices: pending proposals, Editar, Confirmar (a movement and cuotas), Descartar, a
+    stale proposal and the crash reconciliation, once 25A-04 provides a real producer;
+  - 25A2 (Wallet capture) and every other section above still open (24UX6A–25VIS1 included).
 - [ ] Repeat core checks in optimized preview/TestFlight, not just Expo Go/debug mode.
 - [ ] Test with computer turned off and network unavailable.
 - [ ] Legacy import preview and exact balances/holdings match before/after, with backup.

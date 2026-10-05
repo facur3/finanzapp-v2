@@ -24,6 +24,7 @@ import { assistant } from './assistant.ts';
 import { display } from './display.ts';
 import { onboarding } from './onboarding.ts';
 import { operations } from './operations.ts';
+import { review } from './review.ts';
 
 export const en: Messages = {
   ...common,
@@ -48,4 +49,5 @@ export const en: Messages = {
   ...display,
   ...onboarding,
   ...operations,
+  ...review,
 };

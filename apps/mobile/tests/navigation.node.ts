@@ -18,6 +18,8 @@ const source = readFileSync(new URL('../app/(tabs)/_layout.tsx', import.meta.url
 const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
 
 const pushed: unknown[] = [];
+// 25A-03: what the review store holds; a test may set it and must restore it.
+let reviewTray: unknown = { writable: true, items: [], unreadable: [], conflicts: [] };
 function renderLayout(background: string) {
   const jsx = (type: unknown, props: Record<string, unknown>) => ({ type, props });
   const Tabs = Object.assign(() => null, { Screen: 'TabScreen' });
@@ -31,6 +33,7 @@ function renderLayout(background: string) {
     '../../src/ui/floating-tab-bar': { FloatingTabBar: 'FloatingTabBar' },
     '../../src/ui/navigation': { tabHostOptions, tabScreenOptions },
     '../../src/ui/motion': { selectionHaptic: () => {} },
+    '../../src/storage/LedgerProvider': { useLedger: () => ({ review: reviewTray }) },
     '../../src/ui/theme': { usePalette: () => ({ background, primary: '#5B87FF', text: '#FFFFFF', tertiary: '#7C7C84', secondary: '#A6B0C0', surface: '#151A22', line: '#2B3544' }) },
   };
   runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
@@ -123,4 +126,19 @@ test('23.1B1: tab labels follow the language; routes and order never change', ()
     const { props } = renderLayout('#F5F6F8');
     for (const screen of props.children) assert.equal(screen.props.options.headerRight, undefined, screen.props.name);
   } finally { locale = 'es-AR'; }
+});
+
+test('25A-03: Más carries the number of readable pending proposals as its badge, and no badge at zero or when the store is unavailable', () => {
+  const badgeOf = () => renderLayout('#F5F6F8').props.children.find((screen: any) => screen.props.name === 'settings').props.options.tabBarBadge;
+  const others = () => renderLayout('#F5F6F8').props.children.filter((screen: any) => screen.props.name !== 'settings').map((screen: any) => screen.props.options.tabBarBadge);
+  try {
+    assert.equal(badgeOf(), undefined, 'nothing pending: no badge');
+    reviewTray = { writable: true, items: [{ id: 'a' }, { id: 'b' }], unreadable: ['c', 'd', 'e'], conflicts: [] };
+    assert.equal(badgeOf(), 2, 'unreadable rows are never counted as proposals');
+    assert.equal(others().every((badge: unknown) => badge === undefined), true, 'only Más carries it');
+    reviewTray = 'unavailable';
+    assert.equal(badgeOf(), undefined);
+    reviewTray = null;
+    assert.equal(badgeOf(), undefined, 'while the store opens');
+  } finally { reviewTray = { writable: true, items: [], unreadable: [], conflicts: [] }; }
 });

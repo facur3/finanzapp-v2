@@ -26,6 +26,7 @@ import { assistant } from './assistant.ts';
 import { display } from './display.ts';
 import { onboarding } from './onboarding.ts';
 import { operations } from './operations.ts';
+import { review } from './review.ts';
 
 export const es = {
   ...common,
@@ -50,4 +51,5 @@ export const es = {
   ...display,
   ...onboarding,
   ...operations,
+  ...review,
 } as const;

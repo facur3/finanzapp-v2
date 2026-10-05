@@ -15,7 +15,7 @@ declare const __DEV__: boolean | undefined;
 // Diagnostic: where this launch read the device languages. "módulo nativo" proves the build links expo-localization.
 const LOCALE_SOURCE_LABELS = { native: 'settings.localeSource.native', intl: 'settings.localeSource.intl', none: 'settings.localeSource.none' } as const;
 /** The pilot's version and the internal release name; neither is translated. */
-const VERSION = '0.1.0', RELEASE = '25VIS1';
+const VERSION = '0.1.0', RELEASE = '25A-03';
 /** 24UX5: the material and locale diagnostics are for a tester on a development build; everyone else sees the version,
  * like the About line of an iOS app. `__DEV__` is false in a preview or store bundle, so the line is compiled away. */
 const DIAGNOSTICS = typeof __DEV__ !== 'undefined' && __DEV__;
@@ -36,7 +36,7 @@ const DIAGNOSTICS = typeof __DEV__ !== 'undefined' && __DEV__;
  * neutral tiles, so the two groups align on one edge), and the local-storage note and the version as a quiet footer.
  * No row was added, removed or renamed; there is no «Ajustes» destination. */
 export default function MoreScreen() {
-  const { archive, gate = LEDGER_CURRENCIES } = useLedger();
+  const { archive, gate = LEDGER_CURRENCIES, review } = useLedger();
   const p = usePalette();
   // Which control material this session draws and why: lets a tester confirm the opaque or glass mode without guessing.
   const material = useMaterialDecision();
@@ -55,6 +55,12 @@ export default function MoreScreen() {
   // 24T3: an undone devolución or adelanto is listed (and restored) in Movimientos deshechos too, so it counts here.
   const undone = (archive?.records.filter(record => record.voided).length ?? 0) + (archive?.transfers?.filter(record => record.voided).length ?? 0)
     + (archive?.purchaseOperations?.filter(operation => operation.voided).length ?? 0);
+  // 25A-03: «Para revisar» leads Finanzas while a proposal waits or a row cannot be read (and always in a development
+  // build, so its empty tray can be opened); otherwise, or while the review file is unavailable, it is not there at all.
+  const tray = review && review !== 'unavailable' ? review : null;
+  const pendingReview = tray?.items.length ?? 0;
+  const showsReview = !!tray && (DIAGNOSTICS || pendingReview > 0 || tray.unreadable.length > 0);
+  const reviewSubtitle = pendingReview ? t('settings.rows.reviewCount', { count: pendingReview }) : t('settings.rows.reviewNone');
   const tile = (key: keyof typeof FINANCE_ROW_LOOKS) => <GlyphTile icon={FINANCE_ROW_LOOKS[key].glyph} color={appearanceHex(FINANCE_ROW_LOOKS[key].color, p)} size={34} />;
   const neutral = (icon: IconName) => <GlyphTile icon={icon} size={34} />;
 
@@ -62,6 +68,7 @@ export default function MoreScreen() {
     <View style={{ gap: 8 }}>
       <GroupLabel>{t('settings.sections.finance')}</GroupLabel>
       <Surface grouped>
+        {showsReview && <NavigationRow title={t('settings.rows.review')} subtitle={reviewSubtitle} leading={neutral('file-tray-full-outline')} onPress={() => router.push('/review')} />}
         <NavigationRow title={t('settings.rows.accounts')} subtitle={t('settings.rows.accountsSubtitle')} leading={tile('accounts')} onPress={() => router.push('/accounts')} />
         <NavigationRow title={t('settings.rows.cards')} subtitle={activeCards ? t('settings.rows.cardsCount', { count: activeCards }) : t('settings.rows.cardsSubtitle')} leading={tile('cards')} onPress={() => router.push('/cards')} />
         <NavigationRow title={t('settings.rows.budgets')} subtitle={currentBudgets ? t('settings.rows.budgetsCount', { count: currentBudgets }) : t('settings.rows.budgetsSubtitle')} leading={tile('budgets')} onPress={() => router.push('/budgets')} />
