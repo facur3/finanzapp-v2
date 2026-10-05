@@ -129,7 +129,7 @@ the repository is safer still.
   project, for a signed-in person, unexpired and not anonymous, is refused without a network call. `/auth/v1/user`
   remains the only authority (§10.2).
 - [x] **Vercel configuration** (`vercel.json`): `ignoreCommand` builds only Production deployments, so Previews are
-  skipped; one region `iad1`; `maxDuration` 60 s for `api/mobile/*.js`. Root `package.json` declares `engines.node`
+  skipped; one region `gru1` (São Paulo); `maxDuration` 60 s for `api/mobile/*.js`. Root `package.json` declares `engines.node`
   `24.x`.
 - [x] **Evaluation** (`server/mobile/evals/`):
   - `estimateExceededCount` (threshold `max: 0`), `servedModels`, `servedTiers`, token totals, `costTotalMicroUsd`,
@@ -307,16 +307,31 @@ verified session, and nothing runs without the database's own switch.
 
 ### 4.2 Region
 
-`iad1` (Washington, D.C., US East), set in `vercel.json` for both projects, with the staging Supabase project in
-**AWS us-east-1** (§6.1). The function makes three sequential calls to Supabase per request (session, reservation,
-settlement) and one to OpenAI, served from the US. Co-locating the function with the database keeps those three
-round trips short, and US East is near the provider. The person's own round trip to the US (from Argentina, roughly
-130–170 ms) happens once per request.
+**Owner decision (2026-10-05):** Vercel Functions in **`gru1` (São Paulo)**, set in `vercel.json` for both projects,
+with the staging Supabase project in the specific region **`sa-east-1` (South America, São Paulo)** (§6.1). The
+product is Argentina-first, and the choice follows three reasons:
+- **compute next to its database:** the function makes three sequential calls to Supabase per request (session,
+  reservation, settlement), so it sits in the same AWS region as the database;
+- **lower client latency for the initial Argentina market:** the person's own round trip goes to São Paulo instead of
+  the US East coast;
+- **a representative staging:** it matches the intended initial production topology, so staging's latencies mean
+  something for production.
 
-Rejected: São Paulo (`gru1` with Supabase sa-east-1) would cut the person's round trip but put every provider call on
-an international path. It is reconsidered only with staging's measured p50/p95 broken down by leg (production-plan.md
-§3.5). If the owner creates Supabase in another region, `vercel.json`'s region must change to match before B6 (a
-reviewed PR). Hobby allows exactly one region.
+The trade-off, accepted and measured in staging: the single provider call per request (OpenAI) leaves South America.
+Staging records p50/p95 broken down by leg (production-plan.md §3.5) before production confirms the topology.
+
+What this is not:
+- not a legal requirement;
+- not a data-residency claim: request content still reaches the AI provider under its own documented terms
+  (production-plan.md §5.7), and nothing about provider data residency changes.
+
+Plan check (read on Vercel's documentation, 2026-10-05):
+- `gru1` is a compute-capable Vercel region (AWS sa-east-1);
+- the Hobby plan may select any **single** region, so no plan limitation prevents it;
+- regional pricing differs by region (**OWNER CHECK** at B1, Vercel's regional pricing page).
+
+If the owner creates Supabase in another region, `vercel.json`'s region must change to match before B6, in a reviewed
+PR.
 
 ### 4.3 Project settings for `finanzapp-api-staging` (OWNER, at B6)
 
@@ -460,8 +475,8 @@ Authentication → Sign In / Providers and → Settings in the staging project. 
 
 ### 6.1 Project (OWNER, at B3)
 
-- [ ] **New project** in a new or existing organization, named `finanzapp-staging`, region **East US (North Virginia)**
-  (§4.2), Free plan acceptable for staging. A Free project pauses after a week without activity: resume it from the
+- [ ] **New project** in a new or existing organization, named `finanzapp-staging`, specific region **South America
+  (São Paulo), `sa-east-1`** (§4.2), Free plan acceptable for staging. A Free project pauses after a week without activity: resume it from the
   dashboard. Database password into the password manager.
 - [ ] It is **empty**. Never point staging at the legacy project (§2.1) or at any project with data.
 

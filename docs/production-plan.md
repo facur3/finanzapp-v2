@@ -320,14 +320,19 @@ bill. The choice turns on porting cost, plan cost and measured latency.
   new kinds: a publishable key (`MOBILE_SUPABASE_PUBLISHABLE_KEY`, `sb_publishable_…`) to verify sessions and a secret
   key (`MOBILE_SUPABASE_SECRET_KEY`, `sb_secret_…`) for the `service_role`-only functions (§4.6); a legacy JWT or a
   swapped pair closes the route. Neither exists until the owner creates the staging project (runbook B3).
-- **Region.** **EXISTS TODAY (25A-06 Phase A):** `vercel.json` sets `regions: ["iad1"]` (Washington, D.C., US East),
-  for both projects, so the function sits next to a Supabase project in **AWS us-east-1**. The function makes three
-  sequential Supabase calls per request (session, reservation, settlement) and one provider call, served from the US;
-  co-locating it with the database keeps those three round trips short, and the person's own round trip to the US
-  happens once per request. São Paulo (`gru1` with Supabase sa-east-1) is reconsidered only with staging's measured
-  p50/p95 by leg (§3.5). Hobby allows exactly one region. **OWNER ACTION:** create the staging Supabase project in
-  East US (North Virginia) (runbook §6.1); if it is created elsewhere, `vercel.json`'s region changes to match in a
-  reviewed PR before the runbook's B6.
+- **Region.** **DECIDED (owner, 2026-10-05); EXISTS TODAY in the repository (25A-06 Phase A):** `vercel.json` sets
+  `regions: ["gru1"]` (São Paulo) for both projects, next to a staging Supabase project in the specific region
+  **`sa-east-1`** (São Paulo). The reasons:
+  - the product is Argentina-first;
+  - the API compute stays next to its database (three sequential Supabase calls per request);
+  - the person's round trip is shorter for the initial Argentina market;
+  - staging represents the intended initial production topology.
+
+  The one provider call per request leaves South America; staging measures p50/p95 by leg (§3.5). This is not a legal
+  requirement and changes no data-residency claim (§5.7). `gru1` is a compute-capable Vercel region, and Hobby may
+  select any single region (Vercel's documentation, 2026-10-05). **OWNER ACTION:** create the staging Supabase project
+  in South America (São Paulo) (runbook §6.1); if it is created elsewhere, `vercel.json`'s region changes to match in
+  a reviewed PR before the runbook's B6.
 
 ### 3.5 Exit criteria: when to re-evaluate Vercel
 
@@ -694,6 +699,18 @@ without its version and id (`modelInput`). The region is sent because it is the 
 Using AI does not upload the ledger. A custom category name is the most personal thing an `explain` request carries.
 The consent screen must say exactly this. New fact kinds (budgets, cards, commitments) are added one at a time, each
 with a reason, each visible in the consent text; "send everything and let the model sort it out" is not an option.
+
+**Exact date and date-range questions (DECIDED by the owner, 2026-10-05; IMPLEMENTATION GATE of 25A-07).** A question
+scoped to an exact calendar date or range («¿Qué gasté el 20 de septiembre?») is answered from deterministic local
+evidence, before any visual calendar exists:
+1. the device resolves a typed scope (one local calendar day, or an inclusive range of them);
+2. it queries the local ledger for exactly that scope;
+3. it sends only bounded, typed, aggregated facts for it (totals and counts per currency, category totals), each with
+   its own `startISO`/`endISO`, within the caps above;
+4. the model answers only from those facts, citing them.
+
+How the scope is identified, and whether the new fact ids need a protocol version, is 25A-07's contract (roadmap
+«Producto 25A», 25A-07). The financial calendar (§10) is not needed for it.
 
 **Evidence and fact ids.** Every fact has an id. The protocol refuses a result that cites an id not in the request
 (`validateAssistantResultV2`, on the server and again on the device), requires at least one citation on an answer, and
@@ -1495,6 +1512,11 @@ Roadmap: «Producto 25C2», and «Later notes recorded in 24UX6A» (Calendar). *
 **DECIDED** (roadmap; decision 005): in Reportes or a Reportes-adjacent surface. **Not a fifth tab**, unless future
 evidence changes the decision through a decision record.
 
+**A surface, not a source (owner, 2026-10-05).** The calendar presents and navigates the ledger; the Assistant never
+depends on it. Date questions are answered from the ledger already in 25A-07 (§5.4). When the calendar exists, it and
+Movimientos' filters (25C) share the Assistant's typed scope, so an evidence action can open Movimientos filtered to an
+exact date, range, category, account or merchant, or the matching day in Reportes → Calendario where appropriate.
+
 ### 10.2 What it may show
 
 Recorded expenses and incomes; upcoming occurrences of recurring rules; instalments; card closing dates; card due
@@ -1716,7 +1738,7 @@ Nothing below is complete unless it says **EXISTS TODAY**. "Launch §n" is a sec
 | Environment separation rules | 25A | **DECIDED**; the environment identity and database binding **EXIST TODAY** in code (25A-06 Phase A); **REMOTE SETUP**, **OWNER ACTION** | Staging and production projects created by the owner (runbook B2 to B6) |
 | Production app variant and EAS profile | 26 | **NOT IMPLEMENTED**, **OWNER DECISION**, **LAUNCH BLOCKER** | The identity decision; launch §11 |
 | Vercel as the mobile API host | 25A | **DECIDED** to keep for staging; **EXISTS TODAY** | Re-evaluated only by the exit criteria of §3.5 |
-| Vercel plan and Node version; Supabase plan | 25A, 26 | `engines.node` 24.x and region `iad1` **EXIST TODAY** in the repository (25A-06 Phase A); the plans and the projects' Node setting: **OWNER ACTION**, **LAUNCH BLOCKER** for monetisation | The owner checks and authorizes the plans (runbook B1) |
+| Vercel plan and Node version; Supabase plan | 25A, 26 | `engines.node` 24.x and region `gru1` **EXIST TODAY** in the repository (25A-06 Phase A); the plans and the projects' Node setting: **OWNER ACTION**, **LAUNCH BLOCKER** for monetisation | The owner checks and authorizes the plans (runbook B1) |
 | Staging access through deployment protection | 25A | **DECIDED** for staging (25A-06 Phase A): the Production environment of `finanzapp-api-staging`; Previews unbuilt, unconfigured and closed by code; **OWNER ACTION** to create it | §2.4; runbook §4 (B6) |
 | Supabase staging and production projects | 25A, 26 | **NOT IMPLEMENTED**, **REMOTE SETUP** | Created and migrated by the owner's decision |
 | Migration files and the deployment procedure | 25A | **DECIDED** rule (AGENTS rule 3); procedure proposed; `schema.sql` is the single initial script, never applied; `verify.sql` **EXISTS TODAY** (25A-06 Phase A, run by CI only); **IMPLEMENTATION GATE** | The owner applies it to staging deliberately and `verify.sql` prints `STAGING_VERIFY_OK` (runbook B4); every later change an ordered migration |

@@ -20,7 +20,8 @@ describe('deployment configuration (vercel.json)', () => {
     expect(read('vercel.json')).not.toMatch(/MOBILE_|sb_|sk-|proj_/);
   });
   it('pins one region and a duration above the handler budget, within every plan', () => {
-    expect(config.regions).toEqual(['iad1']);
+    // São Paulo, next to the staging Supabase project in sa-east-1 (owner decision 2026-10-05, runbook §4.2).
+    expect(config.regions).toEqual(['gru1']);
     const { maxDuration } = config.functions['api/mobile/*.js'];
     const budget = Object.values(TIMEOUTS_MS).reduce((a, b) => a + b, 0) / 1000;
     expect(maxDuration).toBeGreaterThanOrEqual(Math.ceil(CLIENT_TIMEOUT_MS / 1000) + 5);

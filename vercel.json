@@ -4,7 +4,7 @@
   "buildCommand": "mkdir -p dist && printf '<!doctype html><meta charset=utf-8><title>FinanzApp</title><p>FinanzApp is a native app; this host serves only its mobile API.</p>' > dist/404.html",
   "outputDirectory": "dist",
   "ignoreCommand": "[ \"$VERCEL_ENV\" != production ]",
-  "regions": ["iad1"],
+  "regions": ["gru1"],
   "functions": {
     "api/mobile/*.js": { "maxDuration": 60 }
   }

@@ -145,8 +145,8 @@ Two Vercel projects are planned to deploy `api/mobile/*` as functions from this 
 Each project's static output holds only a plain `404.html` (Vercel refuses an empty output
 directory), so `/` and every other path answer 404 and no web page is served. `vercel.json` builds
 only Production deployments (`ignoreCommand`), so Previews are not built; the code closes them too,
-because a route runs only with Vercel's own `VERCEL_ENV=production`. One region, `iad1`, next to the
-planned staging Supabase project in us-east-1 (runbook §4.2); `maxDuration` 60 s for `api/mobile/*.js`; Node.js `24.x`
+because a route runs only with Vercel's own `VERCEL_ENV=production`. One region, `gru1` (São Paulo), next to the
+planned staging Supabase project in sa-east-1 (runbook §4.2); `maxDuration` 60 s for `api/mobile/*.js`; Node.js `24.x`
 (root `package.json`). Without the owner's configuration (`server/mobile/runtime.js` reads
 `MOBILE_ENVIRONMENT`, which must be `staging`, the only enabled environment, `MOBILE_INTEGRATIONS_ENABLED`,
 `MOBILE_SUPABASE_URL`, `MOBILE_SUPABASE_PUBLISHABLE_KEY`, `MOBILE_SUPABASE_SECRET_KEY`, and for the

@@ -7,7 +7,7 @@ off Vercel for the scripts); only `sb_publishable_…` / `sb_secret_…` Supabas
 refused) and a project-scoped OpenAI key with its project id sent as `OpenAI-Project`; a local claim precheck of the
 bearer before `/auth/v1/user`, which stays the authority (local JWKS verification evaluated, not added). The database
 bound to its environment (`mobile_ai_control.environment`; the reservation and capture functions refuse another name
-first, 503 `environment`). `vercel.json`: Previews skipped, one region `iad1`, 60 s for `api/mobile/*.js`; Node 24.x.
+first, 503 `environment`). `vercel.json`: Previews skipped, one region `gru1` (São Paulo, with Supabase sa-east-1), 60 s for `api/mobile/*.js`; Node 24.x.
 The owner's staging scripts (`server/mobile/staging/`: `verify.sql`, also run by CI, 13 planted faults caught;
 `usage-report.sql`; `probe.js`; `reconcile.js`). A live evaluation also needs staging identity, a price table at most 30
 days old and an owner-approved spend at least the run's worst case; a new threshold, `estimateExceededCount` = 0. The
@@ -295,7 +295,7 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   `schema.sql`: `mobile_ai_control.environment` (`staging` | `production`, installed `staging`); `mobile_ai_reserve` and
   `mobile_receive_capture` take the deployment's environment and answer `environment` (503) on a mismatch before
   anything else (`schema.test.sql` (o)). `vercel.json`: `ignoreCommand` builds Production deployments only, region
-  `iad1`, `maxDuration` 60 s for `api/mobile/*.js`; root `package.json` `engines.node` `24.x`. `server/mobile/staging/`:
+  `gru1` (São Paulo), `maxDuration` 60 s for `api/mobile/*.js`; root `package.json` `engines.node` `24.x`. `server/mobile/staging/`:
   `verify.sql` (the owner's self-rolling-back check, prints `STAGING_VERIFY_OK`; 13 planted faults caught),
   `usage-report.sql`, `probe.js` (`boundary`, `api [--ai-enabled]`, `race`), `reconcile.js` (the provider's Costs API
   against the usage report), `staging.test.js` (fake network only); CI's `mobile_api` job runs both SQL files after
@@ -1790,7 +1790,7 @@ Assistant's capability boundary and model evaluation, monetary safety).
       paid call, no EAS build; «Producto 25A-06» below): the fail-closed environment identity (`MOBILE_ENVIRONMENT=staging`
       with Vercel's `VERCEL_ENV=production`), the current Supabase key kinds only, a project-scoped provider key with its
       project id, the bearer claim precheck, the database's environment binding, `vercel.json` (Previews skipped,
-      `iad1`, 60 s), the owner's staging scripts (`verify.sql`, `usage-report.sql`, `probe.js`, `reconcile.js`), the
+      `gru1`, 60 s), the owner's staging scripts (`verify.sql`, `usage-report.sql`, `probe.js`, `reconcile.js`), the
       live-evaluation gates (staging identity, price freshness, an approved worst case, `estimateExceededCount` = 0),
       the runbook and decision 006.
     - **Phase B — owner-led activation** (not started; after Phase A merges; the runbook's checkpoints B1–B11): the
@@ -1819,6 +1819,25 @@ Assistant's capability boundary and model evaluation, monetary safety).
     (the contract «Producto 25A-05» pins); expanded grounded local evidence; the actual review-sheet flow from a real
     proposal on the device; the groundwork for evidence navigation into filtered Movimientos (25C's filters); later, as
     scoped, the voice and several-drafts contracts.
+    - **Exact date and date-range scope, before any visual calendar (owner, 2026-10-05; required in 25A-07).** A
+      question scoped to an exact calendar date or range («¿Qué gasté el 20 de septiembre?», «¿cuánto gasté del 1 al
+      15?») is answered from **deterministic local evidence**:
+      1. the scope is a typed value resolved and validated on the device: `{ kind: day | range, startISO, endISO }`,
+         local calendar days, inclusive. A date without a year is its most recent occurrence not after today; a
+         future date for spending is a clarification.
+      2. the device queries the local ledger for exactly that scope, with the same domain code that computes the
+         screens' figures;
+      3. the request carries only bounded, typed, aggregated evidence for that scope (totals and counts per
+         currency, never summed across currencies; category totals), each fact with its id and its own
+         `startISO`/`endISO`, within §5.4's caps of production-plan.md. Individual movements or merchants are a new
+         fact kind, added only with a reason and in the consent text;
+      4. the model answers only from that evidence, citing it. A day with no movements is an answer («no hay gastos
+         registrados»), never an invented figure.
+
+      How the scope is identified, by a local parser of the person's words or by a typed scope request from the model
+      that the device validates and executes, and whether the new fact ids need a protocol version, is decided in
+      25A-07's contract. Either way the model never computes or chooses the figures. The visual financial calendar is
+      **not** needed for this, and stays Producto 25C2.
   Then: the inbox consumer; voice last, after the text path is proven on the iPhone. Numbering beyond 25A-07 is
   indicative; each slice records its own section here.
 - **Device gate.** Owner, 2026-10-02: the targeted 24T3 device pass (checklist section Producto 24T3, §2) had to be done
@@ -4700,8 +4719,9 @@ nothing of it is on a screen yet.
 - **Vercel** (runbook §4). DECIDED: staging is the **Production** environment of a second Vercel project,
   `finanzapp-api-staging`, connected to this repository with production branch `master`; `finanzapp-v2` stays the
   planned production host and keeps no AI or Supabase variable until a production release decision. `vercel.json`:
-  `ignoreCommand` `[ "$VERCEL_ENV" != production ]` (Previews are skipped), `regions` `["iad1"]` (with Supabase in AWS
-  us-east-1; São Paulo reconsidered only with staging's measured legs), `functions` `api/mobile/*.js` `maxDuration` 60
+  `ignoreCommand` `[ "$VERCEL_ENV" != production ]` (Previews are skipped), `regions` `["gru1"]` (São Paulo, with Supabase in
+  sa-east-1: owner decision 2026-10-05, Argentina-first, compute next to its database and representative of the initial
+  production topology; not a legal requirement and no data-residency claim), `functions` `api/mobile/*.js` `maxDuration` 60
   (above the handler's 34 s budget and the app's 35 s); root `package.json` `engines.node` `24.x`. `staging.test.js`
   pins them. Variables only in the Production scope of `finanzapp-api-staging`, the secrets marked Sensitive (OWNER
   ACTION at B6, runbook §4.3–§4.4); never a variable in a Preview or Development scope of any project.
@@ -4815,6 +4835,21 @@ nothing of it is on a screen yet.
   scan, protocol v3. 25A2 and production activation are not started.
 - **Device QA.** Nothing to check on the iPhone: no app change beyond the version line, and no build points at staging.
 - **Status.** This PR; not merged. Phase B not started.
+- **Owner refinements before accepting the runbook (2026-10-05, in this PR).**
+  - **Staging region:** Vercel Functions `gru1` (São Paulo) and the staging Supabase project in the specific region
+    `sa-east-1` (São Paulo), replacing `iad1` / us-east-1. The reasons: Argentina-first, the API compute next to its
+    database, lower client latency for the initial market, and a staging representative of the intended initial
+    production topology. It is not a legal requirement, and no provider data-residency claim changes. Vercel's
+    documentation (2026-10-05) lists `gru1` as a compute region and lets the Hobby plan pick any single region, so no
+    plan limitation applies (runbook §4.2).
+  - **Date-scoped Assistant questions:** 25A-07 must answer questions about an exact date or date range from
+    deterministic local evidence, before any visual calendar («Producto 25A», 25A-07; production-plan.md §5.4). The
+    visual financial calendar stays **Producto 25C2**, a presentation and navigation surface over the ledger, not a
+    data source the Assistant depends on. 25C and 25C2 share the same typed scope for evidence actions.
+  - **Theme packs:** checked, unchanged. A **pre-launch 25F Pro candidate**: Electric Lime is the default identity,
+    included without Pro; Forest, Sapphire or other approved packs come behind the later StoreKit entitlement; each
+    passes light, dark, accessibility and semantic-colour QA («Producto 25F»; app-store-launch.md §1.2; brand-brief.md).
+    Not implemented.
 - **Gates.** 2026-10-05, local, Linux. Root `npm test` 35 files, 670 passed, 1 todo; `check:repo` OK (448 tracked
   files). `apps/mobile`: `typecheck` OK; `test:storage` 1342 passed of 1342 (real SQLite included); `currency:verify`,
   `regions:verify` OK; `i18n:check -- --strict` 0 errors, 0 stale; `check` (expo install --check) OK; `export:ios` OK and
@@ -4884,6 +4919,10 @@ nothing of it is on a screen yet.
   the detail row, indexing in `selectEntries`, the Assistant's evidence (never sent without consent) and
   its VoiceOver order.
 - **Rules.** Every write through the validators; imports are drafts; no invented balances.
+- **The Assistant's typed scope (recorded 2026-10-05, 25A-06; built with 25A-07's evidence).** Movimientos' filters
+  (exact date, date range, category, account, merchant) take the **same typed scope** the Assistant's evidence uses,
+  so an evidence action opens Movimientos filtered to exactly the cited scope. The route and the filter are built on
+  the device from the validated scope, never from a name or a date the model wrote.
 - **Gates.** Domain tests per feature; schema/backup version bumps with rollback tests; the
   import preview on the iPhone with the owner's own CSV.
 - **Depends on.** Nothing outside 24M for currencies in imported rows.
@@ -4925,6 +4964,11 @@ docs/merchant-identity.md.
   backup tests if it needs a record.
 - **Rules.** The typed name stays; the category stays the classification; no ambiguous match; a
   scheduled payment is never a movement; no connection to a merchant or a bank is implied.
+- **The calendar and the Assistant (recorded 2026-10-05, 25A-06).** The financial calendar is a presentation and
+  navigation surface over the ledger, **not a data source the Assistant depends on**: the Assistant answers date
+  questions from the ledger already in 25A-07. When the calendar exists it reads the same typed scope (25C), so an
+  Assistant evidence action for a single day may open that day in Reportes → Calendario where appropriate, and
+  Movimientos filtered to the scope otherwise.
 - **Gates.** Domain tests (matching, suggestions never applied without confirmation, the calendar
   per currency), schema and backup versions with rollback tests if any record is added, the history
   and calendar on the iPhone with VoiceOver and large text.
