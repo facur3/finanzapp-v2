@@ -53,7 +53,7 @@ export const assistant = {
       receivedIn: '¿En qué cuenta ingresó?',
       category: '¿En qué categoría lo anoto?',
       /** After the last clarification, above the completed draft card. */
-      reviewDraft: 'Revisala en Para revisar antes de registrarla.',
+      reviewDraft: 'Revisá la propuesta antes de registrarla.',
     },
     /** Rows of the numbers an answer rests on, named from the local evidence. */
     evidence: {
@@ -72,11 +72,11 @@ export const assistant = {
       category: 'Ver categoría',
       budget: 'Ver presupuesto',
     },
-    /** 25A-04: a financial proposal of the Assistant, captured into «Para revisar» and reviewed only there. */
+    /** 25A-04: a financial proposal of the Assistant, captured as a review item; reviewed in the review sheet (or later in «Para revisar»). */
     proposal: {
-      /** Eyebrow of the card: "Para revisar · Gasto". */
+      /** Eyebrow of the card: "Pendiente · Gasto". */
       eyebrow: '{status} · {kind}',
-      status: { preview: 'Vista de prueba', capturing: 'Propuesta', failed: 'Propuesta', pending: 'Para revisar', unknown: 'Para revisar', confirmed: 'Registrado' },
+      status: { preview: 'Vista de prueba', capturing: 'Propuesta', failed: 'Propuesta', pending: 'Pendiente', unknown: 'Pendiente', confirmed: 'Registrado' },
       merchant: 'Comercio',
       source: 'Origen',
       destination: 'Dónde se registra',
@@ -86,14 +86,14 @@ export const assistant = {
       missing: 'Falta completar',
       noAmount: 'Sin monto',
       preview: 'Vista de prueba: esta propuesta no se guarda ni se puede registrar.',
-      capturing: 'Guardando en Para revisar…',
-      failed: 'No se pudo guardar en Para revisar. No se registró nada.',
+      capturing: 'Guardando la propuesta…',
+      failed: 'No se pudo guardar la propuesta. No se registró nada.',
       retry: 'Reintentar',
-      ready: 'Lista para confirmar en Para revisar.',
-      incomplete: { one: 'Falta {count} dato: completalo en Para revisar.', other: 'Faltan {count} datos: completalos en Para revisar.' },
-      unknown: 'Guardada en Para revisar.',
+      ready: 'Lista para confirmar.',
+      incomplete: { one: 'Falta {count} dato para confirmar.', other: 'Faltan {count} datos para confirmar.' },
+      unknown: 'Pendiente de confirmar. También está en Para revisar.',
       review: 'Revisar',
-      confirmed: 'Registrado desde Para revisar.',
+      confirmed: 'Registrado.',
       viewEntry: 'Ver movimiento',
       viewPlan: 'Ver plan',
       dismissed: 'Propuesta descartada. No se registró nada.',

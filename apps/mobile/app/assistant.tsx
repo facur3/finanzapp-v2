@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { FlatList, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
-import { isLegacyCurrency, postingAccountsFor, type Currency, type ReviewArchive } from '@finanzapp/domain';
+import { isLegacyCurrency, postingAccountsFor, todayKey, type Currency, type ReviewArchive } from '@finanzapp/domain';
 import { assistantForBuild } from '../src/assistant/runtime';
 import { REASON_TEXT, SUGGESTIONS, classifyIntent, completeDraft, contentFromResult, optionText, shouldAutoscroll, type AssistantContent,
   type ClarificationOption, type EvidenceLink, type Message, type ProposalContent, type ResolvedContent } from '../src/assistant/conversation';
@@ -35,9 +35,11 @@ const TAB_ROOTS = new Set(['/', '/activity', '/reports', '/settings']);
  * The screen owns no financial rules and never writes the ledger. It sends text to the client boundary
  * (`assistantForBuild`, disconnected in this build) and reduces the events into the conversation model. Producto 25A-04:
  * a resolved draft becomes a proposal captured into the review store (`captureReview`, the store's capture, with an item
- * id and a write id fixed once, so a retry never makes a second item) and is then reviewed, edited, confirmed or
- * discarded in «Para revisar», the one write path (25A-02, 25A-03). Its card reads the review item, never the
- * conversation's snapshot, so a change made there is what the card shows. The fixture view captures nothing.
+ * id and a write id fixed once, so a retry never makes a second item); once it is stored, the review sheet
+ * (`/review-sheet/[id]`) is presented over the Assistant, where it is confirmed, edited or discarded through the review
+ * store's one write path (25A-02, 25A-03). Closing the sheet leaves it pending: the card's «Revisar» reopens it, and
+ * «Para revisar» keeps it as the durable inbox. The card reads the review item, never the conversation's snapshot, so an
+ * edit is what the card shows. The fixture view captures and presents nothing.
  * Questions are explained against `monthlyEvidence`, aggregated on-device;
  * the answer's rows and links come from those facts, never from prose.
  *
@@ -75,12 +77,27 @@ export default function AssistantScreen() {
   latest.current = archive;
   const toContent = useCallback((content: AssistantContent | ResolvedContent | null): AssistantContent | null => {
     if (content?.kind !== 'draft') return content;
+    // 25A-04 capture rule: an unstated date is the device's local day now, at capture (`todayKey()`), never a guess.
     return proposalContent(assistantCapture(content.draft, (latest.current ?? { accounts: [], records: [] }) as ReviewArchive,
-      { id: randomUUID(), writeId: randomUUID() }, new Date().toISOString()), preview);
+      { id: randomUUID(), writeId: randomUUID() }, new Date().toISOString(), todayKey()), preview);
   }, [preview]);
 
+  /** Whether the Assistant is the screen in front. The review sheet is presented only then, and at most one at a time: the
+   * flag drops as soon as one is presented (the blur that follows would be too late for a second capture). */
+  const focused = useRef(false);
+  useFocusEffect(useCallback(() => {
+    focused.current = true;
+    return () => { focused.current = false; };
+  }, []));
+  const present = useCallback((itemId: string) => {
+    focused.current = false;
+    router.push({ pathname: '/review-sheet/[id]', params: { id: itemId } });
+  }, []);
+
   /** Stores a proposal in the review store, from the session (so it finishes even if the screen closes). Only a proposal
-   * not yet captured is sent, always as it was frozen; a failure writes nothing anywhere and leaves Reintentar. */
+   * not yet captured is sent, always as it was frozen; a failure writes nothing anywhere and leaves Reintentar. Once the
+   * item is durably stored, and only then, the review sheet is presented over the Assistant if it is still in front; if
+   * not (the person left, or another sheet is open), the card offers «Revisar» and the item waits in «Para revisar». */
   const capture = useCallback(async (messageId: string) => {
     const message = session.getState().conversation.messages.find(item => item.id === messageId);
     if (message?.role !== 'assistant' || message.content?.kind !== 'proposal') return;
@@ -92,12 +109,13 @@ export default function AssistantScreen() {
     try {
       await captureReview({ id: frozen.id, writeId: frozen.writeId, captureKey: frozen.captureKey, draft: frozen.draft, at: frozen.at });
       dispatch({ type: 'proposal', messageId, status: 'captured' });
+      if (focused.current) present(frozen.id);
     } catch {
       dispatch({ type: 'proposal', messageId, status: 'failed' });
     } finally {
       session.capturing.delete(messageId);
     }
-  }, [session, dispatch, captureReview]);
+  }, [session, dispatch, captureReview, present]);
   /** Every proposal the thread just added that is waiting for its capture. */
   const captureNew = useCallback(() => {
     for (const message of session.getState().conversation.messages) {
@@ -208,7 +226,7 @@ export default function AssistantScreen() {
       {item.content?.kind === 'answer' && <AnswerEvidence content={item.content} onOpen={open} />}
       {item.content?.kind === 'clarification' && <ClarificationChoices options={item.content.options} chosen={item.content.chosen} onChoose={(option, shown) => choose(item.id, option, shown)} />}
       {item.content?.kind === 'proposal' && <ProposalCard content={item.content} state={proposalState(item.content)} archive={archive as ReviewArchive | null}
-        onReview={id => router.push({ pathname: '/review/[id]', params: { id } })} onRetry={() => void capture(item.id)}
+        onReview={id => router.push({ pathname: '/review-sheet/[id]', params: { id } })} onRetry={() => void capture(item.id)}
         onOpenRecord={(record, id) => router.push(record === 'plan' ? { pathname: '/installment/[id]', params: { id } } : { pathname: '/entry/[id]', params: { id } })} />}
     </View>;
   };

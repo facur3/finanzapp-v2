@@ -192,10 +192,10 @@ test('25A-04: a proposal card shows what the review item holds, says what it nee
   assert.deepEqual(labels.filter(label => label.includes(': ')), ['Comercio: Carrefour Express', 'Categoría: Supermercado', 'Dónde se registra: Visa Galicia',
     'Fecha: 21 de septiembre de 2026']);
   assert.equal(all.find(node => node.type === 'Money')!.props.minor, 1850000);
-  assert.equal(all.some(node => node.type === 'AppText' && textOf(node) === 'Para revisar · Gasto'), true);
-  assert.ok(all.some(node => node.type === 'AppText' && textOf(node) === 'Lista para confirmar en Para revisar.'));
+  assert.equal(all.some(node => node.type === 'AppText' && textOf(node) === 'Pendiente · Gasto'), true);
+  assert.ok(all.some(node => node.type === 'AppText' && textOf(node) === 'Lista para confirmar.'));
   assert.deepEqual(all.filter(node => node.type === 'ActionButton').map(node => [node.props.label, node.props.secondary]), [['Revisar', true]],
-    'one way on: the review; no Confirmar, Editar or Descartar in the chat, and no lime');
+    'one way on: the review sheet; no Confirmar, Editar or Descartar in the chat, and no lime');
   all.find(node => node.type === 'ActionButton')!.props.onPress();
   assert.deepEqual(calls, ['review:item-1']);
   assert.equal(pending.type, 'Appear');
@@ -213,10 +213,10 @@ test('25A-04: a proposal card shows what the review item holds, says what it nee
   assert.ok(onCard.some(node => node.props.accessibilityLabel === 'Pago: Una vez'));
   // Capturing, failed, preview: the snapshot, and what is happening; Reintentar only after a failure.
   const capturing = nodes(ui.render('ProposalCard', { content: proposal(reviewDraft(), 'capturing'), state: { kind: 'capturing' }, ...handlers }));
-  assert.ok(capturing.some(node => node.type === 'AppText' && textOf(node) === 'Guardando en Para revisar…'));
+  assert.ok(capturing.some(node => node.type === 'AppText' && textOf(node) === 'Guardando la propuesta…'));
   assert.equal(capturing.some(node => node.type === 'ActionButton'), false);
   const failed = nodes(ui.render('ProposalCard', { content: proposal(reviewDraft(), 'failed'), state: { kind: 'failed' }, ...handlers }));
-  assert.ok(failed.some(node => node.type === 'AppText' && textOf(node) === 'No se pudo guardar en Para revisar. No se registró nada.'));
+  assert.ok(failed.some(node => node.type === 'AppText' && textOf(node) === 'No se pudo guardar la propuesta. No se registró nada.'));
   failed.find(node => node.type === 'ActionButton' && node.props.label === 'Reintentar')!.props.onPress();
   assert.equal(calls.at(-1), 'retry');
   const preview = nodes(ui.render('ProposalCard', { content: proposal(reviewDraft(), 'preview'), state: { kind: 'preview' }, ...handlers }));
@@ -230,7 +230,7 @@ test('25A-04: a proposal card shows what the review item holds, says what it nee
   assert.equal(confirmed.some(node => node.props.accessibilityLabel === 'Comercio: Carrefour'), false);
   assert.equal(confirmed.find(node => node.type === 'Money')!.props.minor, 990000);
   assert.ok(confirmed.some(node => node.props.accessibilityLabel === 'Fecha: 19 de septiembre de 2026'));
-  assert.ok(confirmed.some(node => node.type === 'AppText' && textOf(node) === 'Registrado desde Para revisar.'));
+  assert.ok(confirmed.some(node => node.type === 'AppText' && textOf(node) === 'Registrado.'));
   assert.deepEqual(confirmed.filter(node => node.type === 'ActionButton').map(node => node.props.label), ['Ver plan']);
   confirmed.find(node => node.type === 'ActionButton')!.props.onPress();
   assert.equal(calls.at(-1), 'plan:write-1');
@@ -329,14 +329,14 @@ test('English: every word the Assistant UI says is English; account names, merch
   const labels = nodes(pending).map(node => node.props.accessibilityLabel).filter((label): label is string => typeof label === 'string');
   assert.deepEqual(labels.filter(label => label.includes(': ')), ['Merchant: Carrefour', 'Category: Groceries', 'Recorded in: Visa Galicia', 'Date: September 21, 2026']);
   assert.ok(nodes(pending).some(node => node.type === 'CategoryBadge' && node.props.category === 'Supermercado'), 'the stored category is what the badge receives');
-  assert.ok(nodes(pending).some(node => node.type === 'AppText' && textOf(node) === 'To review · Expense'));
+  assert.ok(nodes(pending).some(node => node.type === 'AppText' && textOf(node) === 'Pending · Expense'));
   assert.deepEqual(nodes(pending).filter(node => node.type === 'ActionButton').map(node => node.props.label), ['Review']);
   const custom = ui.render('ProposalCard', { content: proposal(), state: { kind: 'pending', item: itemOf(reviewDraft({ category: 'Kiosco Pepe', merchant: null, destinationId: null })), conflict: false, writable: true }, ...handlers });
   const customLabels = nodes(custom).map(node => node.props.accessibilityLabel);
   assert.ok(customLabels.includes('Category: Kiosco Pepe'), 'a custom category is the user\'s word');
   assert.ok(customLabels.includes('Merchant: Missing'));
   assert.ok(customLabels.includes('Recorded in: Missing'));
-  assert.ok(nodes(custom).some(node => node.type === 'AppText' && textOf(node) === '3 details missing: complete them in To review.'));
+  assert.ok(nodes(custom).some(node => node.type === 'AppText' && textOf(node) === '3 details missing to confirm.'));
   const income = ui.render('ProposalCard', { content: proposal(reviewDraft({ kind: 'income', merchant: 'Sueldo', category: 'Sueldo' })), state: { kind: 'confirmed', item: { ...itemOf(reviewDraft({ kind: 'income', merchant: 'Sueldo', category: 'Sueldo' })), status: 'confirmed' }, record: 'entry' }, ...handlers });
   assert.ok(nodes(income).some(node => node.props.accessibilityLabel === 'Source: Sueldo'));
   assert.ok(nodes(income).some(node => node.type === 'AppText' && textOf(node) === 'Recorded · Income'));

@@ -15,6 +15,7 @@ import * as moneyInput from '../src/ui/money-input.ts';
 import { lightPalette } from '../src/ui/palette.ts';
 import { REVIEW_ITEM_CHANGED_MESSAGE, type ReviewItem, type ReviewTray } from '../src/storage/review-database.ts';
 import { realModule } from './real-module.ts';
+import { ROW_STACK_SCALE } from '../src/ui/geometry.ts';
 import { reviewFiles } from './review-sqlite.ts';
 
 // Producto 25A-03 over the actual route modules, native hosts replaced by descriptors: the «Para revisar» tray, a
@@ -55,7 +56,7 @@ interface Ledger {
   getReviewItem?: (id: string) => Promise<ReviewItem | null>;
   refreshes?: number;
 }
-function harness(file: string, ledger: Ledger, params: Record<string, string> = {}, options: { locale?: AppLocale; dev?: boolean; canGoBack?: boolean } = {}) {
+function harness(file: string, ledger: Ledger, params: Record<string, string> = {}, options: { locale?: AppLocale; dev?: boolean; canGoBack?: boolean; fontScale?: number } = {}) {
   const source = readFileSync(new URL('../app/' + file, import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: unknown, props: Record<string, unknown>) => ({ type, props });
@@ -78,7 +79,7 @@ function harness(file: string, ledger: Ledger, params: Record<string, string> = 
   });
   const names = ['ActionButton', 'AmountField', 'AppText', 'Choices', 'DetailRow', 'EmptyState', 'ErrorMessage', 'Field', 'GlyphTile', 'IconButton', 'LifecycleNote',
     'Money', 'PressFeedback', 'Screen', 'SectionTitle', 'Surface'];
-  const components = Object.fromEntries(names.map(name => [name, name]));
+  const components: Record<string, unknown> = { ...Object.fromEntries(names.map(name => [name, name])), STACK_AT_SCALE: ROW_STACK_SCALE };
   const hues = { useCategoryLabel: (stored: string) => stored, useAccountNameOf: () => (account: domain.Account) => account.name };
   const theme = { space: { s: 8, m: 12, l: 16, xl: 24 }, usePalette: () => ({ ...lightPalette, isDark: false }) };
   const modules: Record<string, unknown> = {
@@ -99,7 +100,7 @@ function harness(file: string, ledger: Ledger, params: Record<string, string> = 
       },
     },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
-    'react-native': { View: 'View', Keyboard: { dismiss: () => {} },
+    'react-native': { View: 'View', ScrollView: 'ScrollView', Keyboard: { dismiss: () => {} }, useWindowDimensions: () => ({ fontScale: options.fontScale ?? 1, width: 393, height: 852 }),
       Alert: { alert: (title: string, detail: string, buttons: any[]) => { alerts.push({ title, detail, buttons }); } } },
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, useLocalSearchParams: () => params,
       router: { push: (to: unknown) => pushed.push(to), back: () => { nav.back += 1; }, canGoBack: () => options.canGoBack ?? true, replace: (to: unknown) => nav.replaced.push(to) } },
@@ -124,6 +125,7 @@ function harness(file: string, ledger: Ledger, params: Record<string, string> = 
     [prefix + 'src/ui/money-input']: moneyInput,
   });
   modules['../storage/LedgerProvider'] = { useLedger };
+  modules['../i18n/provider'] = i18n;
   const require = function require(name: string) {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected review dependency: ' + name);
     return modules[name];
@@ -131,6 +133,9 @@ function harness(file: string, ledger: Ledger, params: Record<string, string> = 
   // 25A-04: the real hook that finds an item in the tray or reads it from the store, over this harness's mocks.
   const reviewItemHook = realModule('src/ui/use-review-item.ts', require);
   for (const prefix of ['../', '../../']) modules[prefix + 'src/ui/use-review-item'] = reviewItemHook;
+  // 25A-04: the one Confirmar / Descartar of the detail and the review sheet, real, over the same mocks.
+  const reviewActions = realModule('src/ui/review-actions.ts', require);
+  for (const prefix of ['../', '../../']) modules[prefix + 'src/ui/review-actions'] = reviewActions;
   const module = { exports: {} as { default?: () => Node } };
   runInNewContext(code, { module, exports: module.exports, Error, Date, Promise, __DEV__: options.dev ?? false, require });
   return { render: () => { cursor = 0; refCursor = 0; effectCursor = 0; return module.exports.default!(); }, pushed, alerts, nav };
@@ -143,7 +148,8 @@ function nodes(value: any): Node[] {
   if (typeof value.type === 'function') value.rendered ??= value.type(value.props);
   return [value, ...(typeof value.type === 'function' ? nodes(value.rendered) : []), ...nodes(value.props.children)];
 }
-const all = (root: Node, type: string) => nodes(root).filter(node => node.type === type);
+// A local component that wraps its children (the sheet's body) is met twice, through its props and its render: count each once.
+const all = (root: Node, type: string) => [...new Set(nodes(root).filter(node => node.type === type))];
 const text = (node: Node): string => ([] as unknown[]).concat(node.props.children).filter(part => typeof part === 'string' || typeof part === 'number').join('');
 const texts = (root: Node) => all(root, 'AppText').map(text);
 const button = (root: Node, label: string) => all(root, 'ActionButton').find(node => node.props.label.startsWith(label));
@@ -618,5 +624,142 @@ test('25A-04 (Codex review of #85): a capture that committed while the tray coul
     confirm.props.onPress();
     await settle();
     assert.deepEqual(await files.entries(), ['write-x']);
+  } finally { await files.dispose(); }
+});
+
+// ---- 25A-04: the review sheet ------------------------------------------------------------------------------------------
+
+test('the review sheet shows the live item compactly, and Confirmar (the one lime action) calls the same dispatcher once, at the shown revision', async () => {
+  const item = itemOf(drafted({ destinationId: cardAccount.id, purchase: { mode: 'once' } }), { revision: 2 });
+  const ledger: Ledger = { review: trayOf([item]), calls: [] };
+  const view = harness('review-sheet/[id].tsx', ledger, { id: item.id });
+  let root = view.render();
+  assert.equal(all(root, 'Screen').length, 0, 'a sheet, not a full screen');
+  assert.equal(texts(root)[0], 'Confirmá el gasto');
+  assert.deepEqual([all(root, 'Money')[0].props.minor, all(root, 'Money')[0].props.currency], [1500000, 'ARS']);
+  const rows = Object.fromEntries(all(root, 'DetailRow').map(row => [row.props.label, row.props.value]));
+  assert.deepEqual(rows, { Categoría: 'Supermercado', Tarjeta: 'Visa', Pago: 'Una vez', Fecha: i18nFormat.formatDate(today, 'dayYear', 'es-AR') });
+  const confirm = button(root, 'Confirmar')!;
+  assert.deepEqual([confirm.props.label, confirm.props.spokenLabel, confirm.props.secondary, confirm.props.disabled], ['Confirmar · $ 15.000,00', 'Confirmar, 15000,00 pesos', undefined, false]);
+  assert.equal(button(root, 'Editar')!.props.secondary, true);
+  assert.ok(texts(root).includes('Si la cerrás, queda pendiente en Para revisar.'));
+  confirm.props.onPress();
+  confirm.props.onPress();
+  await settle();
+  assert.deepEqual(ledger.calls, [['confirm', item.id, 2]], 'one call, through the provider\'s confirmReview, at the revision on screen');
+  assert.equal(view.nav.back, 1, 'the sheet closes after the success');
+  root = view.render();
+  assert.equal(all(root, 'EmptyState').length, 0);
+});
+
+test('closing the review sheet (its close button, a swipe, back) is not discarding: nothing reaches the store, the item stays pending', () => {
+  const item = itemOf(drafted());
+  const ledger: Ledger = { review: trayOf([item]), calls: [] };
+  const view = harness('review-sheet/[id].tsx', ledger, { id: item.id });
+  const close = all(view.render(), 'IconButton')[0];
+  assert.deepEqual([close.props.name, close.props.label], ['close', 'Ahora no']);
+  close.props.onPress();
+  assert.deepEqual([view.nav.back, ledger.calls.length, view.alerts.length], [1, 0, 0]);
+  // A swipe down or the back gesture is the native dismissal: the route has no dismissal handler that could write.
+  const source = readFileSync(new URL('../app/review-sheet/[id].tsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /beforeRemove|onDismiss|usePreventRemove|dismissReview|addListener/);
+  const layout = readFileSync(new URL('../app/_layout.tsx', import.meta.url), 'utf8');
+  assert.match(layout, /<Stack\.Screen name="review-sheet\/\[id\]" options=\{\{[^}]*presentation: 'formSheet', headerShown: false,\s*sheetGrabberVisible: true, sheetAllowedDetents: fontScale >= STACK_AT_SCALE \? \[1\] : 'fitToContents'/);
+  // With nothing under it (a link), closing goes to the tray instead.
+  const linked = harness('review-sheet/[id].tsx', { review: trayOf([item]), calls: [] }, { id: item.id }, { canGoBack: false });
+  all(linked.render(), 'IconButton')[0].props.onPress();
+  assert.equal(JSON.stringify(linked.nav.replaced), '["/review"]');
+});
+
+test('Descartar in the sheet is explicit and asks first; only the destructive answer dismisses, and never touches the ledger', async () => {
+  const item = itemOf(drafted(), { revision: 1 });
+  const ledger: Ledger = { review: trayOf([item]), calls: [] };
+  const view = harness('review-sheet/[id].tsx', ledger, { id: item.id });
+  const discard = all(view.render(), 'PressFeedback').find(node => node.props.accessibilityLabel === 'Descartar propuesta')!;
+  discard.props.onPress();
+  const [alert] = view.alerts;
+  assert.equal(alert.title, '¿Descartar esta propuesta?');
+  alert.buttons[0].onPress?.();
+  assert.equal(ledger.calls.length, 0);
+  alert.buttons[1].onPress!();
+  await settle();
+  assert.deepEqual(ledger.calls, [['dismiss', item.id, 1]]);
+  assert.equal(view.nav.back, 1);
+});
+
+test('Editar in the sheet opens the review editor over it, and the sheet then shows the saved, edited item', () => {
+  const item = itemOf(drafted());
+  const ledger: Ledger = { review: trayOf([item]), calls: [] };
+  const view = harness('review-sheet/[id].tsx', ledger, { id: item.id });
+  button(view.render(), 'Editar')!.props.onPress();
+  assert.equal(JSON.stringify(view.pushed), JSON.stringify([{ pathname: '/edit-review/[id]', params: { id: item.id } }]));
+  // The editor saves through the store; the tray is read again; the sheet under it draws the stored item.
+  ledger.review = trayOf([{ ...item, revision: 1, draft: { ...item.draft, merchant: 'Coto Palermo', amountMinor: 990000 } }]);
+  const root = view.render();
+  assert.equal(texts(root).includes('Coto Palermo'), true);
+  assert.equal(all(root, 'Money')[0].props.minor, 990000);
+  button(root, 'Confirmar')!.props.onPress();
+  assert.deepEqual(ledger.calls, [['confirm', item.id, 1]], 'the edited revision');
+});
+
+test('the sheet cannot bypass the domain: an incomplete, stale or conflicting item never offers an enabled Confirmar', () => {
+  const incomplete = itemOf(drafted({ category: null, dateISO: null }));
+  let root = harness('review-sheet/[id].tsx', { review: trayOf([incomplete]), calls: [] }, { id: incomplete.id }).render();
+  assert.equal(button(root, 'Confirmar')!.props.disabled, true);
+  assert.equal(JSON.stringify(all(root, 'LifecycleNote').map(note => [note.props.detail, note.props.tone ?? 'neutral'])),
+    JSON.stringify([['Elegí una categoría que ya uses.', 'neutral'], ['Elegí una fecha de hoy o anterior.', 'neutral']]));
+  assert.deepEqual(Object.fromEntries(all(root, 'DetailRow').map(row => [row.props.label, row.props.value])).Fecha, 'Falta completar');
+  const stale = itemOf({ ...drafted(), basis: [{ kind: 'account', id: bank.id, revision: 7 }] });
+  root = harness('review-sheet/[id].tsx', { review: trayOf([stale]), calls: [] }, { id: stale.id }).render();
+  assert.equal(button(root, 'Confirmar')!.props.disabled, true);
+  assert.ok(all(root, 'LifecycleNote').some(note => note.props.icon === 'refresh-outline' && note.props.tone === 'warning'));
+  const conflict = itemOf(drafted());
+  root = harness('review-sheet/[id].tsx', { review: trayOf([conflict], { conflicts: [conflict.id] }), calls: [] }, { id: conflict.id }).render();
+  assert.equal(button(root, 'Confirmar'), undefined);
+  assert.equal(button(root, 'Editar'), undefined);
+  assert.ok(all(root, 'PressFeedback').some(node => node.props.accessibilityLabel === 'Descartar propuesta'), 'dismissable while no write is frozen');
+  const readOnly = itemOf(drafted());
+  root = harness('review-sheet/[id].tsx', { review: trayOf([readOnly], { writable: false }), calls: [] }, { id: readOnly.id }).render();
+  assert.equal(all(root, 'ActionButton').length + all(root, 'PressFeedback').length, 0);
+});
+
+test('the sheet at accessibility text sizes scrolls (the large detent); an item no longer pending says so; English', async () => {
+  const item = itemOf(drafted());
+  const body = (root: Node) => nodes(root).find(node => node.type === 'ScrollView' || node.type === 'View')!.type;
+  assert.equal(body(harness('review-sheet/[id].tsx', { review: trayOf([item]), calls: [] }, { id: item.id }, { fontScale: 1.6 }).render()), 'ScrollView');
+  assert.equal(body(harness('review-sheet/[id].tsx', { review: trayOf([item]), calls: [] }, { id: item.id }).render()), 'View');
+  const gone = harness('review-sheet/[id].tsx', { review: trayOf([]), calls: [] }, { id: 'gone' });
+  gone.render();
+  await settle();
+  assert.equal(all(gone.render(), 'EmptyState')[0].props.title, 'Esta propuesta ya no está pendiente');
+  const english = harness('review-sheet/[id].tsx', { review: trayOf([itemOf(drafted({ kind: 'income', category: 'Sueldo' }))]), calls: [] }, { id: `item-${sequence}` }, { locale: 'en-US' }).render();
+  assert.equal(texts(english)[0], 'Confirm the income');
+  assert.equal(all(english, 'IconButton')[0].props.label, 'Not now');
+  assert.ok(texts(english).includes('If you close it, it stays pending in To review.'));
+});
+
+test('on real SQLite: a captured item opened in the sheet, edited and confirmed, writes exactly once; closing first keeps it pending', async () => {
+  const files = await reviewFiles([bank]);
+  try {
+    const { item } = await files.store.capture({ id: 'item-s', writeId: 'write-s', captureKey: 'assistant:item-s', draft: drafted(), at: createdAt });
+    let tray = await files.tray();
+    const ledger: Ledger = { review: tray, calls: [] };
+    // Close for later: nothing changes in the store.
+    const first = harness('review-sheet/[id].tsx', ledger, { id: item.id });
+    all(first.render(), 'IconButton')[0].props.onPress();
+    tray = await files.tray();
+    assert.deepEqual([tray.items.map(row => row.id), (await files.store.get(item.id))!.status], [['item-s'], 'pending']);
+    // Reopened: edited, then confirmed through the store.
+    const edited = await files.store.updateDraft(item.id, 0, { ...item.draft, merchant: 'Coto Express' }, createdAt);
+    const live: Ledger = { review: await files.tray(), calls: [] };
+    live.confirmResult = async () => ({ recorded: (await files.store.confirm(item.id, { expectedRevision: edited.revision, todayISO: today, at: createdAt })).recorded });
+    const sheet = harness('review-sheet/[id].tsx', live, { id: item.id });
+    assert.ok(texts(sheet.render()).includes('Coto Express'));
+    const confirm = button(sheet.render(), 'Confirmar')!;
+    confirm.props.onPress();
+    confirm.props.onPress();
+    await settle();
+    assert.deepEqual(await files.entries(), ['write-s']);
+    assert.deepEqual([(await files.store.get(item.id))!.status, (await files.store.get(item.id))!.draft.merchant], ['confirmed', 'Coto Express']);
   } finally { await files.dispose(); }
 });

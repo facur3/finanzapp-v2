@@ -1,13 +1,13 @@
-import { useRef, useState, type MutableRefObject } from 'react';
-import { Alert, View } from 'react-native';
+import { useRef, type MutableRefObject } from 'react';
+import { View } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import { todayKey, type ReviewArchive } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import type { ReviewItem } from '../../src/storage/review-database';
 import { ActionButton, AppText, DetailRow, EmptyState, ErrorMessage, LifecycleNote, Money, Screen, SectionTitle, Surface } from '../../src/ui/components';
 import { useAccountNameOf, useCategoryLabel } from '../../src/ui/category-hues';
 import { reviewFacts, stateTone, type ReviewFacts } from '../../src/ui/review-presentation';
+import { useReviewActions } from '../../src/ui/review-actions';
 import { useReviewItem } from '../../src/ui/use-review-item';
 import { space, usePalette } from '../../src/ui/theme';
 import { useI18n } from '../../src/i18n/provider';
@@ -33,57 +33,21 @@ export default function ReviewItemScreen() {
   return <ReviewDetail item={shown} leaving={leaving} reload={reload} />;
 }
 
-/** The shape of a store call `run` takes (an async step). */
-const idle = async () => {};
-
 function ReviewDetail({ item, leaving, reload }: { item: ReviewItem; leaving: MutableRefObject<boolean>; reload: () => void }) {
-  const { archive, review, confirmReview, dismissReview } = useLedger();
+  const { archive, review } = useLedger();
   const p = usePalette();
   const { t, formatDate, spokenMoney, moneyText } = useI18n();
   const nameOf = useAccountNameOf();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const working = useRef(false);
+  // Opened from a link with nothing under it, the tray replaces it instead.
+  const leave = () => { if (router.canGoBack()) router.back(); else router.replace('/review'); };
+  // 25A-04: the same Confirmar and Descartar as the review sheet (src/ui/review-actions.ts).
+  const { busy, error, confirm, dismiss } = useReviewActions(item, { leaving, reload, leave });
   const tray = review && review !== 'unavailable' ? review : null;
   const facts: ReviewFacts | null = archive && tray ? reviewFacts(item, archive as ReviewArchive, { todayISO: todayKey(), writable: tray.writable, conflicts: tray.conflicts }) : null;
   const categoryLabel = useCategoryLabel(item.draft.category ?? '', item.draft.kind ?? 'expense');
   if (!facts || !tray) return <Screen>{null}</Screen>;
   const missing = t('review.missing');
   const conflict = facts.state === 'conflict';
-
-  /** One store call at a time; the revision is the one on screen, so a proposal that changed since is refused, never overwritten. */
-  async function run(work: typeof idle) {
-    if (working.current) return;
-    working.current = true;
-    leaving.current = true;
-    setBusy(true);
-    setError(null);
-    try { await work(); } catch (cause) {
-      leaving.current = false;
-      reload(); // A refused change re-reads the item, so the next tap acts on what is stored now.
-      setError(cause instanceof Error ? cause.message : 'review.unavailable');
-    } finally {
-      // Done: the screen is popping and its actions stay held. Refused: everything is offered again.
-      if (!leaving.current) { working.current = false; setBusy(false); }
-    }
-  }
-  // Opened from a link with nothing under it, the tray replaces it instead.
-  const leave = () => { if (router.canGoBack()) router.back(); else router.replace('/review'); };
-  const confirm = () => run(async () => {
-    await confirmReview(item.id, item.revision);
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    leave();
-  });
-  const dismiss = () => {
-    if (working.current) return;
-    Alert.alert(t('review.detail.dismissQuestion'), t('review.detail.dismissDetail'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      { text: t('review.detail.dismiss'), style: 'destructive', onPress: () => void run(async () => {
-        await dismissReview(item.id, item.revision);
-        leave();
-      }) },
-    ], { cancelable: true });
-  };
 
   const kindTitle = t(facts.kind === null ? 'review.kind.unknown' : `review.kind.${facts.kind}`);
   const plan = facts.purchase?.mode === 'installments' ? facts.purchase : null;

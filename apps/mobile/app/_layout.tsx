@@ -1,6 +1,6 @@
 import 'react-native-gesture-handler';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, View, useWindowDimensions } from 'react-native';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
@@ -14,7 +14,7 @@ import { LedgerProvider, useLedger } from '../src/storage/LedgerProvider';
 import { CategoryHuesProvider } from '../src/ui/category-hues';
 import { DisplayCurrencyProvider } from '../src/ui/display-currency-provider';
 import { RatesProvider } from '../src/fx/rates-provider';
-import { ActionButton, AppText, ErrorMessage } from '../src/ui/components';
+import { ActionButton, AppText, ErrorMessage, STACK_AT_SCALE } from '../src/ui/components';
 import { UIProvider, themePreferenceStore, usePalette, useReduceMotion } from '../src/ui/theme';
 import { HeldCurrenciesProvider, I18nProvider, useI18n } from '../src/i18n/provider';
 import { defaultPreferenceStore } from '../src/i18n/preference';
@@ -46,6 +46,8 @@ function Navigation() {
   const [fontsLoaded, fontError] = useFonts(Ionicons.font);
   const p = usePalette();
   const reduced = useReduceMotion();
+  // 25A-04: the review sheet fits its content; at accessibility text sizes it opens at the large detent and scrolls.
+  const { fontScale } = useWindowDimensions();
   // Headers read the catalogue here, so a language change re-titles every screen in place without touching the stack.
   const { t, speechLanguage } = useI18n();
   useEffect(() => {
@@ -143,6 +145,10 @@ function Navigation() {
       <Stack.Screen name="review" options={{ title: t('nav.titles.review') }} />
       <Stack.Screen name="review/[id]" options={{ title: t('nav.titles.reviewItem') }} />
       <Stack.Screen name="edit-review/[id]" options={{ title: t('nav.titles.editReview'), presentation: 'modal' }} />
+      {/* 25A-04: the review sheet a producer presents over itself (the Assistant, right after a capture): a native form sheet,
+          fitted to its content, with a grabber. A swipe down only closes it: the item stays pending. */}
+      <Stack.Screen name="review-sheet/[id]" options={{ title: t('nav.titles.reviewItem'), presentation: 'formSheet', headerShown: false,
+        sheetGrabberVisible: true, sheetAllowedDetents: fontScale >= STACK_AT_SCALE ? [1] : 'fitToContents', contentStyle: { backgroundColor: p.background } }} />
     </Stack>
   </View></ThemeProvider>;
 }

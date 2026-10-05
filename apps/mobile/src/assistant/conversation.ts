@@ -44,6 +44,9 @@ export type ResolvedDraft = {
    * (`reviewDraftFromAssistant`): neither is ever invented in what is captured. Absent means stated. */
   currencyStated?: boolean;
   dateStated?: boolean;
+  /** 25A-04: whether the person named the account (matched by name) or chose it in a clarification, rather than it being
+   * the one account of the screen's currency that fits. Only a stated destination lends its currency to an unstated one. */
+  destinationStated?: boolean;
 };
 
 export type DraftField = 'kind' | 'amount' | 'paymentMethod' | 'category';
@@ -243,11 +246,12 @@ export function resolveDraft(draft: CaptureDraft, accounts: Account[], entries: 
   const eligible = (draft.kind === 'income' ? incomeAccounts : accounts).filter(account => account.currency === resolvedCurrency);
   const named = draft.paymentMethodRef ? eligible.filter(account => fold(account.name).includes(fold(draft.paymentMethodRef!)) || fold(draft.paymentMethodRef!).includes(fold(account.name))) : [];
   const accountId = named.length === 1 ? named[0].id : eligible.length === 1 ? eligible[0].id : null;
+  const destinationStated = named.length === 1;
   if (!accountId) return { kind: 'clarification', field: 'paymentMethod', question: draft.kind === 'expense' ? 'assistant.clarify.paidWith' : 'assistant.clarify.receivedIn',
     options: eligible.map(account => ({ id: account.id, label: account.name })), partial: { ...partial, accountId: null } };
-  if (!draft.category) return { kind: 'clarification', field: 'category', question: 'assistant.clarify.category', options: categoryOptions(entries, draft.kind), partial: { ...partial, accountId } };
+  if (!draft.category) return { kind: 'clarification', field: 'category', question: 'assistant.clarify.category', options: categoryOptions(entries, draft.kind), partial: { ...partial, accountId, destinationStated } };
   return { kind: 'draft', draft: { kind: draft.kind, amountMinor: draft.amountMinor, currency: resolvedCurrency, merchant: draft.merchant ?? '',
-    category: draft.category, dateISO: draft.dateISO ?? todayISO, accountId, ...stated } };
+    category: draft.category, dateISO: draft.dateISO ?? todayISO, accountId, ...stated, destinationStated } };
 }
 
 /** Apply a chosen option to a parked draft. Returns the next turn: another clarification (still parked) or the draft. */
@@ -264,7 +268,10 @@ export function completeDraft(pending: { draft: Partial<ResolvedDraft>; field: D
   const chosen = (pool: Account[]) => draft.accountId ? pool.filter(account => account.id === draft.accountId) : pool;
   const next = resolveDraft(capture, chosen(accounts), entries, currency, todayISO, chosen(incomeAccounts));
   // What the model stated is carried from the first turn: the re-resolution above always passes a currency and a date.
-  const stated = { currencyStated: pending.draft.currencyStated ?? true, dateStated: pending.draft.dateStated ?? true };
+  // An account chosen now, or named or chosen in an earlier turn, is a stated destination; the one account left by the
+  // filter above is not.
+  const stated = { currencyStated: pending.draft.currencyStated ?? true, dateStated: pending.draft.dateStated ?? true,
+    destinationStated: pending.field === 'paymentMethod' || (pending.draft.destinationStated ?? false) };
   if (next.kind === 'draft') return { textKey: 'assistant.clarify.reviewDraft', pending: null,
     content: { kind: 'draft', draft: { ...next.draft, accountId: draft.accountId ?? next.draft.accountId, ...stated } } };
   return { textKey: next.question, content: { kind: 'clarification', field: next.field, options: next.options, chosen: null },

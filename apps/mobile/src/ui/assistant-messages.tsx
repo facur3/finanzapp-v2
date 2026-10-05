@@ -182,11 +182,12 @@ export type ProposalState =
   /** The recorded item itself: the card draws what was confirmed (edits made in «Para revisar» included). */
   | { kind: 'confirmed'; item: ReviewItem; record: 'entry' | 'plan' };
 
-/** A financial proposal of the Assistant (25A-04). It is never confirmed here: once captured it is a review item, and the
- * card reads that item (an edit made in «Para revisar» is what it shows) and leads to it with «Revisar», the one place
- * where it is confirmed, edited or discarded. Before the capture lands it shows the frozen snapshot and says so; a
- * failed capture offers Reintentar (the same capture again); a confirmed or discarded proposal says what happened and
- * offers nothing that could write it again. The fixture view shows the card and says nothing is saved. */
+/** A financial proposal of the Assistant (25A-04), compact: it is never confirmed in the card. Once captured it is a
+ * review item: the card reads that item (an edit made in the review sheet or «Para revisar» is what it shows) and, while
+ * it is pending (the review sheet was closed for later), offers «Revisar», which reopens the review sheet. Before the
+ * capture lands it shows the frozen snapshot and says so; a failed capture offers Reintentar (the same capture again); a
+ * confirmed proposal shows the stored values with «Registrado» and the link to the record; a discarded one, one line.
+ * Nothing in it can write. The fixture view shows the card and says nothing is saved. */
 export function ProposalCard({ content, state, archive, onReview, onRetry, onOpenRecord }: {
   content: ProposalContent; state: ProposalState; archive: ReviewArchive | null; onReview: (itemId: string) => void; onRetry: () => void;
   onOpenRecord: (record: 'entry' | 'plan', writeId: string) => void;

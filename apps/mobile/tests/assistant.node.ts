@@ -316,7 +316,7 @@ test('English: the app\'s own words translate, the model\'s words, the user\'s d
   assert.equal(draft.textKey, undefined);
   const asked = contentFromResult(FIXTURE_DRAFT_NO_ACCOUNT, [], [visa, cash], entries, 'ARS', today);
   assert.equal(en(asked.textKey!), 'What did you pay with?');
-  assert.equal(en(completeDraft(asked.pending!, 'cash', [visa, cash], entries, today).textKey), 'Review it in To review before recording it.');
+  assert.equal(en(completeDraft(asked.pending!, 'cash', [visa, cash], entries, today).textKey), 'Review the proposal before recording it.');
   const english = bindLocale('en-AR');
   assert.equal(english.errorText('assistant.reasons.offline'), 'No connection. Your transactions didn’t change; you can retry.');
   // The draft a proposal is made of does not depend on the language.
