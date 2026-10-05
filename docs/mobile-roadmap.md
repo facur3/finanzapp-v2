@@ -1741,7 +1741,9 @@ Assistant's capability boundary and model evaluation, monetary safety).
     of capacity tripped on purpose; alerts and the reconciliation against the provider's cost report; the real
     evaluation of the Luna candidate with `node server/mobile/evals/run.js --live` (`MOBILE_AI_EVAL_LIVE=1` and a valid
     server AI configuration), recorded against the thresholds written in 25A-05, with measured latency and cost; a
-    more expensive model only if Luna fails a required threshold. The staging session and sign-in, the cloud
+    more expensive model only if Luna fails a required threshold. Provider billing per production-plan.md §6.6 (staging:
+  auto-recharge off, a tiny prepaid balance and a hard cap). A **repeat focused security audit** once real staging auth,
+  secrets and the provider integration exist (production-plan.md §14.1). The staging session and sign-in, the cloud
     consent screen and the failure states on a real connection are scoped with it or right after (owner decision on the sign-in method, production-plan.md §12).
   - **25A-07 — Real Assistant product contract and polish:** real conversational clarifications before the review sheet
     (the contract «Producto 25A-05» pins); expanded grounded local evidence; the actual review-sheet flow from a real
@@ -1758,7 +1760,8 @@ Assistant's capability boundary and model evaluation, monetary safety).
 ### Producto 25A2 — Wallet Shortcut Capture
 
 Production detail (25OPS1): [production-plan.md](production-plan.md) §7–§8 (the capture flow and its edge cases, the
-Live Activity proof-of-concept gate and fallbacks).
+Live Activity proof-of-concept gate and fallbacks). Security: a focused audit of the Wallet, App Intents, Shortcuts,
+deep-link and Live Activity boundaries (production-plan.md §14.1).
 
 Planned (placed by the owner on 2026-10-02 after 25A's review tray; documentation only, nothing implemented). A focused
 delivery that pulls the Wallet capture forward from 25D: it needs 25A's draft model and local review tray (25A-01 to
@@ -4545,7 +4548,8 @@ nothing of it is on a screen yet.
   export is Hermes bytecode that `grep -I` skips as binary; a server secret name, a Supabase secret key or a provider
   key (`sk-…`) fails, and the scan fails too unless it found a string the app is known to contain, so it cannot pass
   without reading the bundle. It names the file and the kind, never the value.
-- **Security audit follow-up (2026-10-05, in this PR).** A focused audit of this PR found no path from a client, a
+- **Security audit follow-up (2026-10-05, in this PR; the 25A-05 audit of production-plan.md §14.1, completed).** A
+  focused AI/backend audit of this PR found no path from a client, a
   model reply or an injected text to a privileged function, the ledger, a tool or past the reservation. Fixed: (1) the
   CI bundle step added earlier in this PR used `grep -rI`, which never read the `.hbc` bundle, so it could not fail;
   replaced by the script above, with tests; (2) a per-user **daily** money ceiling (`user_day_ceiling_micro_usd`,
@@ -4555,7 +4559,8 @@ nothing of it is on a screen yet.
   per-user limits are only as strong as account creation; the provider and Supabase secret keys scoped to the reviewed
   Vercel environments, never Preview; `estimate_exceeded` rows checked against the input-token bound on the evaluation
   corpus; a price-table freshness check and the reconciliation against the provider's cost report; a dedicated
-  Supabase secret key for this API.
+  Supabase secret key for this API. A follow-up `/security-review` of the whole PR found no High or Medium
+  vulnerability.
 - **Codex review (2026-10-05, in this PR).** The evaluation now applies the server's served-model rule (a reply served
   by another model or tier is flagged, costed at the maximum and fails `servedAsConfiguredRate` = 1, so a fallback model
   is never adopted as the candidate), and a small integer in an answer is checked when it is money («$20», «20 pesos»)
@@ -4700,7 +4705,8 @@ docs/merchant-identity.md.
 ### Producto 25D — Face ID, notifications and Apple integrations
 
 Production detail (25OPS1): [production-plan.md](production-plan.md) §9 and §11 (notifications and push; hide amounts,
-Face ID and data protection).
+Face ID and data protection). Security: a local-device privacy and security audit (Face ID, app-switcher privacy,
+Keychain and SecureStore, iOS file protection, backups and exports, the explicit SQLCipher decision; production-plan.md §14.1).
 
 Documentation only until it starts (scope revised 2026-09-28); nothing here is implemented. Every
 permission is requested only when the person enables the feature that needs it, never at launch. **25D ships
@@ -4856,6 +4862,9 @@ requirements).
 ### Producto 25F — monetisation, StoreKit and AI cost control
 
 Production detail (25OPS1): [app-store-launch.md](app-store-launch.md) §1–§5 and [production-plan.md](production-plan.md) §6.
+Security: a StoreKit review (entitlements, server notifications, restore; production-plan.md §14.1). The production AI
+ceilings, provider limit and any auto-recharge are scaled from measured paid usage, never a permanent constant, and never
+unlimited (production-plan.md §6.6).
 
 - **Scope.** Premium AI with per-user quotas, server-side cost ceilings (per request, per
   person, global), consumption telemetry (usage and cost, not content) and margins calculated
@@ -4911,7 +4920,8 @@ or marketing asset.
   external or public TestFlight candidate, and in any case before App Store submission, the exhaustive real-iPhone
   regression of the accumulated high-risk native and financial flows passes: the deferred 24T3 pass with all its cases,
   the 25A-03 review flows, and the device items of 25A-04, later 25A slices, 25A2 and the other open sections (the
-  checklist's «Release gate» lists them).
+  checklist's «Release gate» lists them). **Whole-app security and privacy audit** (owner decision, 2026-10-05), at the
+  same gate: one full end-to-end audit of the complete shipped app, scoped in production-plan.md §14.1.
 
 ## 5. After launch
 

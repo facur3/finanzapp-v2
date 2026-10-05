@@ -1,7 +1,8 @@
 # FinanzApp: production plan
 
 **Status.** Planning document, written 2026-10-02 in Producto 25OPS1; updated 2026-10-05 in Producto 25A-05 (the AI
-security, provider contract and evaluation harness: §4.2, §4.6, §4.7, §5, §6, §13, §14). Nothing described here is
+security, provider contract and evaluation harness: §4.2, §4.6, §4.7, §5, §6, §13, §14; after its security audit, the
+billing principle §6.6 and the audit cadence §14.1). Nothing described here is
 implemented unless it is marked **EXISTS TODAY**. No environment was created, no remote migration was run, no EAS build
 was made, no model was evaluated and no paid provider was called to write it.
 
@@ -990,6 +991,30 @@ already in flight → 429; a repeated request id → 409; a request too large �
 provider failure or an invalid output → 502; an unreadable reservation reply → 503. The app shows its own note for each
 (catalogue keys `assistant.integration.*` and `assistant.reasons.*`, never the server's words); nothing is recorded.
 
+### 6.6 Provider billing: prepaid balance, auto-recharge and scaling the ceilings
+
+**DECIDED** (owner, 2026-10-05). The provider account's billing settings are an availability mechanism and a last
+backstop, never the security or cost boundary. That boundary is the server's own atomic reservation (§6.3), with the
+provider's hard limit behind it (§6.4).
+
+- **Staging.** Auto-recharge **off**. A tiny prepaid balance and the smallest hard provider cap available, with the
+  server's ceilings set below both. An exhausted balance is a `spend_limit` refusal (503), never a reason to top up
+  automatically.
+- **Production.** Auto-recharge, if the owner enables it later, only keeps the Assistant available between deliberate
+  top-ups; it never replaces a ceiling. **No unlimited automatic recharge**: every recharge has an amount and a
+  frequency bound, set by the owner on the provider's console.
+- **No permanent business-wide constant.** No fixed recharge ceiling (for example «USD 100 for the whole business») is
+  written into the code or the plan as a permanent value. The internal global ceilings (`mobile_ai_control`) and the
+  provider's hard limit are **scaled deliberately** with measured paid usage and revenue, each change by the owner with
+  a recorded approval (§6.2, «Raising a cap»).
+- **Growth must not switch AI off for everyone.** The global ceilings are a circuit breaker against bugs and abuse, not
+  a quota on legitimate growth: they are reviewed against measured paid usage before they bind, so more paying people
+  never trip the breaker by accident. The per-user ceilings (month and day) are what bound any one account.
+- **Independent controls.** Owner alerts (§6.2) and the kill switches (`MOBILE_AI_ENABLED`, `mobile_ai_control.enabled`)
+  never depend on the billing settings, the balance or a recharge.
+- **No production amounts yet.** The production values of every ceiling, the provider limit and any recharge are derived
+  from measured staging cost (25A-06) and later paid-user economics (25F); none is set now.
+
 ---
 
 ## 7. Wallet and Apple Pay capture (25A2)
@@ -1541,7 +1566,7 @@ Nothing below is complete unless it says **EXISTS TODAY**. "Launch §n" is a sec
 | Monetary ceilings as atomic pre-call reservations, settlement, usage accounting, kill switch | 25A | **EXISTS TODAY** in the repository (25A-05), staging placeholders, applied nowhere; **IMPLEMENTATION GATE**, **LAUNCH BLOCKER** for enabling AI | Tripped deliberately in staging (25A-06), including two concurrent requests against the last unit of capacity (§6.3) |
 | Alerts, anomaly stop, reconciliation against the provider's cost report | 25A | **NOT IMPLEMENTED**, **LAUNCH BLOCKER** for enabling AI beyond staging | 25A-06 |
 | Production ceilings and limits | 25A, 25F | **OWNER DECISION** from measured staging cost; the schema's values are placeholders | 25A-06 measurements, the 25F cost report |
-| Provider hard budget | 25A | **OWNER ACTION**, **REMOTE SETUP** | Set by the owner on a dedicated project, below the tolerated amount and above the server's ceilings (25A-06) |
+| Provider hard budget | 25A | **OWNER ACTION**, **REMOTE SETUP** | Set by the owner on a dedicated project, below the tolerated amount and above the server's ceilings (25A-06); billing rules in §6.6 (staging auto-recharge off) |
 | Wallet trigger: fields, currency, timing, Watch | 25A2 | **RESEARCH GATE**, **DEVICE QA** | A raw-input capture on the owner's iPhone |
 | Shortcut App Intent in an Expo app | 25A2 | **RESEARCH GATE**, **NOT IMPLEMENTED** | A build-level spike |
 | Card mapping, capture-key deduplication | 25A2 | **DECIDED** design; **NOT IMPLEMENTED** | After 25A-03 |
@@ -1572,6 +1597,41 @@ Nothing below is complete unless it says **EXISTS TODAY**. "Launch §n" is a sec
 | App Review checklist | 26 | **LAUNCH BLOCKER** items listed there | Launch §12 |
 | Privacy policy, support page, terms | 26 | **NOT IMPLEMENTED**, **LAUNCH BLOCKER**; legal review | Launch §13 |
 | Landing page | 26 (the marketing page may follow launch) | **NOT IMPLEMENTED**, **OWNER DECISION** | Launch §14 |
+| Security and privacy audits per slice; the whole-app audit | 25A-05 to 26 | 25A-05 **DONE**; the rest **NOT STARTED**; the whole-app audit is a **LAUNCH BLOCKER** | §14.1 |
+
+### 14.1 Security and privacy audit cadence
+
+**DECIDED** (owner, 2026-10-05). A focused audit follows each slice that adds a trust boundary. One full, end-to-end
+audit of the whole shipped app is a **LAUNCH BLOCKER** (the release gate). Each audit reports a severity, the exact
+file and line, a concrete exploit or failure path, whether it is realistically exploitable and the smallest fix. It
+uses dummy principals and local or staging evidence only, never production data, live probing or paid calls without
+authorization. Its fixes ship with regression tests in the same slice.
+
+| When | Scope | Status |
+| --- | --- | --- |
+| 25A-05 | Focused AI/backend audit: the Assistant protocol, the provider adapter, the reservation and settlement, the privileged Supabase functions, logging, the mobile client boundary, CI secret and bundle scans | **DONE** (2026-10-05, PR #86): two fixes (the CI bundle scan that never read the Hermes bundle; a per-user daily money ceiling) and a follow-up security review with no High or Medium finding |
+| 25A-06 | Repeat the focused audit once real staging auth, secrets and the provider integration exist: sessions and RLS with real users, key scoping per Vercel environment, sign-up friction, the provider and billing settings (§6.6), alerts and reconciliation | **NOT STARTED** |
+| 25A2 | Focused audit of Wallet capture, App Intents, Shortcuts, deep links and Live Activity boundaries | **NOT STARTED** |
+| 25D | Local-device privacy and security audit: Face ID, app-switcher privacy, Keychain and SecureStore, iOS file protection, backups and exports, and the explicit SQLCipher decision (§11.3) | **NOT STARTED** |
+| 25F | StoreKit review: entitlements, App Store Server Notifications, restore | **NOT STARTED** |
+| Release gate | One full end-to-end security and privacy audit of the complete shipped app, before the first external or public TestFlight and before App Store submission | **NOT STARTED**, **LAUNCH BLOCKER** |
+
+The release-gate audit covers at least:
+- the local SQLite databases (the ledger, the review store, the rates cache);
+- file protection;
+- backup, export and import;
+- deep links and navigation inputs;
+- secrets and the shipped bundle;
+- auth, session and account deletion;
+- Supabase RLS and the privileged functions;
+- the Vercel API surface;
+- the AI provider: jailbreaks and cost controls;
+- Wallet, Shortcuts and App Intents;
+- the privacy of notifications and Live Activities;
+- Face ID and the app switcher;
+- StoreKit and entitlements;
+- dependencies and native configuration;
+- logging, privacy and the App Store declarations.
 
 ---
 
