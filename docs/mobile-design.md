@@ -1105,8 +1105,9 @@ La última entrega de 24T, mergeada como PR #76 (merge commit 399a1fa) desde su 
 `feat/producto-24t3-refunds-payoff-lifecycle` (desde master d30b77f, 24UX6E mergeada como PR #75): una compra devuelta (la **devolución**), las cuotas que faltaban adelantadas (el **adelanto de
 cuotas**), dejar de seguir un plan y reactivarlo, más un arrastre chico de Reportes. Implementado en código; **la
 revisión en iPhone está pendiente** (no hubo build de EAS) y su lista está en docs/mobile-device-checklist.md
-(«Producto 24T3»: el dueño mergeó después de un uso dirigido y postergó la pasada registrada, que debe hacerse antes de
-mergear 25A-03, 25A-04, 25A-11 o 25A-12). No es un rediseño: Tarjetas y el detalle de tarjeta quedan como los
+(«Producto 24T3»: el dueño mergeó después de un uso dirigido y postergó la pasada registrada; no se hizo, y por decisión
+del dueño del 2026-10-04 queda diferida como bloqueo de lanzamiento: debe pasar antes del primer TestFlight externo o
+público y antes de enviar a la App Store, no antes de mergear 25A o 25A2). No es un rediseño: Tarjetas y el detalle de tarjeta quedan como los
 dejó 24UX6D; las pantallas nuevas usan las piezas de Forest que ya existen (modal de formulario, filas agrupadas,
 `LifecycleNote`, `CheckRow`, `DateField`, `AmountField`). La regla contable vinculante está en la decisión 003, regla 7
 («Devoluciones, adelanto de cuotas y ciclo de vida del plan», 2026-10-01); el detalle técnico, en el roadmap
@@ -3037,8 +3038,9 @@ color propio.
 - Producto 25A-02: nada que revisar en el iPhone (la base local de propuestas, en su propio archivo; ninguna pantalla la
   abre todavía); la línea de versión de Más dice «FinanzApp 0.1.0 (25A-02)» en un build de su rama.
 - Producto 25A-01 (mergeada como PR #77): nada que revisar en el iPhone (solo dominio, sin pantalla nueva).
-- Producto 24T3 (mergeada como PR #76; sin build de EAS, nada revisado todavía; una pasada dirigida que el dueño
-  postergó y que debe hacerse antes de mergear 25A-03, 25A-04, 25A-11 o 25A-12): la
+- Producto 24T3 (mergeada como PR #76; sin build de EAS, nada revisado; diferida y bloqueo de lanzamiento por decisión
+  del dueño del 2026-10-04: se hace en la pasada completa en iPhone antes del primer TestFlight externo o público y
+  antes de enviar a la App Store, no antes de mergear 25A o 25A2): la
   actualización a esquema 14 con una copia antes; una devolución en efectivo parcial y total, una de una compra con
   tarjeta que baja el saldo pendiente y una de un plan antes y después de un cierre con las últimas cuotas reducidas; el
   tope que rechaza devolver de más; un adelanto con y sin interés (las dos opciones de financiación) y después Pagar

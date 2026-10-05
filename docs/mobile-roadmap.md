@@ -5,8 +5,10 @@ Updated: 2026-10-04 (Producto 25A-03, on its branch: «Para revisar», the first
 Confirmar, Editar and Descartar, confirmation only through the store's frozen write and reconciliation; no cloud, provider,
 Supabase, Wallet, notification, schema (14) or backup (v14) change; plus the owner-observed follow-up of 25VIS1: the hero
 amount's currency symbol and cents in solid neutral graphite on the lime field; the version line reads «FinanzApp 0.1.0
-(25A-03)». The targeted 24T3 device pass is still not recorded in the repository and remains a merge gate for 25A-03,
-25A-04, 25A-11 and 25A-12. Producto 25VIS1 merged as PR #83, merge commit 0ff9859: Electric Lime, accepted by the owner on the iPhone as the current product palette, plus the owner-approved final polish of Inicio's chosen `Gastado | Disponible` thumb (white with ink), colour tokens only on the existing
+(25A-03)». The targeted 24T3 device pass was not performed; by owner decision (2026-10-04) it is **deferred and a release
+blocker**: it no longer blocks development merges of 25A-03, 25A-04, later 25A slices or 25A2, and is consolidated
+into the physical-device release gate that must pass before the first external or public TestFlight candidate and
+before App Store submission (§2, «Producto 26»). Producto 25VIS1 merged as PR #83, merge commit 0ff9859: Electric Lime, accepted by the owner on the iPhone as the current product palette, plus the owner-approved final polish of Inicio's chosen `Gastado | Disponible` thumb (white with ink), colour tokens only on the existing
 product (`apps/mobile/src/ui/palette.ts`), no layout, navigation, financial, schema (14) or backup (v14) change; the
 version line read «FinanzApp 0.1.0 (25VIS1)»; the owner's iPhone pass of 25OPS1 recorded (the last content now rests
 above the dock). Producto 25DISC1 merged as PR #82, merge commit 227942c, documentation only: the competitive capability map and gap map,
@@ -49,7 +51,7 @@ what already closed first and «Reactivar plan» undoes it, and a card holding a
 decisions B1–B3, 2026-10-01); SQLite schema 14 and backup v14; Reportes, Presupuestos, Inicio and the Assistant's
 evidence net devoluciones without negative slices or claims; plus the carry-in of Reportes' «Categorías | Día a día»
 switch at 15/20 with no shrink-to-fit; no EAS build; the owner merged it after targeted use and deferred the recorded device
-pass, which now gates 25A-03, 25A-04, 25A-11 and 25A-12 (§2). Producto 24UX6E merged as PR #75, merge commit d30b77f: more financial destinations in Forest, presentation and
+pass, which gated 25A-03, 25A-04, 25A-11 and 25A-12 until the owner deferred it to the pre-release device gate on 2026-10-04 (§2). Producto 24UX6E merged as PR #75, merge commit d30b77f: more financial destinations in Forest, presentation and
 lifecycle polish plus bug fixes; Cuentas, Presupuestos, Recurrentes, Deudas y cobros and Categorías with flat summaries
 on the canvas, one shared lifecycle note, colour marking state rather than direction or identity and no chevron on rows
 that open a modal editor; the Más utilities audited, with two bug fixes (the pinned chooser card, Movimientos deshechos
@@ -698,7 +700,7 @@ item unless a section says a new native build is needed. The checklist sections 
   cents on Inicio's field, light and dark; VoiceOver, large text, Reduce Motion and Reduce Transparency. No producer of
   proposals exists in the app yet and synthetic ones belong only in tests, so the pending → Editar → Confirmar /
   Descartar flow, stale and conflicting proposals and crash reconciliation are evidenced by the automated suite and
-  join the device pass of 25A-04. Metro on the installed development build; no native dependency added.
+  join the consolidated pre-release device gate (the checklist's «Release gate»). Metro on the installed development build; no native dependency added.
 - **25VIS1 — Electric Lime palette (merged as PR #83, merge commit 0ff9859; no EAS build; owner's verdict 2026-10-03 on the iPhone, light and
   dark: keep it as the current palette, as implemented; the items below not reported one by one stay open):** the checklist section Producto
   25VIS1: the chosen `Gastado | Disponible` thumb, white with ink (2026-10-04 polish), light and dark; Inicio's lime field with ink and a dark status bar over it, light and dark; Próximos compromisos neutral like
@@ -724,11 +726,13 @@ item unless a section says a new native build is needed. The checklist sections 
   switching, with Reduce Motion and VoiceOver. Metro on the installed development build; no native dependency added.
 - **25A-02 — Durable local review store (merged as PR #78 and PR #79): nothing to check on the iPhone.**
 - **25A-01 — Review draft domain model (merged as PR #77): nothing to check on the iPhone.** Pure domain.
-- **24T3 — Refunds, early payoff and installment lifecycle (merged as PR #76, merge commit 399a1fa; none done; no EAS
-  build).** The owner merged #76 after targeted use and deliberately deferred the recorded pass; no item below is
-  checked. Binding (owner, 2026-10-02): 25A-01 and 25A-02 may proceed; **this targeted pass must be done before 25A-03,
-  25A-04, 25A-11 or 25A-12 merges**, since those begin to expose durable review of financial writes. No owner result
-  for it is recorded in the repository yet, so it still gates 25A-03 (PR #84). The pass: the checklist section Producto 24T3: the schema 14 upgrade over the owner's data with a
+- **24T3 — Refunds, early payoff and installment lifecycle (merged as PR #76, merge commit 399a1fa; DEFERRED / RELEASE
+  BLOCKER; not performed; no EAS build).** The owner merged #76 after targeted use and deferred the recorded pass; no
+  item below is checked, and the owner confirmed on 2026-10-04 that the pass was not performed. Owner decision,
+  2026-10-04 (replacing the gate of 2026-10-02): the pass **no longer blocks development merges** of 25A-03, 25A-04,
+  later 25A slices or 25A2; it is consolidated, unchanged in its cases, into the physical-device release gate that must
+  pass **before the first external or public TestFlight candidate and before App Store submission** (the checklist's
+  «Release gate»). QA is deferred, not waived. The pass: the checklist section Producto 24T3: the schema 14 upgrade over the owner's data with a
   backup first; a cash devolución partial and full; a card purchase's devolución lowering the balance due; a plan
   devolución before and after a closing and the lowered last instalments; an over-refund refused; an adelanto with and
   without interest (both financing choices) and then Pagar tarjeta; «Dejar de seguir el plan» and «Reactivar plan»;
@@ -914,8 +918,8 @@ as PR #82 (merge commit 227942c) and changes no order either; **25VIS1** (Electr
 below, none applied); **25A-03** (the «Para revisar» tray, «Producto 25A-03» below) is this PR; then 25A-04 (the
 Assistant's drafts into the tray) and the rest of 25A, with no paid provider call before its own approved slice. **25A2** (Wallet Shortcut Capture) still
 follows the review-tray foundation: it may begin once 25A-03 has merged, without waiting for 25A's cloud, paid, live or
-voice slices. The targeted 24T3 device pass gates 25A-03, 25A-04, 25A-11 and 25A-12 (§2); no owner result is recorded yet, so it
-remains a merge gate for 25A-03. After 25A: **25C** (with
+voice slices. The targeted 24T3 device pass was not performed and is deferred to the pre-release device gate (owner
+decision, 2026-10-04; §2): a release blocker, not a merge blocker for 25A or 25A2. After 25A: **25C** (with
 Movimientos' advanced filters), **25C2**, **25D**, **25E**, **25F** and **26**, unchanged; «Ocultar importes» stays future
 privacy work beside 25D, not scheduled.
 
@@ -1646,9 +1650,11 @@ Assistant's capability boundary and model evaluation, monetary safety).
   staging session (the first network slice, owner setup and authorization required); the inbox consumer; **one** paid
   slice, the live provider on staging, only after the owner configures and approves it; voice last, after the text path is
   proven on the iPhone. Numbering beyond 25A-04 is indicative; each slice records its own section here.
-- **Device gate (owner, 2026-10-02).** 25A-01 and 25A-02 may proceed now. The targeted 24T3 device pass (checklist
-  section Producto 24T3, §2) must be done before 25A-03, 25A-04, 25A-11 or 25A-12 merges, because they begin to expose
-  durable review of financial writes. Not recorded as passed yet (2026-10-04): it remains the merge gate of 25A-03.
+- **Device gate.** Owner, 2026-10-02: the targeted 24T3 device pass (checklist section Producto 24T3, §2) had to be done
+  before 25A-03, 25A-04, 25A-11 or 25A-12 merged. **Replaced by owner decision, 2026-10-04:** the pass was not performed
+  and is deferred to the physical-device release gate (before the first external or public TestFlight candidate and
+  before App Store submission); 25A slices and 25A2 merge on their automated evidence, and every slice's device items
+  join that release gate.
 
 ### Producto 25A2 — Wallet Shortcut Capture
 
@@ -3529,8 +3535,9 @@ nothing of it is on a screen yet.
   returns 0, an active plan with history offers three actions and a stopped one reads «Sin seguimiento» / «No se
   registra», the instalment components' figures gain the new fields with their 24T1 values unchanged.
 - **Status.** Merged as PR #76 (merge commit 399a1fa) after the owner's targeted use; the recorded device pass was
-  deliberately deferred and nothing in the checklist section Producto 24T3 is checked. It must pass before 25A-03,
-  25A-04, 25A-11 or 25A-12 merges (owner, 2026-10-02; the list in §2); no owner result is recorded yet. No EAS build; no native dependency added;
+  deliberately deferred and nothing in the checklist section Producto 24T3 is checked; the owner confirmed on 2026-10-04
+  that it was not performed. **DEFERRED / RELEASE BLOCKER** (owner decision, 2026-10-04): no longer a merge gate for 25A
+  or 25A2; it must pass before the first external or public TestFlight candidate and before App Store submission (§2). No EAS build; no native dependency added;
   SQLite schema 14 and backup v14.
 - **Gates.** 2026-10-02, local. `apps/mobile`: typecheck OK; `node --experimental-strip-types --test tests/*.node.ts`
   1200 passed, 0 failed (real SQLite included); `i18n:check -- --strict` 0 errors, 0 stale (English lock accepted);
@@ -3967,7 +3974,7 @@ nothing of it is on a screen yet.
   nothing is implemented until the owner chooses; no shortlist name is approved and «FinanzApp» stays the working name.
 - **Open owner decisions.** Landscape §12.4, brand-brief §6 and go-to-market §12.
 - **Device QA.** Nothing to check on the iPhone.
-- **Status.** This PR; not merged.
+- **Status.** Merged as PR #82 (merge commit 227942c).
 - **Gates.** 2026-10-03, local, Linux. Root `npm test` 590 passed, 1 todo; `check:repo` OK. `apps/mobile`: `typecheck`
   OK; `test:storage` 1247 passed, 0 failed; `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0 errors,
   0 stale (no app string changed); `check` OK; `export:ios` OK. No EAS build, no iPhone, no remote migration, no
@@ -4047,7 +4054,8 @@ nothing of it is on a screen yet.
 - **Goal.** The first UI over the durable local review store (25A-02): pending proposals the person confirms, edits or
   discards, with every financial judgement left to the domain (25A-01) and every write to the store's one path.
 - **Scope.** Branch `feat/producto-25a-03-review-tray` from master 0ff9859 (25VIS1 merged as PR #83). The targeted 24T3
-  device pass is not recorded as passed: it remains this PR's merge gate (§2). New routes `app/review.tsx`, `app/review/[id].tsx` and
+  device pass was not performed; by owner decision (2026-10-04) it is deferred to the pre-release device gate and does
+  not block this PR (§2). New routes `app/review.tsx`, `app/review/[id].tsx` and
   `app/edit-review/[id].tsx` (a modal); `src/ui/review-presentation.ts` (pure: `reviewFacts`, `stateTone`,
   `editedReviewDraft`, `editorDestinations`); `loadReviewTray` in `review-database.ts`; the store opened
   by `LedgerProvider` (`review`, `confirmReview`, `updateReview`, `dismissReview`; the store's `capture` stays for 25A-04 and 25A2, with no app producer yet); catalogue
@@ -4399,7 +4407,11 @@ or marketing asset.
 - **Rules.** No submission, subscription or charge without the owner's authorisation; Apple's
   acceptance is separate from a submission; no claim of approval before it exists.
 - **Gates.** The release gate of the checklist; every open device gate above closed or
-  consciously deferred by the owner.
+  consciously deferred by the owner. **Physical-device release gate (owner decision, 2026-10-04):** before the first
+  external or public TestFlight candidate, and in any case before App Store submission, the exhaustive real-iPhone
+  regression of the accumulated high-risk native and financial flows passes: the deferred 24T3 pass with all its cases,
+  the 25A-03 review flows, and the device items of 25A-04, later 25A slices, 25A2 and the other open sections (the
+  checklist's «Release gate» lists them).
 
 ## 5. After launch
 
