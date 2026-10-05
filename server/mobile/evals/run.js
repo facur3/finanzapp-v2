@@ -10,7 +10,7 @@ import { checkThresholds } from './thresholds.js';
 
 export async function main(argv = process.argv.slice(2), env = process.env, { createProvider = defaultCreateProvider, out = console.log, err = console.error } = {}) {
   const live = argv.includes('--live');
-  let respond = fixtureResponder(CASES), price, callOptions = CALL_OPTIONS, model = 'fixture';
+  let respond = fixtureResponder(CASES), price, callOptions = CALL_OPTIONS, expected, model = 'fixture';
   if (live) {
     const config = env.MOBILE_AI_EVAL_LIVE === '1' ? aiConfig(env) : null;
     if (!config) {
@@ -22,9 +22,10 @@ export async function main(argv = process.argv.slice(2), env = process.env, { cr
     respond = call => provider.respond(call);
     price = config.price;
     callOptions = { maxOutputTokens: config.maxOutputTokens, reasoningEffort: config.reasoningEffort };
+    expected = config;
     model = config.modelKey;
   }
-  const { cases, metrics } = await runEval({ cases: CASES, respond, price, callOptions });
+  const { cases, metrics } = await runEval({ cases: CASES, respond, price, callOptions, expected });
   const verdict = checkThresholds(metrics);
   const imperfect = cases.filter(item => !item.typeCorrect || item.flags.length || Object.values(item.fieldScores).includes(false))
     .map(({ id, expectedType, type, fieldScores, flags }) => ({ id, expectedType, type, fieldScores, flags }));

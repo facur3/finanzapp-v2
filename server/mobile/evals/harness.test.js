@@ -175,6 +175,33 @@ describe('eval harness', () => {
     expect(underivedNumbers('You spent $1,842.50.', us.request.facts.slice(0, 1), us)).toEqual(['1,842.50']);
   });
 
+  it('checks a small integer when it is money: after a currency sign or code, or before a currency word', () => {
+    const ar = CASES.find(item => item.id === 'analytics.compare-month.es');
+    const facts = ar.request.facts.filter(item => item.id.endsWith('.expenses'));
+    expect(underivedNumbers('Gastaste $20 en total.', facts, ar)).toEqual(['20']);
+    expect(underivedNumbers('Gastaste US$ 7 y ARS 3.', facts, ar)).toEqual(['7', '3']);
+    expect(underivedNumbers('Gastaste 20 pesos, o 5 dólares.', facts, ar)).toEqual(['20', '5']);
+    expect(underivedNumbers('Del 1 al 15 llevás $ 184.500, en 14 compras.', facts, ar)).toEqual([]);
+    const us = CASES.find(item => item.id === 'analytics.month-total.en');
+    expect(underivedNumbers('You spent 20 dollars by day 15.', us.request.facts.slice(0, 1), us)).toEqual(['20']);
+  });
+
+  it('applies the server\'s served-model rule: another model or tier is flagged, costed at the maximum and fails the bar', async () => {
+    const expected = { model: 'gpt-6-luna', serviceTier: 'default' };
+    const golden = fixtureResponder(CASES);
+    const as = (model, tier) => async (call, testCase) => ({ ...golden(call, testCase), model, tier });
+    const honest = await runEval({ cases: CASES, respond: as('gpt-6-luna-2026-09-15', 'default'), expected });
+    expect(honest.metrics.servedAsConfiguredRate).toBe(1);
+    expect(checkThresholds(honest.metrics).pass).toBe(true);
+    for (const [model, tier] of [['gpt-5.6-luna', 'default'], ['gpt-6-luna', 'priority'], [null, 'default'], ['gpt-6-luna', null]]) {
+      const report = await runEval({ cases: CASES, respond: as(model, tier), expected });
+      expect(report.cases[0].flags[0], `${model} ${tier}`).toBe('served_other_model_or_tier');
+      expect(report.cases[0].usage).toBe(null);
+      expect(report.cases[0].costMicroUsd).toBeGreaterThan(honest.cases[0].costMicroUsd);
+      expect(failed(report)).toContain('servedAsConfiguredRate');
+    }
+  });
+
   it('costs untrusted usage at the reservation maximum and counts a provider failure as invalid', async () => {
     const report = await runEval({ cases: CASES.slice(0, 2), respond: (call, testCase) => {
       if (testCase === CASES[0]) throw Object.assign(new Error('x'), { category: 'timeout', usage: null });
@@ -224,5 +251,13 @@ describe('eval CLI', () => {
     expect(respond).toHaveBeenCalledTimes(CASES.length);
     expect(respond.mock.calls[0][0]).toMatchObject({ maxOutputTokens: 1500, reasoningEffort: 'low' });
     expect(io.err.mock.calls[0][0]).toMatch(/WARNING/);
+  });
+
+  it('fails a live run that the provider served with another model', async () => {
+    const byInput = new Map(CASES.map(item => [JSON.stringify(modelInput(buildRequest(item))), item]));
+    const respond = vi.fn(async call => ({ output: goldenOutput(byInput.get(call.input)), usage: null, model: 'gpt-5.6-luna', tier: 'default' }));
+    const io = quiet();
+    expect(await main(['--live'], { ...LIVE_CONFIG, MOBILE_AI_EVAL_LIVE: '1' }, { createProvider: () => ({ respond }), ...io })).toBe(1);
+    expect(JSON.parse(io.out.mock.calls[0][0]).verdict.failures.map(item => item.metric)).toContain('servedAsConfiguredRate');
   });
 });

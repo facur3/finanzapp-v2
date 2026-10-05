@@ -39,11 +39,16 @@ export function reservationError(code) {
 
 const PROVIDER_STATUS = { refusal: [422, 'No se pudo interpretar. Probá reformular el mensaje.'], spend_limit: [503, 'El asistente no está disponible ahora. Podés registrar manualmente.'] };
 
+/** Whether the provider reports serving the configured model (or one of its snapshots) on the priced tier. The
+ * evaluation harness applies the same rule, so a run served by another model is never scored as the candidate. */
+export function servedAsConfigured(ai, served) {
+  return typeof served.model === 'string' && (served.model === ai.model || served.model.startsWith(ai.model + '-')) && served.tier === ai.serviceTier;
+}
+
 /** Usage the settlement may rely on: complete, consistent, for the configured model, on the priced tier. */
 function trustedUsage(ai, served) {
   const usage = usageOrNull(served.usage);
-  const model = typeof served.model === 'string' && (served.model === ai.model || served.model.startsWith(ai.model + '-'));
-  return usage && model && served.tier === ai.serviceTier ? usage : null;
+  return usage && servedAsConfigured(ai, served) ? usage : null;
 }
 
 /** The Assistant route after the session and the body are verified. Order, each step before the next:

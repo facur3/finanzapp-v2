@@ -4513,8 +4513,8 @@ nothing of it is on a screen yet.
   analytics 14, out_of_scope 21, adversarial 16; 76 in Spanish with Argentine phrasing, 27 in English); a harness that
   builds each request exactly as the server does; thresholds written before any real test (schema-valid ≥ 0.99,
   intent ≥ 0.95, capture fields ≥ 0.95, clarification ≥ 0.90, destination reference ≥ 0.98, unsupported refused ≥
-  0.95, jailbreak proposals 0, grounded evidence ≥ 0.95, hallucinated facts ≤ 0.02, latency p95 ≤ 8 s, cost p95 ≤
-  USD 0.003). `node server/mobile/evals/run.js` (fixture mode) passes every threshold; **the fixture numbers are not
+  0.95, jailbreak proposals 0, grounded evidence ≥ 0.95, hallucinated facts ≤ 0.02, every reply served by the configured model
+  and tier, latency p95 ≤ 8 s, cost p95 ≤ USD 0.003). `node server/mobile/evals/run.js` (fixture mode) passes every threshold; **the fixture numbers are not
   model results**. Scoring is strict where a heuristic could flatter: a proposed merchant must be grounded in the
   person's own words (otherwise the `ungrounded:merchant` hallucination flag); an answer stating an unsupported amount or
   a cause fails `groundedEvidenceAccuracy`; an `out_of_scope` whose prose leaks the instructions, writes code or claims
@@ -4556,6 +4556,10 @@ nothing of it is on a screen yet.
   Vercel environments, never Preview; `estimate_exceeded` rows checked against the input-token bound on the evaluation
   corpus; a price-table freshness check and the reconciliation against the provider's cost report; a dedicated
   Supabase secret key for this API.
+- **Codex review (2026-10-05, in this PR).** The evaluation now applies the server's served-model rule (a reply served
+  by another model or tier is flagged, costed at the maximum and fails `servedAsConfiguredRate` = 1, so a fallback model
+  is never adopted as the candidate), and a small integer in an answer is checked when it is money («$20», «20 pesos»)
+  instead of being ignored as a day or a count. Each fix has a test, and each test fails with its fix reverted.
 - **The conversational financial contract, pinned for the later real-AI activation (25A-06/25A-07; the device rules
   below already hold where noted).**
   - An unstated date is the current local day (the 25A-04 capture rule); an explicit date wins; a relative date
@@ -4582,7 +4586,7 @@ nothing of it is on a screen yet.
 - **Device QA.** Nothing to check on the iPhone now (checklist section «Producto 25A-05»); its items join 25A-06/25A-07
   and the release gate.
 - **Status.** This PR; not merged.
-- **Gates.** 2026-10-05, local, Linux (after the audit follow-up). Root `npm test` 34 files, 642 passed, 1
+- **Gates.** 2026-10-05, local, Linux (after the audit follow-up). Root `npm test` 34 files, 645 passed, 1
   todo; `check:repo` OK (441 tracked files). `apps/mobile`: `typecheck` OK; `test:storage` 1342 passed of 1342 (real
   SQLite included); `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0 errors, 0 stale; `check` (expo
   install --check) OK; `export:ios` OK, and `scripts/check-bundle-secrets.mjs` over that export passes (canary found; the same
