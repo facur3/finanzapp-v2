@@ -1166,8 +1166,9 @@ test('24B6 review: a recurring income in a card-only ledger shows the no-account
   root = none.render();
   assert.equal(find(root, 'EmptyState').props.detail, 'Los recurrentes necesitan una cuenta para registrar cada vencimiento en la moneda correcta.');
   assert.equal(nodes(root).some(node => node.type === 'Choices'), false);
+  // The next date stays in the future: the form refuses to save one before today, which is not what this test is about.
   const legacy: domain.RecurringRule = { id: 'cashback', accountId: 'card-acc', kind: 'income', amountMinor: 500, merchant: 'Cashback', category: 'Otros', frequency: 'monthly',
-    anchorDateISO: '2026-01-05', nextDateISO: '2026-10-05', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
+    anchorDateISO: '2026-01-05', nextDateISO: '2099-10-05', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
   const editing = harness('src/ui/recurring-form.tsx', { original: legacy }, { data: { ...cardOnly, recurring: [legacy] } });
   root = editing.render();
   assert.equal(nodes(root).some(node => node.type === 'EmptyState'), false, 'its own card is eligible');
