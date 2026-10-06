@@ -87,7 +87,7 @@ renamed before step I. Each step produces a written record; the record is kept w
 | F | Handles | The social handles the owner wants; free, taken by an inactive account, or taken by an active brand. | Availability per name | — |
 | G | Trademark and confusing-similarity screening | Identical and similar marks in classes 9 (software), 36 (financial services) and 42 (SaaS) in Argentina (INPI), the United States (USPTO), the European Union (EUIPO) and WIPO's Global Brand Database; phonetic similarity, not only spelling. A hit in a finance class is a probable conflict; a professional opinion is obtained before the final choice when anything is close (launch §9.4 «Screening»). Apple's App Review guideline 5.2 (intellectual property) binds the listing. | A screening memo per surviving name | **OWNER ACTION** to engage a professional when warranted |
 | H | Owner selection | The owner picks one name (and a fallback) from what survived A–G, with the record of why. | The decision, recorded in a decision document (`docs/decisions/006-public-name-and-identity.md` when it exists) | **OWNER DECISION** |
-| I | Only then: product and repository rename | The App Store name per localization, the domain purchase, the handles, the trademark filing where the owner decides, the landing page; and in the code only what must carry the public name (display name, scheme, store metadata; the bundle identifier is its own release decision, launch §11.3, AGENTS rule 3). The internal working name may live on in the repository and the release marker. | A focused delivery in 26 | AGENTS rule 3 |
+| I | Only then: product and repository rename | The App Store name per localization, the domain purchase and its public email aliases (launch §13.1), the handles, the trademark filing where the owner decides, the landing page; and in the code only what must carry the public name (display name, scheme, store metadata; the bundle identifier is its own release decision, launch §11.3, AGENTS rule 3). The internal working name may live on in the repository and the release marker. | A focused delivery in 26 | AGENTS rule 3 |
 
 Rules across the steps: no candidate is tested with real users under the working name; no domain, handle or mark is
 bought «just in case» before H; the screening is repeated once, right before I, because availability changes.
@@ -281,7 +281,7 @@ What the research found crowded, and therefore a poor default for a new identity
 
 | Decision | Options | When |
 | --- | --- | --- |
-| When the naming workflow runs | Now, in parallel with 25A–25E (it needs no code); or in 26 with the identity | Any time; before 25F's sandbox gate if the app record needs the public name |
+| When the naming workflow runs | Now, in parallel with 25A–25E (it needs no code); or in 26 with the identity. Never chosen or accelerated for cloud setup: operational accounts stay brand-neutral (owner, 2026-10-05; production-plan.md §2.6) | Any time; before 25F's sandbox gate if the app record needs the public name |
 | Who runs the visual exploration | Claude Design, a designer, both as independent attempts | Before 26 |
 | Whether Forest is one of the territories | Yes as an evolved option (recommended, it is the owner's own 2026-09-30 decision and costs nothing to show); or excluded to avoid anchoring | At the start of §4 |
 | Budget for professional trademark review and for a typeface licence | None at first; a review only if a screening hit is close; a licence only if a territory needs a brand typeface in the app | Step G; after step C of launch §9.4 |

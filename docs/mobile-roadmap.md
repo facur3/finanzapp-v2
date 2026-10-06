@@ -1,6 +1,9 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-05 (Producto 25A-06 Phase A, on its branch: AI staging activation, the repository preflight, code and
+Updated: 2026-10-05 (owner decisions on the operational and support identity, documentation only: a private
+product-operations account owns new infrastructure and is never public, public domain aliases only after the naming
+gate, «Ayuda y comentarios» in Más before launch, the Apple seller identity gate; §3, «Producto 26»). Producto 25A-06
+Phase A merged as PR #87, merge commit ce4b4b3: AI staging activation, the repository preflight, code and
 documentation only, no service touched. A fail-closed environment identity (`server/mobile/runtime.js`:
 `MOBILE_ENVIRONMENT=staging`, the only enabled environment, and Vercel's own `VERCEL_ENV=production` on a route, absent
 off Vercel for the scripts); only `sb_publishable_…` / `sb_secret_…` Supabase keys (a legacy JWT or a swapped pair
@@ -275,13 +278,13 @@ commit 5c73813), 24UX6C (PR #72, merge
 commit c673be6), 24UX6B (PR #71, merge
 commit ecfd1dc), 24UX6A (PR #70, merged 2026-10-01, merge commit ef24bb6), 24T2 (PR #69, merge commit 8951f6c), 24T1C
 (PR #68), 24T1 (PR #67) and 25B3 (PR #66), then Producto 25A-01 (PR #77, merge commit a4202bc) and 25A-02 (PR #78 and its follow-up PR #79, merge commit
-a1bd181), 25UX1 (PR #80, merge commit d45eca6), and 25OPS1 (PR #81, merge commit d0a0be8), and 25DISC1 (PR #82, merge commit 227942c, documentation only), and 25VIS1 (PR #83, merge commit 0ff9859, Electric Lime, the accepted current palette), 25A-03 («Para revisar», PR #84, merge commit aef2edf), 25A-04 (Assistant → review sheet, PR #85, merge commit d493c83) and 25A-05 (AI security, provider contract and evaluation harness, PR #86, merge commit bd133a3); Producto 25A-06 Phase A (AI staging activation, the repository preflight) on its branch. Per area,
+a1bd181), 25UX1 (PR #80, merge commit d45eca6), and 25OPS1 (PR #81, merge commit d0a0be8), and 25DISC1 (PR #82, merge commit 227942c, documentation only), and 25VIS1 (PR #83, merge commit 0ff9859, Electric Lime, the accepted current palette), 25A-03 («Para revisar», PR #84, merge commit aef2edf), 25A-04 (Assistant → review sheet, PR #85, merge commit d493c83) and 25A-05 (AI security, provider contract and evaluation harness, PR #86, merge commit bd133a3) and 25A-06 Phase A (AI staging activation, the repository preflight, PR #87, merge commit ce4b4b3). Per area,
 without test inventories (those are in apps/mobile/README.md and the history
 file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_REGIONS`,
 `LEDGER_CURRENCIES`): what a build offers, verified on Linux; nothing is distributed to people yet
 (§4).
 
-- **AI staging activation, Phase A: the repository preflight (25A-06 Phase A, on its branch; nothing visible changes;
+- **AI staging activation, Phase A: the repository preflight (25A-06 Phase A, PR #87, merged; nothing visible changes;
   nothing to check on the iPhone).** §3, «Producto 25A-06»; the owner's checklist is
   [ai-staging-runbook.md](ai-staging-runbook.md). Code and documentation, implemented and tested on Linux, deployed,
   applied and configured nowhere; no secret exists and no provider was called. Environment identity, fail closed
@@ -780,7 +783,7 @@ it was checked in). Metro from `master` (or a delivery's branch) on the installe
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
-- **25A-06 Phase A — AI staging activation, the repository preflight (on its branch; no EAS build): nothing to check
+- **25A-06 Phase A — AI staging activation, the repository preflight (PR #87, merged; no EAS build): nothing to check
   on the iPhone.** No app change beyond the version line: every build stays disconnected (`assistantForBuild` passes no
   session provider) and no build points at staging in 25A-06 (ai-staging-runbook.md §13). Phase B's checks happen on
   the services, run by the owner (the runbook's checkpoints B1–B11), not on the device. Metro on the installed
@@ -1013,12 +1016,12 @@ protocol v2, the provider port with a disabled adapter, money-based reservations
 switch, the evaluation corpus, harness and thresholds. **25A-06 Phase A** (the repository preflight of the staging
 activation: environment identity, key kinds, the database's environment binding, `vercel.json`, the owner's staging
 scripts, the live-evaluation gates, [ai-staging-runbook.md](ai-staging-runbook.md) and
-[decision 006](decisions/006-cloud-identity.md); «Producto 25A-06» below) is **this PR**: CI only, no service touched,
+[decision 006](decisions/006-cloud-identity.md); «Producto 25A-06» below) **merged as PR #87** (merge commit ce4b4b3): CI only, no service touched,
 no secret, no paid call, nothing applied or deployed. The activation order is binding, each step only after the one
 before it passes (the runbook's §0.2):
-1. **25A-06 Phase A** (this PR) → review and merge by the owner (checkpoint A).
-2. **OWNER creates and configures staging**: remote inventory recorded (B1), the OpenAI staging project, keys and
-   limits (B2), the Supabase staging project and its auth settings (B3), `schema.sql` applied and `verify.sql` printing
+1. **25A-06 Phase A** → reviewed and merged by the owner as PR #87 (checkpoint A, done).
+2. **OWNER creates and configures staging**: remote inventory recorded (B1), the OpenAI staging project, service
+   accounts and limits (B2), the Supabase staging project and its auth settings (B3), `schema.sql` applied and `verify.sql` printing
    `STAGING_VERIFY_OK` (B4), the boundary probe (B5), the Vercel project `finanzapp-api-staging` deployed with AI still
    off in the database (B6).
 3. **Phase B activates staging**: the **real Luna evaluation** with an owner-approved spend (B7); AI enabled on staging,
@@ -1030,6 +1033,14 @@ before it passes (the runbook's §0.2):
 **25A2 and production activation are not started.** 25A2 stays a separate decision, allowed in parallel as already
 recorded (its first step is the «Card Network Identity» prerequisite, «Producto 25A2»); production activation is a
 later release decision, and nothing in 25A-06 enables AI on production. Nothing in the binding order below changes.
+
+**Owner decisions, 2026-10-05 (operational and support identity; documentation only, nothing created by an agent).**
+The owner created one private product-operations account; it owns the staging resources of step 2 and later
+infrastructure, its address never enters this public repository and it is never a support contact
+(production-plan.md §2.6). Public support addresses are domain aliases created only after the naming gate, and
+«Ayuda y comentarios» in Más is a pre-launch requirement (app-store-launch.md §13.1; «Producto 26»). The Apple seller
+identity (Individual or an eligible Organization) is decided explicitly before the public App Store Connect app record
+is created or finalized, and so before submission; not now (app-store-launch.md §12). The public name is never chosen or accelerated for cloud setup (brand-brief.md §6).
 
 **Earlier recommendation (2026-10-02, history):** **24T3 merged as PR #76** (merge commit 399a1fabaa673423b7a155ddb3cb900b5c0103fc):
 SQLite schema 14 and backup v14 are current, and the broad Forest visual lane (24UX6A–24UX6E) is complete. The active
@@ -1786,7 +1797,7 @@ Assistant's capability boundary and model evaluation, monetary safety).
     analytical facts v3.
   - **25A-06 — Staging activation** (the first network slice; owner setup and authorization required; no production
     activation), in two phases with the checkpoints of [ai-staging-runbook.md](ai-staging-runbook.md) §0.2:
-    - **Phase A — the repository preflight** (this PR; code and documentation only, no service touched, no secret, no
+    - **Phase A — the repository preflight** (PR #87, merged; code and documentation only, no service touched, no secret, no
       paid call, no EAS build; «Producto 25A-06» below): the fail-closed environment identity (`MOBILE_ENVIRONMENT=staging`
       with Vercel's `VERCEL_ENV=production`), the current Supabase key kinds only, a project-scoped provider key with its
       project id, the bearer claim precheck, the database's environment binding, `vercel.json` (Previews skipped,
@@ -4690,7 +4701,7 @@ nothing of it is on a screen yet.
   passes every threshold (not a model result). No EAS build, no remote provider call, no schema applied anywhere, no
   iPhone run by the agent.
 
-### Producto 25A-06 — AI Staging Activation, Phase A (this PR)
+### Producto 25A-06 — AI Staging Activation, Phase A (PR #87, merged)
 
 - **Goal.** Prepare the repository so the owner can bring up the Assistant's **staging** backend safely and in order:
   every guard that does not need a credential written and tested first, every owner step written down once, with who
@@ -4700,8 +4711,8 @@ nothing of it is on a screen yet.
   only: code, tests and documentation, CI only. **Nothing is deployed, applied or configured on any service; no key or
   secret exists; no provider was called; no remote SQL was run.** No EAS build. No ledger schema (14), backup (v14) or
   review schema (1) change; no visible change in a disconnected build. The version line reads «FinanzApp 0.1.0
-  (25A-06)». Phase B (the owner-led activation, the runbook's checkpoints B1–B11) starts only after this PR is
-  reviewed and merged and the owner has read the runbook.
+  (25A-06)». Checkpoint A passed when the owner merged this PR (#87, 2026-10-05). Phase B (the owner-led activation)
+  proceeds only through the runbook's checkpoints B1–B11, in order, once the owner has read the runbook.
 - **Environment contract** (runbook §3). `server/mobile/runtime.js`: `ENABLED_ENVIRONMENTS = ['staging']`, and
   `environmentOf(env, { deployed })` returns the environment or null (fail closed). A route runs only with
   `MOBILE_ENVIRONMENT=staging` **and** Vercel's own `VERCEL_ENV=production` (staging is the Production environment of
@@ -4728,7 +4739,7 @@ nothing of it is on a screen yet.
 - **Supabase auth** (runbook §5, decision 006). Recommended for launch: **Sign in with Apple** as the one cloud
   identity (Supabase's native `signInWithIdToken`, provider `apple`, with a nonce), requested only when the person turns
   on a cloud feature, never for the local core; no e-mail or password, magic link, anonymous user or social provider
-  at launch. The owner **accepts decision 006 by merging this PR**, or amends it here. It is **not built in 25A-06**: it
+  at launch. The owner **accepted decision 006 by merging this PR** (#87). It is **not built in 25A-06**: it
   needs a new development build, Apple Developer configuration and in-app account deletion with Apple token
   revocation, so it is its own later slice (the session slice, «Producto 25A», «Slices»). For staging, two or three
   test people created by the owner in the dashboard (e-mail and password, confirmed on creation), with public sign-ups,
@@ -5188,6 +5199,11 @@ or marketing asset.
   the app does, support and policy pages, the accessibility and performance pass on a TestFlight
   build (an optimised build, not development mode: cold start, memory, dropped frames, VoiceOver,
   large text, Reduce Motion), the release checklist, App Store review; a rollback plan.
+  «Ayuda y comentarios» in Más (report a problem, suggest an improvement, ask a question; technical metadata only,
+  never financial data), a quiet version and build line and no long footer copy; the website's `/support` and
+  `/privacy` with the public support alias (app-store-launch.md §13.1, owner decision 2026-10-05). The Apple seller
+  identity gate, Individual or an eligible Organization, decided explicitly before the public App Store Connect app
+  record is created or finalized, and so before submission (app-store-launch.md §12).
 - **Rules.** No submission, subscription or charge without the owner's authorisation; Apple's
   acceptance is separate from a submission; no claim of approval before it exists.
 - **Gates.** The release gate of the checklist; every open device gate above closed or

@@ -101,7 +101,7 @@ in case» before H (brand-brief §3, «Rules across the steps»). **OWNER DECISI
 | TikTok | Reach beyond followers with the same short videos | The §6 videos, re-exported natively (no other app's watermark) | A business uses the Commercial Music Library for all commercial activity (§13). Safe zones are published by TikTok as downloadable files: check them per format before exporting (*numbers unverified*). |
 | YouTube Shorts | Search-durable home for the same demos and explainers | Vertical video up to three minutes is classified as a Short (§13); a longer horizontal walkthrough only if the owner wants one | The Short's thumbnail is a frame chosen from the video in the YouTube app (§13): design one clean frame (title plus product) into every Short. Channel managed with channel permissions, the owner as Owner (§13). |
 | X / Threads | Optional: release notes and replies to people who mention the app | Text plus a short clip | **OWNER DECISION**; open only if there is someone to answer, otherwise reserve the handle and leave it dormant with a pointer bio. |
-| Website / landing | The canonical home: what it does, privacy, pricing when Pro exists, support | Launch §14 | Same identity; it hosts the privacy, terms and support pages App Store Connect needs (launch §13, a **LAUNCH BLOCKER** for submission, not for marketing). |
+| Website / landing | The canonical home: what it does, privacy, pricing when Pro exists, support | Launch §14; `/support`, `/privacy` and the public support address, launch §13.1 | Same identity; it hosts the privacy, terms and support pages App Store Connect needs (launch §13, a **LAUNCH BLOCKER** for submission, not for marketing). |
 
 **Video title and subtitle treatment.** A title card is not used; the hook is spoken or shown as the first caption.
 Burned-in captions in the identity's typeface, sentence case, two lines at most, high contrast on a solid or blurred
@@ -126,7 +126,9 @@ plate, inside the safe zone (§6). Platform auto-captions stay on as well for ac
 
 - **Product-controlled, not person-bound.** The account is registered with a product email address on the product
   domain (not a personal Gmail), with the recovery phone and email the owner controls and documented in a private
-  password manager, never in this public repository (AGENTS rule 6).
+  password manager, never in this public repository (AGENTS rule 6). The domain and its aliases exist only after the
+  naming gate (launch §13.1); the private operations account that owns the infrastructure
+  ([production-plan.md](production-plan.md) §2.6) is never a profile's contact.
 - **Business portfolio** (formerly Business Manager) in Meta Business Suite holds the Instagram account; an Instagram
   account can belong to one portfolio only, and adding it needs a professional account and full control of the
   portfolio (§13).

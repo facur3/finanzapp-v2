@@ -1,7 +1,7 @@
 # Decision 006: the cloud identity — Sign in with Apple for cloud features, never for the local core
 
-Date: 2026-10-05. Status: **recommended** in Producto 25A-06 Phase A (branch `feat/producto-25a-06-staging-activation`).
-The owner **accepts it by merging that PR**, or amends it there. It resolves the open «OWNER DECISION — the sign-in
+Date: 2026-10-05. Status: **accepted**: recommended in Producto 25A-06 Phase A and accepted by the owner's merge of
+PR #87 (merge commit ce4b4b3, 2026-10-05). It resolves the open «OWNER DECISION — the sign-in
 method» of [production-plan.md](../production-plan.md) §12.2. Nothing in this decision is implemented. The staging
 arrangement of 25A-06 is in [ai-staging-runbook.md](../ai-staging-runbook.md) §5.
 

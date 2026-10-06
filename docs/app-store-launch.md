@@ -3,6 +3,7 @@
 **Status.** A planning document, written on 2026-10-02 in Producto 25OPS1. **Nothing in it is implemented.** There is no
 subscription, no paywall, no StoreKit code, no purchase or analytics SDK, no production identity, no TestFlight build and
 no store listing. No account was created, no agreement signed, no build made and no charge incurred to write it.
+Updated 2026-10-05 with the owner's support identity, in-app help and seller identity gate (§12, §13.1, §14).
 
 - **External facts** (Apple, Expo, RevenueCat) were read from the vendors' own pages on **2026-10-02** and are listed
   in §16. Prices, limits and guideline wording change: re-read the source before any decision that depends on one. A
@@ -948,9 +949,9 @@ approval (roadmap, «Producto 26»).
 | --- | --- | --- | --- |
 | Final bundle identity | A definitive bundle identifier, name and scheme; a production variant and profile (§11.3). AGENTS rule 3. | **LAUNCH BLOCKER**; only `.dev` and `.preview` exist | Producto 26, **OWNER DECISION** |
 | Version and build | A public version; build numbers from EAS (§11.4) | `0.1.0`, remote build numbers | Producto 26 |
-| Developer account type | Individual or organization. Guidelines 3.2.1(viii) and 5.1.1(ix) reserve "financial trading, investing, or money management" and "highly regulated fields" for the institution or legal entity; whether a manual expense tracker is in scope is not defined by Apple (*unverified*). | **OWNER DECISION**, **RESEARCH GATE** | Before the app record is created; professional advice if in doubt |
+| Developer account type (seller identity gate) | Individual or organization. Guidelines 3.2.1(viii) and 5.1.1(ix) reserve "financial trading, investing, or money management" and "highly regulated fields" for the institution or legal entity; whether a manual expense tracker is in scope is not defined by Apple (*unverified*). The seller shown on the App Store is the membership's holder: staying Individual shows the owner's name; a legal entity as seller needs a move to an eligible Organization membership. | **OWNER DECISION**, **RESEARCH GATE**, **LAUNCH BLOCKER**: decided explicitly before the public App Store Connect app record is created or finalized (owner, 2026-10-05), and so before any submission; the legal or entity choice is not made now | Before the public App Store Connect app record is created or finalized; professional advice if in doubt |
 | Privacy policy URL | "Required"; linked in App Store Connect and "within the app in an easily accessible manner" (5.1.1(i)); must state data collected, third parties, retention and deletion | **LAUNCH BLOCKER**; none exists | Producto 26 (§13); already owed for the rate provider before TestFlight |
-| Support URL / contact | "Must lead to actual contact information" | **LAUNCH BLOCKER**; none exists | Producto 26 (§13, §14) |
+| Support URL / contact | "Must lead to actual contact information": the website's `/support` and the public support alias (§13.1) | **LAUNCH BLOCKER**; none exists | Producto 26 (§13, §14), after the naming gate (§9.4) |
 | Terms / EULA decision | Apple's standard EULA applies unless a custom one is provided. A subscription needs Terms of Use and Privacy Policy links in the app and in the metadata | **OWNER DECISION** (standard EULA or custom); none exists | 26 for the EULA choice; 25F for the subscription terms |
 | Age rating | The questionnaire (2025 system: 4+, 9+, 13+, 16+, 18+), considering "AI assistants and chatbot functionality"; an in-app browser raises it; a provider's minimum age can force an override | **NOT IMPLEMENTED** | 26; re-answered when the Assistant goes live (25A) |
 | App Privacy labels | Answers must match what the shipped build does, including third-party code. On-device-only data is "not collected" | Today's build could answer "data not collected" except for what the rate download implies; to verify at submission | 26; re-answered with 25A (AI provider retention), 25E (accounts), 25F (purchase SDK), analytics (§7) |
@@ -1029,6 +1030,27 @@ has its own staging and production credentials (production-plan.md §2); logs ne
 and the repository, being public, never holds a policy draft with personal contact data that the owner has not chosen
 to publish.
 
+### 13.1 Support identity and in-app help (owner decision, 2026-10-05)
+
+**DECIDED** (owner); **NOT IMPLEMENTED**.
+
+- **Public addresses.** No public «FinanzApp» address is created: it is only the working name (§9.4). After the naming
+  gate selects the public name and its domain ([brand-brief.md](brand-brief.md) §3, step I), the public contacts are
+  aliases on that domain: `support@<domain>`, `security@<domain>`, `privacy@<domain>`, and `hello@<domain>` if useful.
+  They are what the store listing, the website, the privacy policy and the app show.
+- **Never the infrastructure login.** The private operations account that owns the infrastructure
+  ([production-plan.md](production-plan.md) §2.6) is never a public or support address.
+- **The website** (§14) carries `/support` and `/privacy`, each with the public support address.
+- **In the app: «Ayuda y comentarios», a pre-launch requirement in Más** (Producto 26). One compact row with three
+  choices: «Reportar un problema», «Sugerir una mejora», «Hacer una consulta». The first implementation may open the
+  system mail composer to the public support alias. Más also shows a quiet app version and build line, and drops the
+  long explanatory footer copy that is not needed (today the «Datos de la app» footnote, `settings.localNote`).
+- **What the message may carry automatically:** only non-sensitive technical metadata: app version and build, iOS
+  version, device family, app language, configured product region.
+- **What it never carries automatically:** balances, movements, amounts, account or card names, merchants, the
+  Assistant conversation, or any auth, session or provider secret. The person may write whatever they choose; the app
+  adds nothing financial.
+
 ---
 
 ## 14. Landing page
@@ -1050,8 +1072,9 @@ submit (Producto 26); whether the marketing page ships with 1.0 or after it is a
   (only once it ships, described as the person's own automation); the controlled Assistant (drafts the person confirms);
   privacy and local-first; pricing (only when Pro exists, matching the App Store exactly); FAQ; support and privacy
   links; the App Store call to action (Apple's badge under its marketing guidelines).
-- **It also hosts** the privacy policy, terms and support pages that App Store Connect needs as URLs (§13); those are
-  needed before the marketing page and can ship first as plain pages.
+- **It also hosts** the privacy policy, terms and support pages that App Store Connect needs as URLs (§13): at least
+  `/support` and `/privacy`, with the public support address (§13.1); those are needed before the marketing page and
+  can ship first as plain pages.
 - **Design references.** Refero or manually collected references may be used for inspiration; no paid Refero MCP or
   other paid tool is assumed.
 - **The brand gate first** (§9.4): the page carries the final public name and identity, never the working name or
