@@ -10,8 +10,8 @@ only in the services' own settings and in local env files outside the repository
 - no key exists;
 - no provider was called.
 
-**Phase B** starts only after this PR is reviewed and merged **and** the owner has read this runbook. Each Phase B step
-names who acts. Production is out of scope: no step here touches it, enables AI there or decides its numbers.
+**Phase A merged as PR #87** (merge commit ce4b4b3, 2026-10-05): checkpoint A passed. **Phase B** proceeds only
+through the checkpoints of §0.2, in order, once the owner has read this runbook. Each Phase B step names who acts. Production is out of scope: no step here touches it, enables AI there or decides its numbers.
 
 Related: [production-plan.md](production-plan.md) (§2 environments, §3 Vercel, §4 Supabase, §5 the Assistant, §6 cost,
 §14.1 audits), [decision 006](decisions/006-cloud-identity.md) (the cloud identity), [mobile-roadmap.md](mobile-roadmap.md)
@@ -35,10 +35,10 @@ Each checkpoint must pass before the next one starts. Do not skip ahead.
 
 | # | Checkpoint | Who | Passes when |
 | --- | --- | --- | --- |
-| A | Phase A PR reviewed and merged | Owner | CI green; review threads resolved; merged by the owner |
+| A | Phase A PR reviewed and merged | Owner | **Passed**: PR #87 merged by the owner, 2026-10-05 |
 | B1 | Remote inventory recorded (§2) | Owner checks | Every OWNER CHECK answered in the roadmap; nothing deleted |
-| B2 | OpenAI staging project, key and limits (§7) | Owner | Key in a password manager only; limits, budget and alerts set; auto-recharge off |
-| B3 | Supabase staging project and auth settings (§5, §6.1) | Owner | Settings of §5.3 set; keys of §6.2 created |
+| B2 | OpenAI staging project, service accounts and limits, under the operations identity (§7) | Owner | Key in a password manager only; limits, budget and alerts set; auto-recharge off |
+| B3 | Supabase staging project and auth settings, under the operations identity (§5, §6.1) | Owner | Settings of §5.3 set; keys of §6.2 created |
 | B4 | Schema applied and verified (§6.3, §6.4) | Owner | `verify.sql` prints `STAGING_VERIFY_OK` |
 | B5 | Boundary probe (§6.5) | Owner runs a script | Every line PASS |
 | B6 | Vercel staging project deployed, AI off in the database (§4) | Owner | `probe.js api` all PASS |
@@ -475,7 +475,9 @@ Authentication → Sign In / Providers and → Settings in the staging project. 
 
 ### 6.1 Project (OWNER, at B3)
 
-- [ ] **New project** in a new or existing organization, named `finanzapp-staging`, specific region **South America
+- [ ] **Owner identity:** the Supabase organization is owned by the private product-operations identity
+  ([production-plan.md](production-plan.md) §2.6), never a public support address; its address is not written here.
+- [ ] **New project** in that organization, named `finanzapp-staging`, specific region **South America
   (São Paulo), `sa-east-1`** (§4.2), Free plan acceptable for staging. A Free project pauses after a week without activity: resume it from the
   dashboard. Database password into the password manager.
 - [ ] It is **empty**. Never point staging at the legacy project (§2.1) or at any project with data.
@@ -602,8 +604,9 @@ provider is called.
 
 - Billing (prepaid credits, auto-recharge) is per **organization**. Projects carry their own **budgets and alerts**, and
   where offered, model and rate limits.
-- If personal or other API use shares the organization (§2.4), the project limits are the only isolation of staging's
-  spend. A dedicated organization for FinanzApp is the stricter option; the owner decides.
+- The staging organization and project are created under the private product-operations identity
+  ([production-plan.md](production-plan.md) §2.6), never a public support address; its address is not written here. If
+  other API use shares that organization (§2.4), the project limits are the only isolation of staging's spend.
 - OpenAI says a project spend limit's enforcement is not instantaneous, so the server's ceilings stay **below** it
   (production-plan.md §5.7).
 
@@ -613,9 +616,12 @@ provider is called.
   (`proj_…`) → `MOBILE_AI_PROVIDER_PROJECT`.
 - [ ] **Model access** (project → Limits), where offered: allow only `gpt-6-luna`, plus `gpt-5.6-luna` only if §11
   needs the comparison.
-- [ ] **Keys:** create two project-scoped keys:
+- [ ] **Keys:** prefer two project **service accounts**, each with its own key, so machine access belongs to no
+  person's login:
   - `finanzapp-staging-api` → Vercel only (§4.4);
   - `finanzapp-staging-eval` → the owner's `staging-ai.env` only (§0.3).
+
+  Only if the console offers no service account, two project-scoped keys with the same names.
 
   Permissions **Restricted**, where offered: the Responses API (`/v1/responses`) write, nothing else; Models read only
   if the console requires it. Never an organization admin key in any FinanzApp setting. Each key goes into the

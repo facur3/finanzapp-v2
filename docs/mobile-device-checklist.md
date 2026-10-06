@@ -1,6 +1,6 @@
 # Physical iPhone acceptance checklist
 
-## Producto 25A-06 — AI staging activation, Phase A (on its branch; no device check required now)
+## Producto 25A-06 — AI staging activation, Phase A (PR #87, merged; no device check required now)
 
 Repository preflight: the server's environment identity (`staging` only), the accepted key kinds, the database's
 environment binding, the owner's staging scripts and [docs/ai-staging-runbook.md](ai-staging-runbook.md). Server and

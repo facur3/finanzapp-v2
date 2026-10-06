@@ -240,7 +240,7 @@ staging. Production's own arrangement, and the plan the commercial backend needs
 **DECIDED** (owner, 2026-10-05). The repository is public, so this section names roles, never an address.
 
 - **OWNER ACTION, done: one private product-operations Google account.** Its address is deliberately not committed
-  here or anywhere in the repository (AGENTS rule 6); the owner keeps it privately. It owns the infrastructure created from now on: the OpenAI Platform organization and projects (runbook B2),
+  here or anywhere in the repository (AGENTS rule 6); the owner keeps it privately. It owns the infrastructure created from now on: the OpenAI Platform organization and projects, with machine access through project service accounts (runbook B2, §7.2),
   new Supabase resources such as the staging project (runbook B3), and later Vercel admin or team access, domains and
   DNS, and similar services.
 - **Never public.** It is never published as a support or contact address, never shown in the app, the store listing,
@@ -1692,8 +1692,8 @@ The rule is that every later ask happens at the moment its value is clear, not o
 | Face ID lock, hide amounts | From Más, when the person wants them | **NOT IMPLEMENTED** |
 | Paywall | Never before the person understands the core product ([app-store-launch.md](app-store-launch.md) §3) | **NOT IMPLEMENTED** |
 
-**The sign-in method: resolved by [decision 006](decisions/006-cloud-identity.md)** (**recommended** in 25A-06 Phase A;
-the owner accepts it by merging that PR, or amends it there). **Sign in with Apple is the one cloud identity at
+**The sign-in method: resolved by [decision 006](decisions/006-cloud-identity.md)** (**accepted**: recommended in 25A-06 Phase A,
+accepted by the owner's merge of PR #87). **Sign in with Apple is the one cloud identity at
 launch**, through Supabase's native ID-token flow (`signInWithIdToken`, provider `apple`, a hashed nonce). It is asked
 only when the person turns on a cloud feature (first the Assistant's cloud mode, with the consent of §5.7), never for
 the local core, which keeps working with no account. There are no anonymous users, no e-mail or password sign-in and no
@@ -1764,7 +1764,7 @@ Nothing below is complete unless it says **EXISTS TODAY**. "Launch §n" is a sec
 | RLS validation with two users | 25A | Proven on disposable PostgreSQL in CI (25A-05); `verify.sql` and `probe.js boundary` **EXIST TODAY** (25A-06 Phase A); **IMPLEMENTATION GATE** in staging | Run in staging with two owner-created test people (runbook B4, B5), kept in SQL tests |
 | Direct callability of `mobile_reserve_usage` | 25A | **FIXED in the repository** (25A-05): internal, no client role executes any function; not applied anywhere | Applied with the schema in 25A-06 |
 | Privileged path with the Supabase secret key | 25A | **EXISTS TODAY** in code (25A-05; only `sb_secret_…` and `sb_publishable_…` kinds since 25A-06 Phase A); no key exists | The owner creates the staging project and sets the key (runbook B3, B6) |
-| Sign-in, session storage, account deletion | 25A | **NOT IMPLEMENTED**; the method **recommended** by [decision 006](decisions/006-cloud-identity.md) (Sign in with Apple; accepted by merging 25A-06 Phase A); **LAUNCH BLOCKER** once accounts exist | The session slice, after 25A-06 and before any build calls the cloud Assistant |
+| Sign-in, session storage, account deletion | 25A | **NOT IMPLEMENTED**; the method **accepted** in [decision 006](decisions/006-cloud-identity.md) (Sign in with Apple; PR #87); **LAUNCH BLOCKER** once accounts exist | The session slice, after 25A-06 and before any build calls the cloud Assistant |
 | Assistant capability boundary (no generic tools) | all | **DECIDED**; **EXISTS TODAY** (no tools; the adapter's request keys are allowlisted and a tool call is refused, 25A-05) | Kept by review of every Assistant change |
 | Closed Assistant protocol v2, validated on the server and the device | 25A | **EXISTS TODAY** (25A-05); v1 retired, never deployed | v3 (locale, currencies) server first, later |
 | Cloud-AI consent screen | 25A | **NOT IMPLEMENTED**, **LAUNCH BLOCKER** | Built and shown before any send |
