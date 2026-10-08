@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
-import { PROTOCOL_LIMITS, modelInput, validateAssistantRequestV2 } from '../../../packages/integrations/assistant-protocol.js';
+import { CLARIFICATION_FIELDS, PROTOCOL_LIMITS, modelInput, validateAssistantRequestV2 } from '../../../packages/integrations/assistant-protocol.js';
 import { ASSISTANT_INSTRUCTIONS } from '../assistant-prompt.js';
 import { CASES, EVAL_TODAY } from './corpus.js';
-import { buildRequest, fixtureResponder, goldenOutput, requestIdFor, runEval, underivedNumbers } from './harness.js';
+import { buildRequest, fixtureResponder, goldenOutput, isImperfect, missedMetrics, requestIdFor, runEval, underivedNumbers } from './harness.js';
 import { THRESHOLDS, checkThresholds } from './thresholds.js';
 import { main, worstCaseMicroUsd } from './run.js';
 import { aiConfig } from '../runtime.js';
@@ -264,6 +264,55 @@ describe('eval CLI', () => {
     const report = JSON.parse(io.out.mock.calls[0][0]);
     expect(report.mode).toBe('fixture');
     expect(report.verdict.pass).toBe(true);
+  });
+
+  // Codex review of PR #92: a case that costs clarificationAccuracy or groundedEvidenceAccuracy kept the right type, no
+  // flag and no field score, so the old selection (type, flags, field scores) left it out of `imperfect` and a paid
+  // failed run had no output to read for it.
+  it('lists every case that costs a metric, naming the metric, from the table the metrics are computed from', async () => {
+    const byInput = new Map(CASES.map(item => [JSON.stringify(modelInput(buildRequest(item))), item]));
+    const wrongField = testCase => CLARIFICATION_FIELDS.find(field => !testCase.expect.clarification.fields.includes(field));
+    const outputFor = testCase => {
+      const golden = goldenOutput(testCase);
+      if (testCase.expect.type === 'clarification') return { ...golden, clarification: { field: wrongField(testCase), candidateIds: [] } };
+      // The allowed but not required fact, with its own amount: no underived number, no flag, the wrong evidence.
+      if (testCase.id === 'analytics.month-total.es') return { ...golden, evidenceIds: ['previous.expenses'], message: 'Gastos registrados: $ 152.300, 12 movimientos.' };
+      return golden;
+    };
+    const respond = vi.fn(async call => ({ output: outputFor(byInput.get(call.input)), usage: null, model: 'gpt-6-luna', tier: 'default' }));
+    const io = quiet();
+    expect(await main(LIVE, { ...LIVE_CONFIG, MOBILE_AI_EVAL_LIVE: '1' }, { createProvider: () => ({ respond }), ...io })).toBe(1);
+    const report = JSON.parse(io.out.mock.calls[0][0]);
+    expect(report.verdict.failures.map(item => item.metric)).toEqual(['clarificationAccuracy', 'groundedEvidenceAccuracy']);
+    const clarifications = CASES.filter(item => item.expect.type === 'clarification').map(item => item.id);
+    const listed = Object.fromEntries(report.imperfect.map(item => [item.id, item]));
+    expect(Object.keys(listed).sort()).toEqual([...clarifications, 'analytics.month-total.es'].sort());
+    for (const id of clarifications) expect(listed[id]).toMatchObject({ expectedType: 'clarification', type: 'clarification', misses: ['clarificationAccuracy'], flags: [], fieldScores: {},
+      output: { type: 'clarification', clarification: { field: wrongField(CASES.find(item => item.id === id)) } } });
+    expect(listed['analytics.month-total.es']).toMatchObject({ expectedType: 'answer', type: 'answer', misses: ['groundedEvidenceAccuracy'], flags: [], output: { evidenceIds: ['previous.expenses'] } });
+    // The list and the numbers come from one table: every miss a case-level rate counts is a case listing that rate.
+    for (const metric of ['schemaValidRate', 'intentAccuracy', 'clarificationAccuracy', 'unsupportedRefusalRate', 'groundedEvidenceAccuracy', 'servedAsConfiguredRate']) {
+      const { pass, of } = report.metrics.counts[metric];
+      expect(report.imperfect.filter(item => item.misses.includes(metric)).length, metric).toBe(of - pass);
+    }
+    for (const metric of ['jailbreakProposalRate', 'hallucinatedFactRate']) {
+      expect(report.imperfect.filter(item => item.misses.includes(metric)).length, metric).toBe(report.metrics.counts[metric].pass);
+    }
+  });
+
+  it('names every metric a case costs, including the field rates and the served-model rule', async () => {
+    const golden = await evaluate();
+    expect(golden.cases.filter(isImperfect)).toEqual([]);
+    const report = await evaluate(testCase => {
+      const output = goldenOutput(testCase);
+      return output.type === 'proposal' ? { ...output, proposals: [{ ...output.proposals[0], paymentMethodRef: 'Visa Galicia', currency: null }] } : output;
+    });
+    const named = report.cases.find(item => item.id === 'capture.visa-one.es');
+    expect(missedMetrics(named)).toEqual(['captureFieldAccuracy', 'destinationReferencePreservation']);
+    expect(missedMetrics(report.cases.find(item => item.id === 'capture.expense-simple.es'))).toEqual(['captureFieldAccuracy', 'destinationReferencePreservation', 'hallucinatedFactRate']);
+    const other = await runEval({ cases: CASES.slice(0, 1), respond: (call, testCase) => ({ ...fixtureResponder(CASES)(call, testCase), model: 'gpt-5.6-luna' }), expected: { model: 'gpt-6-luna', serviceTier: 'default' } });
+    expect(missedMetrics(other.cases[0])).toEqual(['servedAsConfiguredRate']);
+    expect(isImperfect(other.cases[0])).toBe(true);
   });
 
   it('refuses --live without both gates, before any provider is created', async () => {

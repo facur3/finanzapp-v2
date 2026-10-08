@@ -4944,8 +4944,14 @@ nothing of it is on a screen yet.
       commit the evaluator's worst case is 151 469 µUSD for Luna (the instructions grew) and 333 787 for
       `gpt-5.6-luna`.
     - **Diagnosis of the 15 imperfect cases** (branch `fix/25a-06-luna-eval-quality`, no provider call). The report kept
-      scores and flags, not outputs, so a refused output's cause is the most probable one, marked «probable»; the
-      evaluator now keeps each imperfect case's raw output for the next run.
+      scores and flags, not outputs, so a refused output's cause is the most probable one, marked «probable». Since
+      PR #92 the evaluator lists every case that costs a metric (the list and the metrics read one table, so a wrong
+      clarification field or a wrong cited fact can no longer be left out) with the metrics it costs and the parsed
+      output the adapter returned, the one the protocol validator judged. **Not every rejected response is
+      recoverable:** when the adapter itself throws (`provider_<category>` first in the flags: not completed, a
+      refusal, no JSON, a tool call, HTTP, timeout, network, spend limit) the port returns no partial or unparsed body
+      and the eval keeps none, by design; only the category is recorded. Run #1's three `invalid_schema` cases carried
+      no `provider_*` flag, so they were parsed outputs the validator refused, the kind a next run would show.
 
       | Case | Expected → returned | Flags, failed fields | Cause |
       | --- | --- | --- | --- |
@@ -4969,6 +4975,18 @@ nothing of it is on a screen yet.
       `send-money.es`, `huge-amount.es` and `negative.es` (intent up to 101/103, clarification up to 23/23) and the seven
       currency fields. If both oversized cases stay refused, `schemaValidRate` is 101/103 = 0.9806 and **still fails**:
       that is the measured limitation, not something to tune away.
+    - **Over-long names at the boundary (reviewed in PR #92, not changed).** Today an over-long optional `merchant` or
+      `category` makes the whole result invalid: the server answers 502 `output_invalid` («La IA devolvió una respuesta
+      inválida. No se guardó ningún movimiento.») and the person types again or enters the movement by hand; nothing
+      is saved and nothing is truncated. A deterministic boundary rule (drop the over-long optional name, keep the
+      amount, mark the proposal incomplete so the review sheet asks for it) would need a protocol field v2 does not
+      have (`validateAssistantResultV2` returns only the protocol's keys and runs again on the device), and inside the
+      evaluation it would make the validator, not the model, pass these two cases: the adoption rule measures the
+      model's output as returned. Silent truncation or nulling without a marker is excluded (a name is the person's
+      words; a cut name is a different merchant). **Recommendation:** a protocol v3 item for 25A-07, decided with the
+      v3 locale and currency fields: an explicit `incomplete` marker on a proposal whose optional name was dropped at
+      the server boundary, shown in the review sheet as a field to complete; the thresholds and this corpus's
+      expectations (`merchant: null`, `category: null`) stay as they are. Not expanded in PR #92.
 - **Owner refinements before accepting the runbook (2026-10-05, in this PR).**
   - **Staging region:** Vercel Functions `gru1` (São Paulo) and the staging Supabase project in the specific region
     `sa-east-1` (São Paulo), replacing `iad1` / us-east-1. The reasons: Argentina-first, the API compute next to its

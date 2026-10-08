@@ -909,8 +909,10 @@ The eval calls the provider **directly**: they bypass the database reservations.
   - If Luna fails a required bound, `gpt-5.6-luna` is evaluated the same way, as a comparison (a second approved spend).
   - If both fail, nothing is adopted and 25A-06 records the failure.
 - [x] Keep `eval.json` outside the repository. Claude records its numbers in the roadmap: no prose of refusals, no
-  token counts per case. Since run #1 the report also keeps each imperfect case's raw output (`imperfect[].output`,
-  synthetic), so a failed run can be diagnosed without another one; it stays outside the repository like the rest.
+  token counts per case. Since run #1 the report lists every case that costs a metric, with the metrics it costs
+  (`imperfect[].misses`) and the parsed output the adapter returned (`imperfect[].output`, synthetic), so a failed run
+  can be diagnosed without another one; it stays outside the repository like the rest. A response the adapter itself
+  rejected (`provider_<category>` in the flags) has no output to show: the port keeps no partial or unparsed body.
 
 ## 12. Staging smoke and failure drills (OWNER, at B8)
 

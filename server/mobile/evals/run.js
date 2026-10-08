@@ -12,7 +12,7 @@ import { maxCostMicroUsd } from '../cost.js';
 import { PRICING, PRICING_MAX_AGE_DAYS, pricingAgeDays } from '../pricing.js';
 import { createProvider as defaultCreateProvider } from '../provider.js';
 import { CASES } from './corpus.js';
-import { CALL_OPTIONS, buildRequest, fixtureResponder, runEval } from './harness.js';
+import { CALL_OPTIONS, buildRequest, fixtureResponder, isImperfect, missedMetrics, runEval } from './harness.js';
 import { checkThresholds } from './thresholds.js';
 
 const boundOf = (config, testCase) => inputTokenBound(providerRequest(buildRequest(testCase),
@@ -65,8 +65,11 @@ export async function main(argv = process.argv.slice(2), env = process.env, { cr
   }
   const { cases, metrics } = await runEval({ cases: CASES, respond, price, callOptions, expected });
   const verdict = checkThresholds(metrics);
-  const imperfect = cases.filter(item => !item.typeCorrect || item.flags.length || Object.values(item.fieldScores).includes(false))
-    .map(({ id, expectedType, type, fieldScores, flags, output }) => ({ id, expectedType, type, fieldScores, flags, output }));
+  // Every case that costs a metric or carries a flag, with the metrics it costs: the same table the metrics are computed
+  // from (harness.js RATES), so the list and the numbers cannot diverge. `output` is the adapter's parsed output, null
+  // when the adapter threw (then flags[0] is `provider_<category>` and no body was kept).
+  const imperfect = cases.filter(isImperfect)
+    .map(item => ({ id: item.id, expectedType: item.expectedType, type: item.type, misses: missedMetrics(item), fieldScores: item.fieldScores, flags: item.flags, output: item.output }));
   // A live run lists every refusal's words for a human reading: the refusal metrics are heuristics, not a judgement.
   const refusals = live ? cases.filter(item => item.expectedType === 'out_of_scope').map(({ id, type, message }) => ({ id, type, message })) : undefined;
   if (stale && !live) err(`WARNING: the price table was read on ${PRICING.readOn}; a live run or a release must re-read it first.`);
