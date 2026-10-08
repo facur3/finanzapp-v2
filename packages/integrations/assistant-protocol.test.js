@@ -21,7 +21,7 @@ describe('a reply to a question states only the figures of the facts it cites, e
   it('accepts a cited fact\'s amount or count restated in any writing, the periods\' days and years, and a number in a cited label', () => {
     for (const [ok, cited] of [['Llevás $ 184.500 en 14 movimientos; el mes pasado a esta altura, $ 152.300: más.', BOTH], ['Llevás 184.500 pesos.', BOTH], ['Llevás $184.500,00.', BOTH],
       ['Llevás 184500.', BOTH], ['Llevás 184,5 mil.', BOTH], ['Del 1 al 5 de octubre de 2026 registraste 14 movimientos, 12 en septiembre.', BOTH],
-      ['Ingresos: $ 842,50 (uno).', ['current.income']], ['Ingresos: US$ 842,5.', ['current.income']], ['En Plan 2030 llevás $ 78.200 en 5 compras.', ['current.category.0']],
+      ['Ingresos: $ 842,50 (uno).', ['current.income']], ['Ingresos: ARS 842,5, o sea 842,50 pesos.', ['current.income']], ['En Plan 2030 llevás $ 78.200 en 5 compras.', ['current.category.0']],
       ['No llegaste a ese monto este mes: $ 184.500.', BOTH], ['Fuiste 5 veces al super: 5 compras.', BOTH], ['Hoy, 05/10/2026, a las 14:30.', BOTH],
       ['Del 2026-10-01 al 2026-10-05.', BOTH]]) {
       expect(unsupportedFigures(ok, ask('¿Gasté más de 100 mil este mes?'), cited), ok).toEqual([]);
@@ -34,7 +34,7 @@ describe('a reply to a question states only the figures of the facts it cites, e
     const cents = [fact('current.refunds', 'Devoluciones', 100, 1), fact('current.expenses', 'Gastos registrados', 199, 1), fact('current.income', 'Ingresos registrados', PROTOCOL_LIMITS.maxAmountMinor, 1)];
     const request = validateAssistantRequestV2({ version: 2, requestId: 'fixture-request-0001', action: 'explain', text: '¿Cuánto?', todayISO: '2026-10-05', currency: 'ARS', region: 'AR', facts: cents });
     const all = cents.map(item => item.id);
-    for (const ok of ['Te devolvieron $ 1.', 'Te devolvieron $ 1,00.', 'Te devolvieron 1 peso: $ 1,0.', 'Gastaste $ 1,99.', 'Gastaste 1,99 pesos.', 'Cobraste $ 9.999.999.999.999,99.'])
+    for (const ok of ['Te devolvieron $ 1.', 'Te devolvieron $ 1,00.', 'Te devolvieron 1 peso: $ 1,0.', 'Te devolvieron 100 centavos.', 'Gastaste $ 1,99.', 'Gastaste 1,99 pesos.', 'Cobraste $ 9.999.999.999.999,99.'])
       expect(unsupportedFigures(ok, request, all), ok).toEqual([]);
     for (const [bad, figures] of [['Te devolvieron $ 1,005.', ['1,005']], ['Te devolvieron $ 1,004.', ['1,004']], ['Gastaste $ 2.', ['2']], ['Gastaste $ 2,00.', ['2,00']], ['Gastaste $ 1,9.', ['1,9']],
       ['Cobraste $ 9.999.999.999.999,98.', ['9.999.999.999.999,98']], ['Cobraste $ 10.000.000.000.000.', ['10.000.000.000.000']], ['Cobraste 1e13 pesos.', ['1e13']]]) {
@@ -53,8 +53,8 @@ describe('a reply to a question states only the figures of the facts it cites, e
     expect(unsupportedFigures('Gastaste $ 1.000.', request, [thousand.id])).toEqual([]);
     expect(unsupportedFigures('Gastaste $ 1.000,00 (mil pesos: 1000).', request, [thousand.id])).toEqual([]);
     for (const bad of ['Gastaste $ 1,000.', 'Gastaste $ 1,000.00.', 'Gastaste $1000.00.']) expect(unsupportedFigures(bad, request, [thousand.id]), bad).toEqual([bad.match(/[\d.,]+\d/)[0]]);
-    for (const bad of ['Cobraste US$ 2,00.', 'Cobraste US$ 1,9.', 'Cobraste US$ 1.99.', 'Cobraste US$ 1,990.']) expect(unsupportedFigures(bad, request, [usd.id]), bad).toEqual([bad.match(/[\d.,]+\d/)[0]]);
-    expect(unsupportedFigures('Cobraste US$ 1,99.', request, [usd.id])).toEqual([]);
+    for (const bad of ['Cobraste $ 2,00.', 'Cobraste $ 1,9.', 'Cobraste $ 1.99.', 'Cobraste $ 1,990.']) expect(unsupportedFigures(bad, request, [usd.id]), bad).toEqual([bad.match(/[\d.,]+\d/)[0]]);
+    expect(unsupportedFigures('Cobraste $ 1,99.', request, [usd.id])).toEqual([]);
     expect(figureMinorUnits('1.000')).toEqual([100000n]);
     for (const token of ['1,000', '842.50', '1,234.56', '1.23.456', '0500', '007', '1.0', '12.5', '184,500', '1.2345']) expect(figureMinorUnits(token), token).toEqual([]);
   });
@@ -83,6 +83,10 @@ describe('a reply to a question states only the figures of the facts it cites, e
       ['Gastaste $2030 en esa categoría.', ['2030'], ['current.category.0']], ['Gastaste -2030.', ['2030'], ['current.category.0']], ['Subió 2030%.', ['2030%'], ['current.category.0']],
       ['Gastaste 2030 en esa categoría.', ['2030'], ['current.category.0']], ['Son 2.030 pesos en Plan 2030.', ['2.030'], ['current.category.0']],
       ['Plan 2030 tuvo 2030 compras.', ['2030'], ['current.category.0']], // only the occurrence inside the name is the label's
+      // A monetary mark beside a small integer makes it money (Codex review): a subunit is read in minor units, another
+      // currency is refused, and so is the other protocol currency in a request of this one (a conversion).
+      ['Gastaste 1 peso.', ['1'], BOTH], ['Gastaste 20 centavos.', ['20'], BOTH], ['Eso equivale a 20 euros.', ['20'], BOTH], ['Son € 20.', ['20'], BOTH], ['Son 20 EUR.', ['20'], BOTH],
+      ['Llevás US$ 184.500.', ['184.500'], BOTH], ['Llevás 184.500 dólares.', ['184.500'], BOTH], ['Cobraste 84.250 centavos.', ['84.250'], ['current.income']],
       // Every Unicode dash or minus before an amount is a sign: the small and fullwidth hyphen-minus, the en dash.
       ['Llevás \ufe6378.200 pesos.', ['78.200'], ['current.category.0']], ['Llevás \uff0d78.200 pesos.', ['78.200'], ['current.category.0']], ['Llevás \u201378.200.', ['78.200'], ['current.category.0']]]) {
       expect(unsupportedFigures(bad, request, cited), bad).toEqual(figures);

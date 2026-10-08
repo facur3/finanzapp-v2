@@ -144,8 +144,18 @@ const FIGURE = /(\d[\d.,]*\d(?:[eE][+-]?\d+)?|\d(?:[eE][+-]?\d+)?)(\s*(?:%|％|p
 // Any dash or minus (every Unicode dash, the minus sign, the small and fullwidth hyphen-minus) before the figure.
 const SIGNED_BEFORE = /(?<!\d)[\p{Pd}\u2212]\s*(?:(?:\$|u\$s|USD|ARS)\s*)?$/iu;
 const PERCENT = /^(?:%|％|por\s*ciento|porciento|per\s*cent|percent)$/i;
-const MONEY_BEFORE = /(?:\$|u\$s|\b(?:USD|ARS))\s*$/i;
-const MONEY_AFTER = /^\s*(?:pesos|mangos|d[oó]lares|dollars|bucks|USD|ARS)\b/i;
+// A monetary mark beside a figure says which currency the figure is in: a bare «$» may be either protocol currency;
+// a word, symbol or code of the request's currency is fine; another currency is a conversion or an invention and is
+// refused; a subunit («centavos») is read in minor units. Singular and plural, Spanish and English (Codex review).
+const MARKS = {
+  any: ['$'], USD: ['us$', 'u$s', 'usd', 'dólar', 'dolar', 'dólares', 'dolares', 'dollar', 'dollars', 'buck', 'bucks'],
+  ARS: ['ar$', 'ars', 'peso', 'pesos', 'mango', 'mangos'], minor: ['centavo', 'centavos', 'céntimo', 'céntimos', 'centimo', 'centimos', 'cent', 'cents'],
+  other: ['€', '£', '¥', 'r$', 'eur', 'brl', 'gbp', 'jpy', 'clp', 'uyu', 'mxn', 'cop', 'pen', 'cny', 'chf', 'euro', 'euros', 'real', 'reales', 'libra', 'libras', 'pound', 'pounds', 'yen', 'yenes', 'yuan', 'franco', 'francos'],
+};
+const markPattern = Object.values(MARKS).flat().sort((a, b) => b.length - a.length).map(mark => mark.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+const MONEY_BEFORE = new RegExp(`(?<![\\p{L}\\d])(${markPattern})\\s*$`, 'iu');
+const MONEY_AFTER = new RegExp(`^\\s*(${markPattern})(?![\\p{L}\\d])`, 'iu');
+const currencyOf = mark => Object.keys(MARKS).find(key => MARKS[key].includes(mark.toLowerCase()));
 // A digit of another script or a numeric symbol («٣», «３», «²», «½») is never a restated fact; a format or combining
 // character glued to a digit would split a figure into digits that pass alone.
 const FOREIGN_DIGIT = /(?![0-9])[\p{Nd}\p{No}]/u;
@@ -187,8 +197,11 @@ export function unsupportedFigures(message, request, evidenceIds = []) {
     if (GLUED_BEFORE.test(before) || GLUED_AFTER.test(after) || SIGNED_BEFORE.test(before) || /[eE]/.test(match[1])) { found.push(match[0]); continue; }
     const suffix = (match[2] ?? '').trim();
     if (PERCENT.test(suffix)) { found.push(match[0]); continue; }
-    const money = MONEY_BEFORE.test(before) || MONEY_AFTER.test(after);
-    const bare = !suffix && !money && /^\d+$/.test(match[1]);
+    const mark = MONEY_BEFORE.exec(before)?.[1] ?? MONEY_AFTER.exec(after)?.[1] ?? null;
+    const currency = mark === null ? null : currencyOf(mark);
+    if (currency === 'other' || (currency === 'USD' || currency === 'ARS') && request.currency !== undefined && currency !== request.currency) { found.push(match[0]); continue; }
+    if (currency === 'minor') { if (suffix || !/^\d+$/.test(match[1]) || !amounts.has(BigInt(match[1]))) found.push(match[0]); continue; }
+    const bare = !suffix && mark === null && /^\d+$/.test(match[1]);
     const named = bare && spans.some(([start, end]) => match.index >= start && match.index + match[0].length <= end);
     const supported = named || figureMinorUnits(match[1], suffix).some(value => amounts.has(value))
       || (bare && (Number(match[1]) <= 31 || counts.has(BigInt(match[1])) || (match[1].length === 4 && years.has(match[1]))));

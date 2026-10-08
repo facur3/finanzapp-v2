@@ -5282,7 +5282,10 @@ nothing of it is on a screen yet.
       would carry the figure instead), never a draft or a question on `parse`. Adversarially reviewed before the PR
       (four lenses, 230 probes) and tightened: a percentage in words («21 por ciento»), a thousands-shaped round figure
       that read as a small integer or a count («22.000», «$ 14.000»), a figure inside a longer number the person wrote,
-      colloquial money marks, another script's digits and format characters glued to digits are refused, as are a
+      colloquial money marks (and, after the Codex review of `52699e6`, any monetary mark beside a figure in singular
+      or plural, Spanish or English: a subunit «centavos» is read in minor units, another currency «euros», «€», «EUR»
+      is refused, and so is the other protocol currency in a request of this one, a conversion), another script's
+      digits and format characters glued to digits are refused, as are a
       dash or minus of any kind before a fact's figure, spaced or not («-$ 184.500», «- $ 184.500», «－78.200», a
       rewrite of a non-negative fact; so a spaced dash before an amount is refused too, fail closed; only a dash right
       after a digit, as in an ISO date, is not a sign) and exponent notation («2e6»), from the Codex reviews of the PR. The owner's review

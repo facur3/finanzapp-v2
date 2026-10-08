@@ -35,7 +35,7 @@ export declare function validateAssistantResultV2(value: unknown, request: Assis
 /** The figures of a reply's prose that the cited facts (`evidenceIds`) do not hold exactly (an amount in minor units
  * or a count, a period's year, a number in a cited label, a day-sized integer): each is a reason to refuse a reply to a
  * question. Nothing else supports a figure: not an uncited fact, not the person's question. */
-export declare function unsupportedFigures(message: string, request: Pick<AssistantRequestV2, 'facts'> & Partial<Pick<AssistantRequestV2, 'todayISO'>>, evidenceIds?: readonly string[]): string[];
+export declare function unsupportedFigures(message: string, request: Pick<AssistantRequestV2, 'facts'> & Partial<Pick<AssistantRequestV2, 'todayISO' | 'currency'>>, evidenceIds?: readonly string[]): string[];
 /** The exact minor-unit value of a figure token written under the reply's numeric contract (Argentine writing: a point
  * groups thousands, a comma precedes one or two centavos), under a multiplier suffix («mil», «millones»): one value, or
  * none when the writing is not the contract's. */

@@ -110,7 +110,7 @@ const CAUSAL = /\b(?:porque|debido a|a causa de|ya que|because|due to|caused by)
  * person's own number; the device draws the verified difference. Integers ≤ 31 that are not money (days, small
  * counts), the periods' years and a number in a cited label pass, as in the validator. */
 export function underivedNumbers(message, cited, testCase) {
-  return unsupportedFigures(message, { facts: cited, todayISO: testCase.request.todayISO ?? EVAL_TODAY }, cited.map(item => item.id));
+  return unsupportedFigures(message, { facts: cited, todayISO: testCase.request.todayISO ?? EVAL_TODAY, currency: testCase.request.currency }, cited.map(item => item.id));
 }
 
 const words = value => fold(value).split(/[^\p{L}\p{N}]+/u).filter(word => word.length >= 3);
