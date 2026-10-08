@@ -5283,9 +5283,9 @@ nothing of it is on a screen yet.
       (four lenses, 230 probes) and tightened: a percentage in words («21 por ciento»), a thousands-shaped round figure
       that read as a small integer or a count («22.000», «$ 14.000»), a figure inside a longer number the person wrote,
       colloquial money marks, another script's digits and format characters glued to digits are refused, as are a
-      minus before a fact's figure, spaced or not («-$ 184.500», «- $ 184.500», a rewrite of a non-negative fact; so a
-      spaced dash before an amount is refused too, fail closed; only a dash right after a digit, as in an ISO date, is
-      not a sign) and exponent notation («2e6»), from the Codex reviews of the PR. The owner's review
+      dash or minus of any kind before a fact's figure, spaced or not («-$ 184.500», «- $ 184.500», «－78.200», a
+      rewrite of a non-negative fact; so a spaced dash before an amount is refused too, fail closed; only a dash right
+      after a digit, as in an ISO date, is not a sign) and exponent notation («2e6»), from the Codex reviews of the PR. The owner's review
       of `1a97a0d` then removed two weaknesses: a float comparison within 0,005 (so «1,005» passed for a fact of 1,00)
       became exact minor units, and the person's question and uncited facts stopped supporting figures; the owner's
       review of `3484c57` removed a third: a lone separator before three digits was read both ways and whichever
@@ -5297,8 +5297,8 @@ nothing of it is on a screen yet.
       («el doble», «medio millón», «veintidós mil»), the direction word («más»/«menos» is the model's claim; the
       signed row is the verified one), a computed count or ratio of 31 or less («2 movimientos más», «2 veces»; a bare
       integer ≤ 31 is also the one way a question's number can still be echoed), a cited label's own number (accepted
-      only bare and inside that name as the label writes it, «Plan 2030», never as money, signed or a percentage:
-      Codex review of `bf0c78b`), or space-grouped thousands («184 500» is read as two figures): those rest on the instructions and on reading a
+      only bare and inside an occurrence of that name as the label writes it, «Plan 2030», never as money, signed, a
+      percentage or elsewhere in the message: Codex reviews of `bf0c78b` and `17e4093`), or space-grouped thousands («184 500» is read as two figures): those rest on the instructions and on reading a
       live report. The robust design is a result-shape change, for protocol v3 and its own PR: typed figure references
       in the prose («{current.expenses}», rendered by the device from its own evidence) and no digits at all in the
       model's text, so every figure is exact and attributed by construction; not forced into this PR. The security

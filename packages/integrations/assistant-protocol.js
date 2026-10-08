@@ -141,7 +141,8 @@ function navigation(value, cited) {
 // «- $ 184.500», «$ - 184.500»), rewrites a non-negative fact: both are refused, fail closed, so a spaced dash before
 // an amount is also refused; only a dash right after a digit (an ISO date, a range) is not a sign (Codex reviews).
 const FIGURE = /(\d[\d.,]*\d(?:[eE][+-]?\d+)?|\d(?:[eE][+-]?\d+)?)(\s*(?:%|％|por\s*ciento\b|porciento\b|per\s*cent\b|percent\b)|\s*(?:mil|k|lucas)\b|\s*mill[oó]n(?:es)?\b)?/giu;
-const SIGNED_BEFORE = /(?<!\d)[-−]\s*(?:(?:\$|u\$s|USD|ARS)\s*)?$/i;
+// Any dash or minus (every Unicode dash, the minus sign, the small and fullwidth hyphen-minus) before the figure.
+const SIGNED_BEFORE = /(?<!\d)[\p{Pd}\u2212]\s*(?:(?:\$|u\$s|USD|ARS)\s*)?$/iu;
 const PERCENT = /^(?:%|％|por\s*ciento|porciento|per\s*cent|percent)$/i;
 const MONEY_BEFORE = /(?:\$|u\$s|\b(?:USD|ARS))\s*$/i;
 const MONEY_AFTER = /^\s*(?:pesos|mangos|d[oó]lares|dollars|bucks|USD|ARS)\b/i;
@@ -172,10 +173,12 @@ export function unsupportedFigures(message, request, evidenceIds = []) {
   const facts = (Array.isArray(request.facts) ? request.facts : []).filter(item => evidenceIds.includes(item.id));
   const amounts = new Set(facts.map(item => BigInt(item.amountMinor))), counts = new Set(facts.map(item => BigInt(item.count)));
   const years = new Set([...facts.flatMap(item => [item.startISO, item.endISO]), request.todayISO].map(iso => String(iso).slice(0, 4)));
-  // A number in a cited fact's label (a category name such as «Plan 2030») may appear only inside that name, written as
-  // the label writes it, and bare: never as money, signed, with a suffix or alone (Codex review of this change).
+  // A number in a cited fact's label (a category name such as «Plan 2030») may appear only inside an occurrence of that
+  // name in the prose, written as the label writes it, and bare: never as money, signed, with a suffix, alone, or
+  // elsewhere in the message (Codex reviews of this change).
   const names = facts.map(item => spaced(String(item.label ?? '').split(':').pop())).filter(name => /\d/.test(name));
-  const prose = spaced(message);
+  const spans = names.flatMap(name => [...message.matchAll(new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+'), 'giu'))]
+    .map(match => [match.index, match.index + match[0].length]));
   const found = [];
   const foreign = FOREIGN_DIGIT.exec(message);
   if (foreign) found.push(foreign[0]);
@@ -186,7 +189,7 @@ export function unsupportedFigures(message, request, evidenceIds = []) {
     if (PERCENT.test(suffix)) { found.push(match[0]); continue; }
     const money = MONEY_BEFORE.test(before) || MONEY_AFTER.test(after);
     const bare = !suffix && !money && /^\d+$/.test(match[1]);
-    const named = bare && names.some(name => name.includes(match[1]) && prose.includes(name));
+    const named = bare && spans.some(([start, end]) => match.index >= start && match.index + match[0].length <= end);
     const supported = named || figureMinorUnits(match[1], suffix).some(value => amounts.has(value))
       || (bare && (Number(match[1]) <= 31 || counts.has(BigInt(match[1])) || (match[1].length === 4 && years.has(match[1]))));
     if (!supported) found.push(match[0]);

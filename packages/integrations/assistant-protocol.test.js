@@ -81,7 +81,10 @@ describe('a reply to a question states only the figures of the facts it cites, e
       ['Cobraste $ 842,50.', ['842,50'], BOTH], ['Llevás $ 184.500.', ['184.500'], ['current.income']], ['En Plan 2030 llevás $ 78.200.', ['2030', '78.200'], BOTH],
       // A cited label's number only inside the name, bare: never as money, signed, a percentage or alone (Codex review).
       ['Gastaste $2030 en esa categoría.', ['2030'], ['current.category.0']], ['Gastaste -2030.', ['2030'], ['current.category.0']], ['Subió 2030%.', ['2030%'], ['current.category.0']],
-      ['Gastaste 2030 en esa categoría.', ['2030'], ['current.category.0']], ['Son 2.030 pesos en Plan 2030.', ['2.030'], ['current.category.0']]]) {
+      ['Gastaste 2030 en esa categoría.', ['2030'], ['current.category.0']], ['Son 2.030 pesos en Plan 2030.', ['2.030'], ['current.category.0']],
+      ['Plan 2030 tuvo 2030 compras.', ['2030'], ['current.category.0']], // only the occurrence inside the name is the label's
+      // Every Unicode dash or minus before an amount is a sign: the small and fullwidth hyphen-minus, the en dash.
+      ['Llevás \ufe6378.200 pesos.', ['78.200'], ['current.category.0']], ['Llevás \uff0d78.200 pesos.', ['78.200'], ['current.category.0']], ['Llevás \u201378.200.', ['78.200'], ['current.category.0']]]) {
       expect(unsupportedFigures(bad, request, cited), bad).toEqual(figures);
       expect(() => validateAssistantResultV2(answer(bad, cited), request), bad).toThrow();
     }
