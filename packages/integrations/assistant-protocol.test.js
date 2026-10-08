@@ -16,7 +16,8 @@ describe('a reply to a question states only the figures of the facts it cites, e
   const facts = [fact('current.expenses', 'Gastos registrados', 18450000, 14), fact('previous.expenses', 'Gastos registrados', 15230000, 12, true),
     fact('current.category.0', 'Categoría de gasto: Plan 2030', 7820000, 5), fact('current.income', 'Ingresos registrados', 84250, 1),
     fact('current.category.1', 'Categoría de gasto: Plan: 2030', 500, 5), fact('current.category.2', 'Categoría de gasto: Varios', 100, 1000),
-    fact('current.category.3', 'Categoría de gasto: YPF', 18450000, 2), fact('previous.income', 'Ingresos registrados', 1000000000000000, 1, true)];
+    fact('current.category.3', 'Categoría de gasto: YPF', 18450000, 2), fact('previous.income', 'Ingresos registrados', 1000000000000000, 1, true),
+    fact('current.category.4', 'Categoría de gasto: Plan-7', 18450000, 3)];
   const ask = (text = '¿Gasté más que el mes pasado?') => validateAssistantRequestV2({ version: 2, requestId: 'fixture-request-0001', action: 'explain', text, todayISO: '2026-10-05', currency: 'ARS', region: 'AR', facts });
   const BOTH = ['current.expenses', 'previous.expenses'];
   const answer = (message, evidenceIds = BOTH) => ({ type: 'answer', message, evidenceIds, navigation: null, proposals: [], clarification: null });
@@ -27,7 +28,8 @@ describe('a reply to a question states only the figures of the facts it cites, e
       ['No llegaste a ese monto este mes: $ 184.500.', BOTH], ['Fuiste 5 veces al super: 5 compras.', BOTH], ['Hoy, 05/10/2026, a las 14:30.', BOTH],
       ['Del 2026-10-01 al 2026-10-05.', BOTH], ['En Plan: 2030 llevás $ 5 en 5 compras.', ['current.category.1']], ['Categoría de gasto: Plan: 2030, $ 5.', ['current.category.1']],
       ['Gastaste más ($ 184.500 contra $ 152.300).', BOTH], ['En Varios, 1.000 movimientos por $ 1.', ['current.category.2']], ['Del 1 al 5, 14 movimientos.', BOTH],
-      ['YPF: $ 184.500 en 2 cargas.', ['current.category.3']], ['Cobraste $ 10.000.000.000.000 el mes pasado.', ['previous.income']], ['Llevás 184,5 mil más que ayer.', BOTH]]) {
+      ['YPF: $ 184.500 en 2 cargas.', ['current.category.3']], ['Cobraste $ 10.000.000.000.000 el mes pasado.', ['previous.income']], ['Llevás 184,5 mil más que ayer.', BOTH],
+      ['En Plan-7 gastaste $ 184.500.', ['current.category.4']]]) {
       expect(unsupportedFigures(ok, ask('¿Gasté más de 100 mil este mes?'), cited), ok).toEqual([]);
       expect(() => validateAssistantResultV2(answer(ok, cited), ask('¿Gasté más de 100 mil este mes?')), ok).not.toThrow();
     }
@@ -106,6 +108,8 @@ describe('a reply to a question states only the figures of the facts it cites, e
       ['Llevás - ARS $ 184.500.', ['184.500'], BOTH], ['Gastaste (ARS $ 184.500 pesos).', ['184.500'], BOTH], ['Llevás 184.500 pesos ARS-.', ['184.500'], BOTH],
       // Codex review of 03b4cd3: a mark across a colon, a comma or a bracket.
       ['Llevás USD: 184.500.', ['184.500'], BOTH], ['Llevás 184.500 (USD).', ['184.500'], BOTH], ['Llevás $184.500 (dólares).', ['184.500'], BOTH], ['Llevás $184.500, en dólares.', ['184.500'], BOTH],
+      // Codex review of 20e16a8: percentage points; a prefix mark closing a bracket; a hyphen inside a cited label is not a sign.
+      ['$184.500, 21 puntos porcentuales más.', ['21 puntos porcentuales'], BOTH], ['Subió 21 pp.', ['21 pp'], BOTH], ['Llevás (USD) 184.500.', ['184.500'], BOTH], ['En Plan-7 gastaste $ 184.500 y -7 más.', ['7'], ['current.category.4']],
       // Codex review of f7f03d9: abbreviated magnitudes; a capitals-only word of a cited label is a name, not a code.
       ['El total es 2 M de pesos.', ['2 M'], BOTH], ['El total es 2MM.', ['2MM'], BOTH], ['Son 0,1845 M de pesos.', ['0,1845 M'], BOTH], // a multiplier never relaxes the two-decimal contract
       // Every Unicode dash or minus before an amount is a sign: the small and fullwidth hyphen-minus, the en dash.

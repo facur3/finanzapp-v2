@@ -144,7 +144,7 @@ function navigation(value, cited) {
 // magnitude; a word must not continue with a letter («14 movimientos» is a count). Built without the `i` flag.
 const anyCaseWord = word => word.replace(/\p{L}/gu, letter => `[${letter.toLowerCase()}${letter.toUpperCase()}]`).replace(/ /g, '\\s*');
 const words = (...list) => list.map(anyCaseWord).join('|');
-const PERCENT_WORDS = words('por ciento', 'porciento', 'per cent', 'percent');
+const PERCENT_WORDS = words('puntos porcentuales', 'punto porcentual', 'percentage points', 'percentage point', 'por ciento', 'porciento', 'por cien', 'per cent', 'percent', 'pct', 'pp');
 const THOUSAND_WORDS = words('mil', 'k', 'lucas');
 const MILLION_WORDS = words('millón', 'millon', 'millones') + '|M';
 const BEYOND_WORDS = words('billón', 'billon', 'billones', 'trillón', 'trillon', 'trillones', 'millardo', 'millardos', 'billion', 'billions', 'trillion', 'trillions') + '|MM';
@@ -175,7 +175,8 @@ const markPattern = Object.values(MARKS).flat().sort((a, b) => b.length - a.leng
 // A mark beside the figure, across a colon or an opening bracket («USD: 184.500», «184.500 (USD)») and, after the
 // figure, a linking word («en dólares»); never across a comma (a comma separates figures: «2030, $ 5»). One mark per match: runs of marks are stripped one at a time (marksBeside),
 // never by a nested quantifier, so no input can make the reader backtrack (security review of this change).
-const MONEY_BEFORE = new RegExp(`(?<![\\p{L}\\d])(${markPattern})\\s*[:(]?\\s*$`, 'u');
+// Before the figure: the mark may close a bracket («(USD) 184.500») or precede a colon or an opening bracket.
+const MONEY_BEFORE = new RegExp(`(?<![\\p{L}\\d])(${markPattern})\\s*\\)?\\s*[:(]?\\s*$`, 'u');
 // After the figure: optionally a bracket, or a comma that introduces a linking word («$ 184.500, en dólares»).
 const LINK = '(?:[Ee][Nn]|[Dd][Ee]|[Ii][Nn]|[Oo][Ff])';
 const MONEY_AFTER = new RegExp(`^\\s*(?:,\\s*${LINK}\\s+|\\(\\s*(?:${LINK}\\s+)?|${LINK}\\s+)?(${markPattern})(?![\\p{L}\\d])`, 'u');
@@ -237,6 +238,8 @@ export function unsupportedFigures(message, request, evidenceIds = []) {
   if (foreign) found.push(foreign[0]);
   for (const match of message.matchAll(FIGURE)) {
     const before = message.slice(0, match.index), after = message.slice(match.index + match[0].length);
+    // A bare digit run inside an occurrence of a cited label's name is that name («Plan-7»): read before any sign.
+    if (/^\d+$/.test(match[1]) && spans.some(([start, end]) => match.index >= start && match.index + match[0].length <= end)) continue;
     if (GLUED_BEFORE.test(before) || GLUED_AFTER.test(after) || /[eE]/.test(match[1])) { found.push(match[0]); continue; }
     const lead = marksBeside(before, MONEY_BEFORE, beforeCut), trail = marksBeside(after, MONEY_AFTER, afterCut);
     if (SIGNED_BEFORE.test(lead.rest) || (PAREN_BEFORE.test(lead.rest) && PAREN_AFTER.test(trail.rest)) || TRAILING_MINUS.test(trail.rest)) { found.push(match[0]); continue; }
