@@ -14,7 +14,9 @@ only in the services' own settings and in local env files outside the repository
 through the checkpoints of §0.2, in order, once the owner has read this runbook. Each Phase B step names who acts. Production is out of scope: no step here touches it, enables AI there or decides its numbers.
 
 **Phase B progress (recorded 2026-10-07, owner-verified):** B1–B6 passed (B1 under the revised scope of §2, after the
-legacy decommission of §0.6); the B7 spend is approved, not yet run. B2–B6 were carried out before B1 closed. The results, with no account address, key, token, project ref or secret, are in
+legacy decommission of §0.6). **B7 run #1 completed 2026-10-08 UTC: `gpt-6-luna` FAILED adoption** (five thresholds
+failed; 7 818 µUSD spent of the 200 000 approved; thresholds unchanged); B8 is blocked and a second live run needs a new
+owner spend approval (§11). B2–B6 were carried out before B1 closed. The results, with no account address, key, token, project ref or secret, are in
 [mobile-roadmap.md](mobile-roadmap.md), «Producto 25A-06», «Phase B record»; the resources to keep and to clean up later
 are in §0.5.
 
@@ -47,7 +49,7 @@ Each checkpoint must pass before the next one starts. Do not skip ahead.
 | B4 | Schema applied and verified (§6.3, §6.4) | Owner | **Passed** 2026-10-07. `verify.sql` prints `STAGING_VERIFY_OK` |
 | B5 | Boundary probe (§6.5) | Owner runs a script | **Passed** 2026-10-07. Every line PASS |
 | B6 | Vercel staging project deployed, AI off in the database (§4) | Owner | **Passed** 2026-10-07. `probe.js api` all PASS |
-| B7 | Real Luna evaluation (§11) | Owner approves the spend and runs it | Every threshold passes, or the run is recorded as a failure, never re-graded. **Spend approved** 2026-10-07 (200 000 µUSD, one run); not run yet |
+| B7 | Real Luna evaluation (§11) | Owner approves the spend and runs it | Every threshold passes, or the run is recorded as a failure, never re-graded. **RUN #1 completed 2026-10-08 UTC: FAILED** (exit 1; `schemaValidRate`, `intentAccuracy`, `clarificationAccuracy`, `groundedEvidenceAccuracy`, `hallucinatedFactRate`); 7 818 µUSD of the 200 000 approved, now spent. A second run needs a **new** owner spend approval |
 | B8 | AI enabled on staging, failure drills (§12), race (§6.6) | Owner | Every drill as expected; race PASS; kill switch tested |
 | B9 | Cost reconciliation (§9.3) | Owner runs a script | No day `investigate`; `estimate_exceeded` = 0 |
 | B10 | Focused `/security_audit`, then `/security_review` (§14) | Claude, on the owner's request | No open High or Medium; findings fixed or recorded |
@@ -864,7 +866,10 @@ The eval calls the provider **directly**: they bypass the database reservations.
 
 - [x] The owner approves an amount, for example `--approve-micro-usd 200000` (USD 0.20), in writing, in the roadmap.
   **Approved 2026-10-07:** 200 000 µUSD for one run (roadmap, «Producto 25A-06», «Phase B record»).
-- [ ] Run, from the merged `master`, with no personal financial data (the corpus is synthetic):
+- [x] Run, from the merged `master`, with no personal financial data (the corpus is synthetic). **Run #1, 2026-10-08
+  UTC, exit 1: `gpt-6-luna` FAILED adoption**; 7 818 µUSD; the numbers and the case-by-case diagnosis are in the
+  roadmap («Producto 25A-06», «Phase B record», B7). A second run repeats this step only after a **new** written
+  approval; the worst case is recomputed by the script (151 469 µUSD for Luna since the diagnosis PR's instructions):
 
   ```
   MOBILE_AI_EVAL_LIVE=1 node --env-file=$HOME/.config/finanzapp/staging-ai.env server/mobile/evals/run.js \
@@ -903,8 +908,11 @@ The eval calls the provider **directly**: they bypass the database reservations.
   - **Thresholds are never lowered because a real model fails.**
   - If Luna fails a required bound, `gpt-5.6-luna` is evaluated the same way, as a comparison (a second approved spend).
   - If both fail, nothing is adopted and 25A-06 records the failure.
-- [ ] Keep `eval.json` outside the repository. Claude records its numbers in the roadmap: no prose of refusals, no
-  token counts per case.
+- [x] Keep `eval.json` outside the repository. Claude records its numbers in the roadmap: no prose of refusals, no
+  token counts per case. Since run #1 the report lists every case that costs a metric, with the metrics it costs
+  (`imperfect[].misses`) and the parsed output the adapter returned (`imperfect[].output`, synthetic), so a failed run
+  can be diagnosed without another one; it stays outside the repository like the rest. A response the adapter itself
+  rejected (`provider_<category>` in the flags) has no output to show: the port keeps no partial or unparsed body.
 
 ## 12. Staging smoke and failure drills (OWNER, at B8)
 
