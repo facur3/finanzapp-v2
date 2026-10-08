@@ -155,12 +155,13 @@ const MARKS = {
   ARS: ['ar$', 'ars', 'peso', 'pesos', 'mango', 'mangos'], minor: ['centavo', 'centavos', 'céntimo', 'céntimos', 'centimo', 'centimos', 'cent', 'cents'],
   other: ['€', '£', '¥', 'r$', 'eur', 'brl', 'gbp', 'jpy', 'clp', 'uyu', 'mxn', 'cop', 'pen', 'cny', 'chf', 'euro', 'euros', 'real', 'reales', 'libra', 'libras', 'pound', 'pounds', 'yen', 'yenes', 'yuan', 'franco', 'francos'],
 };
-const markPattern = Object.values(MARKS).flat().sort((a, b) => b.length - a.length).map(mark => mark.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+// Any other currency symbol (\p{Sc}: «₹», «₩», …) is a mark too, of a currency the protocol does not hold.
+const markPattern = Object.values(MARKS).flat().sort((a, b) => b.length - a.length).map(mark => mark.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + '|\\p{Sc}';
 const MONEY_BEFORE = new RegExp(`(?<![\\p{L}\\d])(${markPattern})\\s*$`, 'iu');
 const MONEY_AFTER = new RegExp(`^\\s*(?:(?:en|de|in|of)\\s+)?(${markPattern})(?![\\p{L}\\d])`, 'iu');
 const PAREN_BEFORE = new RegExp(`\\(\\s*(?:(?:${markPattern})\\s*)?$`, 'iu');
-const PAREN_AFTER = /^\s*\)/;
-const currencyOf = mark => Object.keys(MARKS).find(key => MARKS[key].includes(mark.toLowerCase()));
+const PAREN_AFTER = new RegExp(`^\\s*(?:(?:en|de|in|of)\\s+)?(?:(?:${markPattern})\\s*)?\\)`, 'iu');
+const currencyOf = mark => Object.keys(MARKS).find(key => MARKS[key].includes(mark.toLowerCase())) ?? 'other';
 // Any dash or minus (every Unicode dash, the minus sign, the small and fullwidth hyphen-minus) before the figure or
 // before any monetary mark that precedes it, spaced or not.
 const SIGNED_BEFORE = new RegExp(`(?<!\\d)[\\p{Pd}\\u2212]\\s*(?:(?:${markPattern})\\s*)?$`, 'iu');
