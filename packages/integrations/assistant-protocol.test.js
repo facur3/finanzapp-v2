@@ -97,6 +97,9 @@ describe('a reply to a question states only the figures of the facts it cites, e
       ['Llevás ARS 184.500 en dólares.', ['184.500'], BOTH], ['Llevás $ 184.500 de euros.', ['184.500'], BOTH], ['Hubo 1.000 movimientos.', ['1.000'], BOTH], ['Del 1 al 5 - 14 movimientos.', ['14'], BOTH], // a spaced dash before a figure is a sign (fail closed)
       // Codex review of 2512f15: a suffix mark inside an accounting negative; any other currency symbol fails closed.
       ['Gastaste (184.500 pesos).', ['184.500'], BOTH], ['Gastaste ($ 184.500 pesos).', ['184.500'], BOTH], ['Llevás ₹184.500.', ['184.500'], BOTH], ['Llevás 184.500 ₩.', ['184.500'], BOTH],
+      // Codex review of e93f931: an unlisted code in capitals; every consecutive mark on a side; a trailing dash of any kind.
+      ['Llevás CAD 184.500.', ['184.500'], BOTH], ['Llevás 184.500 AUD.', ['184.500'], BOTH], ['Llevás USD ARS 184.500.', ['184.500'], BOTH], ['Llevás 184.500 ARS USD.', ['184.500'], BOTH],
+      ['Llevás 184.500 pesos dólares.', ['184.500'], BOTH], ['Llevás 184.500－.', ['184.500'], BOTH], ['Llevás 184.500 pesos-.', ['184.500'], BOTH],
       // Every Unicode dash or minus before an amount is a sign: the small and fullwidth hyphen-minus, the en dash.
       ['Llevás \ufe6378.200 pesos.', ['78.200'], ['current.category.0']], ['Llevás \uff0d78.200 pesos.', ['78.200'], ['current.category.0']], ['Llevás \u201378.200.', ['78.200'], ['current.category.0']]]) {
       expect(unsupportedFigures(bad, request, cited), bad).toEqual(figures);

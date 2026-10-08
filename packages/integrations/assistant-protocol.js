@@ -144,8 +144,8 @@ const FIGURE = /(\d[\d.,]*\d(?:[eE][+-]?\d+)?|\d(?:[eE][+-]?\d+)?)(\s*(?:%|％|p
 // A magnitude the protocol cannot hold, or a second magnitude after the first («mil millones»), is refused outright.
 const MAGNITUDE_BEYOND = /^(?:bill[oó]n(?:es)?|trill[oó]n(?:es)?|millardos?|billions?|trillions?)$/i;
 const MAGNITUDE_AFTER = /^\s*(?:mil|k|lucas|mill[oó]n(?:es)?|bill[oó]n(?:es)?|trill[oó]n(?:es)?|millardos?|billions?|trillions?)\b/i;
-// Accounting negatives: a figure alone inside parentheses («($ 184.500)»), or a trailing minus («184.500-»).
-const TRAILING_MINUS = /^\s*[-\u2212](?!\s*\d)/;
+// Accounting negatives: a figure alone inside parentheses («($ 184.500)»), or a trailing dash of any kind after the
+// figure or its suffix mark («184.500-», «184.500 pesos－»); a dash followed by a digit is a range, not a sign.
 const PERCENT = /^(?:%|％|por\s*ciento|porciento|per\s*cent|percent)$/i;
 // A monetary mark beside a figure says which currency the figure is in: a bare «$» may be either protocol currency;
 // a word, symbol or code of the request's currency is fine; another currency is a conversion or an invention and is
@@ -155,16 +155,29 @@ const MARKS = {
   ARS: ['ar$', 'ars', 'peso', 'pesos', 'mango', 'mangos'], minor: ['centavo', 'centavos', 'céntimo', 'céntimos', 'centimo', 'centimos', 'cent', 'cents'],
   other: ['€', '£', '¥', 'r$', 'eur', 'brl', 'gbp', 'jpy', 'clp', 'uyu', 'mxn', 'cop', 'pen', 'cny', 'chf', 'euro', 'euros', 'real', 'reales', 'libra', 'libras', 'pound', 'pounds', 'yen', 'yenes', 'yuan', 'franco', 'francos'],
 };
-// Any other currency symbol (\p{Sc}: «₹», «₩», …) is a mark too, of a currency the protocol does not hold.
-const markPattern = Object.values(MARKS).flat().sort((a, b) => b.length - a.length).map(mark => mark.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + '|\\p{Sc}';
-const MONEY_BEFORE = new RegExp(`(?<![\\p{L}\\d])(${markPattern})\\s*$`, 'iu');
-const MONEY_AFTER = new RegExp(`^\\s*(?:(?:en|de|in|of)\\s+)?(${markPattern})(?![\\p{L}\\d])`, 'iu');
-const PAREN_BEFORE = new RegExp(`\\(\\s*(?:(?:${markPattern})\\s*)?$`, 'iu');
-const PAREN_AFTER = new RegExp(`^\\s*(?:(?:en|de|in|of)\\s+)?(?:(?:${markPattern})\\s*)?\\)`, 'iu');
+// Any other currency symbol (\p{Sc}: «₹», «₩», …) or three-letter code in capitals («CAD», «AUD») beside a figure is a
+// mark too, of a currency the protocol does not hold. A currency NAME outside the list («rupias») is not recognised:
+// a limit of this heuristic, documented; the v3 typed references remove digits from the prose altogether.
+// Listed marks match in any case; a code of three capitals matches only as capitals (no `i` flag: «los», «con» stay words).
+const anyCase = mark => mark.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\p{L}/gu, letter => `[${letter.toLowerCase()}${letter.toUpperCase()}]`);
+const markPattern = Object.values(MARKS).flat().sort((a, b) => b.length - a.length).map(anyCase).join('|') + '|\\p{Sc}|[A-Z]{3}';
+const MONEY_BEFORE = new RegExp(`(?<![\\p{L}\\d])(${markPattern})\\s*$`, 'u');
+const MONEY_AFTER = new RegExp(`^\\s*(?:(?:[Ee][Nn]|[Dd][Ee]|[Ii][Nn]|[Oo][Ff])\\s+)?(${markPattern})(?![\\p{L}\\d])`, 'u');
+/** Every consecutive mark on one side of a figure («USD ARS 184.500», «184.500 pesos dólares»), nearest first. */
+function marksBeside(text, regex, cut) {
+  const found = [];
+  for (let rest = text, match = regex.exec(rest); match; match = regex.exec(rest)) { found.push(match[1]); rest = cut(rest, match); }
+  return found;
+}
+const beforeCut = (text, match) => text.slice(0, match.index);
+const afterCut = (text, match) => text.slice(match.index + match[0].length);
+const PAREN_BEFORE = new RegExp(`\\(\\s*(?:(?:${markPattern})\\s*)?$`, 'u');
+const PAREN_AFTER = new RegExp(`^\\s*(?:(?:[Ee][Nn]|[Dd][Ee]|[Ii][Nn]|[Oo][Ff])\\s+)?(?:(?:${markPattern})\\s*)?\\)`, 'u');
+const TRAILING_MINUS = new RegExp(`^\\s*(?:(?:${markPattern})\\s*)?[\\p{Pd}\\u2212](?!\\s*\\d)`, 'u');
 const currencyOf = mark => Object.keys(MARKS).find(key => MARKS[key].includes(mark.toLowerCase())) ?? 'other';
 // Any dash or minus (every Unicode dash, the minus sign, the small and fullwidth hyphen-minus) before the figure or
 // before any monetary mark that precedes it, spaced or not.
-const SIGNED_BEFORE = new RegExp(`(?<!\\d)[\\p{Pd}\\u2212]\\s*(?:(?:${markPattern})\\s*)?$`, 'iu');
+const SIGNED_BEFORE = new RegExp(`(?<!\\d)[\\p{Pd}\\u2212]\\s*(?:(?:${markPattern})\\s*)?$`, 'u');
 // A digit of another script or a numeric symbol («٣», «３», «²», «½») is never a restated fact; a format or combining
 // character glued to a digit would split a figure into digits that pass alone.
 const FOREIGN_DIGIT = /(?![0-9])[\p{Nd}\p{No}]/u;
@@ -213,7 +226,7 @@ export function unsupportedFigures(message, request, evidenceIds = []) {
     if (MAGNITUDE_BEYOND.test(suffix) || MAGNITUDE_AFTER.test(after)) { found.push(match[0]); continue; }
     // Every mark beside the figure counts: a mark of another currency, or of the other protocol currency in a request
     // of this one (a conversion), refuses it whichever side it sits on.
-    const marks = [MONEY_BEFORE.exec(before)?.[1], MONEY_AFTER.exec(after)?.[1]].filter(mark => mark !== undefined).map(currencyOf);
+    const marks = [...marksBeside(before, MONEY_BEFORE, beforeCut), ...marksBeside(after, MONEY_AFTER, afterCut)].map(currencyOf);
     if (marks.includes('other') || marks.some(currency => (currency === 'USD' || currency === 'ARS') && request.currency !== undefined && currency !== request.currency)) { found.push(match[0]); continue; }
     if (marks.includes('minor')) { if (suffix || !/^\d+$/.test(match[1]) || !amounts.has(BigInt(match[1]))) found.push(match[0]); continue; }
     const bare = !suffix && !marks.length && /^\d+$/.test(match[1]);
