@@ -171,13 +171,13 @@ function marksBeside(text, regex, cut) {
 }
 const beforeCut = (text, match) => text.slice(0, match.index);
 const afterCut = (text, match) => text.slice(match.index + match[0].length);
-const PAREN_BEFORE = new RegExp(`\\(\\s*(?:(?:${markPattern})\\s*)?$`, 'u');
-const PAREN_AFTER = new RegExp(`^\\s*(?:(?:[Ee][Nn]|[Dd][Ee]|[Ii][Nn]|[Oo][Ff])\\s+)?(?:(?:${markPattern})\\s*)?\\)`, 'u');
-const TRAILING_MINUS = new RegExp(`^\\s*(?:(?:${markPattern})\\s*)?[\\p{Pd}\\u2212](?!\\s*\\d)`, 'u');
+const PAREN_BEFORE = new RegExp(`\\(\\s*(?:(?:${markPattern})\\s*)*$`, 'u');
+const PAREN_AFTER = new RegExp(`^\\s*(?:(?:[Ee][Nn]|[Dd][Ee]|[Ii][Nn]|[Oo][Ff])\\s+)?(?:(?:${markPattern})\\s*)*\\)`, 'u');
+const TRAILING_MINUS = new RegExp(`^\\s*(?:(?:${markPattern})\\s*)*[\\p{Pd}\\u2212](?!\\s*\\d)`, 'u');
 const currencyOf = mark => Object.keys(MARKS).find(key => MARKS[key].includes(mark.toLowerCase())) ?? 'other';
 // Any dash or minus (every Unicode dash, the minus sign, the small and fullwidth hyphen-minus) before the figure or
 // before any monetary mark that precedes it, spaced or not.
-const SIGNED_BEFORE = new RegExp(`(?<!\\d)[\\p{Pd}\\u2212]\\s*(?:(?:${markPattern})\\s*)?$`, 'u');
+const SIGNED_BEFORE = new RegExp(`(?<!\\d)[\\p{Pd}\\u2212]\\s*(?:(?:${markPattern})\\s*)*$`, 'u');
 // A digit of another script or a numeric symbol («٣», «３», «²», «½») is never a restated fact; a format or combining
 // character glued to a digit would split a figure into digits that pass alone.
 const FOREIGN_DIGIT = /(?![0-9])[\p{Nd}\p{No}]/u;

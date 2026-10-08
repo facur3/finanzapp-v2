@@ -100,6 +100,8 @@ describe('a reply to a question states only the figures of the facts it cites, e
       // Codex review of e93f931: an unlisted code in capitals; every consecutive mark on a side; a trailing dash of any kind.
       ['Llevás CAD 184.500.', ['184.500'], BOTH], ['Llevás 184.500 AUD.', ['184.500'], BOTH], ['Llevás USD ARS 184.500.', ['184.500'], BOTH], ['Llevás 184.500 ARS USD.', ['184.500'], BOTH],
       ['Llevás 184.500 pesos dólares.', ['184.500'], BOTH], ['Llevás 184.500－.', ['184.500'], BOTH], ['Llevás 184.500 pesos-.', ['184.500'], BOTH],
+      // Codex review of f020dc7: a sign or a parenthesis across several consecutive marks.
+      ['Llevás - ARS $ 184.500.', ['184.500'], BOTH], ['Gastaste (ARS $ 184.500 pesos).', ['184.500'], BOTH], ['Llevás 184.500 pesos ARS-.', ['184.500'], BOTH],
       // Every Unicode dash or minus before an amount is a sign: the small and fullwidth hyphen-minus, the en dash.
       ['Llevás \ufe6378.200 pesos.', ['78.200'], ['current.category.0']], ['Llevás \uff0d78.200 pesos.', ['78.200'], ['current.category.0']], ['Llevás \u201378.200.', ['78.200'], ['current.category.0']]]) {
       expect(unsupportedFigures(bad, request, cited), bad).toEqual(figures);
