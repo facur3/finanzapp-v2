@@ -102,6 +102,8 @@ describe('a reply to a question states only the figures of the facts it cites, e
       ['Llevás 184.500 pesos dólares.', ['184.500'], BOTH], ['Llevás 184.500－.', ['184.500'], BOTH], ['Llevás 184.500 pesos-.', ['184.500'], BOTH],
       // Codex review of f020dc7: a sign or a parenthesis across several consecutive marks.
       ['Llevás - ARS $ 184.500.', ['184.500'], BOTH], ['Gastaste (ARS $ 184.500 pesos).', ['184.500'], BOTH], ['Llevás 184.500 pesos ARS-.', ['184.500'], BOTH],
+      // Codex review of 03b4cd3: a mark across a colon, a comma or a bracket.
+      ['Llevás USD: 184.500.', ['184.500'], BOTH], ['Llevás 184.500 (USD).', ['184.500'], BOTH], ['Llevás $184.500 (dólares).', ['184.500'], BOTH],
       // Every Unicode dash or minus before an amount is a sign: the small and fullwidth hyphen-minus, the en dash.
       ['Llevás \ufe6378.200 pesos.', ['78.200'], ['current.category.0']], ['Llevás \uff0d78.200 pesos.', ['78.200'], ['current.category.0']], ['Llevás \u201378.200.', ['78.200'], ['current.category.0']]]) {
       expect(unsupportedFigures(bad, request, cited), bad).toEqual(figures);
@@ -128,6 +130,14 @@ describe('a reply to a question states only the figures of the facts it cites, e
       ['No, no llegaste a 100 mil este mes: $ 184.500.', ['100 mil']], ['No, no llegaste a $ 100.000 este mes.', ['100.000']]]) {
       expect(unsupportedFigures(bad, ask('¿Gasté más de 100 mil este mes?'), BOTH), bad).toEqual(figures);
       expect(() => validateAssistantResultV2(answer(bad), ask('¿Gasté más de 100 mil este mes?')), bad).toThrow();
+    }
+  });
+  it('reads a run of marks in linear time: no input makes the reader backtrack (security review)', () => {
+    const request = ask();
+    for (const text of [`Llevás - ${'USD '.repeat(400)}184.500.`, `Llevás (${'ARS $ '.repeat(300)}184.500${' pesos'.repeat(300)}).`, `${'$ '.repeat(600)}1`, `1${' USD'.repeat(600)}-`]) {
+      const started = performance.now();
+      expect(unsupportedFigures(text, request, BOTH).length, text.slice(0, 40)).toBeGreaterThan(0);
+      expect(performance.now() - started, text.slice(0, 40)).toBeLessThan(200);
     }
   });
   it('applies to every reply to a question, so a computed figure cannot hide in a clarification; a draft or a question on parse may repeat the person\'s own number', () => {

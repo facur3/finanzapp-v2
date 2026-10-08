@@ -161,23 +161,27 @@ const MARKS = {
 // Listed marks match in any case; a code of three capitals matches only as capitals (no `i` flag: «los», «con» stay words).
 const anyCase = mark => mark.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\p{L}/gu, letter => `[${letter.toLowerCase()}${letter.toUpperCase()}]`);
 const markPattern = Object.values(MARKS).flat().sort((a, b) => b.length - a.length).map(anyCase).join('|') + '|\\p{Sc}|[A-Z]{3}';
-const MONEY_BEFORE = new RegExp(`(?<![\\p{L}\\d])(${markPattern})\\s*$`, 'u');
-const MONEY_AFTER = new RegExp(`^\\s*(?:(?:[Ee][Nn]|[Dd][Ee]|[Ii][Nn]|[Oo][Ff])\\s+)?(${markPattern})(?![\\p{L}\\d])`, 'u');
-/** Every consecutive mark on one side of a figure («USD ARS 184.500», «184.500 pesos dólares»), nearest first. */
+// A mark beside the figure, across a colon or an opening bracket («USD: 184.500», «184.500 (USD)») and, after the
+// figure, a linking word («en dólares»); never across a comma (a comma separates figures: «2030, $ 5»). One mark per match: runs of marks are stripped one at a time (marksBeside),
+// never by a nested quantifier, so no input can make the reader backtrack (security review of this change).
+const MONEY_BEFORE = new RegExp(`(?<![\\p{L}\\d])(${markPattern})\\s*[:(]?\\s*$`, 'u');
+const MONEY_AFTER = new RegExp(`^\\s*\\(?\\s*(?:(?:[Ee][Nn]|[Dd][Ee]|[Ii][Nn]|[Oo][Ff])\\s+)?(${markPattern})(?![\\p{L}\\d])`, 'u');
+/** Every consecutive mark on one side of a figure, nearest first, and the text that remains once they are stripped. */
 function marksBeside(text, regex, cut) {
   const found = [];
-  for (let rest = text, match = regex.exec(rest); match; match = regex.exec(rest)) { found.push(match[1]); rest = cut(rest, match); }
-  return found;
+  let rest = text;
+  for (let match = regex.exec(rest); match; match = regex.exec(rest)) { found.push(match[1]); rest = cut(rest, match); }
+  return { marks: found, rest };
 }
 const beforeCut = (text, match) => text.slice(0, match.index);
 const afterCut = (text, match) => text.slice(match.index + match[0].length);
-const PAREN_BEFORE = new RegExp(`\\(\\s*(?:(?:${markPattern})\\s*)*$`, 'u');
-const PAREN_AFTER = new RegExp(`^\\s*(?:(?:[Ee][Nn]|[Dd][Ee]|[Ii][Nn]|[Oo][Ff])\\s+)?(?:(?:${markPattern})\\s*)*\\)`, 'u');
-const TRAILING_MINUS = new RegExp(`^\\s*(?:(?:${markPattern})\\s*)*[\\p{Pd}\\u2212](?!\\s*\\d)`, 'u');
+const PAREN_BEFORE = /\(\s*$/u;
+const PAREN_AFTER = /^\s*\)/u;
+const TRAILING_MINUS = /^\s*[\p{Pd}\u2212](?!\s*\d)/u;
 const currencyOf = mark => Object.keys(MARKS).find(key => MARKS[key].includes(mark.toLowerCase())) ?? 'other';
 // Any dash or minus (every Unicode dash, the minus sign, the small and fullwidth hyphen-minus) before the figure or
-// before any monetary mark that precedes it, spaced or not.
-const SIGNED_BEFORE = new RegExp(`(?<!\\d)[\\p{Pd}\\u2212]\\s*(?:(?:${markPattern})\\s*)*$`, 'u');
+// before the marks that precede it, spaced or not: tested on the text left once those marks are stripped.
+const SIGNED_BEFORE = /(?<!\d)[\p{Pd}\u2212]\s*$/u;
 // A digit of another script or a numeric symbol («٣», «３», «²», «½») is never a restated fact; a format or combining
 // character glued to a digit would split a figure into digits that pass alone.
 const FOREIGN_DIGIT = /(?![0-9])[\p{Nd}\p{No}]/u;
@@ -219,14 +223,15 @@ export function unsupportedFigures(message, request, evidenceIds = []) {
   if (foreign) found.push(foreign[0]);
   for (const match of message.matchAll(FIGURE)) {
     const before = message.slice(0, match.index), after = message.slice(match.index + match[0].length);
-    if (GLUED_BEFORE.test(before) || GLUED_AFTER.test(after) || SIGNED_BEFORE.test(before) || /[eE]/.test(match[1])) { found.push(match[0]); continue; }
-    if ((PAREN_BEFORE.test(before) && PAREN_AFTER.test(after)) || TRAILING_MINUS.test(after)) { found.push(match[0]); continue; }
+    if (GLUED_BEFORE.test(before) || GLUED_AFTER.test(after) || /[eE]/.test(match[1])) { found.push(match[0]); continue; }
+    const lead = marksBeside(before, MONEY_BEFORE, beforeCut), trail = marksBeside(after, MONEY_AFTER, afterCut);
+    if (SIGNED_BEFORE.test(lead.rest) || (PAREN_BEFORE.test(lead.rest) && PAREN_AFTER.test(trail.rest)) || TRAILING_MINUS.test(trail.rest)) { found.push(match[0]); continue; }
     const suffix = (match[2] ?? '').trim();
     if (PERCENT.test(suffix)) { found.push(match[0]); continue; }
     if (MAGNITUDE_BEYOND.test(suffix) || MAGNITUDE_AFTER.test(after)) { found.push(match[0]); continue; }
     // Every mark beside the figure counts: a mark of another currency, or of the other protocol currency in a request
     // of this one (a conversion), refuses it whichever side it sits on.
-    const marks = [...marksBeside(before, MONEY_BEFORE, beforeCut), ...marksBeside(after, MONEY_AFTER, afterCut)].map(currencyOf);
+    const marks = [...lead.marks, ...trail.marks].map(currencyOf);
     if (marks.includes('other') || marks.some(currency => (currency === 'USD' || currency === 'ARS') && request.currency !== undefined && currency !== request.currency)) { found.push(match[0]); continue; }
     if (marks.includes('minor')) { if (suffix || !/^\d+$/.test(match[1]) || !amounts.has(BigInt(match[1]))) found.push(match[0]); continue; }
     const bare = !suffix && !marks.length && /^\d+$/.test(match[1]);

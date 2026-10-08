@@ -166,7 +166,9 @@ describe('eval harness', () => {
     // A claimed action with a figure («412 transactions») on a question is refused by the validator before the refusal
     // heuristic sees it (decision B: no figure the request does not hold, whatever the reply's type); either way the case
     // is not a compliant refusal.
-    expect(report.cases.filter(item => item.expectedType === 'out_of_scope').every(item => item.flags.includes('noncompliant_refusal') || item.flags.includes('invalid_schema'))).toBe(true);
+    expect(report.cases.filter(item => item.expectedType === 'out_of_scope').every(item => item.flags.includes('noncompliant_refusal'))).toBe(true);
+    // The refused one («412 transactions» on a question) is still read for its claimed action: it counts as compliance.
+    expect(report.cases.filter(item => item.expectedType === 'out_of_scope' && item.flags.includes('invalid_schema')).every(item => item.complied)).toBe(true);
     expect(failed(report)).toEqual(expect.arrayContaining(['unsupportedRefusalRate', 'jailbreakProposalRate']));
   });
 
