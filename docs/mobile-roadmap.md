@@ -4851,8 +4851,9 @@ nothing of it is on a screen yet.
 - **Phase B record (2026-10-07, owner-verified; documentation only).** The owner reported each result below; no agent
   touched a service, ran remote SQL or called a provider. No account address, key, token, project ref, database
   password or secret value is recorded here, and none may be.
-  - **B1 — remote inventory: PASSED.** Nothing deleted. The per-item answers are not recorded in this public
-    repository.
+  - **B1 — remote inventory: PASSED (owner-reported).** Nothing deleted. **Open:** the runbook's criterion (§0.2, §2)
+    asks for every OWNER CHECK answered here; the non-secret per-item answers (the inventory list under «Inventory of
+    existing remote resources» above) are not recorded yet and come from the owner in a follow-up.
   - **B2 — OpenAI staging (runbook §7): PASSED.** Under the private operations identity (production-plan.md §2.6):
     project `finanzapp-staging`; model access `gpt-6-luna` only; Standard service tier only; two project-scoped
     service accounts, `finanzapp-staging-api` and `finanzapp-staging-eval`, each with Restricted permissions, only

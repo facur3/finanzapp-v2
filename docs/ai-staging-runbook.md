@@ -40,7 +40,7 @@ Each checkpoint must pass before the next one starts. Do not skip ahead.
 | # | Checkpoint | Who | Passes when |
 | --- | --- | --- | --- |
 | A | Phase A PR reviewed and merged | Owner | **Passed**: PR #87 merged by the owner, 2026-10-05 |
-| B1 | Remote inventory recorded (§2) | Owner checks | **Passed** 2026-10-07 (owner-verified; the per-item answers are not recorded in this public repository). Every OWNER CHECK answered; nothing deleted |
+| B1 | Remote inventory recorded (§2) | Owner checks | **Passed** per the owner, 2026-10-07; nothing deleted. **Open:** the non-secret per-item answers of §2 are not yet recorded in the roadmap. Every OWNER CHECK answered in the roadmap; nothing deleted |
 | B2 | OpenAI staging project, service accounts and limits, under the operations identity (§7) | Owner | **Passed** 2026-10-07. Key in a password manager only; limits, budget and alerts set; auto-recharge off |
 | B3 | Supabase staging project and auth settings, under the operations identity (§5, §6.1) | Owner | **Passed** 2026-10-07. Settings of §5.3 set; keys of §6.2 created |
 | B4 | Schema applied and verified (§6.3, §6.4) | Owner | **Passed** 2026-10-07. `verify.sql` prints `STAGING_VERIFY_OK` |
