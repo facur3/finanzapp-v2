@@ -140,7 +140,12 @@ function navigation(value, cited) {
 // An exponent («2e6») is one token; a minus before the figure or its currency mark, spaced or not («-184.500»,
 // «- $ 184.500», «$ - 184.500»), rewrites a non-negative fact: both are refused, fail closed, so a spaced dash before
 // an amount is also refused; only a dash right after a digit (an ISO date, a range) is not a sign (Codex reviews).
-const FIGURE = /(\d[\d.,]*\d(?:[eE][+-]?\d+)?|\d(?:[eE][+-]?\d+)?)(\s*(?:%|％|por\s*ciento\b|porciento\b|per\s*cent\b|percent\b)|\s*(?:mil|k|lucas)\b|\s*mill[oó]n(?:es)?\b)?/giu;
+const FIGURE = /(\d[\d.,]*\d(?:[eE][+-]?\d+)?|\d(?:[eE][+-]?\d+)?)(\s*(?:%|％|por\s*ciento\b|porciento\b|per\s*cent\b|percent\b)|\s*(?:mil|k|lucas)\b|\s*mill[oó]n(?:es)?\b|\s*(?:bill[oó]n(?:es)?|trill[oó]n(?:es)?|millardos?|billions?|trillions?)\b)?/giu;
+// A magnitude the protocol cannot hold, or a second magnitude after the first («mil millones»), is refused outright.
+const MAGNITUDE_BEYOND = /^(?:bill[oó]n(?:es)?|trill[oó]n(?:es)?|millardos?|billions?|trillions?)$/i;
+const MAGNITUDE_AFTER = /^\s*(?:mil|k|lucas|mill[oó]n(?:es)?|bill[oó]n(?:es)?|trill[oó]n(?:es)?|millardos?|billions?|trillions?)\b/i;
+// Accounting negatives: a figure alone inside parentheses («($ 184.500)»), or a trailing minus («184.500-»).
+const TRAILING_MINUS = /^\s*[-\u2212](?!\s*\d)/;
 const PERCENT = /^(?:%|％|por\s*ciento|porciento|per\s*cent|percent)$/i;
 // A monetary mark beside a figure says which currency the figure is in: a bare «$» may be either protocol currency;
 // a word, symbol or code of the request's currency is fine; another currency is a conversion or an invention and is
@@ -152,7 +157,9 @@ const MARKS = {
 };
 const markPattern = Object.values(MARKS).flat().sort((a, b) => b.length - a.length).map(mark => mark.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
 const MONEY_BEFORE = new RegExp(`(?<![\\p{L}\\d])(${markPattern})\\s*$`, 'iu');
-const MONEY_AFTER = new RegExp(`^\\s*(${markPattern})(?![\\p{L}\\d])`, 'iu');
+const MONEY_AFTER = new RegExp(`^\\s*(?:(?:en|de|in|of)\\s+)?(${markPattern})(?![\\p{L}\\d])`, 'iu');
+const PAREN_BEFORE = new RegExp(`\\(\\s*(?:(?:${markPattern})\\s*)?$`, 'iu');
+const PAREN_AFTER = /^\s*\)/;
 const currencyOf = mark => Object.keys(MARKS).find(key => MARKS[key].includes(mark.toLowerCase()));
 // Any dash or minus (every Unicode dash, the minus sign, the small and fullwidth hyphen-minus) before the figure or
 // before any monetary mark that precedes it, spaced or not.
@@ -199,17 +206,21 @@ export function unsupportedFigures(message, request, evidenceIds = []) {
   for (const match of message.matchAll(FIGURE)) {
     const before = message.slice(0, match.index), after = message.slice(match.index + match[0].length);
     if (GLUED_BEFORE.test(before) || GLUED_AFTER.test(after) || SIGNED_BEFORE.test(before) || /[eE]/.test(match[1])) { found.push(match[0]); continue; }
+    if ((PAREN_BEFORE.test(before) && PAREN_AFTER.test(after)) || TRAILING_MINUS.test(after)) { found.push(match[0]); continue; }
     const suffix = (match[2] ?? '').trim();
     if (PERCENT.test(suffix)) { found.push(match[0]); continue; }
+    if (MAGNITUDE_BEYOND.test(suffix) || MAGNITUDE_AFTER.test(after)) { found.push(match[0]); continue; }
     // Every mark beside the figure counts: a mark of another currency, or of the other protocol currency in a request
     // of this one (a conversion), refuses it whichever side it sits on.
     const marks = [MONEY_BEFORE.exec(before)?.[1], MONEY_AFTER.exec(after)?.[1]].filter(mark => mark !== undefined).map(currencyOf);
     if (marks.includes('other') || marks.some(currency => (currency === 'USD' || currency === 'ARS') && request.currency !== undefined && currency !== request.currency)) { found.push(match[0]); continue; }
     if (marks.includes('minor')) { if (suffix || !/^\d+$/.test(match[1]) || !amounts.has(BigInt(match[1]))) found.push(match[0]); continue; }
     const bare = !suffix && !marks.length && /^\d+$/.test(match[1]);
+    // A count may be written grouped («1.000 movimientos»); never with a suffix or a monetary mark.
+    const integer = !suffix && !marks.length && /^(?:[1-9]\d*|[1-9]\d{0,2}(?:\.\d{3})+)$/.test(match[1]) ? BigInt(match[1].replace(/\./g, '')) : null;
     const named = bare && spans.some(([start, end]) => match.index >= start && match.index + match[0].length <= end);
-    const supported = named || figureMinorUnits(match[1], suffix).some(value => amounts.has(value))
-      || (bare && (Number(match[1]) <= 31 || counts.has(BigInt(match[1])) || (match[1].length === 4 && years.has(match[1]))));
+    const supported = named || figureMinorUnits(match[1], suffix).some(value => amounts.has(value)) || (integer !== null && counts.has(integer))
+      || (bare && (Number(match[1]) <= 31 || (match[1].length === 4 && years.has(match[1]))));
     if (!supported) found.push(match[0]);
   }
   return found;

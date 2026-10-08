@@ -15,7 +15,7 @@ describe('a reply to a question states only the figures of the facts it cites, e
   const fact = (id, label, amountMinor, count, previous = false) => ({ id, label, amountMinor, count, startISO: previous ? '2026-09-01' : '2026-10-01', endISO: previous ? '2026-09-05' : '2026-10-05' });
   const facts = [fact('current.expenses', 'Gastos registrados', 18450000, 14), fact('previous.expenses', 'Gastos registrados', 15230000, 12, true),
     fact('current.category.0', 'Categoría de gasto: Plan 2030', 7820000, 5), fact('current.income', 'Ingresos registrados', 84250, 1),
-    fact('current.category.1', 'Categoría de gasto: Plan: 2030', 500, 5)];
+    fact('current.category.1', 'Categoría de gasto: Plan: 2030', 500, 5), fact('current.category.2', 'Categoría de gasto: Varios', 100, 1000)];
   const ask = (text = '¿Gasté más que el mes pasado?') => validateAssistantRequestV2({ version: 2, requestId: 'fixture-request-0001', action: 'explain', text, todayISO: '2026-10-05', currency: 'ARS', region: 'AR', facts });
   const BOTH = ['current.expenses', 'previous.expenses'];
   const answer = (message, evidenceIds = BOTH) => ({ type: 'answer', message, evidenceIds, navigation: null, proposals: [], clarification: null });
@@ -24,7 +24,8 @@ describe('a reply to a question states only the figures of the facts it cites, e
       ['Llevás 184500.', BOTH], ['Llevás 184,5 mil.', BOTH], ['Del 1 al 5 de octubre de 2026 registraste 14 movimientos, 12 en septiembre.', BOTH],
       ['Ingresos: $ 842,50 (uno).', ['current.income']], ['Ingresos: ARS 842,5, o sea 842,50 pesos.', ['current.income']], ['En Plan 2030 llevás $ 78.200 en 5 compras.', ['current.category.0']],
       ['No llegaste a ese monto este mes: $ 184.500.', BOTH], ['Fuiste 5 veces al super: 5 compras.', BOTH], ['Hoy, 05/10/2026, a las 14:30.', BOTH],
-      ['Del 2026-10-01 al 2026-10-05.', BOTH], ['En Plan: 2030 llevás $ 5 en 5 compras.', ['current.category.1']], ['Categoría de gasto: Plan: 2030, $ 5.', ['current.category.1']]]) {
+      ['Del 2026-10-01 al 2026-10-05.', BOTH], ['En Plan: 2030 llevás $ 5 en 5 compras.', ['current.category.1']], ['Categoría de gasto: Plan: 2030, $ 5.', ['current.category.1']],
+      ['Gastaste más ($ 184.500 contra $ 152.300).', BOTH], ['En Varios, 1.000 movimientos por $ 1.', ['current.category.2']], ['Del 1 al 5, 14 movimientos.', BOTH]]) {
       expect(unsupportedFigures(ok, ask('¿Gasté más de 100 mil este mes?'), cited), ok).toEqual([]);
       expect(() => validateAssistantResultV2(answer(ok, cited), ask('¿Gasté más de 100 mil este mes?')), ok).not.toThrow();
     }
@@ -91,6 +92,9 @@ describe('a reply to a question states only the figures of the facts it cites, e
       // Codex review of 1c66b93: a sign before any monetary mark; marks on both sides; a name holding a colon stays whole.
       ['Llevás - AR$ 184.500.', ['184.500'], BOTH], ['Llevás − pesos 184.500.', ['184.500'], BOTH], ['Llevás ARS 184.500 dólares.', ['184.500'], BOTH], ['Llevás $ 184.500 euros.', ['184.500'], BOTH],
       ['2030 compras en esa categoría.', ['2030'], ['current.category.1']], ['Plan 2030 tuvo 5 compras: $ 5.', ['2030'], ['current.category.1']], // the name is «Plan: 2030», not «Plan 2030»
+      // Codex review of 4f4f94b: accounting negatives, magnitudes beyond the protocol or stacked, a currency after «en»/«de».
+      ['Gastaste ($ 184.500).', ['184.500'], BOTH], ['Gastaste 184.500-.', ['184.500'], BOTH], ['El total es 2 billones de pesos.', ['2 billones'], BOTH], ['Son 184,5 mil millones.', ['184,5 mil'], BOTH],
+      ['Llevás ARS 184.500 en dólares.', ['184.500'], BOTH], ['Llevás $ 184.500 de euros.', ['184.500'], BOTH], ['Hubo 1.000 movimientos.', ['1.000'], BOTH], ['Del 1 al 5 - 14 movimientos.', ['14'], BOTH], // a spaced dash before a figure is a sign (fail closed)
       // Every Unicode dash or minus before an amount is a sign: the small and fullwidth hyphen-minus, the en dash.
       ['Llevás \ufe6378.200 pesos.', ['78.200'], ['current.category.0']], ['Llevás \uff0d78.200 pesos.', ['78.200'], ['current.category.0']], ['Llevás \u201378.200.', ['78.200'], ['current.category.0']]]) {
       expect(unsupportedFigures(bad, request, cited), bad).toEqual(figures);
