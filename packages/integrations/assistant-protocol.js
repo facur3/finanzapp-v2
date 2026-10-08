@@ -152,7 +152,7 @@ const FIGURE = new RegExp(`(\\d[\\d.,]*\\d(?:[eE][+-]?\\d+)?|\\d(?:[eE][+-]?\\d+
 // A magnitude the protocol cannot hold («billones», «MM»), or a second magnitude after the first («mil millones»),
 // is refused outright.
 const MAGNITUDE_BEYOND = new RegExp(`^(?:${BEYOND_WORDS})$`, 'u');
-const MAGNITUDE_AFTER = new RegExp(`^\\s*(?:${THOUSAND_WORDS}|${MILLION_WORDS}|${BEYOND_WORDS})(?![\\p{L}])`, 'u');
+const MAGNITUDE_AFTER = new RegExp(`^\\s*(?:[Dd][Ee]\\s+)?(?:${THOUSAND_WORDS}|${MILLION_WORDS}|${BEYOND_WORDS})(?![\\p{L}])`, 'u');
 // Accounting negatives: a figure alone inside parentheses («($ 184.500)»), or a trailing dash of any kind after the
 // figure or its suffix mark («184.500-», «184.500 pesos－»); a dash followed by a digit is a range, not a sign.
 const PERCENT = new RegExp(`^(?:%|％|${PERCENT_WORDS})$`, 'u');
@@ -214,7 +214,7 @@ const currencyOf = mark => Object.keys(MARKS).find(key => MARKS[key].includes(ma
 const SIGNED_BEFORE = /(?<!\d)[\p{Pd}\u2212]\s*$/u;
 // A digit of another script or a numeric symbol («٣», «３», «²», «½») is never a restated fact; a format or combining
 // character glued to a digit would split a figure into digits that pass alone.
-const FOREIGN_DIGIT = /(?![0-9])[\p{Nd}\p{No}]/u;
+const FOREIGN_DIGIT = /(?![0-9])[\p{Nd}\p{No}\p{Nl}]/u;
 const GLUED_BEFORE = /[\p{Cf}\p{Mn}\p{Me}]$/u;
 const GLUED_AFTER = /^[\p{Cf}\p{Mn}\p{Me}]/u;
 const spaced = value => value.replace(/\s+/g, ' ').trim().toLowerCase();

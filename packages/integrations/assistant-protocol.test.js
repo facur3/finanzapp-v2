@@ -112,6 +112,7 @@ describe('a reply to a question states only the figures of the facts it cites, e
       ['$184.500, 21 puntos porcentuales más.', ['21 puntos porcentuales'], BOTH], ['Subió 21 pp.', ['21 pp'], BOTH], ['Llevás (USD) 184.500.', ['184.500'], BOTH], ['En Plan-7 gastaste $ 184.500 y -7 más.', ['7'], ['current.category.4']],
       // Codex review of f7f03d9: abbreviated magnitudes; a capitals-only word of a cited label is a name, not a code.
       ['El total es 2 M de pesos.', ['2 M'], BOTH], ['El total es 2MM.', ['2MM'], BOTH], ['Son 0,1845 M de pesos.', ['0,1845 M'], BOTH], // a multiplier never relaxes the two-decimal contract
+      ['Gastaste $184,5 mil de millones.', ['184,5 mil'], BOTH], ['Gastaste Ⅼ% más.', ['Ⅼ'], BOTH], // a linked second magnitude; a letter-numeral (Codex review of ad76f11)
       // Every Unicode dash or minus before an amount is a sign: the small and fullwidth hyphen-minus, the en dash.
       ['Llevás \ufe6378.200 pesos.', ['78.200'], ['current.category.0']], ['Llevás \uff0d78.200 pesos.', ['78.200'], ['current.category.0']], ['Llevás \u201378.200.', ['78.200'], ['current.category.0']]]) {
       expect(unsupportedFigures(bad, request, cited), bad).toEqual(figures);
