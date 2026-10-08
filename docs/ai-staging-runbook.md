@@ -13,6 +13,11 @@ only in the services' own settings and in local env files outside the repository
 **Phase A merged as PR #87** (merge commit ce4b4b3, 2026-10-05): checkpoint A passed. **Phase B** proceeds only
 through the checkpoints of §0.2, in order, once the owner has read this runbook. Each Phase B step names who acts. Production is out of scope: no step here touches it, enables AI there or decides its numbers.
 
+**Phase B progress (recorded 2026-10-07, owner-verified):** B1–B6 passed (B1 under the revised scope of §2, after the
+legacy decommission of §0.6); the B7 spend is approved, not yet run. B2–B6 were carried out before B1 closed. The results, with no account address, key, token, project ref or secret, are in
+[mobile-roadmap.md](mobile-roadmap.md), «Producto 25A-06», «Phase B record»; the resources to keep and to clean up later
+are in §0.5.
+
 Related: [production-plan.md](production-plan.md) (§2 environments, §3 Vercel, §4 Supabase, §5 the Assistant, §6 cost,
 §14.1 audits), [decision 006](decisions/006-cloud-identity.md) (the cloud identity), [mobile-roadmap.md](mobile-roadmap.md)
 («Producto 25A-06»).
@@ -36,13 +41,13 @@ Each checkpoint must pass before the next one starts. Do not skip ahead.
 | # | Checkpoint | Who | Passes when |
 | --- | --- | --- | --- |
 | A | Phase A PR reviewed and merged | Owner | **Passed**: PR #87 merged by the owner, 2026-10-05 |
-| B1 | Remote inventory recorded (§2) | Owner checks | Every OWNER CHECK answered in the roadmap; nothing deleted |
-| B2 | OpenAI staging project, service accounts and limits, under the operations identity (§7) | Owner | Key in a password manager only; limits, budget and alerts set; auto-recharge off |
-| B3 | Supabase staging project and auth settings, under the operations identity (§5, §6.1) | Owner | Settings of §5.3 set; keys of §6.2 created |
-| B4 | Schema applied and verified (§6.3, §6.4) | Owner | `verify.sql` prints `STAGING_VERIFY_OK` |
-| B5 | Boundary probe (§6.5) | Owner runs a script | Every line PASS |
-| B6 | Vercel staging project deployed, AI off in the database (§4) | Owner | `probe.js api` all PASS |
-| B7 | Real Luna evaluation (§11) | Owner approves the spend and runs it | Every threshold passes, or the run is recorded as a failure, never re-graded |
+| B1 | Remote inventory recorded (§2) | Owner checks | **Passed** 2026-10-07 (revised scope, §2): inventory recorded, both legacy resources decommissioned, probes PASS again (§0.6). Every OWNER CHECK of §2 answered in the roadmap; the legacy resources retired by owner decision deleted and verified absent (§0.6); then `probe.js boundary` and `probe.js api` PASS again against staging. Nothing else deleted |
+| B2 | OpenAI staging project, service accounts and limits, under the operations identity (§7) | Owner | **Passed** 2026-10-07. Key in a password manager only; limits, budget and alerts set; auto-recharge off |
+| B3 | Supabase staging project and auth settings, under the operations identity (§5, §6.1) | Owner | **Passed** 2026-10-07. Settings of §5.3 set; keys of §6.2 created |
+| B4 | Schema applied and verified (§6.3, §6.4) | Owner | **Passed** 2026-10-07. `verify.sql` prints `STAGING_VERIFY_OK` |
+| B5 | Boundary probe (§6.5) | Owner runs a script | **Passed** 2026-10-07. Every line PASS |
+| B6 | Vercel staging project deployed, AI off in the database (§4) | Owner | **Passed** 2026-10-07. `probe.js api` all PASS |
+| B7 | Real Luna evaluation (§11) | Owner approves the spend and runs it | Every threshold passes, or the run is recorded as a failure, never re-graded. **Spend approved** 2026-10-07 (200 000 µUSD, one run); not run yet |
 | B8 | AI enabled on staging, failure drills (§12), race (§6.6) | Owner | Every drill as expected; race PASS; kill switch tested |
 | B9 | Cost reconciliation (§9.3) | Owner runs a script | No day `investigate`; `estimate_exceeded` = 0 |
 | B10 | Focused `/security_audit`, then `/security_review` (§14) | Claude, on the owner's request | No open High or Medium; findings fixed or recorded |
@@ -89,12 +94,12 @@ the repository is safer still.
 
 | Do not… | Until |
 | --- | --- |
-| Delete or rename the Vercel project `finanzapp-v2`, its domains or its deployments | Its role is decided after B11 (§2.2); it is the planned production host |
-| Delete, pause or rotate anything in the legacy Supabase project (§2.1) | B1 has recorded what it holds; then a separate owner decision (§2.1) |
-| Delete any OpenAI project, key or organization | B1 has recorded them; never delete one in use by something else |
+| Delete, rename or reuse a staging resource or credential (§0.5, «Keep») | Never in 25A-06 |
+| Promote, rename or copy a staging resource or credential into production | Never: production gets its own (§0.5) |
+| Reuse the deleted legacy projects' names or credentials for the API | Never: both were deleted by owner decision 2026-10-07 (§0.6), which superseded «keep `finanzapp-v2` until B11» |
+| Delete any OpenAI project, key or organization | Never delete one in use by something else |
 | Delete remote Git branches | Never as part of 25A-06 (§2.3 gives the safe alternative) |
 | Put any variable in a **Preview** or **Development** scope on Vercel | Never, in any project |
-| Set `MOBILE_AI_ENABLED`, a Supabase key or a provider key on the project `finanzapp-v2` | Never in 25A-06; production is a release decision |
 | Enable public sign-ups, anonymous sign-ins or any social provider on staging Supabase | Never in 25A-06 (§5) |
 | Turn on OpenAI auto-recharge | Never on staging (§8) |
 | Set `mobile_ai_control.enabled = true` | B8, after B5–B7 pass |
@@ -103,6 +108,60 @@ the repository is safer still.
 | Point an app build at staging | Never in 25A-06 (§13) |
 | Apply `schema.sql` anywhere but the new staging project | Never in 25A-06 |
 | Use the production bundle identifier or make an EAS build | Never in 25A-06 (AGENTS rule 3) |
+
+### 0.5 Staging resource register (keep, removed, later decision)
+
+So no temporary resource is forgotten. Names only; no address, ref, key or value. Being unused today is never by itself
+a reason to delete something (§2.1).
+
+| Resource | State |
+| --- | --- |
+| `~/.config/finanzapp/staging-db.env`, `~/.config/finanzapp/staging-ai.env` (§0.3) | **Keep** through B10/B11 or later staging work |
+| Staging Supabase test people A and B | **Keep** through B10/B11; later decision when no longer needed |
+| Staging Supabase probe key and API secret key (§6.2) | **Keep** through B10/B11; rotate or revoke when their purpose ends |
+| OpenAI service accounts `finanzapp-staging-api`, `finanzapp-staging-eval` | **Keep** through B10/B11; rotate or revoke when their purpose ends |
+| Supabase project `finanzapp-staging` | **Keep** (staging) |
+| OpenAI project `finanzapp-staging` | **Keep** (staging) |
+| Vercel project `finanzapp-api-staging` | **Keep** (staging) |
+| `~/.config/finanzapp/vercel-staging.env` | **Already removed** (owner, 2026-10-07, after its one-time Vercel import) |
+| Legacy Vercel project `finanzapp-v2`, with its deployments, domains, aliases, variables and settings | **Decommissioned** 2026-10-07 (§0.6) |
+| Legacy Supabase project (ref prefix `mtij`), with its endpoint and public legacy `anon` key | **Decommissioned** 2026-10-07; the endpoint and key are retired with it (§0.6) |
+| Synthetic probe and capture rows in staging (§6.5) | **Later decision** |
+| Saved SQL-editor verification queries in staging | **Later decision**, if the owner wants them gone |
+| A default Supabase secret key on staging | **Later decision**, only if verified unused |
+
+Production gets its own projects and credentials; a staging credential is never promoted or copied into production.
+
+### 0.6 Legacy decommission (owner decision, 2026-10-07; done)
+
+**Owner attestation.** Both resources below belonged only to the retired web/PWA experiment. They hold no data the
+owner wants or needs to preserve, and the iOS product will not reuse them. The owner deliberately chose **permanent
+deletion** over export, retention or rotation. Only the owner deletes, by hand; no agent touches either service.
+
+**Legacy Supabase project** (identified only by its ref prefix `mtij`, the project whose legacy `anon` JWT is in public
+Git history, §2.1):
+- [x] Decision recorded (2026-10-07).
+- [x] The owner deleted the project in the Supabase dashboard (2026-10-07).
+- [x] Verified: it no longer appears in the project list, and its old API endpoint no longer answers with the legacy
+  key (the key is unusable).
+
+**Legacy Vercel project `finanzapp-v2`:**
+- [x] Decision recorded (2026-10-07). It is not the production host.
+- [x] Before deleting: note its environment variable **names** (never values). Deleting a project removes its
+  variables but **does not revoke the credentials** they hold: any provider or Supabase credential found there that is
+  still live is revoked at its issuer (one belonging to the legacy Supabase project dies with that project). Owner:
+  checked, none live.
+- [x] The owner deleted the project in the Vercel dashboard (2026-10-07; its deployments, domains, aliases, variables
+  and settings went with it).
+- [x] Verified: it no longer appears in the project list, and `finanzapp-v2.vercel.app` no longer serves it.
+- [x] Verified after both deletions (owner, 2026-10-07): the surviving projects are Supabase `finanzapp-staging`, Vercel
+  `finanzapp-api-staging` and OpenAI `finanzapp-staging`; `finanzapp-api-staging` still builds from `master`, and `probe.js boundary` and
+  `probe.js api` (§6.5, §4.6) PASS again against the surviving staging resources. Result: `boundary` every line PASS;
+  `api` every line PASS, including the intended 503 while the database AI switch stays off.
+
+**B1 passed** (2026-10-07): every box above is checked. The future production API is a separate new project (working name
+`finanzapp-api-production` until the naming gate), never `finanzapp-v2`; the public landing page is not the API backend
+and is not coupled to any API project (launch, brand and go-to-market slices).
 
 ## 1. What Phase A added to the repository (AUTOMATED / CLAUDE)
 
@@ -147,8 +206,14 @@ the repository is safer still.
 ## 2. Existing remote resources: inventory (OWNER CHECK, change nothing)
 
 The repository cannot see dashboards. Everything below comes from repository files and Git history. Each item lists
-what only the owner can confirm. **Do not delete anything in 25A-06** (§0.4). Record each answer in the roadmap's
-25A-06 section.
+what only the owner can confirm. **Do not delete anything in 25A-06** except the legacy resources retired by owner
+decision (§0.4, §0.6). Record each answer in the roadmap's 25A-06 section.
+
+**Scope of B1 (revised by owner decision, 2026-10-07).** B1 inventories the resources materially connected to the
+FinanzApp mobile app, its staging or production, its secrets or data that might need preserving; not unrelated personal
+cloud or provider resources. A legacy disposable resource needs no table-by-table inventory when the owner attests it
+holds no data to preserve and elects permanent deletion; instead the roadmap records the attestation, the safe
+identity, the decision, the deletion and the post-deletion verification (§0.6).
 
 ### 2.1 Supabase
 
@@ -163,12 +228,10 @@ Repository truth, from the inventory of 2026-10-05:
 - The retired web's `SUPABASE_SETUP.md`, reachable from that tag, describes magic-link auth with that anon key and the
   old Vercel URL as Site URL.
 
-- [ ] **OWNER CHECK — the legacy project.** In the Supabase dashboard, does the project `mtij…` still exist? Record:
-  its name, plan, region, whether it is paused, its tables and row counts (no data), whether it holds real people's
-  data, its auth providers and users count, and whether its legacy `anon` key is still active.
-- [ ] **OWNER CHECK — other projects.** List every project in the organization: name, ref prefix (first 4 characters),
-  plan, region and purpose.
-- Then a **separate owner decision**, not part of 25A-06, one of:
+- [x] **OWNER CHECK — the legacy project.** Replaced by the owner's attestation and deletion decision (2026-10-07,
+  §0.6): no data to preserve, never reused; permanently deleted 2026-10-07.
+- [x] **OWNER CHECK — other projects** connected to FinanzApp: the staging project `finanzapp-staging` (§6.1).
+- The owner's decision (2026-10-07) among the options below was **delete** (§0.6). The options were:
   - **ignore** it (nothing in the product reads it);
   - **retain** it (for example to export old data);
   - **rotate** its legacy key (it is public in Git history: anyone can call its API with `anon` privileges, so its RLS
@@ -192,17 +255,13 @@ Repository truth:
 - 79 remote branches exist; 63 contain `api/mobile/assistant.js`. One, `origin/feat/producto-24rep-native-first-web-retirement`,
   carries the **pre-25A-05 runtime**: it reads `MOBILE_OPENAI_API_KEY` and calls Supabase RPCs with the person's token.
 
-- [ ] **OWNER CHECK — `finanzapp-v2`:** plan (Hobby or Pro); team; Git repository connected; production branch; Node.js
-  version (Vercel disabled 20.x on 2026-10-01); Fluid compute on or off; **every environment variable name and its
-  scopes** (names only); domains and aliases still assigned (does `finanzapp-v2.vercel.app` still serve something?);
-  Deployment Protection settings; the "Automatically expose System Environment Variables" setting; the
-  Ignored Build Step setting.
-- [ ] **OWNER CHECK — other Vercel projects** connected to this repository or named FinanzApp.
-- [ ] **OWNER CHECK — Preview deployments.** Does any variable exist in a Preview or Development scope? If one does, it
-  is recorded and removed. That removal is the only change allowed at B1, because a Preview of an old branch could
-  otherwise run old code with it.
-- Planned role (decided after B11, not now): `finanzapp-v2` stays the **production** host of the mobile API and keeps
-  **no AI or Supabase variable** until a production release decision. Staging gets its own project (§4.1).
+- [x] **OWNER CHECK — `finanzapp-v2`:** replaced by the owner's retirement and deletion decision (2026-10-07, §0.6).
+  Its variable names are noted before deletion and any live credential revoked at its issuer (§0.6).
+- [x] **OWNER CHECK — other Vercel projects:** `finanzapp-api-staging` (§4).
+- [x] **OWNER CHECK — Preview deployments:** no Preview or Development variable in `finanzapp-api-staging`;
+  `finanzapp-v2`'s go with its deletion (§0.6).
+- **Role (owner decision 2026-10-07, superseding «production host after B11»):** `finanzapp-v2` was deleted (2026-10-07);
+  production gets a separate new project (§0.6).
 
 ### 2.3 Git branches
 
@@ -213,7 +272,7 @@ Old branches are inert unless a deployment builds them with secrets. The protect
    to the same command in the dashboard (§4.3) stops those too.
 4. The runtime guard (§1) applies only to code from this PR on.
 
-- [ ] **OWNER (optional, recommended):** set the Ignored Build Step in both Vercel projects (§4.3). Deleting branches is
+- [ ] **OWNER (optional, recommended):** set the Ignored Build Step on `finanzapp-api-staging` (§4.3). Deleting branches is
   not part of 25A-06. If the owner wants it later, archive with a tag first.
 
 ### 2.4 OpenAI
@@ -222,17 +281,16 @@ Repository truth:
 - No OpenAI project id, key or organization is referenced anywhere.
 - `server/mobile/pricing.js` prices `gpt-6-luna` (candidate) and `gpt-5.6-luna` (comparison only), read 2026-10-05.
 
-- [ ] **OWNER CHECK:** organizations and projects that exist; whether personal or other API use shares the
-  organization; the organization's billing (prepaid balance, auto-recharge on or off, payment method); existing keys
-  and their projects (names only); the organization's usage tier; whether `gpt-6-luna` is available to the
-  organization.
+- [x] **OWNER CHECK** (narrowed to FinanzApp, 2026-10-07): the staging project `finanzapp-staging` under the private
+  operations identity; its two service accounts; small prepaid balance, auto-reload off; `gpt-6-luna` allowed (§7.2).
+  Unrelated personal API use is out of scope.
 
 ### 2.5 Expo / EAS and GitHub
 
-- [ ] **OWNER CHECK:** EAS environment variables of the project `@facur3/finanzapp-mobile` (environments `development`,
-  `preview`, `production`): names and visibility only. None may hold a server secret. A publishable value is allowed
+- [x] **OWNER CHECK:** EAS environment variables of the project `@facur3/finanzapp-mobile` (environments `development`,
+  `preview`, `production`): names and visibility only. **None** at the owner's check (2026-10-07). None may hold a server secret. A publishable value is allowed
   but not needed in 25A-06 (§13).
-- [ ] **OWNER CHECK:** GitHub repository secrets and variables (names only). CI uses none. A Vercel or Supabase token
+- [x] **OWNER CHECK:** GitHub repository secrets and variables (names only): **none** of either (2026-10-07). CI uses none. A Vercel or Supabase token
   there would be unexpected.
 
 ### 2.6 Environment names in the repository
@@ -251,13 +309,13 @@ environment.
 
 | | Development / local | Preview (Vercel Preview, any branch) | Staging | Production |
 | --- | --- | --- | --- | --- |
-| Runs where | The owner's Mac, Metro, CI on Linux | A non-production Vercel deployment | The **Production** environment of the Vercel project `finanzapp-api-staging` (§4.1) | The Production environment of `finanzapp-v2` (later) |
+| Runs where | The owner's Mac, Metro, CI on Linux | A non-production Vercel deployment | The **Production** environment of the Vercel project `finanzapp-api-staging` (§4.1) | The Production environment of a separate new production project (later; working name `finanzapp-api-production`) |
 | `MOBILE_ENVIRONMENT` | unset | unset | `staging` | `production` (refused by code today) |
 | Supabase | none; CI's disposable PostgreSQL | **none** | its own new project (§6.1) | its own project (later) |
 | Supabase keys | none; fixtures in tests | **none** | a publishable key and **one secret key for the API** (plus one for the owner's probe) | its own (later) |
 | AI provider | fixtures (`EXPO_PUBLIC_ASSISTANT_FIXTURES`, dev bundles) and fake fetch in tests | **none** | the project `finanzapp-staging` (§7), its own key | a separate project and key (later) |
 | AI budget state | none | none | `staging` database's `mobile_ai_control` and reservations | production's own |
-| Vercel variable scope | none | **no variable may be scoped here** | Production scope of `finanzapp-api-staging` only | Production scope of `finanzapp-v2` only |
+| Vercel variable scope | none | **no variable may be scoped here** | Production scope of `finanzapp-api-staging` only | Production scope of the production project only |
 | App build that may call it | none | none | none in 25A-06 (§13) | none until a release decision |
 | Logs | console | n/a (no build) | telemetry lines only (§4.7) | same rule |
 
@@ -341,7 +399,7 @@ PR.
 - [ ] Settings → Environment Variables → "Automatically expose System Environment Variables": **on**. The code
   requires `VERCEL_ENV=production`; without it every route stays closed.
 - [ ] Settings → Git → Ignored Build Step: custom command `[ "$VERCEL_ENV" != production ]`. This also stops Previews of
-  old branches whose `vercel.json` predates it. Set the same on `finanzapp-v2`.
+  old branches whose `vercel.json` predates it. (`finanzapp-v2` is retired, §0.6.)
 - [ ] Deployment Protection: keep Vercel Authentication on for Previews. Previews are not built anyway. The production
   domain stays public (§4.1).
 - [ ] Functions: Fluid compute either way. `maxDuration` comes from `vercel.json` (§4.5).
@@ -371,7 +429,7 @@ Rules:
 - Leave `MOBILE_AI_MAX_INPUT_TOKENS` and `MOBILE_AI_MAX_OUTPUT_TOKENS` unset: the defaults are 32 000 and 1 500.
 - **Never** set `MOBILE_AI_EVAL_LIVE` on any deployment.
 - A variable change takes effect only on a new deployment: Deployments → … → Redeploy.
-- After B6, `finanzapp-v2` keeps **none** of these variables (B1 records its current state).
+- `finanzapp-v2` was deleted (§0.6).
 
 ### 4.5 Function duration
 
@@ -804,7 +862,8 @@ reservation maximum.
 The eval calls the provider **directly**: they bypass the database reservations. They are bounded by the
 `--approve-micro-usd` amount (refused below the worst case) and by the provider project's hard limit (§7.2).
 
-- [ ] The owner approves an amount, for example `--approve-micro-usd 200000` (USD 0.20), in writing, in the roadmap.
+- [x] The owner approves an amount, for example `--approve-micro-usd 200000` (USD 0.20), in writing, in the roadmap.
+  **Approved 2026-10-07:** 200 000 µUSD for one run (roadmap, «Producto 25A-06», «Phase B record»).
 - [ ] Run, from the merged `master`, with no personal financial data (the corpus is synthetic):
 
   ```

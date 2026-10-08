@@ -138,10 +138,10 @@ No environment is created by this document. The matrix is the target; the "today
   `preview` (internal, bundled JavaScript) and `testflight` (store distribution). The `testflight` profile sets
   `APP_VARIANT=preview`, so today it would upload the `.preview` identity under the name "FinanzApp Preview". There is
   no `production` profile. Details and the fix are in [app-store-launch.md](app-store-launch.md) §11.
-- **EXISTS TODAY:** one Vercel project that serves the two mobile API routes (§3), `finanzapp-v2`, the same project
-  that hosted the retired PWA (`finanzapp-v2.vercel.app` and a `-rho` alias in history). Whether it has any environment
-  variable set was not inspected (an **OWNER CHECK** of [runbook](ai-staging-runbook.md) §2.2); unconfigured, both
-  routes answer 503.
+- **EXISTS TODAY:** the Vercel project `finanzapp-api-staging` serves the two mobile API routes (§3) as staging
+  (runbook B6, passed 2026-10-07). The legacy project `finanzapp-v2`, which hosted the retired PWA, is **retired by owner
+  decision (2026-10-07)**: it is not the production host, and the owner deleted it on 2026-10-07
+  ([runbook](ai-staging-runbook.md) §0.6).
 - **EXISTS TODAY (25A-06 Phase A, in code): the environment identity.** `environmentOf` in `server/mobile/runtime.js`
   lets a route run only when `MOBILE_ENVIRONMENT` names an enabled environment (`ENABLED_ENVIRONMENTS`: `staging` only;
   production joins it only by a reviewed code change, never by configuration) **and** Vercel's own `VERCEL_ENV` is
@@ -153,8 +153,8 @@ No environment is created by this document. The matrix is the target; the "today
 - **NOT IMPLEMENTED, REMOTE SETUP:** no Supabase project is recorded in the repository, no AI provider project, no
   staging or production backend, no StoreKit configuration, no analytics. Git history (the repository is public) holds a
   legacy Supabase project ref (beginning `mtij`) and its legacy `anon` JWT, reachable at the tag `web-frontend-final`;
-  no `service_role` key was ever committed. That project is never reused as staging; what it holds and its fate are an
-  **OWNER CHECK** and a separate owner decision (runbook §2.1).
+  no `service_role` key was ever committed. That project is never reused: the owner attests it served only the retired
+  web experiment and holds no data to preserve, and deleted it permanently on 2026-10-07, with its legacy key (runbook §0.6).
 
 ### 2.2 Target matrix
 
@@ -163,8 +163,8 @@ No environment is created by this document. The matrix is the target; the "today
 | Purpose | Daily work on the owner's registered iPhone with Metro; CI on Linux. | The first place a network feature runs end to end, with test accounts only. | Real people. |
 | Expo / EAS profile | `development` (exists) | `preview` (exists) for ad hoc installs; an internal TestFlight build once the identity is decided | A `production` profile that does not exist yet (**IMPLEMENTATION GATE**, Producto 26) |
 | App identity | `com.facur3.finanzapp.dev` | `com.facur3.finanzapp.preview` | **OWNER DECISION** at Producto 26. `com.facur3.finanzapp` was registered by the retired Capacitor app and is not reassigned by default (decision 004; AGENTS rule 3). |
-| Backend origin | None, or a local server with fakes. Never production. | A staging origin of the mobile API: the production domain of the Vercel project `finanzapp-api-staging` (§2.4) | The production origin of the mobile API (`finanzapp-v2`, later) |
-| Vercel deployment | None (`vercel dev` stays closed: `VERCEL_ENV` is not `production`) | The **Production** environment of `finanzapp-api-staging` | The Production environment of `finanzapp-v2`, which keeps no AI or Supabase variable until a release decision |
+| Backend origin | None, or a local server with fakes. Never production. | A staging origin of the mobile API: the production domain of the Vercel project `finanzapp-api-staging` (§2.4) | The production origin of the mobile API: a separate new project (working name `finanzapp-api-production`, later) |
+| Vercel deployment | None (`vercel dev` stays closed: `VERCEL_ENV` is not `production`) | The **Production** environment of `finanzapp-api-staging` | The Production environment of that separate production project, created at a release decision; never a staging resource promoted or copied |
 | `MOBILE_ENVIRONMENT` | Unset | `staging`, the only enabled value (**EXISTS TODAY**, 25A-06 Phase A) | `production`, refused by code today |
 | Database environment binding | None | `mobile_ai_control.environment = 'staging'`; a call naming another environment is refused (§4.2) | `'production'` in its own database (later) |
 | Supabase project | None, or the CI PostgreSQL job | A staging project of its own | A production project of its own |
@@ -203,9 +203,12 @@ AI budget, StoreKit assumptions or admin data. The five rules below are this pla
 
 **DECIDED for staging (25A-06 Phase A; [runbook](ai-staging-runbook.md) §4.1): the second-project option.** Staging
 is the **Production** environment of a second Vercel project, **`finanzapp-api-staging`**, connected to this same
-repository with production branch `master`; its production domain is the staging API origin. `finanzapp-v2` stays the
-planned production host and keeps no AI or Supabase variable until a production release decision (its final role is
-recorded after the runbook's B11). Creating the project, its settings and its Production-only variables are **OWNER
+repository with production branch `master`; its production domain is the staging API origin. The legacy
+`finanzapp-v2` is **not** the production host: the owner decided on 2026-10-07 to retire and delete it (runbook §0.6).
+Production gets a separate new project (working name `finanzapp-api-production` until the naming gate) with its own
+Supabase project, provider project, credentials, quotas and kill switch; nothing from staging is promoted, renamed or
+copied into it. The public landing page is not the API backend and is not coupled to any API project; its repository,
+project and domain belong to the launch, brand and go-to-market slices. Creating the project, its settings and its Production-only variables are **OWNER
 ACTIONS** at the runbook's B6 (§4.3, §4.4); nothing is created by this document. Vercel's Standard Deployment
 Protection puts an authentication wall in front of every non-production URL, which a phone app cannot pass; the
 staging production domain is therefore public by necessity, safe because every route requires a verified session and
@@ -327,13 +330,12 @@ bill. The choice turns on porting cost, plan cost and measured latency.
 
 - **OWNER ACTION, LAUNCH BLOCKER — plan.** Vercel's fair-use guidelines restrict the Hobby plan to "non-commercial
   personal use only". A backend for an app that sells a subscription is commercial use; that needs the Pro plan before
-  monetisation. Which plan the project is on today was not inspected (an **OWNER CHECK** at runbook B1, §2.2). Supabase's Free plan pauses a project after a week
+  monetisation. The staging project's plan is not recorded here; the production project's plan is chosen when it is created. Supabase's Free plan pauses a project after a week
   without activity and has no backups, so it is not a production backend either (acceptable for staging, runbook §6.1).
   Each is a paid subscription and needs the owner's authorization (AGENTS rule 3).
 - **Node version.** Vercel disabled Node.js 20 for new deployments on 2026-10-01. **EXISTS TODAY (25A-06 Phase A):**
   the root `package.json` (what the Vercel project reads) declares `engines.node` **`24.x`** (`apps/mobile/package.json`
-  declares its own for the app's tooling only). **OWNER ACTION:** record the Node.js version set on `finanzapp-v2`
-  (runbook B1) and choose 24.x when creating `finanzapp-api-staging` (runbook §4.3).
+  declares its own for the app's tooling only). **OWNER ACTION:** choose 24.x on each API project (runbook §4.3).
 - **Supabase keys (designed in 25A-05; key kinds enforced since 25A-06 Phase A).** Supabase states it is deprecating the
   `anon` and `service_role` keys by the end of 2026 in favour of publishable and secret keys. The server reads only the
   new kinds: a publishable key (`MOBILE_SUPABASE_PUBLISHABLE_KEY`, `sb_publishable_…`) to verify sessions and a secret
@@ -1021,7 +1023,8 @@ adapter is disabled, no provider project or key exists, and no real request has 
 - **Price freshness:** `PRICING_MAX_AGE_DAYS` = 30 in `server/mobile/pricing.js`; a live evaluation refuses an older
   table, and a release re-reads the prices (runbook §9.1).
 
-**Still missing (25A-06 Phase B and later):** the provider project and its hard cap (**OWNER ACTION**), an automated
+**Still missing (25A-06 Phase B and later; the staging provider project and its USD 5 hard limit exist since runbook
+B2, passed 2026-10-07):** an automated
 owner alert (§6.2), a job that settles reservations from the provider's report, measured thresholds and every
 production number (§6.2). **Alerts in staging** are the provider project's budget e-mails at 50 % and 80 % (an **OWNER
 ACTION**, runbook §7.2) and the daily `usage-report.sql` while drills run; no job runs in staging.
@@ -1754,16 +1757,16 @@ Nothing below is complete unless it says **EXISTS TODAY**. "Launch §n" is a sec
 | Review tray; Assistant drafts on the one write path | 25A-03, 25A-04 | **EXISTS TODAY** (PR #84, PR #85); **DEVICE QA** open | Their device QA and the deferred 24T3 pass join the pre-release device gate (owner decision, 2026-10-04) |
 | Data ownership rules; no mandatory account | all | **DECIDED** | — |
 | iOS backup inclusion of the ledger | 26 | **RESEARCH GATE**, **DEVICE QA** | A restore test on a second device |
-| Environment separation rules | 25A | **DECIDED**; the environment identity and database binding **EXIST TODAY** in code (25A-06 Phase A); **REMOTE SETUP**, **OWNER ACTION** | Staging and production projects created by the owner (runbook B2 to B6) |
+| Environment separation rules | 25A | **DECIDED**; the environment identity and database binding **EXIST TODAY** in code (25A-06 Phase A); staging projects created by the owner (runbook B2 to B6, passed 2026-10-07); production **REMOTE SETUP**, **OWNER ACTION** | Production projects created by the owner at a release decision |
 | Production app variant and EAS profile | 26 | **NOT IMPLEMENTED**, **OWNER DECISION**, **LAUNCH BLOCKER** | The identity decision; launch §11 |
 | Vercel as the mobile API host | 25A | **DECIDED** to keep for staging; **EXISTS TODAY** | Re-evaluated only by the exit criteria of §3.5 |
-| Vercel plan and Node version; Supabase plan | 25A, 26 | `engines.node` 24.x and region `gru1` **EXIST TODAY** in the repository (25A-06 Phase A); the plans and the projects' Node setting: **OWNER ACTION**, **LAUNCH BLOCKER** for monetisation | The owner checks and authorizes the plans (runbook B1) |
-| Staging access through deployment protection | 25A | **DECIDED** for staging (25A-06 Phase A): the Production environment of `finanzapp-api-staging`; Previews unbuilt, unconfigured and closed by code; **OWNER ACTION** to create it | §2.4; runbook §4 (B6) |
-| Supabase staging and production projects | 25A, 26 | **NOT IMPLEMENTED**, **REMOTE SETUP** | Created and migrated by the owner's decision |
-| Migration files and the deployment procedure | 25A | **DECIDED** rule (AGENTS rule 3); procedure proposed; `schema.sql` is the single initial script, never applied; `verify.sql` **EXISTS TODAY** (25A-06 Phase A, run by CI only); **IMPLEMENTATION GATE** | The owner applies it to staging deliberately and `verify.sql` prints `STAGING_VERIFY_OK` (runbook B4); every later change an ordered migration |
-| RLS validation with two users | 25A | Proven on disposable PostgreSQL in CI (25A-05); `verify.sql` and `probe.js boundary` **EXIST TODAY** (25A-06 Phase A); **IMPLEMENTATION GATE** in staging | Run in staging with two owner-created test people (runbook B4, B5), kept in SQL tests |
-| Direct callability of `mobile_reserve_usage` | 25A | **FIXED in the repository** (25A-05): internal, no client role executes any function; not applied anywhere | Applied with the schema in 25A-06 |
-| Privileged path with the Supabase secret key | 25A | **EXISTS TODAY** in code (25A-05; only `sb_secret_…` and `sb_publishable_…` kinds since 25A-06 Phase A); no key exists | The owner creates the staging project and sets the key (runbook B3, B6) |
+| Vercel plan and Node version; Supabase plan | 25A, 26 | `engines.node` 24.x and region `gru1` **EXIST TODAY** in the repository (25A-06 Phase A); the plans and the projects' Node setting: **OWNER ACTION**, **LAUNCH BLOCKER** for monetisation | The owner checks and authorizes the plans before monetisation |
+| Staging access through deployment protection | 25A | **DECIDED** for staging (25A-06 Phase A): the Production environment of `finanzapp-api-staging`; Previews unbuilt, unconfigured and closed by code; **EXISTS** (created by the owner, B6 passed 2026-10-07) | §2.4; runbook §4 (B6) |
+| Supabase staging and production projects | 25A, 26 | Staging **EXISTS** (sa-east-1, created by the owner, B3 passed 2026-10-07); production **NOT IMPLEMENTED**, **REMOTE SETUP** | Production created and migrated by the owner's decision |
+| Migration files and the deployment procedure | 25A | **DECIDED** rule (AGENTS rule 3); procedure proposed; `schema.sql` is the single initial script, applied once to staging only (runbook B4, passed 2026-10-07: `verify.sql` printed `STAGING_VERIFY_OK`); never applied to production | Every later change an ordered migration |
+| RLS validation with two users | 25A | Proven on disposable PostgreSQL in CI (25A-05); `verify.sql` and `probe.js boundary` **EXIST TODAY** (25A-06 Phase A) and passed in staging with two owner-created test people (runbook B4, B5, 2026-10-07) | Kept in SQL tests |
+| Direct callability of `mobile_reserve_usage` | 25A | **FIXED in the repository** (25A-05): internal, no client role executes any function; applied to staging only, boundary probe PASS (runbook B4, B5, 2026-10-07) | — |
+| Privileged path with the Supabase secret key | 25A | **EXISTS TODAY** in code (25A-05; only `sb_secret_…` and `sb_publishable_…` kinds since 25A-06 Phase A); staging keys exist (runbook B3, B6, 2026-10-07); none for production | Production keys at a release decision |
 | Sign-in, session storage, account deletion | 25A | **NOT IMPLEMENTED**; the method **accepted** in [decision 006](decisions/006-cloud-identity.md) (Sign in with Apple; PR #87); **LAUNCH BLOCKER** once accounts exist | The session slice, after 25A-06 and before any build calls the cloud Assistant |
 | Assistant capability boundary (no generic tools) | all | **DECIDED**; **EXISTS TODAY** (no tools; the adapter's request keys are allowlisted and a tool call is refused, 25A-05) | Kept by review of every Assistant change |
 | Closed Assistant protocol v2, validated on the server and the device | 25A | **EXISTS TODAY** (25A-05); v1 retired, never deployed | v3 (locale, currencies) server first, later |
@@ -1771,7 +1774,7 @@ Nothing below is complete unless it says **EXISTS TODAY**. "Launch §n" is a sec
 | Provider port, model as configuration | 25A | **EXISTS TODAY** (25A-05); the OpenAI adapter disabled, nothing configured | — |
 | Model evaluation and choice | 25A | Corpus, harness and thresholds **EXIST TODAY** (25A-05; fixture run only, not model results); `estimateExceededCount` = 0 and the live-run gates added (25A-06 Phase A); **RESEARCH GATE**, **OWNER ACTION** (paid, approved amount) | `run.js --live --approve-micro-usd` on staging with the Luna candidate (runbook B7) |
 | Replacement of `gpt-5-mini` before 2026-12-11 | 25A | **DONE in code** (25A-05: removed; no model in code) | The model chosen by 25A-06's evaluation |
-| Monetary ceilings as atomic pre-call reservations, settlement, usage accounting, kill switch | 25A | **EXISTS TODAY** in the repository (25A-05), staging placeholders, applied nowhere; **IMPLEMENTATION GATE**, **LAUNCH BLOCKER** for enabling AI | Tripped deliberately in staging (runbook B4, B8: `verify.sql`, the drills, `probe.js race`), including concurrent requests against the last unit of capacity (§6.3) |
+| Monetary ceilings as atomic pre-call reservations, settlement, usage accounting, kill switch | 25A | **EXISTS TODAY** in the repository (25A-05), staging placeholders, applied to staging only with AI disabled (runbook B4, 2026-10-07); **IMPLEMENTATION GATE**, **LAUNCH BLOCKER** for enabling AI | Tripped deliberately in staging (runbook B4, B8: `verify.sql`, the drills, `probe.js race`), including concurrent requests against the last unit of capacity (§6.3) |
 | Alerts, anomaly stop, reconciliation against the provider's cost report | 25A | The owner-run reconciliation (`usage-report.sql`, `reconcile.js`) **EXISTS TODAY** (25A-06 Phase A); staging alerts are the provider's budget e-mails (**OWNER ACTION**); the automated owner alert and the anomaly stop **NOT IMPLEMENTED**, **LAUNCH BLOCKER** for enabling AI beyond staging | Reconciliation at runbook B9 (no `investigate` day, `estimate_exceeded` = 0); the automated alert before production (25A-07 or 25F) |
 | Production ceilings and limits | 25A, 25F | **OWNER DECISION** from measured staging cost; the schema's values are placeholders; the scaling inputs and rules **DECIDED** (§6.7, no amounts) | 25A-06 measurements, the 25F cost report |
 | Provider hard budget | 25A | **OWNER ACTION**, **REMOTE SETUP** | Set by the owner on a dedicated project, below the tolerated amount and above the server's ceilings (runbook B2; the staging global month ceiling at most 80 % of it, B8); billing rules in §6.6 (staging auto-recharge off) |
