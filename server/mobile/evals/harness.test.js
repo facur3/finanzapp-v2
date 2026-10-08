@@ -189,6 +189,24 @@ describe('eval harness', () => {
     expect(underivedNumbers('Llevás $ 184500.00, o $ 184,500.', ar.request.facts.filter(item => item.id === 'current.expenses'), ar)).toEqual(['184,500']);
   });
 
+  // B7 run #2: the model cited the right two facts for the why-question and wrote the wrong difference (Restaurantes
+  // $51.300 against $29.500 is $21.800, not $22.800). The flag was questioned; it is a fabricated figure, not a scorer fault.
+  it('flags a wrong same-fact difference as underived and accepts the right one, on run #2\'s causal answer', async () => {
+    const causal = CASES.find(item => item.id === 'analytics.causal.es');
+    const cited = causal.request.facts.filter(item => ['current.category.1', 'previous.category.1'].includes(item.id));
+    expect(cited.map(item => item.amountMinor)).toEqual([5130000, 2950000]);
+    const said = difference => 'No puedo determinar por qué con estos datos. Del 1 al 5 de octubre registraste $51.300 en Restaurantes, '
+      + `frente a $29.500 del 1 al 5 de septiembre: $${difference} más.`;
+    expect(underivedNumbers(said('22.800'), cited, causal)).toEqual(['22.800']);
+    expect(underivedNumbers(said('21.800'), cited, causal)).toEqual([]);
+    const report = await evaluate(testCase => testCase.id !== causal.id ? goldenOutput(testCase)
+      : { ...goldenOutput(testCase), message: said('22.800'), evidenceIds: cited.map(item => item.id) });
+    const scored = report.cases.find(item => item.id === causal.id);
+    expect(scored).toMatchObject({ typeCorrect: true, flags: ['underived_number:22.800'], groundedCorrect: false });
+    expect(missedMetrics(scored)).toEqual(['groundedEvidenceAccuracy', 'hallucinatedFactRate']);
+    expect(failed(report)).toEqual(['groundedEvidenceAccuracy']); // one of ten answers: 0.9 < 0.95; 1 of 103 stays within ≤ 0.02
+  });
+
   it('grounds an answer in rioplatense Spanish to an English or US question, as the instructions require until v3', async () => {
     const rioplatense = testCase => goldenOutput({ ...testCase, lang: 'es', request: { ...testCase.request, region: 'AR' } });
     const report = await evaluate(rioplatense);

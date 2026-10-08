@@ -14,9 +14,11 @@ only in the services' own settings and in local env files outside the repository
 through the checkpoints of §0.2, in order, once the owner has read this runbook. Each Phase B step names who acts. Production is out of scope: no step here touches it, enables AI there or decides its numbers.
 
 **Phase B progress (recorded 2026-10-07, owner-verified):** B1–B6 passed (B1 under the revised scope of §2, after the
-legacy decommission of §0.6). **B7 run #1 completed 2026-10-08 UTC: `gpt-6-luna` FAILED adoption** (five thresholds
-failed; 7 818 µUSD spent of the 200 000 approved; thresholds unchanged); B8 is blocked and a second live run needs a new
-owner spend approval (§11). B2–B6 were carried out before B1 closed. The results, with no account address, key, token, project ref or secret, are in
+legacy decommission of §0.6). **B7 runs #1 and #2 completed 2026-10-08 UTC: `gpt-6-luna` FAILED adoption both times**
+(run #1 five thresholds, 7 818 µUSD; run #2, from merged PR #92, four thresholds, 7 836 µUSD; thresholds unchanged); the
+second, separate one-run approval of 2026-10-08 (200 000 µUSD) was consumed by run #2; the first (2026-10-07) by run #1;
+neither authorizes a further run; B8 is blocked
+and any further live run needs a new owner spend approval (§11). B2–B6 were carried out before B1 closed. The results, with no account address, key, token, project ref or secret, are in
 [mobile-roadmap.md](mobile-roadmap.md), «Producto 25A-06», «Phase B record»; the resources to keep and to clean up later
 are in §0.5.
 
@@ -49,7 +51,7 @@ Each checkpoint must pass before the next one starts. Do not skip ahead.
 | B4 | Schema applied and verified (§6.3, §6.4) | Owner | **Passed** 2026-10-07. `verify.sql` prints `STAGING_VERIFY_OK` |
 | B5 | Boundary probe (§6.5) | Owner runs a script | **Passed** 2026-10-07. Every line PASS |
 | B6 | Vercel staging project deployed, AI off in the database (§4) | Owner | **Passed** 2026-10-07. `probe.js api` all PASS |
-| B7 | Real Luna evaluation (§11) | Owner approves the spend and runs it | Every threshold passes, or the run is recorded as a failure, never re-graded. **RUN #1 completed 2026-10-08 UTC: FAILED** (exit 1; `schemaValidRate`, `intentAccuracy`, `clarificationAccuracy`, `groundedEvidenceAccuracy`, `hallucinatedFactRate`); 7 818 µUSD of the 200 000 approved, now spent. A second run needs a **new** owner spend approval |
+| B7 | Real Luna evaluation (§11) | Owner approves the spend and runs it | Every threshold passes, or the run is recorded as a failure, never re-graded. **RUN #1 completed 2026-10-08 UTC: FAILED** (exit 1; `schemaValidRate`, `intentAccuracy`, `clarificationAccuracy`, `groundedEvidenceAccuracy`, `hallucinatedFactRate`; 7 818 µUSD). **RUN #2 completed 2026-10-08 UTC from merged PR #92: FAILED** (exit 1; `schemaValidRate` 0.9806, `intentAccuracy` 0.9417, `clarificationAccuracy` 0.8696, `groundedEvidenceAccuracy` 0.9; 7 836 µUSD). Two one-run approvals, 2026-10-07 (consumed by run #1) and 2026-10-08 (consumed by run #2), each 200 000 µUSD; neither authorizes a further run. Any further run needs a **new** written owner spend approval covering the worst case recomputed by the script, after the local fixes and the decisions recorded in the roadmap |
 | B8 | AI enabled on staging, failure drills (§12), race (§6.6) | Owner | Every drill as expected; race PASS; kill switch tested |
 | B9 | Cost reconciliation (§9.3) | Owner runs a script | No day `investigate`; `estimate_exceeded` = 0 |
 | B10 | Focused `/security_audit`, then `/security_review` (§14) | Claude, on the owner's request | No open High or Medium; findings fixed or recorded |
@@ -865,11 +867,18 @@ The eval calls the provider **directly**: they bypass the database reservations.
 `--approve-micro-usd` amount (refused below the worst case) and by the provider project's hard limit (§7.2).
 
 - [x] The owner approves an amount, for example `--approve-micro-usd 200000` (USD 0.20), in writing, in the roadmap.
-  **Approved 2026-10-07:** 200 000 µUSD for one run (roadmap, «Producto 25A-06», «Phase B record»).
+  **Approved 2026-10-07:** 200 000 µUSD for one run (roadmap, «Producto 25A-06», «Phase B record»); consumed by run #1.
+  **Approved again 2026-10-08, separately, for the second run:** 200 000 µUSD for one run («Autorizo una segunda evaluación live de GPT-6 Luna, con un máximo aprobado de 200000 micro-USD (USD 0,20) para una sola corrida.»);
+  consumed by run #2. Neither authorizes a further run: each further run needs its own written approval covering the
+  complete corpus worst case recomputed with `worstCaseMicroUsd` by the committed evaluator after any prompt or
+  configuration change (the script refuses an approval below it).
 - [x] Run, from the merged `master`, with no personal financial data (the corpus is synthetic). **Run #1, 2026-10-08
-  UTC, exit 1: `gpt-6-luna` FAILED adoption**; 7 818 µUSD; the numbers and the case-by-case diagnosis are in the
-  roadmap («Producto 25A-06», «Phase B record», B7). A second run repeats this step only after a **new** written
-  approval; the worst case is recomputed by the script (151 469 µUSD for Luna since the diagnosis PR's instructions):
+  UTC, exit 1: `gpt-6-luna` FAILED adoption**; 7 818 µUSD under the 2026-10-07 approval. **Run #2, 2026-10-08 UTC,
+  from merged PR #92 (b1c0136), under the separate 2026-10-08 approval, exit 1: FAILED adoption**; worst case
+  151 469 µUSD, measured 7 836 µUSD. The numbers and the case-by-case diagnoses
+  are in the roadmap («Producto 25A-06», «Phase B record», B7). Any further run repeats this step only after a **new**
+  written approval, after the local fixes and the owner decisions the run #2 record lists (with the protocol as it is,
+  `schemaValidRate` cannot pass on the corpus as committed); the worst case is recomputed by the script:
 
   ```
   MOBILE_AI_EVAL_LIVE=1 node --env-file=$HOME/.config/finanzapp/staging-ai.env server/mobile/evals/run.js \
