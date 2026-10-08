@@ -137,10 +137,11 @@ function navigation(value, cited) {
 // compared as integers: 1,99 is 199, never 200. The reader sees Western digits: a figure in words («el doble»,
 // «medio millón»), the direction word or a small computed count rests on the instructions and on reading a live
 // report, never on this check, which is a partial defence in depth, not a verification of what the prose claims.
-// An exponent («2e6») is one token; a minus attached to the figure or to its currency mark (never a dash between
-// digits, as in an ISO date) rewrites a non-negative fact: both are refused (Codex review of this change).
+// An exponent («2e6») is one token; a minus before the figure or its currency mark, spaced or not («-184.500»,
+// «- $ 184.500», «$ - 184.500»), rewrites a non-negative fact: both are refused, fail closed, so a spaced dash before
+// an amount is also refused; only a dash right after a digit (an ISO date, a range) is not a sign (Codex reviews).
 const FIGURE = /(\d[\d.,]*\d(?:[eE][+-]?\d+)?|\d(?:[eE][+-]?\d+)?)(\s*(?:%|％|por\s*ciento\b|porciento\b|per\s*cent\b|percent\b)|\s*(?:mil|k|lucas)\b|\s*mill[oó]n(?:es)?\b)?/giu;
-const SIGNED_BEFORE = /(?<!\d)[-−](?:(?:\$|u\$s|USD|ARS)\s?)?$/i;
+const SIGNED_BEFORE = /(?<!\d)[-−]\s*(?:(?:\$|u\$s|USD|ARS)\s*)?$/i;
 const PERCENT = /^(?:%|％|por\s*ciento|porciento|per\s*cent|percent)$/i;
 const MONEY_BEFORE = /(?:\$|u\$s|\b(?:USD|ARS))\s*$/i;
 const MONEY_AFTER = /^\s*(?:pesos|mangos|d[oó]lares|dollars|bucks|USD|ARS)\b/i;

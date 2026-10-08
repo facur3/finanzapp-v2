@@ -23,7 +23,7 @@ describe('a reply to a question states only the figures of the facts it cites, e
       ['Llevás 184500.', BOTH], ['Llevás 184,5 mil.', BOTH], ['Del 1 al 5 de octubre de 2026 registraste 14 movimientos, 12 en septiembre.', BOTH],
       ['Ingresos: $ 842,50 (uno).', ['current.income']], ['Ingresos: US$ 842,5.', ['current.income']], ['En Plan 2030 llevás $ 78.200 en 5 compras.', ['current.category.0']],
       ['No llegaste a ese monto este mes: $ 184.500.', BOTH], ['Fuiste 5 veces al super: 5 compras.', BOTH], ['Hoy, 05/10/2026, a las 14:30.', BOTH],
-      ['Del 2026-10-01 al 2026-10-05.', BOTH], ['Gastos registrados - 14 movimientos.', BOTH]]) {
+      ['Del 2026-10-01 al 2026-10-05.', BOTH]]) {
       expect(unsupportedFigures(ok, ask('¿Gasté más de 100 mil este mes?'), cited), ok).toEqual([]);
       expect(() => validateAssistantResultV2(answer(ok, cited), ask('¿Gasté más de 100 mil este mes?')), ok).not.toThrow();
     }
@@ -97,6 +97,8 @@ describe('a reply to a question states only the figures of the facts it cites, e
       ['Gastaste 2\u200d1\u200d8\u200d0\u200d0 más.', ['2', '1', '8', '0', '0']],
       // Codex review: a minus attached to a non-negative fact, a currency mark between, or an exponent as one token.
       ['Llevás -$ 184.500.', ['184.500']], ['Llevás $-184.500.', ['184.500']], ['Llevás −184.500 pesos.', ['184.500']], ['Gastaste 2e6.', ['2e6']], ['Gastaste 1.845e5 pesos.', ['1.845e5']],
+      // A spaced sign is a sign too (fail closed): a dash before an amount is refused unless a digit precedes it (a date).
+      ['Llevás - 184.500.', ['184.500']], ['Llevás - $ 184.500.', ['184.500']], ['Llevás $ - 184.500.', ['184.500']], ['Gastos registrados - 14 movimientos.', ['14']],
       // The person's number, in any writing, is not evidence (owner invariant: a threshold is not a ledger total).
       ['No, no llegaste a 100 mil este mes: $ 184.500.', ['100 mil']], ['No, no llegaste a $ 100.000 este mes.', ['100.000']]]) {
       expect(unsupportedFigures(bad, ask('¿Gasté más de 100 mil este mes?'), BOTH), bad).toEqual(figures);
