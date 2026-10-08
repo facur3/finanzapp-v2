@@ -141,8 +141,6 @@ function navigation(value, cited) {
 // «- $ 184.500», «$ - 184.500»), rewrites a non-negative fact: both are refused, fail closed, so a spaced dash before
 // an amount is also refused; only a dash right after a digit (an ISO date, a range) is not a sign (Codex reviews).
 const FIGURE = /(\d[\d.,]*\d(?:[eE][+-]?\d+)?|\d(?:[eE][+-]?\d+)?)(\s*(?:%|％|por\s*ciento\b|porciento\b|per\s*cent\b|percent\b)|\s*(?:mil|k|lucas)\b|\s*mill[oó]n(?:es)?\b)?/giu;
-// Any dash or minus (every Unicode dash, the minus sign, the small and fullwidth hyphen-minus) before the figure.
-const SIGNED_BEFORE = /(?<!\d)[\p{Pd}\u2212]\s*(?:(?:\$|u\$s|USD|ARS)\s*)?$/iu;
 const PERCENT = /^(?:%|％|por\s*ciento|porciento|per\s*cent|percent)$/i;
 // A monetary mark beside a figure says which currency the figure is in: a bare «$» may be either protocol currency;
 // a word, symbol or code of the request's currency is fine; another currency is a conversion or an invention and is
@@ -156,6 +154,9 @@ const markPattern = Object.values(MARKS).flat().sort((a, b) => b.length - a.leng
 const MONEY_BEFORE = new RegExp(`(?<![\\p{L}\\d])(${markPattern})\\s*$`, 'iu');
 const MONEY_AFTER = new RegExp(`^\\s*(${markPattern})(?![\\p{L}\\d])`, 'iu');
 const currencyOf = mark => Object.keys(MARKS).find(key => MARKS[key].includes(mark.toLowerCase()));
+// Any dash or minus (every Unicode dash, the minus sign, the small and fullwidth hyphen-minus) before the figure or
+// before any monetary mark that precedes it, spaced or not.
+const SIGNED_BEFORE = new RegExp(`(?<!\\d)[\\p{Pd}\\u2212]\\s*(?:(?:${markPattern})\\s*)?$`, 'iu');
 // A digit of another script or a numeric symbol («٣», «３», «²», «½») is never a restated fact; a format or combining
 // character glued to a digit would split a figure into digits that pass alone.
 const FOREIGN_DIGIT = /(?![0-9])[\p{Nd}\p{No}]/u;
@@ -186,7 +187,10 @@ export function unsupportedFigures(message, request, evidenceIds = []) {
   // A number in a cited fact's label (a category name such as «Plan 2030») may appear only inside an occurrence of that
   // name in the prose, written as the label writes it, and bare: never as money, signed, with a suffix, alone, or
   // elsewhere in the message (Codex reviews of this change).
-  const names = facts.map(item => spaced(String(item.label ?? '').split(':').pop())).filter(name => /\d/.test(name));
+  // The name is the label, and the label after its prefix (what precedes the first colon, «Categoría de gasto: »)
+  // when a letter remains: a name holding a colon («Plan: 2030») stays whole, a name of digits alone is never a span.
+  const names = facts.flatMap(item => { const label = spaced(String(item.label ?? '')); const name = label.replace(/^[^:]*:\s*/, ''); return name !== label && /\p{L}/u.test(name) ? [label, name] : [label]; })
+    .filter(name => /\d/.test(name));
   const spans = names.flatMap(name => [...message.matchAll(new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+'), 'giu'))]
     .map(match => [match.index, match.index + match[0].length]));
   const found = [];
@@ -197,11 +201,12 @@ export function unsupportedFigures(message, request, evidenceIds = []) {
     if (GLUED_BEFORE.test(before) || GLUED_AFTER.test(after) || SIGNED_BEFORE.test(before) || /[eE]/.test(match[1])) { found.push(match[0]); continue; }
     const suffix = (match[2] ?? '').trim();
     if (PERCENT.test(suffix)) { found.push(match[0]); continue; }
-    const mark = MONEY_BEFORE.exec(before)?.[1] ?? MONEY_AFTER.exec(after)?.[1] ?? null;
-    const currency = mark === null ? null : currencyOf(mark);
-    if (currency === 'other' || (currency === 'USD' || currency === 'ARS') && request.currency !== undefined && currency !== request.currency) { found.push(match[0]); continue; }
-    if (currency === 'minor') { if (suffix || !/^\d+$/.test(match[1]) || !amounts.has(BigInt(match[1]))) found.push(match[0]); continue; }
-    const bare = !suffix && mark === null && /^\d+$/.test(match[1]);
+    // Every mark beside the figure counts: a mark of another currency, or of the other protocol currency in a request
+    // of this one (a conversion), refuses it whichever side it sits on.
+    const marks = [MONEY_BEFORE.exec(before)?.[1], MONEY_AFTER.exec(after)?.[1]].filter(mark => mark !== undefined).map(currencyOf);
+    if (marks.includes('other') || marks.some(currency => (currency === 'USD' || currency === 'ARS') && request.currency !== undefined && currency !== request.currency)) { found.push(match[0]); continue; }
+    if (marks.includes('minor')) { if (suffix || !/^\d+$/.test(match[1]) || !amounts.has(BigInt(match[1]))) found.push(match[0]); continue; }
+    const bare = !suffix && !marks.length && /^\d+$/.test(match[1]);
     const named = bare && spans.some(([start, end]) => match.index >= start && match.index + match[0].length <= end);
     const supported = named || figureMinorUnits(match[1], suffix).some(value => amounts.has(value))
       || (bare && (Number(match[1]) <= 31 || counts.has(BigInt(match[1])) || (match[1].length === 4 && years.has(match[1]))));
