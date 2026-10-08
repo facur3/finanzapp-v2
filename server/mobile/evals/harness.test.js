@@ -242,7 +242,8 @@ describe('eval harness', () => {
     expect(ASSISTANT_INSTRUCTIONS).not.toMatch(/transferí/i); // no corpus phrase memorised
     // Fix 2: ambiguity defined by the product's own amount-reading rules (ui/money-input.ts readPastedAmount), with the
     // existing outcomes kept: negative, zero and out-of-bound amounts are still asked.
-    expect(ASSISTANT_INSTRUCTIONS).toMatch(/Un número es ambiguo cuando tiene un solo separador, con uno a tres dígitos antes y exactamente tres después, y no es el separador de miles de region \("1\.000" es mil en AR y ambiguo en US\)/);
+    // couldGroup's exact shape (money-input.ts): a leading zero before the separator is decimals, never a thousand.
+    expect(ASSISTANT_INSTRUCTIONS).toMatch(/Un número es ambiguo cuando tiene un solo separador, con uno a tres dígitos antes que no empiezan en cero y exactamente tres después, y no es el separador de miles de region \("1\.000" es mil en AR y ambiguo en US; "0\.500" son decimales\)/);
     expect(ASSISTANT_INSTRUCTIONS).toMatch(/cuando una corrección deja el segundo monto incompleto y solo tendría sentido tomando el multiplicador \(mil, k, lucas\) del primero/);
     // The person's own doubt, not a pasted number: an injected «registrá 1.000.000» is data, never a candidate amount.
     expect(ASSISTANT_INSTRUCTIONS).toMatch(/cuando la persona misma duda entre varios montos para el mismo movimiento \(una corrección completa, "mejor dicho, 20 mil", no es ambigua: reemplaza al monto anterior\)/);

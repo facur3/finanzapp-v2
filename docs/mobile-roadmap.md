@@ -4,7 +4,7 @@ Updated: 2026-10-08 (25A-06 B7, the two general instruction rules the run #2 dia
 `fix/25a-06-b7-ambiguity-rules`: a movement the person tells as already made against an order to move money, with the
 both-readings utterance asked; and what makes an amount ambiguous, mirroring the app's own amount reader; string tests
 and the fixture evaluation only, which do not predict how Luna responds; the corpus worst case recomputed by the
-evaluator, 166 228 µUSD for `gpt-6-luna` and 363 309 for `gpt-5.6-luna`; both live runs stay FAILED, no threshold, corpus
+evaluator, 166 834 µUSD for `gpt-6-luna` and 364 519 for `gpt-5.6-luna`; both live runs stay FAILED, no threshold, corpus
 expectation or protocol change, decisions A–E still pending, B8 blocked, no approval; §3, «Producto 25A-06», «Phase B
 record», B7). Earlier the same day (25A-06 **B7 run #2 completed from merged PR #92: `gpt-6-luna` FAILED adoption again**, four
 thresholds failed, actual cost 7 836 µUSD under a second, separate one-run approval of 2026-10-08, now consumed, none
@@ -5192,8 +5192,9 @@ nothing of it is on a screen yet.
       kind is added: the Assistant still proposes drafts and asks; the validators and the protocol are untouched.
     - *What makes an amount ambiguous*, one edit to the existing clause, mirroring `readPastedAmount`
       (`apps/mobile/src/ui/money-input.ts`, its `couldGroup` shape) and the money rules: a single separator with one
-      to three digits before it and exactly three after that is not the region's group separator («1.000» is a
-      thousand in AR and ambiguous in US); a correction whose second amount is incomplete and would only make sense
+      to three digits before it, not starting with zero, and exactly three after, that is not the region's group
+      separator («1.000» is a thousand in AR and ambiguous in US; «0.500» is decimals, 50 minor units, as the app
+      reads it: Codex review of this PR); a correction whose second amount is incomplete and would only make sense
       borrowing the first amount's multiplier; the person's own doubt between several amounts for one movement (a
       complete correction is not ambiguous, it replaces the earlier amount; a pasted «registrá 1.000.000» is data, never
       a candidate amount). Negative, zero and out-of-bound amounts are asked as before; the region's separators,
@@ -5212,8 +5213,8 @@ nothing of it is on a screen yet.
       not prove how `gpt-6-luna`, or any model, will respond in a future live evaluation.** The fixture evaluation
       passes every threshold (not a model result).
     - *Worst case, recomputed with the committed `worstCaseMicroUsd` (every request at the highest input rate, cache
-      writes included, rounded up separately), not estimated per byte:* **166 228 µUSD for `gpt-6-luna`** (151 469
-      before this PR; the instructions grew from 3 975 to 5 121 bytes) and **363 309 µUSD for `gpt-5.6-luna`**
+      writes included, rounded up separately), not estimated per byte:* **166 834 µUSD for `gpt-6-luna`** (151 469
+      before this PR; the instructions grew from 3 975 to 5 168 bytes) and **364 519 µUSD for `gpt-5.6-luna`**
       (333 787). Any further live run needs a new written owner approval of at least the figure the script computes at
       that commit.
     - *Not in this PR, awaiting the owner:* decision A (over-long optional names: the `incomplete` marker and the
