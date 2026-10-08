@@ -173,6 +173,8 @@ describe('assistant route: order, reservation and settlement', () => {
       [request, { ...answer, evidenceIds: [] }], // an answer on parse
       [explain, { ...answer, evidenceIds: ['invented'] }],
       [explain, { ...answer, evidenceIds: [] }], // uncited
+      [explain, { ...answer, message: 'Llevás $15.000, unos $3.000 más que el mes pasado.' }], // a figure the facts do not hold: the model's arithmetic
+      [explain, { ...answer, message: 'Llevás $15.000, un 25% más.' }],
       [explain, { ...answer, navigation: { target: 'category', factId: 'current.expenses' } }],
       [explain, { ...answer, navigation: { target: 'movements', factId: 'previous.expenses' } }],
       [explain, { ...answer, navigation: { target: 'https://evil', factId: 'current.expenses' } }],

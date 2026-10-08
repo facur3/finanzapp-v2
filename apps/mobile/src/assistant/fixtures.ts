@@ -28,7 +28,7 @@ export const FIXTURE_FACTS: AssistantFact[] = [
 const none = { evidenceIds: [], navigation: null, proposals: [], clarification: null };
 
 export const FIXTURE_ANSWER: AssistantResultV2 = { ...none, type: 'answer',
-  message: 'Gastaste $84.300 más que el mes pasado, comparando los mismos 21 días. Restaurantes explica la mitad de la diferencia.',
+  message: 'Gastaste más este mes: $412.300 contra $328.000 a esta altura del mes pasado, comparando los mismos 21 días. En Restaurantes, $98.500 contra $56.000.',
   evidenceIds: ['current.expenses', 'previous.expenses', 'current.category.0', 'previous.category.0', 'current.category.1', 'previous.category.1', 'current.category.2', 'previous.category.2'] };
 
 export const FIXTURE_CATEGORY_ANSWER: AssistantResultV2 = { ...none, type: 'answer',

@@ -251,8 +251,9 @@ test('the remote client wraps the existing endpoint contract and maps failures t
   const calls: { url: string; body: any; auth: string }[] = [];
   const fetcher = (async (url: string, init: any) => {
     calls.push({ url, body: JSON.parse(init.body), auth: init.headers.Authorization });
-    // The server's own copy of the evidence is never what the device shows: here it is tampered with.
-    return { ok: true, status: 200, json: async () => ({ ...FIXTURE_ANSWER, evidenceIds: ['current.expenses'], evidence: [{ ...FIXTURE_FACTS[0], amountMinor: 1 }] }) };
+    // The server's own copy of the evidence is never what the device shows: here it is tampered with. The prose states
+    // only the figure this request holds (one fact): a figure the request does not hold is refused by the device too.
+    return { ok: true, status: 200, json: async () => ({ ...FIXTURE_ANSWER, message: 'Gastaste $412.300 este mes, en 38 movimientos.', evidenceIds: ['current.expenses'], evidence: [{ ...FIXTURE_FACTS[0], amountMinor: 1 }] }) };
   }) as unknown as typeof fetch;
   const client = remoteAssistant('https://finanzapp.example', async () => 'jwt', fetcher);
   assert.equal(client.mode, 'remote');

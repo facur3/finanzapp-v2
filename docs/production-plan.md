@@ -663,12 +663,21 @@ Rules that follow:
   from the cited fact ids over local evidence (`answerContent` in `apps/mobile/src/assistant/conversation.ts`), never
   parsed out of prose. A model's typed navigation intent (protocol v2) only moves to the front a link the device already
   derived from the same cited fact; it never adds a link or a route.
-- Prose may restate a cited fact's amount, or the difference of the same fact between the two periods (`current.X`
-  and `previous.X`), and nothing else numeric: never two different facts subtracted (income minus expenses, expenses
-  minus refunds), never a
-  balance, a card debt, a budget's usage, an instalment's state, a conversion, a net flow or a refund's state. Those come
-  from the domain code and the evidence rows the device draws (the v2 instructions say so; the evaluation measures it,
-  §5.8).
+- **Prose may restate the request's own figures and nothing computed (owner decision B, 2026-10-08; it replaces the
+  25A-05 allowance for the difference of the same fact between the two periods).** A fact's amount, as is, or its
+  count, a year of its periods, a day-sized integer that is not money, a number the person or a fact label wrote; never
+  a difference, a percentage, a rounding, a total, two facts subtracted (income minus expenses, expenses minus
+  refunds), a balance, a card debt, a budget's usage, an instalment's state, a conversion, a net flow or a refund's
+  state. To compare, the model names both verified amounts and says which is larger; the device draws the verified
+  difference row from the cited pair. **EXISTS TODAY (25A-06, B7):** `unsupportedFigures` in the shared protocol
+  module, applied by `validateAssistantResultV2` to every answer, so the server refuses the provider's output and the
+  device refuses the server's reply when the prose holds a figure the request does not, for every reply to a question
+  (the v2 instructions say so too; the evaluation measures it, §5.8). The reader sees Western digits only: a figure in
+  words («el doble», «medio millón»), the direction word («más»/«menos» is the model's claim; the signed row is the
+  verified one), a computed count or ratio of 31 or less and space-grouped thousands are outside the deterministic
+  check and rest on the instructions and on reading the live report. The prose therefore cannot name the difference;
+  the 25A-07 item «a verified difference as a fact» (roadmap) is the smallest safe way to give it back inside v2's
+  fact shape and its 60-fact bound.
 
 ### 5.3 The one write path
 
@@ -1772,7 +1781,7 @@ Nothing below is complete unless it says **EXISTS TODAY**. "Launch §n" is a sec
 | Closed Assistant protocol v2, validated on the server and the device | 25A | **EXISTS TODAY** (25A-05); v1 retired, never deployed | v3 (locale, currencies) server first, later |
 | Cloud-AI consent screen | 25A | **NOT IMPLEMENTED**, **LAUNCH BLOCKER** | Built and shown before any send |
 | Provider port, model as configuration | 25A | **EXISTS TODAY** (25A-05); the OpenAI adapter disabled, nothing configured | — |
-| Model evaluation and choice | 25A | Corpus, harness and thresholds **EXIST TODAY** (25A-05; fixture run only, not model results); `estimateExceededCount` = 0 and the live-run gates added (25A-06 Phase A); B7 runs #1 and #2 (2026-10-08 UTC): **`gpt-6-luna` FAILED adoption** both times (run #1 five thresholds, run #2 four: `schemaValidRate` 0.9806, `intentAccuracy` 0.9417, `clarificationAccuracy` 0.8696, `groundedEvidenceAccuracy` 0.9; thresholds unchanged; both one-run approvals, 2026-10-07 and 2026-10-08, consumed; roadmap «Producto 25A-06», B7); **RESEARCH GATE**, **OWNER ACTION** (paid, approved amount) | The two general instruction rules of the run #2 record are in the ambiguity-rules PR (string and fixture tests only: not a prediction of a live result); then the owner decisions of that record (over-long optional names at the protocol boundary; model arithmetic; the non-AR currency precedence; the transfer sentence; the approval's shape), then a further live run only with a new owner spend approval covering the worst case the evaluator recomputes (runbook B7) |
+| Model evaluation and choice | 25A | Corpus, harness and thresholds **EXIST TODAY** (25A-05; fixture run only, not model results); `estimateExceededCount` = 0 and the live-run gates added (25A-06 Phase A); B7 runs #1 and #2 (2026-10-08 UTC): **`gpt-6-luna` FAILED adoption** both times (run #1 five thresholds, run #2 four: `schemaValidRate` 0.9806, `intentAccuracy` 0.9417, `clarificationAccuracy` 0.8696, `groundedEvidenceAccuracy` 0.9; thresholds unchanged; both one-run approvals, 2026-10-07 and 2026-10-08, consumed; roadmap «Producto 25A-06», B7); **RESEARCH GATE**, **OWNER ACTION** (paid, approved amount) | The two general instruction rules of the run #2 record are in the ambiguity-rules PR (string and fixture tests only: not a prediction of a live result); then the owner decisions of that record: model arithmetic **decided and implemented** (decision B, 2026-10-08: no model arithmetic, enforced by the shared validator; §5.2); over-long optional names at the protocol boundary, the non-AR currency precedence, the transfer sentence and the approval's shape still pending; then a further live run only with a new owner spend approval covering the worst case the evaluator recomputes (runbook B7) |
 | Replacement of `gpt-5-mini` before 2026-12-11 | 25A | **DONE in code** (25A-05: removed; no model in code) | The model chosen by 25A-06's evaluation |
 | Monetary ceilings as atomic pre-call reservations, settlement, usage accounting, kill switch | 25A | **EXISTS TODAY** in the repository (25A-05), staging placeholders, applied to staging only with AI disabled (runbook B4, 2026-10-07); **IMPLEMENTATION GATE**, **LAUNCH BLOCKER** for enabling AI | Tripped deliberately in staging (runbook B4, B8: `verify.sql`, the drills, `probe.js race`), including concurrent requests against the last unit of capacity (§6.3) |
 | Alerts, anomaly stop, reconciliation against the provider's cost report | 25A | The owner-run reconciliation (`usage-report.sql`, `reconcile.js`) **EXISTS TODAY** (25A-06 Phase A); staging alerts are the provider's budget e-mails (**OWNER ACTION**); the automated owner alert and the anomaly stop **NOT IMPLEMENTED**, **LAUNCH BLOCKER** for enabling AI beyond staging | Reconciliation at runbook B9 (no `investigate` day, `estimate_exceeded` = 0); the automated alert before production (25A-07 or 25F) |

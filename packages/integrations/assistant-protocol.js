@@ -122,6 +122,68 @@ function navigation(value, cited) {
   return { target: value.target, factId: value.factId };
 }
 
+// ── Figures in an answer ─────────────────────────────────────────────────────────────────────────────────────────
+// Financial calculations belong to the deterministic domain, never to the model (production-plan.md §5.2, owner
+// decision of 2026-10-08): an answer's prose may restate the request's own figures, a fact's amount or count, a year
+// of its periods, a number the person or a fact label wrote, and nothing computed (no difference, percentage, rounding
+// or total). A figure is read by its shape, whatever the convention: the last of two different separators is the
+// decimal mark, a repeated separator groups thousands, one separator before one or two digits is decimals, and one
+// before exactly three digits is read both ways (a thousand, or decimals), since the reply is Spanish whatever the
+// request's region. A bare integer (no separator, suffix or money mark) may also be a day (≤ 31), a fact's count or a
+// period's year. The reader sees Western digits: a figure in words («el doble», «medio millón»), a direction word or
+// a small computed count rests on the instructions and on reading a live report, never on this check.
+const FIGURE = /(\d[\d.,]*\d|\d)(\s*(?:%|％|por\s*ciento\b|porciento\b|per\s*cent\b|percent\b)|\s*(?:mil|k|lucas)\b|\s*mill[oó]n(?:es)?\b)?/giu;
+const PERCENT = /^(?:%|％|por\s*ciento|porciento|per\s*cent|percent)$/i;
+const MONEY_BEFORE = /(?:\$|u\$s|\b(?:USD|ARS))\s*$/i;
+const MONEY_AFTER = /^\s*(?:pesos|mangos|d[oó]lares|dollars|bucks|USD|ARS)\b/i;
+// A digit of another script or a numeric symbol («٣», «３», «²», «½») is never a restated fact; a format or combining
+// character glued to a digit would split a figure into digits that pass alone.
+const FOREIGN_DIGIT = /(?![0-9])[\p{Nd}\p{No}]/u;
+const GLUED_BEFORE = /[\p{Cf}\p{Mn}\p{Me}]$/u;
+const GLUED_AFTER = /^[\p{Cf}\p{Mn}\p{Me}]/u;
+const flat = value => value.replace(/\s+/g, '').toLowerCase();
+function readings(token) {
+  const separators = token.match(/[.,]/g) ?? [];
+  if (!separators.length) return [Number(token)];
+  const last = Math.max(token.lastIndexOf('.'), token.lastIndexOf(','));
+  const decimal = Number(token.split(token[last] === '.' ? ',' : '.').join('').replace(token[last], '.'));
+  const grouped = Number(token.replace(/[.,]/g, ''));
+  if (new Set(separators).size === 2) return [decimal];
+  if (separators.length > 1) return [grouped];
+  return token.length - last - 1 === 3 ? [grouped, decimal] : [decimal];
+}
+const values = (token, suffix) => readings(token).map(value => value * (suffix.toLowerCase().startsWith('mill') ? 1e6 : suffix ? 1000 : 1));
+const same = (a, b) => Math.abs(a - b) <= 0.005;
+/** The figures of a reply's prose that the request does not support: each is a reason to refuse the reply. */
+export function unsupportedFigures(message, request) {
+  const facts = Array.isArray(request.facts) ? request.facts : [];
+  const amounts = facts.map(item => item.amountMinor / 100), counts = facts.map(item => item.count);
+  const years = new Set([...facts.flatMap(item => [item.startISO, item.endISO]), request.todayISO].map(iso => Number(String(iso).slice(0, 4))));
+  // What the person or a fact label wrote may be echoed: a percentage as written, an amount in any writing of its value.
+  const writtenPercents = new Set(), writtenAmounts = [];
+  for (const source of [request.text ?? '', ...facts.map(item => item.label ?? '')]) {
+    for (const match of String(source).matchAll(FIGURE)) {
+      const suffix = (match[2] ?? '').trim();
+      if (PERCENT.test(suffix)) writtenPercents.add(flat(match[0])); else writtenAmounts.push(...values(match[1], suffix));
+    }
+  }
+  const found = [];
+  const foreign = FOREIGN_DIGIT.exec(message);
+  if (foreign) found.push(foreign[0]);
+  for (const match of message.matchAll(FIGURE)) {
+    const before = message.slice(0, match.index), after = message.slice(match.index + match[0].length);
+    if (GLUED_BEFORE.test(before) || GLUED_AFTER.test(after)) { found.push(match[0]); continue; }
+    const suffix = (match[2] ?? '').trim();
+    if (PERCENT.test(suffix)) { if (!writtenPercents.has(flat(match[0]))) found.push(match[0]); continue; }
+    const money = MONEY_BEFORE.test(before) || MONEY_AFTER.test(after);
+    const bare = !suffix && !money && /^\d+$/.test(match[1]);
+    const supported = values(match[1], suffix).some(value => amounts.some(figure => same(figure, value)) || writtenAmounts.some(figure => same(figure, value))
+      || (bare && (value <= 31 || counts.includes(value) || (match[1].length === 4 && years.has(value)))));
+    if (!supported) found.push(match[0]);
+  }
+  return found;
+}
+
 const RESULT_KEYS = ['type', 'message', 'evidenceIds', 'navigation', 'proposals', 'clarification'];
 /** Validate a result against the request it answers; returns a fresh object holding only the protocol's keys.
  * Run by the server on the provider's output and by the app on the server's reply. */
@@ -130,6 +192,9 @@ export function validateAssistantResultV2(value, request) {
   if (!RESULT_TYPES.includes(value.type) || !Array.isArray(value.proposals) || !Array.isArray(value.evidenceIds)) refuse();
   const supplied = new Set(request.facts.map(item => item.id));
   const message = modelText(value.message, PROTOCOL_LIMITS.messageChars, true);
+  // A figure the request does not hold is the model's own arithmetic or invention: never shown, whatever the reply's
+  // type to a question. A draft or a question on `parse` may reformulate the person's own number.
+  if (request.action === 'explain' && unsupportedFigures(message, request).length) refuse();
   const evidenceIds = ids(value.evidenceIds, supplied, PROTOCOL_LIMITS.facts);
   const empty = !evidenceIds.length && value.navigation === null && !value.proposals.length && value.clarification === null;
   const base = { type: value.type, message, evidenceIds: [], navigation: null, proposals: [], clarification: null };
