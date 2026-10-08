@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { PROTOCOL_LIMITS, PROTOCOL_CURRENCIES, PROPOSAL_KINDS, validateAssistantResultV2, validateAssistantRequestV2, isSafeModelText, isSafeInputText, unsupportedFigures, figureMinorUnits } from './assistant-protocol.js';
+import { PROTOCOL_LIMITS, PROTOCOL_CURRENCIES, PROPOSAL_KINDS, validateAssistantResultV2, validateAssistantRequestV2, isSafeModelText, isSafeInputText, unsupportedFigures, figureMinorUnits, ISO_CURRENCY_CODES } from './assistant-protocol.js';
 import { MAX_ENTRY_MINOR, parseLocalizedAmount } from '../domain/money.ts';
-import { minorUnitExponent } from '../domain/currency.ts';
+import { CURRENCY_CODES, minorUnitExponent } from '../domain/currency.ts';
 import { REVIEW_KINDS, parseReviewDraft } from '../domain/review-drafts.ts';
 
 const request = validateAssistantRequestV2({ version: 2, requestId: 'fixture-request-0001', action: 'parse', text: 'Gasté 15 mil', todayISO: '2026-09-19', currency: 'ARS', region: 'AR', facts: [] });
@@ -105,9 +105,9 @@ describe('a reply to a question states only the figures of the facts it cites, e
       // Codex review of f020dc7: a sign or a parenthesis across several consecutive marks.
       ['Llevás - ARS $ 184.500.', ['184.500'], BOTH], ['Gastaste (ARS $ 184.500 pesos).', ['184.500'], BOTH], ['Llevás 184.500 pesos ARS-.', ['184.500'], BOTH],
       // Codex review of 03b4cd3: a mark across a colon, a comma or a bracket.
-      ['Llevás USD: 184.500.', ['184.500'], BOTH], ['Llevás 184.500 (USD).', ['184.500'], BOTH], ['Llevás $184.500 (dólares).', ['184.500'], BOTH],
+      ['Llevás USD: 184.500.', ['184.500'], BOTH], ['Llevás 184.500 (USD).', ['184.500'], BOTH], ['Llevás $184.500 (dólares).', ['184.500'], BOTH], ['Llevás $184.500, en dólares.', ['184.500'], BOTH],
       // Codex review of f7f03d9: abbreviated magnitudes; a capitals-only word of a cited label is a name, not a code.
-      ['El total es 2 M de pesos.', ['2 M'], BOTH], ['El total es 2MM.', ['2MM'], BOTH], ['YPF: $ 184.500 en 2 cargas.', ['184.500'], BOTH], ['Son 0,1845 M de pesos.', ['0,1845 M'], BOTH], // a multiplier never relaxes the two-decimal contract
+      ['El total es 2 M de pesos.', ['2 M'], BOTH], ['El total es 2MM.', ['2MM'], BOTH], ['Son 0,1845 M de pesos.', ['0,1845 M'], BOTH], // a multiplier never relaxes the two-decimal contract
       // Every Unicode dash or minus before an amount is a sign: the small and fullwidth hyphen-minus, the en dash.
       ['Llevás \ufe6378.200 pesos.', ['78.200'], ['current.category.0']], ['Llevás \uff0d78.200 pesos.', ['78.200'], ['current.category.0']], ['Llevás \u201378.200.', ['78.200'], ['current.category.0']]]) {
       expect(unsupportedFigures(bad, request, cited), bad).toEqual(figures);
@@ -135,6 +135,11 @@ describe('a reply to a question states only the figures of the facts it cites, e
       expect(unsupportedFigures(bad, ask('¿Gasté más de 100 mil este mes?'), BOTH), bad).toEqual(figures);
       expect(() => validateAssistantResultV2(answer(bad), ask('¿Gasté más de 100 mil este mes?')), bad).toThrow();
     }
+  });
+  it('knows every ISO 4217 code of the domain\'s catalogue as a currency mark, and no ordinary word in capitals (drift test)', () => {
+    expect([...ISO_CURRENCY_CODES].sort()).toEqual([...CURRENCY_CODES].sort());
+    expect(unsupportedFigures('HOY: $ 184.500 en 14 movimientos.', ask(), BOTH)).toEqual([]);
+    expect(unsupportedFigures('Llevás CAD 184.500.', ask(), BOTH)).toEqual(['184.500']);
   });
   it('reads a run of marks in linear time: no input makes the reader backtrack (security review)', () => {
     const request = ask();

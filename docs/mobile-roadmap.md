@@ -5285,8 +5285,9 @@ nothing of it is on a screen yet.
       colloquial money marks (and, after the Codex review of `52699e6`, any monetary mark beside a figure in singular
       or plural, Spanish or English: a subunit «centavos» is read in minor units, another currency «euros», «€», «EUR»
       is refused, and so is the other protocol currency in a request of this one, a conversion; any other currency
-      symbol or three-letter code in capitals beside a figure fails closed, a currency *name* outside the list,
-      «rupias», does not: a limit of the heuristic), another script's digits and format characters glued to digits
+      symbol or ISO 4217 code beside a figure fails closed (the domain's catalogue of 178 codes, pinned by a drift
+      test; an ordinary word in capitals, «HOY», is not a code), a currency *name* outside the list, «rupias», does
+      not: a limit of the heuristic), another script's digits and format characters glued to digits
       are refused, as are a
       dash or minus of any kind before a fact's figure, spaced or not («-$ 184.500», «- $ 184.500», «－78.200», a
       rewrite of a non-negative fact; so a spaced dash before an amount is refused too, fail closed; only a dash right

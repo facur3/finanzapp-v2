@@ -164,23 +164,26 @@ const MARKS = {
   ARS: ['ar$', 'ars', 'peso', 'pesos', 'mango', 'mangos'], minor: ['centavo', 'centavos', 'céntimo', 'céntimos', 'centimo', 'centimos', 'cent', 'cents'],
   other: ['€', '£', '¥', 'r$', 'eur', 'brl', 'gbp', 'jpy', 'clp', 'uyu', 'mxn', 'cop', 'pen', 'cny', 'chf', 'euro', 'euros', 'real', 'reales', 'libra', 'libras', 'pound', 'pounds', 'yen', 'yenes', 'yuan', 'franco', 'francos'],
 };
-// Any other currency symbol (\p{Sc}: «₹», «₩», …) or three-letter code in capitals («CAD», «AUD») beside a figure is a
-// mark too, of a currency the protocol does not hold. A currency NAME outside the list («rupias») is not recognised:
-// a limit of this heuristic, documented; the v3 typed references remove digits from the prose altogether.
-// Listed marks match in any case; a code of three capitals matches only as capitals (no `i` flag: «los», «con» stay words).
+// Any other currency symbol (\p{Sc}: «₹», «₩», …) or ISO 4217 code in capitals («CAD», «AUD») beside a figure is a
+// mark too, of a currency the protocol does not hold; an ordinary word in capitals («HOY») is not. The codes are the
+// domain's catalogue (packages/domain/currency-data.ts CURRENCY_CODES), pinned by a drift test. A currency NAME outside
+// the list («rupias») is not recognised: a limit of this heuristic, documented; v3's typed references remove digits
+// from the prose altogether. Listed marks match in any case; a code only as capitals (no `i` flag).
+export const ISO_CURRENCY_CODES = Object.freeze(["AED","AFN","ALL","AMD","AOA","ARS","AUD","AWG","AZN","BAM","BBD","BDT","BHD","BIF","BMD","BND","BOB","BOV","BRL","BSD","BTN","BWP","BYN","BZD","CAD","CDF","CHE","CHF","CHW","CLF","CLP","CNY","COP","COU","CRC","CUP","CVE","CZK","DJF","DKK","DOP","DZD","EGP","ERN","ETB","EUR","FJD","FKP","GBP","GEL","GHS","GIP","GMD","GNF","GTQ","GYD","HKD","HNL","HTG","HUF","IDR","ILS","INR","IQD","IRR","ISK","JMD","JOD","JPY","KES","KGS","KHR","KMF","KPW","KRW","KWD","KYD","KZT","LAK","LBP","LKR","LRD","LSL","LYD","MAD","MDL","MGA","MKD","MMK","MNT","MOP","MRU","MUR","MVR","MWK","MXN","MXV","MYR","MZN","NAD","NGN","NIO","NOK","NPR","NZD","OMR","PAB","PEN","PGK","PHP","PKR","PLN","PYG","QAR","RON","RSD","RUB","RWF","SAR","SBD","SCR","SDG","SEK","SGD","SHP","SLE","SOS","SRD","SSP","STN","SVC","SYP","SZL","THB","TJS","TMT","TND","TOP","TRY","TTD","TWD","TZS","UAH","UGX","USD","USN","UYI","UYU","UYW","UZS","VED","VES","VND","VUV","WST","XAD","XAF","XAG","XAU","XBA","XBB","XBC","XBD","XCD","XCG","XDR","XOF","XPD","XPF","XPT","XSU","XTS","XUA","XXX","YER","ZAR","ZMW","ZWG"]);
 const anyCase = mark => mark.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\p{L}/gu, letter => `[${letter.toLowerCase()}${letter.toUpperCase()}]`);
-const markPattern = Object.values(MARKS).flat().sort((a, b) => b.length - a.length).map(anyCase).join('|') + '|\\p{Sc}|[A-Z]{3}';
+const markPattern = Object.values(MARKS).flat().sort((a, b) => b.length - a.length).map(anyCase).join('|') + '|\\p{Sc}|' + ISO_CURRENCY_CODES.join('|');
 // A mark beside the figure, across a colon or an opening bracket («USD: 184.500», «184.500 (USD)») and, after the
 // figure, a linking word («en dólares»); never across a comma (a comma separates figures: «2030, $ 5»). One mark per match: runs of marks are stripped one at a time (marksBeside),
 // never by a nested quantifier, so no input can make the reader backtrack (security review of this change).
 const MONEY_BEFORE = new RegExp(`(?<![\\p{L}\\d])(${markPattern})\\s*[:(]?\\s*$`, 'u');
-const MONEY_AFTER = new RegExp(`^\\s*\\(?\\s*(?:(?:[Ee][Nn]|[Dd][Ee]|[Ii][Nn]|[Oo][Ff])\\s+)?(${markPattern})(?![\\p{L}\\d])`, 'u');
-/** Every consecutive mark on one side of a figure, nearest first, and the text that remains once they are stripped;
- * `isMark` rules out a capitals-only word that is part of a cited label («YPF: $ 184.500»). */
-function marksBeside(text, regex, cut, isMark) {
+// After the figure: optionally a bracket, or a comma that introduces a linking word («$ 184.500, en dólares»).
+const LINK = '(?:[Ee][Nn]|[Dd][Ee]|[Ii][Nn]|[Oo][Ff])';
+const MONEY_AFTER = new RegExp(`^\\s*(?:,\\s*${LINK}\\s+|\\(\\s*(?:${LINK}\\s+)?|${LINK}\\s+)?(${markPattern})(?![\\p{L}\\d])`, 'u');
+/** Every consecutive mark on one side of a figure, nearest first, and the text that remains once they are stripped. */
+function marksBeside(text, regex, cut) {
   const found = [];
   let rest = text;
-  for (let match = regex.exec(rest); match && isMark(match[1]); match = regex.exec(rest)) { found.push(match[1]); rest = cut(rest, match); }
+  for (let match = regex.exec(rest); match; match = regex.exec(rest)) { found.push(match[1]); rest = cut(rest, match); }
   return { marks: found, rest };
 }
 const beforeCut = (text, match) => text.slice(0, match.index);
@@ -227,8 +230,6 @@ export function unsupportedFigures(message, request, evidenceIds = []) {
   // when a letter remains: a name holding a colon («Plan: 2030») stays whole, a name of digits alone is never a span.
   const names = facts.flatMap(item => { const label = spaced(String(item.label ?? '')); const name = label.replace(/^[^:]*:\s*/, ''); return name !== label && /\p{L}/u.test(name) ? [label, name] : [label]; })
     .filter(name => /\d/.test(name));
-  const labelWords = new Set(facts.flatMap(item => String(item.label ?? '').split(/[^\p{L}\d$]+/u)));
-  const isMark = mark => !/^[A-Z]{3}$/.test(mark) || currencyOf(mark) !== 'other' || !labelWords.has(mark);
   const spans = names.flatMap(name => [...message.matchAll(new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+'), 'giu'))]
     .map(match => [match.index, match.index + match[0].length]));
   const found = [];
@@ -237,7 +238,7 @@ export function unsupportedFigures(message, request, evidenceIds = []) {
   for (const match of message.matchAll(FIGURE)) {
     const before = message.slice(0, match.index), after = message.slice(match.index + match[0].length);
     if (GLUED_BEFORE.test(before) || GLUED_AFTER.test(after) || /[eE]/.test(match[1])) { found.push(match[0]); continue; }
-    const lead = marksBeside(before, MONEY_BEFORE, beforeCut, isMark), trail = marksBeside(after, MONEY_AFTER, afterCut, isMark);
+    const lead = marksBeside(before, MONEY_BEFORE, beforeCut), trail = marksBeside(after, MONEY_AFTER, afterCut);
     if (SIGNED_BEFORE.test(lead.rest) || (PAREN_BEFORE.test(lead.rest) && PAREN_AFTER.test(trail.rest)) || TRAILING_MINUS.test(trail.rest)) { found.push(match[0]); continue; }
     const suffix = (match[2] ?? '').trim();
     if (PERCENT.test(suffix)) { found.push(match[0]); continue; }

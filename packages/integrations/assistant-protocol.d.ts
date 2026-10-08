@@ -36,6 +36,8 @@ export declare function validateAssistantResultV2(value: unknown, request: Assis
  * or a count, a period's year, a number in a cited label, a day-sized integer): each is a reason to refuse a reply to a
  * question. Nothing else supports a figure: not an uncited fact, not the person's question. */
 export declare function unsupportedFigures(message: string, request: Pick<AssistantRequestV2, 'facts'> & Partial<Pick<AssistantRequestV2, 'todayISO' | 'currency'>>, evidenceIds?: readonly string[]): string[];
+/** Every ISO 4217 code the figure reader treats as a currency mark: the domain's catalogue, pinned by a drift test. */
+export declare const ISO_CURRENCY_CODES: readonly string[];
 /** The exact minor-unit value of a figure token written under the reply's numeric contract (Argentine writing: a point
  * groups thousands, a comma precedes one or two centavos), under a multiplier suffix («mil», «millones»): one value, or
  * none when the writing is not the contract's. */
