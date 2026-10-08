@@ -1,6 +1,7 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-07 (25A-06 Phase B, documentation only: staging checkpoints B1–B6 passed, owner-verified, and the
+Updated: 2026-10-07 (25A-06 Phase B, documentation only: staging checkpoints B2–B6 passed, owner-verified, B1's
+inventory still open (unanswered items marked unresolved), a staging resource register (runbook §0.5), and the
 owner approved one B7 live evaluation of at most 200 000 µUSD; no provider call made yet; §3, «Producto 25A-06»,
 «Phase B record»). Earlier, 2026-10-05 (owner decisions on the operational and support identity, documentation only: a private
 product-operations account owns new infrastructure and is never public, public domain aliases only after the naming
@@ -1025,7 +1026,7 @@ scripts, the live-evaluation gates, [ai-staging-runbook.md](ai-staging-runbook.m
 no secret, no paid call, nothing applied or deployed. The activation order is binding, each step only after the one
 before it passes (the runbook's §0.2):
 1. **25A-06 Phase A** → reviewed and merged by the owner as PR #87 (checkpoint A, done).
-2. **Done, owner-verified 2026-10-07** («Producto 25A-06», «Phase B record»). **OWNER creates and configures staging**: remote inventory recorded (B1), the OpenAI staging project, service
+2. **B2–B6 done, owner-verified 2026-10-07; B1 open** («Producto 25A-06», «Phase B record»). **OWNER creates and configures staging**: remote inventory recorded (B1), the OpenAI staging project, service
    accounts and limits (B2), the Supabase staging project and its auth settings (B3), `schema.sql` applied and `verify.sql` printing
    `STAGING_VERIFY_OK` (B4), the boundary probe (B5), the Vercel project `finanzapp-api-staging` deployed with AI still
    off in the database (B6).
@@ -4832,8 +4833,8 @@ nothing of it is on a screen yet.
   committed. Vercel: the project `finanzapp-v2` deploys `api/mobile/*` and also hosted the retired PWA
   (`finanzapp-v2.vercel.app` and a `-rho` alias in history). Git: 63 of 79 remote branches carry
   `api/mobile/assistant.js`; one, `origin/feat/producto-24rep-native-first-web-retirement`, carries the pre-25A-05
-  runtime. OpenAI: no project id, key or organization referenced anywhere. OWNER CHECKS (B1, passed 2026-10-07, «Phase B
-  record» below): the legacy Supabase project (existence, plan, region, tables and row counts, real data, auth providers,
+  runtime. OpenAI: no project id, key or organization referenced anywhere. OWNER CHECKS (B1, open; answers and unresolved
+  items in «Phase B record» below): the legacy Supabase project (existence, plan, region, tables and row counts, real data, auth providers,
   whether its legacy `anon` key is still active) and every other Supabase project; `finanzapp-v2`'s plan, Node
   version, Fluid compute, variable names and scopes, domains and aliases, Deployment Protection, system-variable
   exposure and Ignored Build Step; other Vercel projects; any variable in a Preview or Development scope; the OpenAI
@@ -4850,13 +4851,36 @@ nothing of it is on a screen yet.
   Later: the session slice (Sign in with Apple), the consent screen, the literal origin read and an EAS-built bundle
   scan, protocol v3. 25A2 and production activation are not started.
 - **Device QA.** Nothing to check on the iPhone: no app change beyond the version line, and no build points at staging.
-- **Status.** Phase A merged as PR #87. Phase B: B1–B6 passed (2026-10-07); B7 approved, not run; B8–B11 not started.
+- **Status.** Phase A merged as PR #87. Phase B: B2–B6 passed (2026-10-07); **B1 open** (inventory items unresolved
+  below); B7 approved, not run; B8–B11 not started.
 - **Phase B record (2026-10-07, owner-verified; documentation only).** The owner reported each result below; no agent
   touched a service, ran remote SQL or called a provider. No account address, key, token, project ref, database
   password or secret value is recorded here, and none may be.
-  - **B1 — remote inventory: PASSED (owner-reported).** Nothing deleted. **Open:** the runbook's criterion (§0.2, §2)
-    asks for every OWNER CHECK answered here; the non-secret per-item answers (the inventory list under «Inventory of
-    existing remote resources» above) are not recorded yet and come from the owner in a follow-up.
+  - **B1 — remote inventory (runbook §2): OPEN, not passed.** Nothing deleted. Each OWNER CHECK, answered only from
+    what the owner verified; everything else **UNRESOLVED**:
+    - *Supabase, the legacy project (§2.1):* existence, name, plan, region, paused or not, tables and row counts,
+      whether it holds real data to preserve, auth providers and user count, whether its legacy `anon` key is still
+      active: **UNRESOLVED**. Nothing deleted or rotated.
+    - *Supabase, other projects (§2.1):* `finanzapp-staging`, São Paulo (sa-east-1), staging, under the private
+      operations organization (B3). Its plan and ref prefix, and the complete list of other projects: **UNRESOLVED**.
+    - *Vercel, `finanzapp-v2` (§2.2):* plan, team, connected repository, production branch, Node version, Fluid
+      compute, variable names and scopes, domains and aliases, Deployment Protection, system-variable exposure,
+      Ignored Build Step: **UNRESOLVED**.
+    - *Vercel, other projects (§2.2):* `finanzapp-api-staging`, production branch `master`, region `gru1` from the
+      repository's `vercel.json`, variables in the Production scope only (B6). Any other FinanzApp project:
+      **UNRESOLVED**.
+    - *Vercel, Preview or Development secrets (§2.2):* none in `finanzapp-api-staging` (B6); in `finanzapp-v2`:
+      **UNRESOLVED**. So whether any Preview or Development secret exists anywhere is not yet confirmed.
+    - *OpenAI (§2.4):* staging project `finanzapp-staging` with model access `gpt-6-luna` only, service accounts
+      `finanzapp-staging-api` and `finanzapp-staging-eval`, a USD 5 project hard spend limit, a small prepaid balance
+      and auto-reload OFF (B2). The complete list of organizations and projects, whether other use shares the
+      organization, the payment method, other existing keys, the usage tier and the budget alerts: **UNRESOLVED**.
+    - *EAS (§2.5):* no provider key (B2). The variable names and visibility of each environment: **UNRESOLVED**.
+    - *GitHub (§2.5):* no provider key (B2). The secret and variable names: **UNRESOLVED**.
+    - *Optional (§2.3):* the dashboard Ignored Build Step in both projects: not recorded.
+
+    B1 passes when every UNRESOLVED item above is answered by the owner (or recorded as «none», when verified none).
+    The staging resource register (keep, already removed, later decision) is runbook §0.5.
   - **B2 — OpenAI staging (runbook §7): PASSED.** Under the private operations identity (production-plan.md §2.6):
     project `finanzapp-staging`; model access `gpt-6-luna` only; Standard service tier only; two project-scoped
     service accounts, `finanzapp-staging-api` and `finanzapp-staging-eval`, each with Restricted permissions, only

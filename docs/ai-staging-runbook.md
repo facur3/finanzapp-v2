@@ -13,9 +13,11 @@ only in the services' own settings and in local env files outside the repository
 **Phase A merged as PR #87** (merge commit ce4b4b3, 2026-10-05): checkpoint A passed. **Phase B** proceeds only
 through the checkpoints of §0.2, in order, once the owner has read this runbook. Each Phase B step names who acts. Production is out of scope: no step here touches it, enables AI there or decides its numbers.
 
-**Phase B progress (recorded 2026-10-07, owner-verified):** B1–B6 passed; the B7 spend is approved, not yet run. The
-results, with no account address, key, token, project ref or secret, are in [mobile-roadmap.md](mobile-roadmap.md),
-«Producto 25A-06», «Phase B record».
+**Phase B progress (recorded 2026-10-07, owner-verified):** B2–B6 passed; **B1 is open** (the inventory answers of §2
+not yet supplied are marked unresolved); the B7 spend is approved, not yet run. B2–B6 were carried out before B1's
+answers were recorded. The results, with no account address, key, token, project ref or secret, are in
+[mobile-roadmap.md](mobile-roadmap.md), «Producto 25A-06», «Phase B record»; the resources to keep and to clean up later
+are in §0.5.
 
 Related: [production-plan.md](production-plan.md) (§2 environments, §3 Vercel, §4 Supabase, §5 the Assistant, §6 cost,
 §14.1 audits), [decision 006](decisions/006-cloud-identity.md) (the cloud identity), [mobile-roadmap.md](mobile-roadmap.md)
@@ -40,7 +42,7 @@ Each checkpoint must pass before the next one starts. Do not skip ahead.
 | # | Checkpoint | Who | Passes when |
 | --- | --- | --- | --- |
 | A | Phase A PR reviewed and merged | Owner | **Passed**: PR #87 merged by the owner, 2026-10-05 |
-| B1 | Remote inventory recorded (§2) | Owner checks | **Passed** per the owner, 2026-10-07; nothing deleted. **Open:** the non-secret per-item answers of §2 are not yet recorded in the roadmap. Every OWNER CHECK answered in the roadmap; nothing deleted |
+| B1 | Remote inventory recorded (§2) | Owner checks | **Open** (2026-10-07): the answers verified so far are recorded and the rest marked unresolved in the roadmap; nothing deleted. Every OWNER CHECK answered in the roadmap; nothing deleted |
 | B2 | OpenAI staging project, service accounts and limits, under the operations identity (§7) | Owner | **Passed** 2026-10-07. Key in a password manager only; limits, budget and alerts set; auto-recharge off |
 | B3 | Supabase staging project and auth settings, under the operations identity (§5, §6.1) | Owner | **Passed** 2026-10-07. Settings of §5.3 set; keys of §6.2 created |
 | B4 | Schema applied and verified (§6.3, §6.4) | Owner | **Passed** 2026-10-07. `verify.sql` prints `STAGING_VERIFY_OK` |
@@ -107,6 +109,28 @@ the repository is safer still.
 | Point an app build at staging | Never in 25A-06 (§13) |
 | Apply `schema.sql` anywhere but the new staging project | Never in 25A-06 |
 | Use the production bundle identifier or make an EAS build | Never in 25A-06 (AGENTS rule 3) |
+
+### 0.5 Staging resource register (keep, removed, later decision)
+
+So no temporary resource is forgotten. Names only; no address, ref, key or value. Being unused today is never by itself
+a reason to delete something (§2.1).
+
+| Resource | State |
+| --- | --- |
+| `~/.config/finanzapp/staging-db.env`, `~/.config/finanzapp/staging-ai.env` (§0.3) | **Keep** through B10/B11 or later staging work |
+| Staging Supabase test people A and B | **Keep** through B10/B11; later decision when no longer needed |
+| Staging Supabase probe key and API secret key (§6.2) | **Keep** through B10/B11; rotate or revoke when their purpose ends |
+| OpenAI service accounts `finanzapp-staging-api`, `finanzapp-staging-eval` | **Keep** through B10/B11; rotate or revoke when their purpose ends |
+| Supabase project `finanzapp-staging` | **Keep** (staging) |
+| OpenAI project `finanzapp-staging` | **Keep** (staging) |
+| Vercel project `finanzapp-api-staging` | **Keep** (staging) |
+| `~/.config/finanzapp/vercel-staging.env` | **Already removed** (owner, 2026-10-07) |
+| Synthetic probe and capture rows in staging (§6.5) | **Later decision** |
+| Saved SQL-editor verification queries in staging | **Later decision**, if the owner wants them gone |
+| The legacy Supabase project and its public legacy key (§2.1) | **Later decision**, only after the inventory, an export where needed and an owner decision |
+| A default Supabase secret key on staging | **Later decision**, only if verified unused |
+
+Production gets its own projects and credentials; a staging credential is never promoted or copied into production.
 
 ## 1. What Phase A added to the repository (AUTOMATED / CLAUDE)
 

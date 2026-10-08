@@ -160,7 +160,7 @@ the only thing they serve. How they relate to Supabase and the AI provider, and 
 in [docs/production-plan.md](docs/production-plan.md) (§2 to §4); bringing up staging, step by step and by whom, is
 [docs/ai-staging-runbook.md](docs/ai-staging-runbook.md); the path to TestFlight and the App Store is in
 [docs/app-store-launch.md](docs/app-store-launch.md). Staging exists with the cloud Assistant still disabled in its
-database (runbook checkpoints B1–B6, passed 2026-10-07); no production environment, enabled cloud Assistant,
+database (runbook checkpoints B2–B6, passed 2026-10-07); no production environment, enabled cloud Assistant,
 subscription or store listing exists yet.
 
 ## Files that must never be committed
