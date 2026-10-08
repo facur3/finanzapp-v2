@@ -236,7 +236,7 @@ describe('eval harness', () => {
     expect(ASSISTANT_INSTRUCTIONS).toMatch(/otra moneda que la de los facts, no hay tipo de cambio: pedí aclaración de moneda/);
     // Decision B (2026-10-08): no model arithmetic; a comparison names both verified amounts; the device draws the difference.
     expect(ASSISTANT_INSTRUCTIONS).toMatch(/Las cuentas las hace FinanzApp, nunca vos: no calcules nada \(ni saldos, ni deuda de tarjeta, ni uso de presupuesto, ni cuotas, ni conversiones de moneda, ni flujo neto, ni diferencias entre períodos, ni porcentajes, ni redondeos, ni totales\)/);
-    expect(ASSISTANT_INSTRUCTIONS).toMatch(/solo podés repetir, con sus centavos exactos, importes y cantidades de los facts citados; para comparar, nombrá los dos importes y decí cuál es mayor: la app muestra los números verificados y la diferencia\. Una respuesta con una cifra que no esté en los facts es inválida y se descarta\./);
+    expect(ASSISTANT_INSTRUCTIONS).toMatch(/solo podés repetir, con sus centavos exactos, importes y cantidades de los facts que citás en evidenceIds \(citá cada fact cuyo importe nombrás\); no repitas una cifra de la pregunta de la persona, referite a ella \("ese monto"\); para comparar, nombrá los dos importes y decí cuál es mayor: la app muestra los números verificados y la diferencia\. Una respuesta con una cifra que no esté en los facts citados es inválida y se descarta\./);
     expect(ASSISTANT_INSTRUCTIONS).not.toMatch(/la diferencia del mismo dato entre este período y el anterior/);
     expect(ASSISTANT_INSTRUCTIONS).toMatch(/Un pedido de que FinanzApp pague, transfiera o envíe dinero es out_of_scope/);
   });

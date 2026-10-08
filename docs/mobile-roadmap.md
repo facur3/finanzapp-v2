@@ -2,10 +2,12 @@
 
 Updated: 2026-10-08 (25A-06 B7, **owner decision B: financial calculations belong to FinanzApp's deterministic code,
 never to the model**, on `fix/25a-06-b7-arithmetic-ownership`: the v2 allowance for the model to state the difference
-between the two periods is withdrawn; an answer may restate only the request's own figures, and the shared protocol
-validator now refuses, on the server and on the device, an answer whose prose holds any other figure; comparisons name
-both verified amounts and the device keeps drawing the verified difference row; the scorer, the golden fixture and the
-device fixture follow; the corpus worst case recomputed, 169 185 µUSD for `gpt-6-luna` and 369 219 for `gpt-5.6-luna`;
+between the two periods is withdrawn; a reply to a question may restate only the figures of the facts it cites, in
+exact minor units (1,99 is 199, never 200; no tolerance, no rounding), never a number from the person's question, and
+the shared protocol validator refuses, on the server and on the device, a reply whose prose holds any other figure, a
+partial defence in depth; comparisons name both verified amounts and the device keeps drawing the verified difference
+row; the scorer, the golden fixture and the device fixture follow; the owner's currency-inference rule recorded for its
+own PR (decision D); the corpus worst case recomputed, 171 091 µUSD for `gpt-6-luna` and 373 030 for `gpt-5.6-luna`;
 both live runs stay FAILED as recorded, thresholds and corpus expectations unchanged; §3, «Producto 25A-06», «Phase B
 record», B7). Earlier the same day (25A-06 B7, the two general instruction rules the run #2 diagnosis called safe to fix
 locally, PR #94: a movement the person tells as already made against an order to move money, with the
@@ -1055,8 +1057,8 @@ before it passes (the runbook's §0.2):
    off in the database (B6).
 3. **Phase B activates staging** (B7 runs #1 and #2 completed 2026-10-08 UTC: **Luna FAILED adoption** both times; both
    one-run approvals, 2026-10-07 and 2026-10-08, are consumed; the local fixes are in (PR #94) and decision B is
-   implemented (the arithmetic-ownership PR); next: the owner's decisions A, C, D and E, then a new owner spend approval
-   before any further live run; B8 blocked): the **real Luna evaluation** with an owner-approved spend (B7); AI enabled on staging,
+   implemented (the arithmetic-ownership PR); decision D is taken and awaits its own PR; next: the owner's decisions A,
+   C and E, then a new owner spend approval before any further live run; B8 blocked): the **real Luna evaluation** with an owner-approved spend (B7); AI enabled on staging,
    the failure drills and the race (B8); the **cost reconciliation** against the provider (B9).
 4. A focused **`/security_audit`**, then **`/security_review`** (B10); results recorded and 25A-06 marked done (B11).
 5. **Only then 25A-07 — Real Assistant product contract and polish** («Producto 25A», «Slices»), with the session slice
@@ -5254,38 +5256,53 @@ nothing of it is on a screen yet.
     not a change of the acceptance bar: thresholds and corpus expectations are untouched, run #1 and run #2 stay
     recorded as measured.
     - *The rule.* The 25A-05 allowance («prose may restate … or the difference of the same fact between the two
-      periods») is withdrawn. An answer's prose may restate the request's own figures only: a fact's amount (as is,
-      cents included) or count, a year of its periods, a day-sized integer that is not money, and a number the person
-      or a fact label wrote; nothing computed: no difference, percentage, rounding, total, balance or conversion. To
-      compare, the model names both verified amounts and says which is larger; the device draws the verified
-      difference row from the cited pair (`answerContent`, unchanged), so the person keeps the number.
-    - *Enforced deterministically, not only instructed.* `unsupportedFigures` in
-      `packages/integrations/assistant-protocol.js` reads every figure of an answer's prose by its shape (a lone
-      separator before exactly three digits is read both ways, since the reply is Spanish whatever the request's
-      region) and `validateAssistantResultV2` refuses an answer with any unsupported figure: the server refuses the
+      periods») is withdrawn. A reply to a question may restate only the figures of the facts it cites in
+      `evidenceIds`: an amount in **exact minor units** (owner invariant, 2026-10-08: 1,99 is 199 and never 200;
+      decimals beyond the currency's two only when they are zeros; no tolerance, no rounding) or a count, a year of
+      their periods, a number written in a cited fact's label (a category name), and a day-sized bare integer; nothing
+      computed (no difference, percentage, rounding, total, balance or conversion), nothing from an uncited fact, and
+      **never a number from the person's question**: a threshold the person asked about is not a ledger figure, so «Sí,
+      gastaste 200» is refused and the model refers to it as «ese monto». To compare, the model names both verified
+      amounts and says which is larger; the device draws the verified difference row from the cited pair
+      (`answerContent`, unchanged), so the person keeps the number.
+    - *Enforced deterministically, not only instructed.* `unsupportedFigures(message, request, evidenceIds)` in
+      `packages/integrations/assistant-protocol.js` reads every figure of the prose by its shape (a lone separator
+      before exactly three digits is read both ways, since the reply is Spanish whatever the request's region),
+      converts each reading to minor units by digits with the domain's rule (`packages/domain/money.ts`, pinned by a
+      drift test over both separator conventions; no float, no separate parser) and compares integers against the
+      cited facts; `validateAssistantResultV2` refuses the reply on any unsupported figure: the server refuses the
       provider's output (502 `output_invalid`, billed, nothing saved), the device refuses the server's reply with the
-      same function. Answers only: a clarification or a draft may repeat the person's own number. Pinned in
-      `assistant-protocol.test.js` (accepted writings, refused computations, the cents dropped) and
+      same function. Pinned in `assistant-protocol.test.js` (accepted writings; refused computations, the cents dropped,
+      «1,005» for 1,00, the question's threshold, an uncited fact's figure; the drift test) and
       `handlers.test.js`. The check covers every reply to a question (an answer, and a clarification or refusal that
       would carry the figure instead), never a draft or a question on `parse`. Adversarially reviewed before the PR
       (four lenses, 230 probes) and tightened: a percentage in words («21 por ciento»), a thousands-shaped round figure
       that read as a small integer or a count («22.000», «$ 14.000»), a figure inside a longer number the person wrote,
       colloquial money marks, another script's digits and format characters glued to digits are refused, as are a
       minus attached to a fact's figure («-$ 184.500», a rewrite of a non-negative fact; a dash between digits, as in an
-      ISO date, is not a sign) and exponent notation («2e6»), both from the Codex review of the PR; the person's own
-      number may be echoed in any writing of its value. **What the reader does not see:** a figure in words («el
-      doble», «medio millón», «veintidós mil»), the direction word («más»/«menos» is the model's claim; the signed row
-      is the verified one), a computed count or ratio of 31 or less («2 movimientos más», «2 veces»), and
-      space-grouped thousands («184 500» is read as two figures): those rest on the instructions and on reading a live
-      report. The security boundary is unchanged: no tool, no SQL, no ledger write, no function, no currency beyond
-      ARS/USD; the change only narrows what reaches the person.
-    - *Instructions* (`assistant-prompt.js`): «Las cuentas las hace FinanzApp, nunca vos: no calcules nada …; para
+      ISO date, is not a sign) and exponent notation («2e6»), both from the Codex review of the PR. The owner's review
+      of `1a97a0d` then removed two weaknesses: a float comparison within 0,005 (so «1,005» passed for a fact of 1,00)
+      became exact minor units, and the person's question and uncited facts stopped supporting figures.
+      **Partial defence in depth, not verification:** the check pins every figure to a cited fact exactly; it cannot
+      verify what the prose claims about it (which label, period or direction it is attributed to), a figure in words
+      («el doble», «medio millón», «veintidós mil»), the direction word («más»/«menos» is the model's claim; the
+      signed row is the verified one), a computed count or ratio of 31 or less («2 movimientos más», «2 veces»; a bare
+      integer ≤ 31 is also the one way a question's number can still be echoed), a number repeated from a cited label,
+      or space-grouped thousands («184 500» is read as two figures): those rest on the instructions and on reading a
+      live report. The robust design is a result-shape change, for protocol v3 and its own PR: typed figure references
+      in the prose («{current.expenses}», rendered by the device from its own evidence) and no digits at all in the
+      model's text, so every figure is exact and attributed by construction; not forced into this PR. The security
+      boundary is unchanged: no tool, no SQL, no ledger write, no function, no currency beyond ARS/USD; the change only
+      narrows what reaches the person.
+    - *Instructions* (`assistant-prompt.js`): «Las cuentas las hace FinanzApp, nunca vos: no calcules nada …; solo
+      podés repetir, con sus centavos exactos, importes y cantidades de los facts que citás en evidenceIds (citá cada
+      fact cuyo importe nombrás); no repitas una cifra de la pregunta de la persona, referite a ella ("ese monto"); para
       comparar, nombrá los dos importes y decí cuál es mayor: la app muestra los números verificados y la diferencia.
-      Una respuesta con una cifra que no esté en los facts es inválida y se descarta.» String-tested; a string test
-      does not predict a live result.
+      Una respuesta con una cifra que no esté en los facts citados es inválida y se descarta.» String-tested; a string
+      test does not predict a live result.
     - *Evaluator* (`harness.js`): the scorer's `underivedNumbers` now delegates to the protocol's reader over the
-      cited facts only (a figure an uncited fact holds still costs grounding) and no longer accepts a difference or a
-      percentage; an answer the validator refused is still scored for its figures and causal claims, so a report
+      cited facts (the validator and the scorer apply one rule) and no longer accepts a difference, a percentage or a
+      tolerance; an answer the validator refused is still scored for its figures and causal claims, so a report
       names them behind the `invalid_schema`. The 25A-05 scorer's 1 % tolerance on a restated amount is gone too:
       «unos 184 mil» and «US$ 842» (the cents dropped), which it accepted, are flagged and the answer refused. The golden
       fixture names both amounts and compares in words («Más que …», «Menos que …», «Lo mismo que …») instead of a
@@ -5295,7 +5312,8 @@ nothing of it is on a screen yet.
     - *Effect on scores, explicitly.* Corpus expectations: none changed. Fixture evaluation: every threshold passes
       (not a model result). A live answer that states a correct difference, which the 25A-05 scorer accepted, is now
       refused by the validator and costs `schemaValidRate` and `intentAccuracy` (and `groundedEvidenceAccuracy`,
-      `hallucinatedFactRate`): the bar is stricter, never lower. Re-scored under the new rule, run #2's `causal.es`
+      `hallucinatedFactRate`): the bar is stricter, never lower; so is a figure of a fact the answer did not cite, or
+      the person's own threshold repeated. Re-scored under the new rule, run #2's `causal.es`
       would be `invalid_schema` + `underived_number:22.800` (its recorded result stays as measured); the other nine
       answers' prose was not retained (the report kept outputs for imperfect cases only), so how many stated a
       correct difference, and would now be refused, is unknown: a next live run measures it. Changed tests, each
@@ -5312,12 +5330,29 @@ nothing of it is on a screen yet.
       real ledger (where sums almost always have cents) raises the refusal rate the next live run cannot yet measure.
       The smallest safe solution for the prose is the 25A-07 item above (a derived `difference.<subject>` fact inside
       v2's shape and its 60-fact bound); it is not forced into this PR.
-    - *Worst case, recomputed with `worstCaseMicroUsd`:* **169 185 µUSD for `gpt-6-luna`** (166 834 at PR #94; the
-      instructions are 5 351 bytes) and **369 219 µUSD for `gpt-5.6-luna`** (364 519). Any further live run needs a new
+    - *Worst case, recomputed with `worstCaseMicroUsd`:* **171 091 µUSD for `gpt-6-luna`** (166 834 at PR #94; the
+      instructions are 5 499 bytes) and **373 030 µUSD for `gpt-5.6-luna`** (364 519). Any further live run needs a new
       written owner approval of at least the figure the script computes at that commit.
-    - *Not in this PR:* the over-long-name marker (decision A), the non-AR currency precedence (decision D), the
-      transfer sentence (C), the approval's shape (E). No paid call, no staging configuration, no B8, no EAS build;
-      both live runs remain **FAILED**; B8 **BLOCKED**.
+    - *Not in this PR:* the over-long-name marker (decision A), the currency inference (decision D, taken below,
+      its own PR), the transfer sentence (C), the approval's shape (E). No paid call, no staging configuration, no B8,
+      no EAS build; both live runs remain **FAILED**; B8 **BLOCKED**.
+  - **B7 — decision D taken (owner, 2026-10-08): currency inference, recorded for a subsequent focused PR; not
+    implemented in the arithmetic-ownership PR.** The rule the next PR implements, in this order of precedence:
+    1. an explicit currency named by the person takes precedence;
+    2. a named, unambiguously matched account or card supplies its currency when none was named;
+    3. otherwise, if every eligible active account uses one supported currency, the device may prefill that currency;
+    4. if several currencies are eligible, the currency stays unresolved and a clarification is requested;
+    5. a destination account is never invented merely because the currency is known;
+    6. an explicit currency that conflicts with the selected account asks, never converts silently;
+    7. in the Argentine region, explicit colloquial pesos / lucas / mangos mean ARS; outside AR, ARS is never assumed
+       silently;
+    8. no account data beyond the minimum necessary is sent to the AI provider;
+    9. every inferred value stays visible and editable in the review.
+    It settles the production-plan.md §5.8 «Ambiguous currencies» row against the corpus (the run #2 record's decision
+    D): the device, not the model, infers from accounts (rules 2–3); the model keeps `null` for an unstated or
+    unresolvable currency and asks only for two named currencies or an unsupported one. The corpus cases
+    `pesos-non-ar`, `currency-missing` and `k-suffix` stay as committed; the instructions' precedence sentence and any
+    device change belong to that PR, with its own tests and worst-case recomputation.
 - **Owner refinements before accepting the runbook (2026-10-05, in this PR).**
   - **Staging region:** Vercel Functions `gru1` (São Paulo) and the staging Supabase project in the specific region
     `sa-east-1` (São Paulo), replacing `iad1` / us-east-1. The reasons: Argentina-first, the API compute next to its

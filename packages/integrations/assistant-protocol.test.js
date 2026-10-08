@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { PROTOCOL_LIMITS, PROTOCOL_CURRENCIES, PROPOSAL_KINDS, validateAssistantResultV2, validateAssistantRequestV2, isSafeModelText, isSafeInputText, unsupportedFigures } from './assistant-protocol.js';
-import { MAX_ENTRY_MINOR } from '../domain/money.ts';
+import { PROTOCOL_LIMITS, PROTOCOL_CURRENCIES, PROPOSAL_KINDS, validateAssistantResultV2, validateAssistantRequestV2, isSafeModelText, isSafeInputText, unsupportedFigures, figureMinorUnits } from './assistant-protocol.js';
+import { MAX_ENTRY_MINOR, parseLocalizedAmount } from '../domain/money.ts';
+import { minorUnitExponent } from '../domain/currency.ts';
 import { REVIEW_KINDS, parseReviewDraft } from '../domain/review-drafts.ts';
 
 const request = validateAssistantRequestV2({ version: 2, requestId: 'fixture-request-0001', action: 'parse', text: 'Gasté 15 mil', todayISO: '2026-09-19', currency: 'ARS', region: 'AR', facts: [] });
@@ -10,22 +11,60 @@ const proposal = (fields) => ({ type: 'proposal', message: 'Revisalo.', evidence
 // Financial calculations belong to the deterministic domain, never to the model (owner decision, 2026-10-08;
 // production-plan.md §5.2): an answer may restate the request's own figures and nothing computed. Enforced here, by the
 // server on the provider's output and by the device on the server's reply, not only asked for in the instructions.
-describe('an answer states only the figures the request holds', () => {
+describe('a reply to a question states only the figures of the facts it cites, exactly', () => {
   const fact = (id, label, amountMinor, count, previous = false) => ({ id, label, amountMinor, count, startISO: previous ? '2026-09-01' : '2026-10-01', endISO: previous ? '2026-09-05' : '2026-10-05' });
   const facts = [fact('current.expenses', 'Gastos registrados', 18450000, 14), fact('previous.expenses', 'Gastos registrados', 15230000, 12, true),
     fact('current.category.0', 'Categoría de gasto: Plan 2030', 7820000, 5), fact('current.income', 'Ingresos registrados', 84250, 1)];
   const ask = (text = '¿Gasté más que el mes pasado?') => validateAssistantRequestV2({ version: 2, requestId: 'fixture-request-0001', action: 'explain', text, todayISO: '2026-10-05', currency: 'ARS', region: 'AR', facts });
-  const answer = (message, evidenceIds = ['current.expenses', 'previous.expenses']) => ({ type: 'answer', message, evidenceIds, navigation: null, proposals: [], clarification: null });
-  it('accepts a fact\'s amount or count restated in any writing, the periods\' days and years, and what the person or a label wrote', () => {
-    for (const ok of ['Llevás $ 184.500 en 14 movimientos; el mes pasado a esta altura, $ 152.300: más.', 'Llevás 184.500 pesos.', 'Llevás $184,500.00.', 'Llevás 184500.', 'Llevás 184,5 mil.',
-      'Del 1 al 5 de octubre de 2026 registraste 14 movimientos, 12 en septiembre.', 'Ingresos: $ 842,50 (uno).', 'Ingresos: US$ 842.50.',
-      'En Plan 2030 llevás $ 78.200 en 5 compras.', 'No, no llegaste a 100 mil este mes: $ 184.500.', 'No, no llegaste a $ 100.000 este mes.', // the person's number, in another writing
-      'Fuiste 5 veces al super: 5 compras.', 'Hoy, 05/10/2026, a las 14:30.', 'Del 2026-10-01 al 2026-10-05.', 'Gastos registrados - 14 movimientos.']) {
-      expect(unsupportedFigures(ok, ask('¿Gasté más de 100 mil este mes?')), ok).toEqual([]);
-      expect(() => validateAssistantResultV2(answer(ok), ask('¿Gasté más de 100 mil este mes?')), ok).not.toThrow();
+  const BOTH = ['current.expenses', 'previous.expenses'];
+  const answer = (message, evidenceIds = BOTH) => ({ type: 'answer', message, evidenceIds, navigation: null, proposals: [], clarification: null });
+  it('accepts a cited fact\'s amount or count restated in any writing, the periods\' days and years, and a number in a cited label', () => {
+    for (const [ok, cited] of [['Llevás $ 184.500 en 14 movimientos; el mes pasado a esta altura, $ 152.300: más.', BOTH], ['Llevás 184.500 pesos.', BOTH], ['Llevás $184,500.00.', BOTH],
+      ['Llevás 184500.', BOTH], ['Llevás 184,5 mil.', BOTH], ['Del 1 al 5 de octubre de 2026 registraste 14 movimientos, 12 en septiembre.', BOTH],
+      ['Ingresos: $ 842,50 (uno).', ['current.income']], ['Ingresos: US$ 842.50.', ['current.income']], ['En Plan 2030 llevás $ 78.200 en 5 compras.', ['current.category.0']],
+      ['No llegaste a ese monto este mes: $ 184.500.', BOTH], ['Fuiste 5 veces al super: 5 compras.', BOTH], ['Hoy, 05/10/2026, a las 14:30.', BOTH],
+      ['Del 2026-10-01 al 2026-10-05.', BOTH], ['Gastos registrados - 14 movimientos.', BOTH]]) {
+      expect(unsupportedFigures(ok, ask('¿Gasté más de 100 mil este mes?'), cited), ok).toEqual([]);
+      expect(() => validateAssistantResultV2(answer(ok, cited), ask('¿Gasté más de 100 mil este mes?')), ok).not.toThrow();
     }
-    // A figure an uncited fact holds is still the request's own (verified data), even if the citation is missing.
-    expect(unsupportedFigures('Cobraste $ 842,50.', ask())).toEqual([]);
+  });
+  // Owner invariant (2026-10-08): every amount keeps its exact minor units. The first reader compared floats within
+  // 0.005, so «1,005» passed for a fact of 1,00; now every reading is exact integer minor units, never rounded.
+  it('compares exact minor units: no tolerance, no rounding, decimals beyond the second only when they are zeros', () => {
+    const cents = [fact('current.refunds', 'Devoluciones', 100, 1), fact('current.expenses', 'Gastos registrados', 199, 1), fact('current.income', 'Ingresos registrados', PROTOCOL_LIMITS.maxAmountMinor, 1)];
+    const request = validateAssistantRequestV2({ version: 2, requestId: 'fixture-request-0001', action: 'explain', text: '¿Cuánto?', todayISO: '2026-10-05', currency: 'ARS', region: 'AR', facts: cents });
+    const all = cents.map(item => item.id);
+    for (const ok of ['Te devolvieron $ 1.', 'Te devolvieron $ 1,00.', 'Te devolvieron $ 1.000 … no: $ 1,000.', 'Gastaste $ 1,99.', 'Gastaste 1.99 pesos.',
+      'Cobraste $ 9.999.999.999.999,99.', 'Cobraste $ 9,999,999,999,999.99.']) expect(unsupportedFigures(ok, request, all), ok).toEqual([]);
+    for (const [bad, figures] of [['Te devolvieron $ 1,005.', ['1,005']], ['Te devolvieron $ 1,004.', ['1,004']], ['Gastaste $ 2.', ['2']], ['Gastaste $ 2,00.', ['2,00']], ['Gastaste $ 1,9.', ['1,9']],
+      ['Cobraste $ 9.999.999.999.999,98.', ['9.999.999.999.999,98']], ['Cobraste $ 10.000.000.000.000.', ['10.000.000.000.000']], ['Cobraste 1e13 pesos.', ['1e13']]]) {
+      expect(unsupportedFigures(bad, request, all), bad).toEqual(figures);
+    }
+    expect(figureMinorUnits('184,5', 'mil')).toEqual([18450000n]);
+    expect(figureMinorUnits('0,5', 'millones')).toEqual([50000000n]);
+    expect(figureMinorUnits('1.005')).toEqual([100500n]); // a thousand with Argentine separators; 1,005 is no amount
+    expect(figureMinorUnits('1.23.456')).toEqual([]); // badly grouped: no reading
+  });
+  it('reads digits exactly as the domain does (drift test over both separator conventions)', () => {
+    for (const currency of PROTOCOL_CURRENCIES) expect(minorUnitExponent(currency), currency).toBe(2);
+    const conventions = [{ decimal: ',', group: '.' }, { decimal: '.', group: ',' }];
+    for (const token of ['184.500', '184,500', '1.234,56', '1,234.56', '842,50', '842.50', '0,500', '0.500', '1.005', '1,005', '12.5', '12,5', '184500', '1.000', '1,000', '1.234.567', '1,234,567', '1.23.456', '0.1.2', '007']) {
+      const domain = new Set(conventions.map(separators => parseLocalizedAmount(token, 'ARS', separators)).filter(read => read.ok).map(read => BigInt(read.minor)));
+      expect(new Set(figureMinorUnits(token)), token).toEqual(domain);
+    }
+  });
+  // Owner invariant (2026-10-08): a number from the person's question is never a ledger figure, and an uncited fact's
+  // figure is not what the rows show. The first reader accepted both; a false assertion built on the question's own
+  // threshold («Sí, gastaste 200») reached the person.
+  it('refuses the person\'s own number as an assertion, and a figure of a fact the reply does not cite', () => {
+    const request = ask('¿Gasté más de 200 este mes?');
+    for (const [bad, figures, cited] of [['Sí, gastaste 200 este mes.', ['200'], BOTH], ['Sí, superaste los $ 200: llevás $ 184.500.', ['200'], BOTH], ['Sí, pasaste los 200 pesos.', ['200'], BOTH],
+      ['Cobraste $ 842,50.', ['842,50'], BOTH], ['Llevás $ 184.500.', ['184.500'], ['current.income']], ['En Plan 2030 llevás $ 78.200.', ['2030', '78.200'], BOTH]]) {
+      expect(unsupportedFigures(bad, request, cited), bad).toEqual(figures);
+      expect(() => validateAssistantResultV2(answer(bad, cited), request), bad).toThrow();
+    }
+    // A bare small integer still passes as a day or a small count: the one residual way a question's number can be echoed.
+    expect(unsupportedFigures('Sí, pasaste los 20.', ask('¿Gasté más de 20?'), BOTH)).toEqual([]);
   });
   it('refuses a difference, a percentage, a rounding, a total, a fabricated count, or an amount with its cents dropped', () => {
     for (const [bad, figures] of [['Gastaste $ 32.200 más que el mes pasado.', ['32.200']], ['Un 21% más.', ['21%']], ['Casi 185 mil, unos $ 184.000.', ['185 mil', '184.000']],
@@ -38,9 +77,11 @@ describe('an answer states only the figures the request holds', () => {
       ['Gastaste 50.000 este mes.', ['50.000']], ['Llevás 31 mangos más.', ['31']], ['You spent u$s 12 more.', ['12']], ['Gastaste $ ٣٢٢٠٠ más.', ['٣']],
       ['Gastaste 2\u200d1\u200d8\u200d0\u200d0 más.', ['2', '1', '8', '0', '0']],
       // Codex review: a minus attached to a non-negative fact, a currency mark between, or an exponent as one token.
-      ['Llevás -$ 184.500.', ['184.500']], ['Llevás $-184.500.', ['184.500']], ['Llevás −184.500 pesos.', ['184.500']], ['Gastaste 2e6.', ['2e6']], ['Gastaste 1.845e5 pesos.', ['1.845e5']]]) {
-      expect(unsupportedFigures(bad, ask('¿Gasté más de 150.000 este mes?')), bad).toEqual(figures);
-      expect(() => validateAssistantResultV2(answer(bad), ask('¿Gasté más de 150.000 este mes?')), bad).toThrow();
+      ['Llevás -$ 184.500.', ['184.500']], ['Llevás $-184.500.', ['184.500']], ['Llevás −184.500 pesos.', ['184.500']], ['Gastaste 2e6.', ['2e6']], ['Gastaste 1.845e5 pesos.', ['1.845e5']],
+      // The person's number, in any writing, is not evidence (owner invariant: a threshold is not a ledger total).
+      ['No, no llegaste a 100 mil este mes: $ 184.500.', ['100 mil']], ['No, no llegaste a $ 100.000 este mes.', ['100.000']]]) {
+      expect(unsupportedFigures(bad, ask('¿Gasté más de 100 mil este mes?'), BOTH), bad).toEqual(figures);
+      expect(() => validateAssistantResultV2(answer(bad), ask('¿Gasté más de 100 mil este mes?')), bad).toThrow();
     }
   });
   it('applies to every reply to a question, so a computed figure cannot hide in a clarification; a draft or a question on parse may repeat the person\'s own number', () => {
@@ -48,7 +89,8 @@ describe('an answer states only the figures the request holds', () => {
     const inRefusal = { type: 'out_of_scope', message: 'No puedo hacer eso. Gastaste $ 32.200 más.', evidenceIds: [], navigation: null, proposals: [], clarification: null };
     expect(() => validateAssistantResultV2(inQuestion, ask())).toThrow();
     expect(() => validateAssistantResultV2(inRefusal, ask())).toThrow();
-    expect(() => validateAssistantResultV2({ ...inQuestion, message: '¿Querés el detalle de los $ 184.500 por categoría?' }, ask())).not.toThrow();
+    expect(() => validateAssistantResultV2({ ...inQuestion, message: '¿Querés el detalle de los $ 184.500 por categoría?', evidenceIds: ['current.expenses'] }, ask())).not.toThrow();
+    expect(() => validateAssistantResultV2({ ...inQuestion, message: '¿Querés el detalle de los $ 184.500 por categoría?' }, ask())).toThrow(); // uncited
     const parse = validateAssistantRequestV2({ version: 2, requestId: 'fixture-request-0001', action: 'parse', text: 'Gasté 2000 en el kiosco', todayISO: '2026-10-05', currency: 'ARS', region: 'AR', facts: [] });
     expect(() => validateAssistantResultV2({ type: 'clarification', message: '¿Los 2000 fueron pesos o dólares?', evidenceIds: [], navigation: null, proposals: [], clarification: { field: 'currency', candidateIds: [] } }, parse)).not.toThrow();
     expect(() => validateAssistantResultV2({ type: 'proposal', message: 'Revisá este gasto de 2000.', evidenceIds: [], navigation: null, clarification: null,

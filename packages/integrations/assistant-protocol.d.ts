@@ -32,7 +32,10 @@ export declare function isSafeModelText(value: unknown, max: number, prose?: boo
 export declare function validateAssistantRequestV2(value: unknown): AssistantRequestV2;
 export declare function modelInput(request: AssistantRequestV2): Omit<AssistantRequestV2, 'version' | 'requestId'>;
 export declare function validateAssistantResultV2(value: unknown, request: AssistantRequestV2): AssistantResultV2;
-/** The figures of a reply's prose that the request does not hold (a fact's amount or count, a period's year, a day-sized
- * integer, a number the person or a label wrote): each is a reason to refuse a reply to a question. */
-export declare function unsupportedFigures(message: string, request: Pick<AssistantRequestV2, 'facts'> & Partial<Pick<AssistantRequestV2, 'text' | 'todayISO'>>): string[];
+/** The figures of a reply's prose that the cited facts (`evidenceIds`) do not hold exactly (an amount in minor units
+ * or a count, a period's year, a number in a cited label, a day-sized integer): each is a reason to refuse a reply to a
+ * question. Nothing else supports a figure: not an uncited fact, not the person's question. */
+export declare function unsupportedFigures(message: string, request: Pick<AssistantRequestV2, 'facts'> & Partial<Pick<AssistantRequestV2, 'todayISO'>>, evidenceIds?: readonly string[]): string[];
+/** Every exact minor-unit value a digit token may mean under a multiplier suffix («mil», «millones»), by its shape. */
+export declare function figureMinorUnits(token: string, suffix?: string): bigint[];
 export declare const ASSISTANT_RESULT_SCHEMA: Readonly<Record<string, unknown>>;

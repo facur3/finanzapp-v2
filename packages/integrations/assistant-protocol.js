@@ -122,16 +122,20 @@ function navigation(value, cited) {
   return { target: value.target, factId: value.factId };
 }
 
-// ── Figures in an answer ─────────────────────────────────────────────────────────────────────────────────────────
+// ── Figures in a reply to a question ─────────────────────────────────────────────────────────────────────────────
 // Financial calculations belong to the deterministic domain, never to the model (production-plan.md §5.2, owner
-// decision of 2026-10-08): an answer's prose may restate the request's own figures, a fact's amount or count, a year
-// of its periods, a number the person or a fact label wrote, and nothing computed (no difference, percentage, rounding
-// or total). A figure is read by its shape, whatever the convention: the last of two different separators is the
-// decimal mark, a repeated separator groups thousands, one separator before one or two digits is decimals, and one
-// before exactly three digits is read both ways (a thousand, or decimals), since the reply is Spanish whatever the
-// request's region. A bare integer (no separator, suffix or money mark) may also be a day (≤ 31), a fact's count or a
-// period's year. The reader sees Western digits: a figure in words («el doble», «medio millón»), a direction word or
-// a small computed count rests on the instructions and on reading a live report, never on this check.
+// decision of 2026-10-08): the prose may restate the figures of the facts it CITES, an amount in exact minor units or
+// a count, a year of their periods, a number written in a cited fact's label, a day-sized bare integer, and nothing
+// else: nothing computed (no difference, percentage, rounding or total), nothing from an uncited fact, and never a
+// number from the person's question (a threshold the person asked about is not a ledger figure; the model refers to it
+// without repeating it). A figure is read by its shape, whatever the convention: the last of two different separators
+// is the decimal mark, a repeated separator groups thousands, one separator before one or two digits is decimals, and
+// one before exactly three digits is read both ways (a thousand, or decimals), since the reply is Spanish whatever the
+// request's region. Every reading is converted to minor units exactly, by digits, with the domain's rule (decimals
+// beyond the currency's two are accepted only when they are zeros, never rounded; packages/domain/money.ts, pinned by
+// a drift test) and compared as integers: 1,99 is 199, never 200. The reader sees Western digits: a figure in words
+// («el doble», «medio millón»), the direction word or a small computed count rests on the instructions and on reading
+// a live report, never on this check, which is a partial defence in depth, not a verification of what the prose claims.
 // An exponent («2e6») is one token; a minus attached to the figure or to its currency mark (never a dash between
 // digits, as in an ISO date) rewrites a non-negative fact: both are refused (Codex review of this change).
 const FIGURE = /(\d[\d.,]*\d(?:[eE][+-]?\d+)?|\d(?:[eE][+-]?\d+)?)(\s*(?:%|％|por\s*ciento\b|porciento\b|per\s*cent\b|percent\b)|\s*(?:mil|k|lucas)\b|\s*mill[oó]n(?:es)?\b)?/giu;
@@ -145,43 +149,61 @@ const FOREIGN_DIGIT = /(?![0-9])[\p{Nd}\p{No}]/u;
 const GLUED_BEFORE = /[\p{Cf}\p{Mn}\p{Me}]$/u;
 const GLUED_AFTER = /^[\p{Cf}\p{Mn}\p{Me}]/u;
 const flat = value => value.replace(/\s+/g, '').toLowerCase();
+/** Minor digits of every protocol currency (ARS, USD): the domain's `minorUnitExponent`, pinned by a drift test. */
+const MINOR_DIGITS = 2;
+const MAX_MINOR_DIGITS = String(PROTOCOL_LIMITS.maxAmountMinor).length;
+// Digit groups: one to three digits first, three in each further group, no leading zero (ui/money-input.ts wellGrouped).
+const wellGrouped = groups => /^[1-9]\d{0,2}$/.test(groups[0]) && groups.slice(1).every(group => /^\d{3}$/.test(group));
+/** The ways a digit token reads, as whole and fraction digit strings: by shape, both ways where only a convention
+ * decides (one separator before exactly three digits), never as a float. */
 function readings(token) {
   const separators = token.match(/[.,]/g) ?? [];
-  if (!separators.length) return [Number(token)];
+  if (!separators.length) return [{ whole: token, fraction: '' }];
   const last = Math.max(token.lastIndexOf('.'), token.lastIndexOf(','));
-  const decimal = Number(token.split(token[last] === '.' ? ',' : '.').join('').replace(token[last], '.'));
-  const grouped = Number(token.replace(/[.,]/g, ''));
-  if (new Set(separators).size === 2) return [decimal];
-  if (separators.length > 1) return [grouped];
-  return token.length - last - 1 === 3 ? [grouped, decimal] : [decimal];
+  const groups = token.split(/[.,]/);
+  const grouped = wellGrouped(groups) ? [{ whole: groups.join(''), fraction: '' }] : [];
+  const head = groups.slice(0, -1);
+  const decimal = head.length === 1 || wellGrouped(head) ? [{ whole: head.join(''), fraction: groups[groups.length - 1] }] : [];
+  if (new Set(separators).size === 2) return decimal;
+  if (separators.length > 1) return grouped;
+  return token.length - last - 1 === 3 ? [...grouped, ...decimal] : decimal;
 }
-const values = (token, suffix) => readings(token).map(value => value * (suffix.toLowerCase().startsWith('mill') ? 1e6 : suffix ? 1000 : 1));
-const same = (a, b) => Math.abs(a - b) <= 0.005;
-/** The figures of a reply's prose that the request does not support: each is a reason to refuse the reply. */
-export function unsupportedFigures(message, request) {
-  const facts = Array.isArray(request.facts) ? request.facts : [];
-  const amounts = facts.map(item => item.amountMinor / 100), counts = facts.map(item => item.count);
-  const years = new Set([...facts.flatMap(item => [item.startISO, item.endISO]), request.todayISO].map(iso => Number(String(iso).slice(0, 4))));
-  // What the person or a fact label wrote may be echoed: a percentage as written, an amount in any writing of its value.
-  const writtenPercents = new Set(), writtenAmounts = [];
-  for (const source of [request.text ?? '', ...facts.map(item => item.label ?? '')]) {
-    for (const match of String(source).matchAll(FIGURE)) {
-      const suffix = (match[2] ?? '').trim();
-      if (PERCENT.test(suffix)) writtenPercents.add(flat(match[0])); else writtenAmounts.push(...values(match[1], suffix));
-    }
-  }
+/** A reading, shifted by a multiplier («mil», «millones»), as exact minor units: null when the digits do not fit the
+ * currency (decimals beyond its two that are not zeros, or more digits than an amount may have). Never rounded. */
+function minorUnits({ whole, fraction }, shift) {
+  const digits = whole + fraction, point = whole.length + shift;
+  const integer = digits.slice(0, point).padEnd(point, '0'), rest = digits.slice(point);
+  if (/[^0]/.test(rest.slice(MINOR_DIGITS))) return null;
+  const minor = (integer + rest.slice(0, MINOR_DIGITS).padEnd(MINOR_DIGITS, '0')).replace(/^0+(?=\d)/, '');
+  return minor.length > MAX_MINOR_DIGITS ? null : BigInt(minor);
+}
+/** Every exact minor-unit value a figure token may mean under a multiplier suffix. */
+export function figureMinorUnits(token, suffix = '') {
+  const shift = suffix.toLowerCase().startsWith('mill') ? 6 : suffix ? 3 : 0;
+  return readings(token).map(reading => minorUnits(reading, shift)).filter(value => value !== null);
+}
+/** The figures of a reply's prose that the facts it cites do not support exactly: each is a reason to refuse the reply.
+ * `evidenceIds` are the cited facts; nothing else in the request supports a figure (not an uncited fact, not the
+ * person's question). */
+export function unsupportedFigures(message, request, evidenceIds = []) {
+  const facts = (Array.isArray(request.facts) ? request.facts : []).filter(item => evidenceIds.includes(item.id));
+  const amounts = new Set(facts.map(item => BigInt(item.amountMinor))), counts = new Set(facts.map(item => BigInt(item.count)));
+  const years = new Set([...facts.flatMap(item => [item.startISO, item.endISO]), request.todayISO].map(iso => String(iso).slice(0, 4)));
+  // A number written in a cited fact's label (a category name) may be repeated as written.
+  const labelled = new Set(facts.flatMap(item => [...String(item.label ?? '').matchAll(FIGURE)].map(match => flat(match[0]))));
   const found = [];
   const foreign = FOREIGN_DIGIT.exec(message);
   if (foreign) found.push(foreign[0]);
   for (const match of message.matchAll(FIGURE)) {
     const before = message.slice(0, match.index), after = message.slice(match.index + match[0].length);
+    if (labelled.has(flat(match[0]))) continue;
     if (GLUED_BEFORE.test(before) || GLUED_AFTER.test(after) || SIGNED_BEFORE.test(before) || /[eE]/.test(match[1])) { found.push(match[0]); continue; }
     const suffix = (match[2] ?? '').trim();
-    if (PERCENT.test(suffix)) { if (!writtenPercents.has(flat(match[0]))) found.push(match[0]); continue; }
+    if (PERCENT.test(suffix)) { found.push(match[0]); continue; }
     const money = MONEY_BEFORE.test(before) || MONEY_AFTER.test(after);
     const bare = !suffix && !money && /^\d+$/.test(match[1]);
-    const supported = values(match[1], suffix).some(value => amounts.some(figure => same(figure, value)) || writtenAmounts.some(figure => same(figure, value))
-      || (bare && (value <= 31 || counts.includes(value) || (match[1].length === 4 && years.has(value)))));
+    const supported = figureMinorUnits(match[1], suffix).some(value => amounts.has(value))
+      || (bare && (Number(match[1]) <= 31 || counts.has(BigInt(match[1])) || (match[1].length === 4 && years.has(match[1]))));
     if (!supported) found.push(match[0]);
   }
   return found;
@@ -195,10 +217,10 @@ export function validateAssistantResultV2(value, request) {
   if (!RESULT_TYPES.includes(value.type) || !Array.isArray(value.proposals) || !Array.isArray(value.evidenceIds)) refuse();
   const supplied = new Set(request.facts.map(item => item.id));
   const message = modelText(value.message, PROTOCOL_LIMITS.messageChars, true);
-  // A figure the request does not hold is the model's own arithmetic or invention: never shown, whatever the reply's
-  // type to a question. A draft or a question on `parse` may reformulate the person's own number.
-  if (request.action === 'explain' && unsupportedFigures(message, request).length) refuse();
   const evidenceIds = ids(value.evidenceIds, supplied, PROTOCOL_LIMITS.facts);
+  // A figure the cited facts do not hold exactly is the model's own arithmetic or invention: never shown, whatever the
+  // reply's type to a question. A draft or a question on `parse` may reformulate the person's own number.
+  if (request.action === 'explain' && unsupportedFigures(message, request, evidenceIds).length) refuse();
   const empty = !evidenceIds.length && value.navigation === null && !value.proposals.length && value.clarification === null;
   const base = { type: value.type, message, evidenceIds: [], navigation: null, proposals: [], clarification: null };
   switch (value.type) {

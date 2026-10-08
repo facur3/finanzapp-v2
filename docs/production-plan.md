@@ -663,21 +663,26 @@ Rules that follow:
   from the cited fact ids over local evidence (`answerContent` in `apps/mobile/src/assistant/conversation.ts`), never
   parsed out of prose. A model's typed navigation intent (protocol v2) only moves to the front a link the device already
   derived from the same cited fact; it never adds a link or a route.
-- **Prose may restate the request's own figures and nothing computed (owner decision B, 2026-10-08; it replaces the
-  25A-05 allowance for the difference of the same fact between the two periods).** A fact's amount, as is, or its
-  count, a year of its periods, a day-sized integer that is not money, a number the person or a fact label wrote; never
-  a difference, a percentage, a rounding, a total, two facts subtracted (income minus expenses, expenses minus
-  refunds), a balance, a card debt, a budget's usage, an instalment's state, a conversion, a net flow or a refund's
-  state. To compare, the model names both verified amounts and says which is larger; the device draws the verified
-  difference row from the cited pair. **EXISTS TODAY (25A-06, B7):** `unsupportedFigures` in the shared protocol
-  module, applied by `validateAssistantResultV2` to every answer, so the server refuses the provider's output and the
-  device refuses the server's reply when the prose holds a figure the request does not, for every reply to a question
-  (the v2 instructions say so too; the evaluation measures it, §5.8). The reader sees Western digits only: a figure in
-  words («el doble», «medio millón»), the direction word («más»/«menos» is the model's claim; the signed row is the
-  verified one), a computed count or ratio of 31 or less and space-grouped thousands are outside the deterministic
-  check and rest on the instructions and on reading the live report. The prose therefore cannot name the difference;
-  the 25A-07 item «a verified difference as a fact» (roadmap) is the smallest safe way to give it back inside v2's
-  fact shape and its 60-fact bound.
+- **Prose may restate the figures of the facts it cites, exactly, and nothing computed (owner decision B,
+  2026-10-08; it replaces the 25A-05 allowance for the difference of the same fact between the two periods).** A cited
+  fact's amount in **exact minor units** (every amount keeps its minor units: 1,99 is 199, never 200; decimals beyond
+  the currency's two only when they are zeros; no tolerance, no rounding) or its count, a year of its periods, a number
+  written in a cited fact's label, a day-sized bare integer; never a difference, a percentage, a rounding, a total, two
+  facts subtracted (income minus expenses, expenses minus refunds), a balance, a card debt, a budget's usage, an
+  instalment's state, a conversion, a net flow or a refund's state; never a figure of an uncited fact; **never a number
+  from the person's question** (a threshold the person asked about is not a ledger total). To compare, the model names
+  both verified amounts and says which is larger; the device draws the verified difference row from the cited pair.
+  **EXISTS TODAY (25A-06, B7):** `unsupportedFigures(message, request, evidenceIds)` in the shared protocol module,
+  reading digits with the domain's own rule (`packages/domain/money.ts`, pinned by a drift test, no separate parser)
+  and applied by `validateAssistantResultV2` to every reply to a question, so the server refuses the provider's output
+  and the device refuses the server's reply (the v2 instructions say so too; the evaluation measures it, §5.8). **A
+  partial defence in depth, not a verification:** the check pins each figure to a cited fact; it cannot verify what the
+  prose claims about it (label, period, direction), a figure in words («el doble», «medio millón»), the direction word
+  (the signed row is the verified one), a computed count or ratio of 31 or less or space-grouped thousands, which rest
+  on the instructions and on reading the live report. The robust design is protocol v3's: typed figure references in
+  the prose, rendered by the device from its own evidence, and no digits in the model's text. The prose therefore
+  cannot name the difference; the 25A-07 item «a verified difference as a fact» (roadmap) is the smallest safe way to
+  give it back inside v2's fact shape and its 60-fact bound.
 
 ### 5.3 The one write path
 
@@ -955,7 +960,7 @@ expected draft, the expected clarification, or the expected refusal:
 | Spanish from Argentina | Voseo, "lucas", "k", "mangos", comma decimals, "ayer", "el finde". |
 | English | The same intents in English; mixed-language sentences; names and custom categories kept verbatim. |
 | Malformed amounts | "1.234,56" and "1,234.56", "mil quinientos", a missing amount, two candidate amounts. |
-| Ambiguous currencies | "30" with no currency, "dólares" with no dollar account, a symbol shared by several currencies. Expected: the conversational Assistant asks for the currency (or the destination) before the review sheet, never a guess; an unambiguous regional word resolved through the configured region and a named destination's own currency are deterministic rules, not guesses (owner, 2026-10-04); a non-conversational producer leaves a gap. |
+| Ambiguous currencies | "30" with no currency, "dólares" with no dollar account, a symbol shared by several currencies. Expected: the conversational Assistant asks for the currency (or the destination) before the review sheet, never a guess; an unambiguous regional word resolved through the configured region and a named destination's own currency are deterministic rules, not guesses (owner, 2026-10-04); a non-conversational producer leaves a gap. **Decided 2026-10-08 (owner):** the currency-inference rule (an explicit currency first; a named, unambiguously matched account lends its currency; one eligible currency may be prefilled on the device; several → clarification; never an invented destination; a conflict asks, never converts; colloquial pesos/lucas/mangos are ARS only in AR; minimal account data to the provider; every inferred value visible and editable in review) is recorded in the roadmap («Producto 25A-06», B7, decision D) for its own PR; the committed corpus stands. |
 | Negations | "no gasté nada", "al final no lo compré". Expected: no draft. |
 | Multiple expenses | Two purchases in one message. |
 | Card versus cash | "con la Visa", "en efectivo", an unnamed means of payment. |

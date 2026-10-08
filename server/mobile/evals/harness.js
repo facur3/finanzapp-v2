@@ -106,13 +106,13 @@ function sameField(field, expected, actual) {
 }
 
 const CAUSAL = /\b(?:porque|debido a|a causa de|ya que|because|due to|caused by)\b/i;
-/** Figures in an answer's prose that no cited fact supports: the protocol's own reader (`unsupportedFigures`, the rule
- * the server and the device enforce) over the cited facts only, so a figure an uncited fact holds still costs grounding.
- * Since the owner's decision of 2026-10-08 nothing computed is derivable: not a difference between the periods, not a
- * percentage, not a rounded amount; the device draws the verified difference. Integers ≤ 31 that are not money (days,
- * small counts), the periods' years and numbers the person or a label wrote pass, as in the validator. */
+/** Figures in an answer's prose that no cited fact supports exactly: the protocol's own reader (`unsupportedFigures`,
+ * the rule the server and the device enforce) over the cited facts. Since the owner's decision of 2026-10-08 nothing
+ * computed is derivable: not a difference between the periods, not a percentage, not a rounded amount, not the
+ * person's own number; the device draws the verified difference. Integers ≤ 31 that are not money (days, small
+ * counts), the periods' years and a number in a cited label pass, as in the validator. */
 export function underivedNumbers(message, cited, testCase) {
-  return unsupportedFigures(message, { text: testCase.request.text, facts: cited, todayISO: EVAL_TODAY });
+  return unsupportedFigures(message, { facts: cited, todayISO: testCase.request.todayISO ?? EVAL_TODAY }, cited.map(item => item.id));
 }
 
 const words = value => fold(value).split(/[^\p{L}\p{N}]+/u).filter(word => word.length >= 3);
