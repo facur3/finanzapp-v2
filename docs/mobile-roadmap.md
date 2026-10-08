@@ -5283,8 +5283,9 @@ nothing of it is on a screen yet.
       (four lenses, 230 probes) and tightened: a percentage in words («21 por ciento»), a thousands-shaped round figure
       that read as a small integer or a count («22.000», «$ 14.000»), a figure inside a longer number the person wrote,
       colloquial money marks, another script's digits and format characters glued to digits are refused, as are a
-      minus attached to a fact's figure («-$ 184.500», a rewrite of a non-negative fact; a dash between digits, as in an
-      ISO date, is not a sign) and exponent notation («2e6»), both from the Codex review of the PR. The owner's review
+      minus before a fact's figure, spaced or not («-$ 184.500», «- $ 184.500», a rewrite of a non-negative fact; so a
+      spaced dash before an amount is refused too, fail closed; only a dash right after a digit, as in an ISO date, is
+      not a sign) and exponent notation («2e6»), from the Codex reviews of the PR. The owner's review
       of `1a97a0d` then removed two weaknesses: a float comparison within 0,005 (so «1,005» passed for a fact of 1,00)
       became exact minor units, and the person's question and uncited facts stopped supporting figures; the owner's
       review of `3484c57` removed a third: a lone separator before three digits was read both ways and whichever
