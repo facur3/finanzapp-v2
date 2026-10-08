@@ -15,7 +15,8 @@ describe('a reply to a question states only the figures of the facts it cites, e
   const fact = (id, label, amountMinor, count, previous = false) => ({ id, label, amountMinor, count, startISO: previous ? '2026-09-01' : '2026-10-01', endISO: previous ? '2026-09-05' : '2026-10-05' });
   const facts = [fact('current.expenses', 'Gastos registrados', 18450000, 14), fact('previous.expenses', 'Gastos registrados', 15230000, 12, true),
     fact('current.category.0', 'Categoría de gasto: Plan 2030', 7820000, 5), fact('current.income', 'Ingresos registrados', 84250, 1),
-    fact('current.category.1', 'Categoría de gasto: Plan: 2030', 500, 5), fact('current.category.2', 'Categoría de gasto: Varios', 100, 1000)];
+    fact('current.category.1', 'Categoría de gasto: Plan: 2030', 500, 5), fact('current.category.2', 'Categoría de gasto: Varios', 100, 1000),
+    fact('current.category.3', 'Categoría de gasto: YPF', 18450000, 2), fact('previous.income', 'Ingresos registrados', 1000000000000000, 1, true)];
   const ask = (text = '¿Gasté más que el mes pasado?') => validateAssistantRequestV2({ version: 2, requestId: 'fixture-request-0001', action: 'explain', text, todayISO: '2026-10-05', currency: 'ARS', region: 'AR', facts });
   const BOTH = ['current.expenses', 'previous.expenses'];
   const answer = (message, evidenceIds = BOTH) => ({ type: 'answer', message, evidenceIds, navigation: null, proposals: [], clarification: null });
@@ -25,7 +26,8 @@ describe('a reply to a question states only the figures of the facts it cites, e
       ['Ingresos: $ 842,50 (uno).', ['current.income']], ['Ingresos: ARS 842,5, o sea 842,50 pesos.', ['current.income']], ['En Plan 2030 llevás $ 78.200 en 5 compras.', ['current.category.0']],
       ['No llegaste a ese monto este mes: $ 184.500.', BOTH], ['Fuiste 5 veces al super: 5 compras.', BOTH], ['Hoy, 05/10/2026, a las 14:30.', BOTH],
       ['Del 2026-10-01 al 2026-10-05.', BOTH], ['En Plan: 2030 llevás $ 5 en 5 compras.', ['current.category.1']], ['Categoría de gasto: Plan: 2030, $ 5.', ['current.category.1']],
-      ['Gastaste más ($ 184.500 contra $ 152.300).', BOTH], ['En Varios, 1.000 movimientos por $ 1.', ['current.category.2']], ['Del 1 al 5, 14 movimientos.', BOTH]]) {
+      ['Gastaste más ($ 184.500 contra $ 152.300).', BOTH], ['En Varios, 1.000 movimientos por $ 1.', ['current.category.2']], ['Del 1 al 5, 14 movimientos.', BOTH],
+      ['YPF: $ 184.500 en 2 cargas.', ['current.category.3']], ['Cobraste $ 10.000.000.000.000 el mes pasado.', ['previous.income']], ['Llevás 184,5 mil más que ayer.', BOTH]]) {
       expect(unsupportedFigures(ok, ask('¿Gasté más de 100 mil este mes?'), cited), ok).toEqual([]);
       expect(() => validateAssistantResultV2(answer(ok, cited), ask('¿Gasté más de 100 mil este mes?')), ok).not.toThrow();
     }
@@ -104,6 +106,8 @@ describe('a reply to a question states only the figures of the facts it cites, e
       ['Llevás - ARS $ 184.500.', ['184.500'], BOTH], ['Gastaste (ARS $ 184.500 pesos).', ['184.500'], BOTH], ['Llevás 184.500 pesos ARS-.', ['184.500'], BOTH],
       // Codex review of 03b4cd3: a mark across a colon, a comma or a bracket.
       ['Llevás USD: 184.500.', ['184.500'], BOTH], ['Llevás 184.500 (USD).', ['184.500'], BOTH], ['Llevás $184.500 (dólares).', ['184.500'], BOTH],
+      // Codex review of f7f03d9: abbreviated magnitudes; a capitals-only word of a cited label is a name, not a code.
+      ['El total es 2 M de pesos.', ['2 M'], BOTH], ['El total es 2MM.', ['2MM'], BOTH], ['YPF: $ 184.500 en 2 cargas.', ['184.500'], BOTH], ['Son 0,1845 M de pesos.', ['0,1845 M'], BOTH], // a multiplier never relaxes the two-decimal contract
       // Every Unicode dash or minus before an amount is a sign: the small and fullwidth hyphen-minus, the en dash.
       ['Llevás \ufe6378.200 pesos.', ['78.200'], ['current.category.0']], ['Llevás \uff0d78.200 pesos.', ['78.200'], ['current.category.0']], ['Llevás \u201378.200.', ['78.200'], ['current.category.0']]]) {
       expect(unsupportedFigures(bad, request, cited), bad).toEqual(figures);

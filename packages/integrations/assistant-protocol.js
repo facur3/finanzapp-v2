@@ -140,13 +140,22 @@ function navigation(value, cited) {
 // An exponent («2e6») is one token; a minus before the figure or its currency mark, spaced or not («-184.500»,
 // «- $ 184.500», «$ - 184.500»), rewrites a non-negative fact: both are refused, fail closed, so a spaced dash before
 // an amount is also refused; only a dash right after a digit (an ISO date, a range) is not a sign (Codex reviews).
-const FIGURE = /(\d[\d.,]*\d(?:[eE][+-]?\d+)?|\d(?:[eE][+-]?\d+)?)(\s*(?:%|％|por\s*ciento\b|porciento\b|per\s*cent\b|percent\b)|\s*(?:mil|k|lucas)\b|\s*mill[oó]n(?:es)?\b|\s*(?:bill[oó]n(?:es)?|trill[oó]n(?:es)?|millardos?|billions?|trillions?)\b)?/giu;
-// A magnitude the protocol cannot hold, or a second magnitude after the first («mil millones»), is refused outright.
-const MAGNITUDE_BEYOND = /^(?:bill[oó]n(?:es)?|trill[oó]n(?:es)?|millardos?|billions?|trillions?)$/i;
-const MAGNITUDE_AFTER = /^\s*(?:mil|k|lucas|mill[oó]n(?:es)?|bill[oó]n(?:es)?|trill[oó]n(?:es)?|millardos?|billions?|trillions?)\b/i;
+// Suffix words match in any case; the abbreviations «M» (a million) and «MM» only as capitals, so «32.200 más» is no
+// magnitude; a word must not continue with a letter («14 movimientos» is a count). Built without the `i` flag.
+const anyCaseWord = word => word.replace(/\p{L}/gu, letter => `[${letter.toLowerCase()}${letter.toUpperCase()}]`).replace(/ /g, '\\s*');
+const words = (...list) => list.map(anyCaseWord).join('|');
+const PERCENT_WORDS = words('por ciento', 'porciento', 'per cent', 'percent');
+const THOUSAND_WORDS = words('mil', 'k', 'lucas');
+const MILLION_WORDS = words('millón', 'millon', 'millones') + '|M';
+const BEYOND_WORDS = words('billón', 'billon', 'billones', 'trillón', 'trillon', 'trillones', 'millardo', 'millardos', 'billion', 'billions', 'trillion', 'trillions') + '|MM';
+const FIGURE = new RegExp(`(\\d[\\d.,]*\\d(?:[eE][+-]?\\d+)?|\\d(?:[eE][+-]?\\d+)?)(\\s*(?:%|％|(?:${PERCENT_WORDS})(?![\\p{L}]))|\\s*(?:${THOUSAND_WORDS})(?![\\p{L}])|\\s*(?:${MILLION_WORDS})(?![\\p{L}])|\\s*(?:${BEYOND_WORDS})(?![\\p{L}]))?`, 'gu');
+// A magnitude the protocol cannot hold («billones», «MM»), or a second magnitude after the first («mil millones»),
+// is refused outright.
+const MAGNITUDE_BEYOND = new RegExp(`^(?:${BEYOND_WORDS})$`, 'u');
+const MAGNITUDE_AFTER = new RegExp(`^\\s*(?:${THOUSAND_WORDS}|${MILLION_WORDS}|${BEYOND_WORDS})(?![\\p{L}])`, 'u');
 // Accounting negatives: a figure alone inside parentheses («($ 184.500)»), or a trailing dash of any kind after the
 // figure or its suffix mark («184.500-», «184.500 pesos－»); a dash followed by a digit is a range, not a sign.
-const PERCENT = /^(?:%|％|por\s*ciento|porciento|per\s*cent|percent)$/i;
+const PERCENT = new RegExp(`^(?:%|％|${PERCENT_WORDS})$`, 'u');
 // A monetary mark beside a figure says which currency the figure is in: a bare «$» may be either protocol currency;
 // a word, symbol or code of the request's currency is fine; another currency is a conversion or an invention and is
 // refused; a subunit («centavos») is read in minor units. Singular and plural, Spanish and English (Codex review).
@@ -166,11 +175,12 @@ const markPattern = Object.values(MARKS).flat().sort((a, b) => b.length - a.leng
 // never by a nested quantifier, so no input can make the reader backtrack (security review of this change).
 const MONEY_BEFORE = new RegExp(`(?<![\\p{L}\\d])(${markPattern})\\s*[:(]?\\s*$`, 'u');
 const MONEY_AFTER = new RegExp(`^\\s*\\(?\\s*(?:(?:[Ee][Nn]|[Dd][Ee]|[Ii][Nn]|[Oo][Ff])\\s+)?(${markPattern})(?![\\p{L}\\d])`, 'u');
-/** Every consecutive mark on one side of a figure, nearest first, and the text that remains once they are stripped. */
-function marksBeside(text, regex, cut) {
+/** Every consecutive mark on one side of a figure, nearest first, and the text that remains once they are stripped;
+ * `isMark` rules out a capitals-only word that is part of a cited label («YPF: $ 184.500»). */
+function marksBeside(text, regex, cut, isMark) {
   const found = [];
   let rest = text;
-  for (let match = regex.exec(rest); match; match = regex.exec(rest)) { found.push(match[1]); rest = cut(rest, match); }
+  for (let match = regex.exec(rest); match && isMark(match[1]); match = regex.exec(rest)) { found.push(match[1]); rest = cut(rest, match); }
   return { marks: found, rest };
 }
 const beforeCut = (text, match) => text.slice(0, match.index);
@@ -198,9 +208,10 @@ const AMOUNT = /^(0|[1-9]\d{0,2}(?:\.\d{3})*|[1-9]\d*)(?:,(\d{1,2}))?$/;
 export function figureMinorUnits(token, suffix = '') {
   const match = AMOUNT.exec(token);
   if (!match) return [];
-  const shift = suffix.toLowerCase().startsWith('mill') ? 6 : suffix ? 3 : 0;
+  const shift = /^(?:[mM][iI][lL][lL]|M$)/.test(suffix) ? 6 : suffix ? 3 : 0;
   const minor = BigInt(match[1].replace(/\./g, '') + (match[2] ?? '').padEnd(MINOR_DIGITS, '0')) * 10n ** BigInt(shift);
-  return minor > BigInt(PROTOCOL_LIMITS.maxAmountMinor) ? [] : [minor];
+  // A fact is an aggregate: any safe integer of minor units (the request validator's bound), not a draft's entry bound.
+  return minor > BigInt(Number.MAX_SAFE_INTEGER) ? [] : [minor];
 }
 /** The figures of a reply's prose that the facts it cites do not support exactly: each is a reason to refuse the reply.
  * `evidenceIds` are the cited facts; nothing else in the request supports a figure (not an uncited fact, not the
@@ -216,6 +227,8 @@ export function unsupportedFigures(message, request, evidenceIds = []) {
   // when a letter remains: a name holding a colon («Plan: 2030») stays whole, a name of digits alone is never a span.
   const names = facts.flatMap(item => { const label = spaced(String(item.label ?? '')); const name = label.replace(/^[^:]*:\s*/, ''); return name !== label && /\p{L}/u.test(name) ? [label, name] : [label]; })
     .filter(name => /\d/.test(name));
+  const labelWords = new Set(facts.flatMap(item => String(item.label ?? '').split(/[^\p{L}\d$]+/u)));
+  const isMark = mark => !/^[A-Z]{3}$/.test(mark) || currencyOf(mark) !== 'other' || !labelWords.has(mark);
   const spans = names.flatMap(name => [...message.matchAll(new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+'), 'giu'))]
     .map(match => [match.index, match.index + match[0].length]));
   const found = [];
@@ -224,7 +237,7 @@ export function unsupportedFigures(message, request, evidenceIds = []) {
   for (const match of message.matchAll(FIGURE)) {
     const before = message.slice(0, match.index), after = message.slice(match.index + match[0].length);
     if (GLUED_BEFORE.test(before) || GLUED_AFTER.test(after) || /[eE]/.test(match[1])) { found.push(match[0]); continue; }
-    const lead = marksBeside(before, MONEY_BEFORE, beforeCut), trail = marksBeside(after, MONEY_AFTER, afterCut);
+    const lead = marksBeside(before, MONEY_BEFORE, beforeCut, isMark), trail = marksBeside(after, MONEY_AFTER, afterCut, isMark);
     if (SIGNED_BEFORE.test(lead.rest) || (PAREN_BEFORE.test(lead.rest) && PAREN_AFTER.test(trail.rest)) || TRAILING_MINUS.test(trail.rest)) { found.push(match[0]); continue; }
     const suffix = (match[2] ?? '').trim();
     if (PERCENT.test(suffix)) { found.push(match[0]); continue; }
