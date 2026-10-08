@@ -150,7 +150,7 @@ const MONEY_AFTER = /^\s*(?:pesos|mangos|d[oó]lares|dollars|bucks|USD|ARS)\b/i;
 const FOREIGN_DIGIT = /(?![0-9])[\p{Nd}\p{No}]/u;
 const GLUED_BEFORE = /[\p{Cf}\p{Mn}\p{Me}]$/u;
 const GLUED_AFTER = /^[\p{Cf}\p{Mn}\p{Me}]/u;
-const flat = value => value.replace(/\s+/g, '').toLowerCase();
+const spaced = value => value.replace(/\s+/g, ' ').trim().toLowerCase();
 /** Minor digits of every protocol currency (ARS, USD): the domain's `minorUnitExponent`, pinned by a drift test. */
 const MINOR_DIGITS = 2;
 /** The one writing of an amount in a v2 reply: whole pesos as plain digits or in groups of three separated by a point
@@ -172,20 +172,22 @@ export function unsupportedFigures(message, request, evidenceIds = []) {
   const facts = (Array.isArray(request.facts) ? request.facts : []).filter(item => evidenceIds.includes(item.id));
   const amounts = new Set(facts.map(item => BigInt(item.amountMinor))), counts = new Set(facts.map(item => BigInt(item.count)));
   const years = new Set([...facts.flatMap(item => [item.startISO, item.endISO]), request.todayISO].map(iso => String(iso).slice(0, 4)));
-  // A number written in a cited fact's label (a category name) may be repeated as written.
-  const labelled = new Set(facts.flatMap(item => [...String(item.label ?? '').matchAll(FIGURE)].map(match => flat(match[0]))));
+  // A number in a cited fact's label (a category name such as «Plan 2030») may appear only inside that name, written as
+  // the label writes it, and bare: never as money, signed, with a suffix or alone (Codex review of this change).
+  const names = facts.map(item => spaced(String(item.label ?? '').split(':').pop())).filter(name => /\d/.test(name));
+  const prose = spaced(message);
   const found = [];
   const foreign = FOREIGN_DIGIT.exec(message);
   if (foreign) found.push(foreign[0]);
   for (const match of message.matchAll(FIGURE)) {
     const before = message.slice(0, match.index), after = message.slice(match.index + match[0].length);
-    if (labelled.has(flat(match[0]))) continue;
     if (GLUED_BEFORE.test(before) || GLUED_AFTER.test(after) || SIGNED_BEFORE.test(before) || /[eE]/.test(match[1])) { found.push(match[0]); continue; }
     const suffix = (match[2] ?? '').trim();
     if (PERCENT.test(suffix)) { found.push(match[0]); continue; }
     const money = MONEY_BEFORE.test(before) || MONEY_AFTER.test(after);
     const bare = !suffix && !money && /^\d+$/.test(match[1]);
-    const supported = figureMinorUnits(match[1], suffix).some(value => amounts.has(value))
+    const named = bare && names.some(name => name.includes(match[1]) && prose.includes(name));
+    const supported = named || figureMinorUnits(match[1], suffix).some(value => amounts.has(value))
       || (bare && (Number(match[1]) <= 31 || counts.has(BigInt(match[1])) || (match[1].length === 4 && years.has(match[1]))));
     if (!supported) found.push(match[0]);
   }

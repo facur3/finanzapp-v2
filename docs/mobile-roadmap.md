@@ -5296,8 +5296,9 @@ nothing of it is on a screen yet.
       verify what the prose claims about it (which label, period or direction it is attributed to), a figure in words
       («el doble», «medio millón», «veintidós mil»), the direction word («más»/«menos» is the model's claim; the
       signed row is the verified one), a computed count or ratio of 31 or less («2 movimientos más», «2 veces»; a bare
-      integer ≤ 31 is also the one way a question's number can still be echoed), a number repeated from a cited label,
-      or space-grouped thousands («184 500» is read as two figures): those rest on the instructions and on reading a
+      integer ≤ 31 is also the one way a question's number can still be echoed), a cited label's own number (accepted
+      only bare and inside that name as the label writes it, «Plan 2030», never as money, signed or a percentage:
+      Codex review of `bf0c78b`), or space-grouped thousands («184 500» is read as two figures): those rest on the instructions and on reading a
       live report. The robust design is a result-shape change, for protocol v3 and its own PR: typed figure references
       in the prose («{current.expenses}», rendered by the device from its own evidence) and no digits at all in the
       model's text, so every figure is exact and attributed by construction; not forced into this PR. The security
