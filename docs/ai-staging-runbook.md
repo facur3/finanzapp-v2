@@ -13,9 +13,8 @@ only in the services' own settings and in local env files outside the repository
 **Phase A merged as PR #87** (merge commit ce4b4b3, 2026-10-05): checkpoint A passed. **Phase B** proceeds only
 through the checkpoints of §0.2, in order, once the owner has read this runbook. Each Phase B step names who acts. Production is out of scope: no step here touches it, enables AI there or decides its numbers.
 
-**Phase B progress (recorded 2026-10-07, owner-verified):** B2–B6 passed; **B1 is open** until the legacy
-decommission of §0.6 is done and verified; the B7 spend is approved, not yet run. B2–B6 were carried out before B1
-closed. The results, with no account address, key, token, project ref or secret, are in
+**Phase B progress (recorded 2026-10-07, owner-verified):** B1–B6 passed (B1 under the revised scope of §2, after the
+legacy decommission of §0.6); the B7 spend is approved, not yet run. B2–B6 were carried out before B1 closed. The results, with no account address, key, token, project ref or secret, are in
 [mobile-roadmap.md](mobile-roadmap.md), «Producto 25A-06», «Phase B record»; the resources to keep and to clean up later
 are in §0.5.
 
@@ -42,7 +41,7 @@ Each checkpoint must pass before the next one starts. Do not skip ahead.
 | # | Checkpoint | Who | Passes when |
 | --- | --- | --- | --- |
 | A | Phase A PR reviewed and merged | Owner | **Passed**: PR #87 merged by the owner, 2026-10-05 |
-| B1 | Remote inventory recorded (§2) | Owner checks | **Open** (2026-10-07): inventory recorded; legacy deletions pending (§0.6). Every OWNER CHECK of §2 answered in the roadmap; the legacy resources retired by owner decision deleted and verified absent (§0.6); then `probe.js boundary` and `probe.js api` PASS again against staging. Nothing else deleted |
+| B1 | Remote inventory recorded (§2) | Owner checks | **Passed** 2026-10-07 (revised scope, §2): inventory recorded, both legacy resources decommissioned, probes PASS again (§0.6). Every OWNER CHECK of §2 answered in the roadmap; the legacy resources retired by owner decision deleted and verified absent (§0.6); then `probe.js boundary` and `probe.js api` PASS again against staging. Nothing else deleted |
 | B2 | OpenAI staging project, service accounts and limits, under the operations identity (§7) | Owner | **Passed** 2026-10-07. Key in a password manager only; limits, budget and alerts set; auto-recharge off |
 | B3 | Supabase staging project and auth settings, under the operations identity (§5, §6.1) | Owner | **Passed** 2026-10-07. Settings of §5.3 set; keys of §6.2 created |
 | B4 | Schema applied and verified (§6.3, §6.4) | Owner | **Passed** 2026-10-07. `verify.sql` prints `STAGING_VERIFY_OK` |
@@ -97,11 +96,10 @@ the repository is safer still.
 | --- | --- |
 | Delete, rename or reuse a staging resource or credential (§0.5, «Keep») | Never in 25A-06 |
 | Promote, rename or copy a staging resource or credential into production | Never: production gets its own (§0.5) |
-| Delete the legacy Vercel project `finanzapp-v2` or the legacy Supabase project | **Allowed** by owner decision 2026-10-07, by the owner only, through the checklist of §0.6 (supersedes the earlier «keep `finanzapp-v2` until B11») |
+| Reuse the deleted legacy projects' names or credentials for the API | Never: both were deleted by owner decision 2026-10-07 (§0.6), which superseded «keep `finanzapp-v2` until B11» |
 | Delete any OpenAI project, key or organization | Never delete one in use by something else |
 | Delete remote Git branches | Never as part of 25A-06 (§2.3 gives the safe alternative) |
 | Put any variable in a **Preview** or **Development** scope on Vercel | Never, in any project |
-| Set `MOBILE_AI_ENABLED`, a Supabase key or a provider key on the legacy project `finanzapp-v2` | Never (it is retired, §0.6) |
 | Enable public sign-ups, anonymous sign-ins or any social provider on staging Supabase | Never in 25A-06 (§5) |
 | Turn on OpenAI auto-recharge | Never on staging (§8) |
 | Set `mobile_ai_control.enabled = true` | B8, after B5–B7 pass |
@@ -126,15 +124,15 @@ a reason to delete something (§2.1).
 | OpenAI project `finanzapp-staging` | **Keep** (staging) |
 | Vercel project `finanzapp-api-staging` | **Keep** (staging) |
 | `~/.config/finanzapp/vercel-staging.env` | **Already removed** (owner, 2026-10-07, after its one-time Vercel import) |
-| Legacy Vercel project `finanzapp-v2` | **Retire**: deletion decided 2026-10-07, pending (§0.6) |
-| Legacy Supabase project (ref prefix `mtij`) and its public legacy `anon` key | **Retire**: deletion decided 2026-10-07, pending (§0.6) |
+| Legacy Vercel project `finanzapp-v2`, with its deployments, domains, aliases, variables and settings | **Decommissioned** 2026-10-07 (§0.6) |
+| Legacy Supabase project (ref prefix `mtij`), with its endpoint and public legacy `anon` key | **Decommissioned** 2026-10-07; the endpoint and key are retired with it (§0.6) |
 | Synthetic probe and capture rows in staging (§6.5) | **Later decision** |
 | Saved SQL-editor verification queries in staging | **Later decision**, if the owner wants them gone |
 | A default Supabase secret key on staging | **Later decision**, only if verified unused |
 
 Production gets its own projects and credentials; a staging credential is never promoted or copied into production.
 
-### 0.6 Legacy decommission (owner decision, 2026-10-07)
+### 0.6 Legacy decommission (owner decision, 2026-10-07; done)
 
 **Owner attestation.** Both resources below belonged only to the retired web/PWA experiment. They hold no data the
 owner wants or needs to preserve, and the iOS product will not reuse them. The owner deliberately chose **permanent
@@ -143,22 +141,25 @@ deletion** over export, retention or rotation. Only the owner deletes, by hand; 
 **Legacy Supabase project** (identified only by its ref prefix `mtij`, the project whose legacy `anon` JWT is in public
 Git history, §2.1):
 - [x] Decision recorded (2026-10-07).
-- [ ] The owner deletes the project in the Supabase dashboard.
-- [ ] Verified: it no longer appears in the project list, and its old API endpoint no longer answers with the legacy
+- [x] The owner deleted the project in the Supabase dashboard (2026-10-07).
+- [x] Verified: it no longer appears in the project list, and its old API endpoint no longer answers with the legacy
   key (the key is unusable).
 
 **Legacy Vercel project `finanzapp-v2`:**
 - [x] Decision recorded (2026-10-07). It is not the production host.
-- [ ] Before deleting: note its environment variable **names** (never values). Deleting a project removes its
+- [x] Before deleting: note its environment variable **names** (never values). Deleting a project removes its
   variables but **does not revoke the credentials** they hold: any provider or Supabase credential found there that is
-  still live is revoked at its issuer (one belonging to the legacy Supabase project dies with that project).
-- [ ] The owner deletes the project in the Vercel dashboard (its deployments, domains, aliases, variables and settings
-  go with it).
-- [ ] Verified: it no longer appears in the project list, and `finanzapp-v2.vercel.app` no longer serves it.
-- [ ] Verified after both deletions: `finanzapp-api-staging` still builds from `master`, and `probe.js boundary` and
-  `probe.js api` (§6.5, §4.6) PASS again against the surviving staging resources.
+  still live is revoked at its issuer (one belonging to the legacy Supabase project dies with that project). Owner:
+  checked, none live.
+- [x] The owner deleted the project in the Vercel dashboard (2026-10-07; its deployments, domains, aliases, variables
+  and settings went with it).
+- [x] Verified: it no longer appears in the project list, and `finanzapp-v2.vercel.app` no longer serves it.
+- [x] Verified after both deletions (owner, 2026-10-07): the surviving projects are Supabase `finanzapp-staging`, Vercel
+  `finanzapp-api-staging` and OpenAI `finanzapp-staging`; `finanzapp-api-staging` still builds from `master`, and `probe.js boundary` and
+  `probe.js api` (§6.5, §4.6) PASS again against the surviving staging resources. Result: `boundary` every line PASS;
+  `api` every line PASS, including the intended 503 while the database AI switch stays off.
 
-**B1 passes** only when every box above is checked. The future production API is a separate new project (working name
+**B1 passed** (2026-10-07): every box above is checked. The future production API is a separate new project (working name
 `finanzapp-api-production` until the naming gate), never `finanzapp-v2`; the public landing page is not the API backend
 and is not coupled to any API project (launch, brand and go-to-market slices).
 
@@ -212,7 +213,7 @@ decision (§0.4, §0.6). Record each answer in the roadmap's 25A-06 section.
 FinanzApp mobile app, its staging or production, its secrets or data that might need preserving; not unrelated personal
 cloud or provider resources. A legacy disposable resource needs no table-by-table inventory when the owner attests it
 holds no data to preserve and elects permanent deletion; instead the roadmap records the attestation, the safe
-identity, the decision, the pending deletion and the post-deletion verification (§0.6).
+identity, the decision, the deletion and the post-deletion verification (§0.6).
 
 ### 2.1 Supabase
 
@@ -228,7 +229,7 @@ Repository truth, from the inventory of 2026-10-05:
   old Vercel URL as Site URL.
 
 - [x] **OWNER CHECK — the legacy project.** Replaced by the owner's attestation and deletion decision (2026-10-07,
-  §0.6): no data to preserve, never reused, permanent deletion pending.
+  §0.6): no data to preserve, never reused; permanently deleted 2026-10-07.
 - [x] **OWNER CHECK — other projects** connected to FinanzApp: the staging project `finanzapp-staging` (§6.1).
 - The owner's decision (2026-10-07) among the options below was **delete** (§0.6). The options were:
   - **ignore** it (nothing in the product reads it);
@@ -259,7 +260,7 @@ Repository truth:
 - [x] **OWNER CHECK — other Vercel projects:** `finanzapp-api-staging` (§4).
 - [x] **OWNER CHECK — Preview deployments:** no Preview or Development variable in `finanzapp-api-staging`;
   `finanzapp-v2`'s go with its deletion (§0.6).
-- **Role (owner decision 2026-10-07, superseding «production host after B11»):** `finanzapp-v2` is retired and deleted;
+- **Role (owner decision 2026-10-07, superseding «production host after B11»):** `finanzapp-v2` was deleted (2026-10-07);
   production gets a separate new project (§0.6).
 
 ### 2.3 Git branches
@@ -428,7 +429,7 @@ Rules:
 - Leave `MOBILE_AI_MAX_INPUT_TOKENS` and `MOBILE_AI_MAX_OUTPUT_TOKENS` unset: the defaults are 32 000 and 1 500.
 - **Never** set `MOBILE_AI_EVAL_LIVE` on any deployment.
 - A variable change takes effect only on a new deployment: Deployments → … → Redeploy.
-- `finanzapp-v2` is retired and deleted (§0.6); none of these variables is ever set there.
+- `finanzapp-v2` was deleted (§0.6).
 
 ### 4.5 Function duration
 

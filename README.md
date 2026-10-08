@@ -139,7 +139,7 @@ checkpoint B6 (passed 2026-10-07), it is the Assistant's **staging**: its Produc
 variables in the Production scope only (runbook §4.4), never Preview or Development.
 
 - `finanzapp-v2`, the retired PWA's project, is **legacy**: the owner decided on 2026-10-07 to delete it and not to
-  reuse it as the production host; deletion is pending (runbook §0.6).
+  reuse it as the production host; the owner deleted it on 2026-10-07 (runbook §0.6).
 - Production will be a **separate new** project (working name `finanzapp-api-production` until the naming gate) with
   its own Supabase project, provider project, credentials, quotas and kill switch; nothing from staging is promoted,
   renamed or copied into it. The public landing page is not the API backend (launch, brand and go-to-market slices).
@@ -162,7 +162,7 @@ the only thing they serve. How they relate to Supabase and the AI provider, and 
 in [docs/production-plan.md](docs/production-plan.md) (§2 to §4); bringing up staging, step by step and by whom, is
 [docs/ai-staging-runbook.md](docs/ai-staging-runbook.md); the path to TestFlight and the App Store is in
 [docs/app-store-launch.md](docs/app-store-launch.md). Staging exists with the cloud Assistant still disabled in its
-database (runbook checkpoints B2–B6, passed 2026-10-07); no production environment, enabled cloud Assistant,
+database (runbook checkpoints B1–B6, passed 2026-10-07); no production environment, enabled cloud Assistant,
 subscription or store listing exists yet.
 
 ## Files that must never be committed

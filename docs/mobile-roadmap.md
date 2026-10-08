@@ -1,8 +1,8 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-07 (25A-06 Phase B, documentation only: staging checkpoints B2–B6 passed, owner-verified; B1 open
-until the owner deletes the retired legacy Supabase project and the legacy Vercel project `finanzapp-v2` (owner
-decision: retired, not the production host; production gets a separate new project) and the staging probes pass again
+Updated: 2026-10-07 (25A-06 Phase B, documentation only: staging checkpoints B1–B6 passed, owner-verified; B1 under
+its revised scope after the owner deleted the legacy Supabase project and the legacy Vercel project `finanzapp-v2`
+(retired, not the production host; production gets a separate new project) and the staging probes passed again
 (runbook §0.6); a staging resource register (runbook §0.5); and the
 owner approved one B7 live evaluation of at most 200 000 µUSD; no provider call made yet; §3, «Producto 25A-06»,
 «Phase B record»). Earlier, 2026-10-05 (owner decisions on the operational and support identity, documentation only: a private
@@ -1028,8 +1028,8 @@ scripts, the live-evaluation gates, [ai-staging-runbook.md](ai-staging-runbook.m
 no secret, no paid call, nothing applied or deployed. The activation order is binding, each step only after the one
 before it passes (the runbook's §0.2):
 1. **25A-06 Phase A** → reviewed and merged by the owner as PR #87 (checkpoint A, done).
-2. **B2–B6 done, owner-verified 2026-10-07; B1 open until the legacy deletions are verified** («Producto 25A-06»,
-   «Phase B record»; runbook §0.6). **OWNER creates and configures staging**: remote inventory recorded (B1), the OpenAI staging project, service
+2. **B1–B6 done, owner-verified 2026-10-07** (B1 after the legacy decommission; «Producto 25A-06», «Phase B record»;
+   runbook §0.6). **OWNER creates and configures staging**: remote inventory recorded (B1), the OpenAI staging project, service
    accounts and limits (B2), the Supabase staging project and its auth settings (B3), `schema.sql` applied and `verify.sql` printing
    `STAGING_VERIFY_OK` (B4), the boundary probe (B5), the Vercel project `finanzapp-api-staging` deployed with AI still
    off in the database (B6).
@@ -4739,7 +4739,7 @@ nothing of it is on a screen yet.
 - **Vercel** (runbook §4). DECIDED: staging is the **Production** environment of a second Vercel project,
   `finanzapp-api-staging`, connected to this repository with production branch `master`; `finanzapp-v2` stays the
   planned production host and keeps no AI or Supabase variable until a production release decision (superseded on
-  2026-10-07: `finanzapp-v2` is retired and deleted, production gets a separate new project; «Phase B record»). `vercel.json`:
+  2026-10-07: `finanzapp-v2` was deleted, production gets a separate new project; «Phase B record»). `vercel.json`:
   `ignoreCommand` `[ "$VERCEL_ENV" != production ]` (Previews are skipped), `regions` `["gru1"]` (São Paulo, with Supabase in
   sa-east-1: owner decision 2026-10-05, Argentina-first, compute next to its database and representative of the initial
   production topology; not a legal requirement and no data-residency claim), `functions` `api/mobile/*.js` `maxDuration` 60
@@ -4837,7 +4837,7 @@ nothing of it is on a screen yet.
   committed. Vercel: the project `finanzapp-v2` deploys `api/mobile/*` and also hosted the retired PWA
   (`finanzapp-v2.vercel.app` and a `-rho` alias in history). Git: 63 of 79 remote branches carry
   `api/mobile/assistant.js`; one, `origin/feat/producto-24rep-native-first-web-retirement`, carries the pre-25A-05
-  runtime. OpenAI: no project id, key or organization referenced anywhere. OWNER CHECKS as written in Phase A (B1, open;
+  runtime. OpenAI: no project id, key or organization referenced anywhere. OWNER CHECKS as written in Phase A (B1, passed;
   scope revised and answered 2026-10-07 in «Phase B record» below): the legacy Supabase project (existence, plan, region, tables and row counts, real data, auth providers,
   whether its legacy `anon` key is still active) and every other Supabase project; `finanzapp-v2`'s plan, Node
   version, Fluid compute, variable names and scopes, domains and aliases, Deployment Protection, system-variable
@@ -4855,23 +4855,27 @@ nothing of it is on a screen yet.
   Later: the session slice (Sign in with Apple), the consent screen, the literal origin read and an EAS-built bundle
   scan, protocol v3. 25A2 and production activation are not started.
 - **Device QA.** Nothing to check on the iPhone: no app change beyond the version line, and no build points at staging.
-- **Status.** Phase A merged as PR #87. Phase B: B2–B6 passed (2026-10-07); **B1 open** (the legacy deletions
-  pending, below); B7 approved, not run; B8–B11 not started.
+- **Status.** Phase A merged as PR #87. Phase B: B1–B6 passed (2026-10-07); B7 approved, not run; B8–B11 not
+  started.
 - **Phase B record (2026-10-07, owner-verified; documentation only).** The owner reported each result below; no agent
   touched a service, ran remote SQL or called a provider. No account address, key, token, project ref, database
   password or secret value is recorded here, and none may be.
-  - **B1 — remote inventory (runbook §2): OPEN, not passed.** Scope revised by the owner (2026-10-07, runbook §2):
+  - **B1 — remote inventory (runbook §2): PASSED** (2026-10-07, under the revised criterion). Scope revised by the owner (2026-10-07, runbook §2):
     resources materially connected to the FinanzApp mobile app, its staging or production, its secrets or data that
     might need preserving; not unrelated personal cloud or provider resources.
     - *Legacy Supabase project* (identified only by its ref prefix `mtij`, the one whose legacy `anon` JWT is in public
-      Git history): **owner attestation** — it served only the retired web/PWA experiment, holds no data the owner
-      wants or needs to preserve, and is never reused by the mobile product. **Decision:** permanent deletion (not
-      export, retention or rotation). **Deletion pending**, by the owner; then verified absent from the project list
-      and its legacy key unusable (runbook §0.6).
+      Git history): **owner attestation** — it served only the retired web/PWA experiment, held no data the owner
+      wanted or needed to preserve, and is never reused by the mobile product. **Decision:** permanent deletion (not
+      export, retention or rotation). **DECOMMISSIONED** 2026-10-07 by the owner: absent from the project list; its
+      endpoint and the legacy key from Git history are retired with it (verified: the key is no longer accepted).
     - *Legacy Vercel project `finanzapp-v2`:* retired infrastructure, **not** the production host (superseding «stays
-      the planned production host» of Phase A). **Decision:** permanent deletion. **Deletion pending**, by the owner:
-      first its variable names noted and any live credential revoked at its issuer, then deleted with its
-      deployments, domains, variables and settings, then verified absent (runbook §0.6).
+      the planned production host» of Phase A). Before deletion its variable names were checked: no live credential.
+      **DECOMMISSIONED** 2026-10-07 by the owner, with its deployments, domains, aliases, variables and settings:
+      absent from the project list; `finanzapp-v2.vercel.app` no longer serves it.
+    - *Surviving resources* (owner-verified after the deletions): Supabase `finanzapp-staging`, Vercel
+      `finanzapp-api-staging` (still deploying from `master`), OpenAI `finanzapp-staging`. Post-deletion probes:
+      `probe.js boundary` every line PASS; `probe.js api` every line PASS, including the intended 503 while the
+      database AI switch stays off.
     - *Supabase, current:* `finanzapp-staging`, São Paulo (sa-east-1), under the private operations organization; public
       sign-up and anonymous sign-in disabled (B3).
     - *Vercel, current:* `finanzapp-api-staging`, production branch `master`, region `gru1`; variables in the Production
@@ -4889,8 +4893,8 @@ nothing of it is on a screen yet.
       credential is promoted, renamed or copied into it. The public landing page is not the API backend and is not
       coupled to `finanzapp-v2` or any API project (launch, brand and go-to-market slices).
 
-    **B1 passes** when the owner reports both legacy deletions done and verified, and `probe.js boundary` and `probe.js
-    api` PASS again against the surviving staging resources (runbook §0.6). The resource register is runbook §0.5.
+    B1 passed because both legacy deletions are done and verified and `probe.js boundary` and `probe.js api` PASS again
+    against the surviving staging resources (runbook §0.6). The resource register is runbook §0.5.
   - **B2 — OpenAI staging (runbook §7): PASSED.** Under the private operations identity (production-plan.md §2.6):
     project `finanzapp-staging`; model access `gpt-6-luna` only; Standard service tier only; two project-scoped
     service accounts, `finanzapp-staging-api` and `finanzapp-staging-eval`, each with Restricted permissions, only

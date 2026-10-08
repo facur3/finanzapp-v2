@@ -140,7 +140,7 @@ No environment is created by this document. The matrix is the target; the "today
   no `production` profile. Details and the fix are in [app-store-launch.md](app-store-launch.md) §11.
 - **EXISTS TODAY:** the Vercel project `finanzapp-api-staging` serves the two mobile API routes (§3) as staging
   (runbook B6, passed 2026-10-07). The legacy project `finanzapp-v2`, which hosted the retired PWA, is **retired by owner
-  decision (2026-10-07)**: it is not the production host, and its deletion by the owner is pending
+  decision (2026-10-07)**: it is not the production host, and the owner deleted it on 2026-10-07
   ([runbook](ai-staging-runbook.md) §0.6).
 - **EXISTS TODAY (25A-06 Phase A, in code): the environment identity.** `environmentOf` in `server/mobile/runtime.js`
   lets a route run only when `MOBILE_ENVIRONMENT` names an enabled environment (`ENABLED_ENVIRONMENTS`: `staging` only;
@@ -154,7 +154,7 @@ No environment is created by this document. The matrix is the target; the "today
   staging or production backend, no StoreKit configuration, no analytics. Git history (the repository is public) holds a
   legacy Supabase project ref (beginning `mtij`) and its legacy `anon` JWT, reachable at the tag `web-frontend-final`;
   no `service_role` key was ever committed. That project is never reused: the owner attests it served only the retired
-  web experiment and holds no data to preserve, and decided its permanent deletion (2026-10-07; pending, runbook §0.6).
+  web experiment and holds no data to preserve, and deleted it permanently on 2026-10-07, with its legacy key (runbook §0.6).
 
 ### 2.2 Target matrix
 
