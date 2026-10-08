@@ -173,22 +173,38 @@ export const ISO_CURRENCY_CODES = Object.freeze(["AED","AFN","ALL","AMD","AOA","
 const anyCase = mark => mark.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\p{L}/gu, letter => `[${letter.toLowerCase()}${letter.toUpperCase()}]`);
 const markPattern = Object.values(MARKS).flat().sort((a, b) => b.length - a.length).map(anyCase).join('|') + '|\\p{Sc}|' + ISO_CURRENCY_CODES.join('|');
 // A mark beside the figure, across a colon or an opening bracket («USD: 184.500», «184.500 (USD)») and, after the
-// figure, a linking word («en dólares»); never across a comma (a comma separates figures: «2030, $ 5»). One mark per match: runs of marks are stripped one at a time (marksBeside),
+// figure, a linking word («en dólares»); never across a comma (a comma separates figures: «2030, $ 5»). One mark per match: runs of marks are read one at a time (leadMarks, trailMarks),
 // never by a nested quantifier, so no input can make the reader backtrack (security review of this change).
-// Before the figure: the mark may close a bracket («(USD) 184.500») or precede a colon or an opening bracket.
-const MONEY_BEFORE = new RegExp(`(?<![\\p{L}\\d])(${markPattern})\\s*\\)?\\s*[:(]?\\s*$`, 'u');
-// After the figure: optionally a bracket, or a comma that introduces a linking word («$ 184.500, en dólares»).
+// Before the figure: the mark may close a bracket («(USD) 184.500») or precede a colon or an opening bracket; that
+// tail is read in three bounded attempts (leadMarks), never by chained optional quantifiers, which backtrack on long
+// whitespace runs (security review of this change: 200 ms on 1 200 characters, 5 ms now). After the figure: optionally a bracket, or a comma
+// that introduces a linking word («$ 184.500, en dólares»), after a procedural trim of the leading whitespace.
+const MONEY_BEFORE = new RegExp(`(?<![\\p{L}\\d])(${markPattern})$`, 'u');
 const LINK = '(?:[Ee][Nn]|[Dd][Ee]|[Ii][Nn]|[Oo][Ff])';
-const MONEY_AFTER = new RegExp(`^\\s*(?:,\\s*${LINK}\\s+|\\(\\s*(?:${LINK}\\s+)?|${LINK}\\s+)?(${markPattern})(?![\\p{L}\\d])`, 'u');
-/** Every consecutive mark on one side of a figure, nearest first, and the text that remains once they are stripped. */
-function marksBeside(text, regex, cut) {
+const MONEY_AFTER = new RegExp(`^(?:,\\s*${LINK}\\s+|\\(\\s*(?:${LINK}\\s+)?|${LINK}\\s+)?(${markPattern})(?![\\p{L}\\d])`, 'u');
+/** The marks before a figure, nearest first, and what precedes them. A mark may sit right before the figure, before a
+ * colon or an opening bracket («USD: 184.500»), or close a bracket («(USD) 184.500»); a bracket with no mark after it
+ * stays in the remainder (an accounting negative, «($ 184.500)»). Three bounded attempts per mark, no backtracking. */
+function leadMarks(before) {
   const found = [];
-  let rest = text;
-  for (let match = regex.exec(rest); match; match = regex.exec(rest)) { found.push(match[1]); rest = cut(rest, match); }
+  let rest = before.trimEnd();
+  for (;;) {
+    const attempts = [rest, rest.replace(/[:(]$/u, '').trimEnd(), rest.replace(/\)$/u, '').trimEnd()];
+    let match = null, text = rest;
+    for (text of attempts) { match = MONEY_BEFORE.exec(text); if (match) break; }
+    if (!match) return { marks: found, rest };
+    found.push(match[1]);
+    rest = text.slice(0, match.index).trimEnd();
+  }
+}
+/** Every consecutive mark on one side of a figure, nearest first, and the text that remains once they are stripped. */
+/** The marks after a figure, nearest first, and what follows them. */
+function trailMarks(after) {
+  const found = [];
+  let rest = after.replace(/^\s+/u, '');
+  for (let match = MONEY_AFTER.exec(rest); match; match = MONEY_AFTER.exec(rest)) { found.push(match[1]); rest = rest.slice(match.index + match[0].length).replace(/^\s+/u, ''); }
   return { marks: found, rest };
 }
-const beforeCut = (text, match) => text.slice(0, match.index);
-const afterCut = (text, match) => text.slice(match.index + match[0].length);
 const PAREN_BEFORE = /\(\s*$/u;
 const PAREN_AFTER = /^\s*\)/u;
 const TRAILING_MINUS = /^\s*[\p{Pd}\u2212](?!\s*\d)/u;
@@ -241,7 +257,7 @@ export function unsupportedFigures(message, request, evidenceIds = []) {
     // A bare digit run inside an occurrence of a cited label's name is that name («Plan-7»): read before any sign.
     if (/^\d+$/.test(match[1]) && spans.some(([start, end]) => match.index >= start && match.index + match[0].length <= end)) continue;
     if (GLUED_BEFORE.test(before) || GLUED_AFTER.test(after) || /[eE]/.test(match[1])) { found.push(match[0]); continue; }
-    const lead = marksBeside(before, MONEY_BEFORE, beforeCut), trail = marksBeside(after, MONEY_AFTER, afterCut);
+    const lead = leadMarks(before), trail = trailMarks(after);
     if (SIGNED_BEFORE.test(lead.rest) || (PAREN_BEFORE.test(lead.rest) && PAREN_AFTER.test(trail.rest)) || TRAILING_MINUS.test(trail.rest)) { found.push(match[0]); continue; }
     const suffix = (match[2] ?? '').trim();
     if (PERCENT.test(suffix)) { found.push(match[0]); continue; }
