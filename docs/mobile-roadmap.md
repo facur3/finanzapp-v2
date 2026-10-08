@@ -774,7 +774,10 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   owner's iPhone (FinanzApp Dev, `com.facur3.finanzapp.dev`); Metro from the branch for QA. CI:
   root tests/build/hygiene, mobile `npm ls`, `expo install --check`, typecheck, currency and
   region catalogue verification, strict localization check, the SQLite tests, the iOS export;
-  the mobile API's PostgreSQL tests.
+  the mobile API's PostgreSQL tests. Expo SDK 57 patch releases last aligned 2026-10-07 for `expo install --check`
+  (`expo` 57.0.27, `expo-constants` 57.0.21, `expo-linking` 57.0.12, `expo-router` 57.0.25, `expo-sqlite` 57.0.4; React
+  Native stays 0.86.3); the native fixes in `expo-sqlite` and `expo-modules-core` reach the iPhone with the next
+  development build.
 
 ## 2. Device QA pending
 
