@@ -104,8 +104,8 @@ function sameField(field, expected, actual) {
 
 const CAUSAL = /\b(?:porque|debido a|a causa de|ya que|because|due to|caused by)\b/i;
 /** Amounts in an answer's prose that no cited fact supports. Heuristic: every digit group (with . and , separators, read
- * in the case's convention, times «mil»/«k»/«lucas» or «millones» when one follows) must be within 1 % of a cited fact's
- * amount in major units, of the difference of two cited amounts, of a cited count, of a year of the request's dates, or
+ * by their shape or, where only a convention decides, in the case's; times «mil»/«k»/«lucas» or «millones» when one
+ * follows) must be within 1 % of a cited fact's amount in major units, of the difference of two cited amounts, of a cited count, of a year of the request's dates, or
  * (followed by %) within 1 point of that change; differences only between current.X and previous.X. Integers ≤ 31 (days,
  * small counts) are ignored unless they are money: after a currency sign or code, or before a currency word. */
 export function underivedNumbers(message, cited, testCase) {
@@ -117,12 +117,18 @@ export function underivedNumbers(message, cited, testCase) {
   const derived = [...amounts, ...pairs.map(([a, b]) => Math.abs(a - b)), ...cited.map(item => item.count),
     ...[testCase.request.facts.flatMap(item => [item.startISO, item.endISO]), EVAL_TODAY].flat().map(iso => Number(iso.slice(0, 4)))];
   const percents = pairs.filter(([, b]) => b > 0).map(([a, b]) => 100 * (a - b) / b);
-  const [thousands, decimal] = dotDecimal(testCase) ? [',', '.'] : ['.', ','];
+  const decimal = dotDecimal(testCase) ? '.' : ',';
   const found = [];
   const isMoney = match => /(?:\$|\b(?:USD|ARS))\s*$/i.test(message.slice(0, match.index))
     || /^\s*(?:pesos|d[oó]lares|dollars|USD|ARS)\b/i.test(message.slice(match.index + match[0].length));
   for (const match of message.matchAll(/(\d[\d.,]*\d|\d)(\s*%|\s*(?:mil|k|lucas)\b|\s*millones\b)?/giu)) {
-    let value = Number(match[1].split(thousands).join('').replace(decimal, '.'));
+    // The shape fixes the decimal mark whatever the convention: the last of two different separators, or a lone one
+    // before one or two digits («842,50»). Replies are rioplatense Spanish until protocol v3 (assistant-prompt.js), so
+    // an English or US case may come back in comma decimals (B7 run #1). Only a lone separator before three digits
+    // («1.500») or a repeated one is read in the case's convention.
+    const token = match[1], separators = token.match(/[.,]/g) ?? [], last = Math.max(token.lastIndexOf('.'), token.lastIndexOf(','));
+    const mark = new Set(separators).size === 2 || (separators.length === 1 && token.length - last - 1 !== 3) ? token[last] : decimal;
+    let value = Number(token.split(mark === '.' ? ',' : '.').join('').replace(mark, '.'));
     const suffix = (match[2] ?? '').trim().toLowerCase();
     if (suffix === '%') { if (!percents.some(p => Math.abs(Math.abs(p) - value) <= 1)) found.push(match[0]); continue; }
     if (suffix === 'millones') value *= 1e6; else if (suffix) value *= 1000;
@@ -215,7 +221,10 @@ export async function runEval({ cases, respond, price = DEFAULT_PRICE, callOptio
       latencyMs, usage, costMicroUsd, maxMicroUsd, estimateExceeded: costMicroUsd > maxMicroUsd, model: served.model ?? null, tier: served.tier ?? null, servedAsConfigured: asConfigured,
       clarificationCorrect: scored.clarificationCorrect, complied: scored.complied, groundedCorrect: scored.groundedCorrect,
       // Refusal prose is kept for a person to read in a live report: a heuristic never judges it completely.
-      ...(testCase.expect.type === 'out_of_scope' ? { message: scored.result?.message ?? null } : {}) });
+      ...(testCase.expect.type === 'out_of_scope' ? { message: scored.result?.message ?? null } : {}),
+      // The raw output, so a live report can show what an imperfect case returned (B7 run #1 kept only scores and flags,
+      // which left a refused output's cause unconfirmed). Synthetic corpus only; the report stays outside the repo.
+      output: served.output ?? null });
   }
   return { cases: records, metrics: metrics(records) };
 }

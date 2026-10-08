@@ -66,7 +66,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, { cr
   const { cases, metrics } = await runEval({ cases: CASES, respond, price, callOptions, expected });
   const verdict = checkThresholds(metrics);
   const imperfect = cases.filter(item => !item.typeCorrect || item.flags.length || Object.values(item.fieldScores).includes(false))
-    .map(({ id, expectedType, type, fieldScores, flags }) => ({ id, expectedType, type, fieldScores, flags }));
+    .map(({ id, expectedType, type, fieldScores, flags, output }) => ({ id, expectedType, type, fieldScores, flags, output }));
   // A live run lists every refusal's words for a human reading: the refusal metrics are heuristics, not a judgement.
   const refusals = live ? cases.filter(item => item.expectedType === 'out_of_scope').map(({ id, type, message }) => ({ id, type, message })) : undefined;
   if (stale && !live) err(`WARNING: the price table was read on ${PRICING.readOn}; a live run or a release must re-read it first.`);

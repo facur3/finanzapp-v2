@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { modelInput, validateAssistantRequestV2 } from '../../../packages/integrations/assistant-protocol.js';
+import { PROTOCOL_LIMITS, modelInput, validateAssistantRequestV2 } from '../../../packages/integrations/assistant-protocol.js';
 import { ASSISTANT_INSTRUCTIONS } from '../assistant-prompt.js';
 import { CASES, EVAL_TODAY } from './corpus.js';
 import { buildRequest, fixtureResponder, goldenOutput, requestIdFor, runEval, underivedNumbers } from './harness.js';
@@ -177,6 +177,36 @@ describe('eval harness', () => {
     expect(underivedNumbers('You spent $1,842.50.', us.request.facts.slice(0, 1), us)).toEqual(['1,842.50']);
   });
 
+  // B7 run #1: replies are rioplatense Spanish whatever the request's language, so «US$ 842,50» (a cited fact) was read
+  // in US convention as 84 250 and flagged; the old scorer failed grounding and hallucination on these words alone.
+  it('reads a decimal mark its shape fixes, whatever the case\'s convention; only «1.500»-shaped numbers take the case\'s', () => {
+    const us = CASES.find(item => item.id === 'analytics.month-total.en');
+    const facts = us.request.facts.slice(0, 1);
+    expect(underivedNumbers('Llevás gastados US$ 842,50 en 9 movimientos.', facts, us)).toEqual([]);
+    expect(underivedNumbers('Llevás US$ 1.842,50 o US$ 842.5.', facts, us)).toEqual(['1.842,50']);
+    expect(underivedNumbers('Llevás US$ 84.250.', facts, us)).toEqual(['84.250']);
+    const ar = CASES.find(item => item.id === 'analytics.compare-month.es');
+    expect(underivedNumbers('Llevás $ 184500.00, o $ 184,500.', ar.request.facts.filter(item => item.id === 'current.expenses'), ar)).toEqual(['184,500']);
+  });
+
+  it('grounds an answer in rioplatense Spanish to an English or US question, as the instructions require until v3', async () => {
+    const rioplatense = testCase => goldenOutput({ ...testCase, lang: 'es', request: { ...testCase.request, region: 'AR' } });
+    const report = await evaluate(rioplatense);
+    expect(report.cases.find(item => item.id === 'analytics.month-total.en').flags).toEqual([]);
+    expect(report.metrics).toMatchObject({ groundedEvidenceAccuracy: 1, hallucinatedFactRate: 0 });
+  });
+
+  // The general rules B7 run #1 showed missing or contradictory (docs/mobile-roadmap.md, «Producto 25A-06», B7). A string
+  // test proves the rule is stated, not that a model follows it: only a live run measures that.
+  it('states the amount bound, the colloquial currency words, the conversion question and the order to move money', () => {
+    expect(ASSISTANT_INSTRUCTIONS).toContain(`de 1 a ${PROTOCOL_LIMITS.maxAmountMinor}`);
+    expect(ASSISTANT_INSTRUCTIONS).toMatch(/ambiguo, negativo, cero o mayor que ese límite, pedí aclaración del monto/);
+    expect(ASSISTANT_INSTRUCTIONS).toMatch(/nombre coloquial como "lucas" o "mangos"\) vale ARS solo si region es AR/);
+    expect(ASSISTANT_INSTRUCTIONS).toMatch(/"k" y "mil" solos no nombran ninguna moneda/);
+    expect(ASSISTANT_INSTRUCTIONS).toMatch(/otra moneda que la de los facts, no hay tipo de cambio: pedí aclaración de moneda/);
+    expect(ASSISTANT_INSTRUCTIONS).toMatch(/Un pedido de que FinanzApp pague, transfiera o envíe dinero es out_of_scope/);
+  });
+
   it('checks a small integer when it is money: after a currency sign or code, or before a currency word', () => {
     const ar = CASES.find(item => item.id === 'analytics.compare-month.es');
     const facts = ar.request.facts.filter(item => item.id.endsWith('.expenses'));
@@ -271,7 +301,10 @@ describe('eval CLI', () => {
     const respond = vi.fn(async call => ({ output: goldenOutput(byInput.get(call.input)), usage: null, model: 'gpt-5.6-luna', tier: 'default' }));
     const io = quiet();
     expect(await main(LIVE, { ...LIVE_CONFIG, MOBILE_AI_EVAL_LIVE: '1' }, { createProvider: () => ({ respond }), ...io })).toBe(1);
-    expect(JSON.parse(io.out.mock.calls[0][0]).verdict.failures.map(item => item.metric)).toContain('servedAsConfiguredRate');
+    const report = JSON.parse(io.out.mock.calls[0][0]);
+    expect(report.verdict.failures.map(item => item.metric)).toContain('servedAsConfiguredRate');
+    // Every imperfect case keeps what the provider returned, so a failed live run can be diagnosed without another one.
+    expect(report.imperfect[0]).toMatchObject({ id: CASES[0].id, output: goldenOutput(CASES[0]) });
   });
 
   it('refuses a live run on a stale price table or without an approved spend covering the worst case', async () => {
