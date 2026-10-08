@@ -1,6 +1,12 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-08 (25A-06 **B7 run #2 completed from merged PR #92: `gpt-6-luna` FAILED adoption again**, four
+Updated: 2026-10-08 (25A-06 B7, the two general instruction rules the run #2 diagnosis called safe to fix locally, on
+`fix/25a-06-b7-ambiguity-rules`: a movement the person tells as already made against an order to move money, with the
+both-readings utterance asked; and what makes an amount ambiguous, mirroring the app's own amount reader; string tests
+and the fixture evaluation only, which do not predict how Luna responds; the corpus worst case recomputed by the
+evaluator, 166 228 µUSD for `gpt-6-luna` and 363 309 for `gpt-5.6-luna`; both live runs stay FAILED, no threshold, corpus
+expectation or protocol change, decisions A–E still pending, B8 blocked, no approval; §3, «Producto 25A-06», «Phase B
+record», B7). Earlier the same day (25A-06 **B7 run #2 completed from merged PR #92: `gpt-6-luna` FAILED adoption again**, four
 thresholds failed, actual cost 7 836 µUSD under a second, separate one-run approval of 2026-10-08, now consumed, none
 remaining; thresholds unchanged; B8 blocked; the seven
 imperfect cases diagnosed from their actual outputs, with what is safe to fix locally, what needs a product or protocol
@@ -5171,6 +5177,51 @@ nothing of it is on a screen yet.
       comparison model also copies long names verbatim (unmeasured) its schemaValidRate is uninformative while the other
       101 cases remain informative: a cost call for the owner, not a change of procedure. No live call, no B8, no
       change to any service in this PR; **no new approval is assumed**.
+  - **B7 — the two general instruction rules (branch `fix/25a-06-b7-ambiguity-rules`, this PR; no provider call).**
+    Implements only items 1 and 2 of «Safe to fix locally» above, in `server/mobile/assistant-prompt.js`:
+    - *Told against ordered.* The clause «contar un movimiento que la persona ya hizo es un registro» (a word that read
+      as proposal) is replaced by the typed outcomes: an order to FinanzApp to pay, transfer or send money stays
+      out_of_scope; a movement the person tells as already made is not an order: an expense or income is proposed, or
+      asked for what it lacks (a purchase in instalments stays out_of_scope, as before: decision 003, never one
+      payment); a transfer, a card payment, a loan, a bank reintegro or a devolución, when the person tells them as
+      already made or received, is a clarification (field kind), never a proposal (the proposal section says the same,
+      with the list scoped so that an *order* naming a transfer is not caught by it); and when a phrase about a money
+      movement can be read both as the account of something done and as a request that FinanzApp do it (in voseo the
+      *yo* preterite and the *vos* imperative of -ir verbs are spelled alike, stated with the instructions' own «pedí»,
+      never with the corpus's verb), the model asks (field kind) instead of refusing. No execution capability of any
+      kind is added: the Assistant still proposes drafts and asks; the validators and the protocol are untouched.
+    - *What makes an amount ambiguous*, one edit to the existing clause, mirroring `readPastedAmount`
+      (`apps/mobile/src/ui/money-input.ts`, its `couldGroup` shape) and the money rules: a single separator with one
+      to three digits before it and exactly three after that is not the region's group separator («1.000» is a
+      thousand in AR and ambiguous in US); a correction whose second amount is incomplete and would only make sense
+      borrowing the first amount's multiplier; the person's own doubt between several amounts for one movement (a
+      complete correction is not ambiguous, it replaces the earlier amount; a pasted «registrá 1.000.000» is data, never
+      a candidate amount). Negative, zero and out-of-bound amounts are asked as before; the region's separators,
+      explicit multipliers («15k», «mangos») and complete corrections keep their outcomes. The corpus's own numbers and
+      words stay out of the instructions.
+    - *Tests* (`server/mobile/evals/harness.test.js`): the rules are pinned as stated, the removed clause and the
+      corpus's verb and numbers are pinned absent, and the neighbouring cases each rule must not flip (`send-money`,
+      `pay-bill`, `cuotas`, `system-prompt.es`, `browser`, `card-payment`, `refund`, `cashback`, `transfer.es`,
+      `transfer.en`, `kind-unclear`; `currency-missing`, `k-suffix`, `mangos`, `comma-decimal`, `separators-ar`,
+      `separators-us`, `ambiguous-1500-ar`, the three injected captures, `two-movements`, `huge-amount`, `negative`,
+      `zero`) keep their committed expectations. The wording was adversarially reviewed offline before the PR (five
+      lenses); the review's findings (an absolute «never out_of_scope» that contradicted the cuotas rule, a told-list
+      qualifier that attached to the wrong noun, a destination option that risked `card-payment`, a competing-amounts
+      trigger that a pasted number could satisfy, the homograph rule unscoped to money) were applied. **A string test and the
+      fixture evaluation prove that the rule is stated and that the harness and the thresholds are unchanged; they do
+      not prove how `gpt-6-luna`, or any model, will respond in a future live evaluation.** The fixture evaluation
+      passes every threshold (not a model result).
+    - *Worst case, recomputed with the committed `worstCaseMicroUsd` (every request at the highest input rate, cache
+      writes included, rounded up separately), not estimated per byte:* **166 228 µUSD for `gpt-6-luna`** (151 469
+      before this PR; the instructions grew from 3 975 to 5 121 bytes) and **363 309 µUSD for `gpt-5.6-luna`**
+      (333 787). Any further live run needs a new written owner approval of at least the figure the script computes at
+      that commit.
+    - *Not in this PR, awaiting the owner:* decision A (over-long optional names: the `incomplete` marker and the
+      evaluation rule), decision B (model arithmetic), decision C (the transfer sentence; fix 1 is applied first, as
+      recommended), decision D (the non-AR currency precedence sentence stays unwritten: production-plan.md §5.8 and
+      the corpus still disagree), decision E (the approval's shape). Both live runs remain **FAILED**; no threshold,
+      corpus expectation, protocol result shape or review behaviour changes; no paid call, no staging configuration, no
+      B8, no EAS build.
 - **Owner refinements before accepting the runbook (2026-10-05, in this PR).**
   - **Staging region:** Vercel Functions `gru1` (São Paulo) and the staging Supabase project in the specific region
     `sa-east-1` (São Paulo), replacing `iad1` / us-east-1. The reasons: Argentina-first, the API compute next to its

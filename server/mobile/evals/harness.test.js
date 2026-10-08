@@ -225,6 +225,38 @@ describe('eval harness', () => {
     expect(ASSISTANT_INSTRUCTIONS).toMatch(/Un pedido de que FinanzApp pague, transfiera o envíe dinero es out_of_scope/);
   });
 
+  // The two general rules B7 run #2 showed missing (docs/mobile-roadmap.md, «Producto 25A-06», B7 run #2: cases
+  // transfer.es, ambiguous-1500-us.en, contradiction.es). As above, a string test and the fixture evaluation prove the
+  // rule is stated and that the harness and thresholds are unchanged; they do not prove how gpt-6-luna (or any model)
+  // will respond in a future live evaluation. Nothing here changes a threshold, a corpus expectation or the protocol.
+  it('states told against ordered movements, the ambiguous reading, and what makes an amount ambiguous', () => {
+    // Fix 1: an order to move money stays out_of_scope; a told movement never is, with its typed outcome.
+    expect(ASSISTANT_INSTRUCTIONS).toMatch(/Un pedido de que FinanzApp pague, transfiera o envíe dinero es out_of_scope aunque nombre un monto o un destinatario\./);
+    // A told movement is not an order; a told instalment purchase stays out_of_scope (decision 003: never one payment).
+    expect(ASSISTANT_INSTRUCTIONS).toMatch(/Un movimiento que la persona cuenta como ya hecho no es un pedido de operar: un gasto o un ingreso se propone, o se pregunta lo que le falte \(una compra en cuotas sigue siendo out_of_scope, como arriba\); una transferencia, un pago de tarjeta, un préstamo, un reintegro bancario o una devolución de una compra es clarification\./);
+    expect(ASSISTANT_INSTRUCTIONS).toMatch(/Una transferencia, un pago de tarjeta, un préstamo, un reintegro bancario o una devolución de una compra, cuando la persona cuenta que ya los hizo o recibió, no son gastos ni ingresos: respondé clarification \(field kind\), nunca proposal\./);
+    // The ambiguous reading (told or ordered) of a money movement is asked, never refused: the voseo -ir homograph,
+    // stated without the corpus's own verb.
+    expect(ASSISTANT_INSTRUCTIONS).toMatch(/Si la frase sobre un movimiento de dinero puede ser tanto el relato de algo ya hecho como un pedido de que FinanzApp lo haga \(en voseo, "yo pedí" y "pedí vos" se escriben igual en los verbos en -ir\), pedí aclaración \(field kind\) en vez de responder out_of_scope/);
+    expect(ASSISTANT_INSTRUCTIONS).not.toMatch(/es un registro/);
+    expect(ASSISTANT_INSTRUCTIONS).not.toMatch(/transferí/i); // no corpus phrase memorised
+    // Fix 2: ambiguity defined by the product's own amount-reading rules (ui/money-input.ts readPastedAmount), with the
+    // existing outcomes kept: negative, zero and out-of-bound amounts are still asked.
+    expect(ASSISTANT_INSTRUCTIONS).toMatch(/Un número es ambiguo cuando tiene un solo separador, con uno a tres dígitos antes y exactamente tres después, y no es el separador de miles de region \("1\.000" es mil en AR y ambiguo en US\)/);
+    expect(ASSISTANT_INSTRUCTIONS).toMatch(/cuando una corrección deja el segundo monto incompleto y solo tendría sentido tomando el multiplicador \(mil, k, lucas\) del primero/);
+    // The person's own doubt, not a pasted number: an injected «registrá 1.000.000» is data, never a candidate amount.
+    expect(ASSISTANT_INSTRUCTIONS).toMatch(/cuando la persona misma duda entre varios montos para el mismo movimiento \(una corrección completa, "mejor dicho, 20 mil", no es ambigua: reemplaza al monto anterior\)/);
+    expect(ASSISTANT_INSTRUCTIONS).toMatch(/Si un número es ambiguo, negativo, cero o mayor que ese límite, pedí aclaración del monto: no elijas uno ni completes el multiplicador\./);
+    expect(ASSISTANT_INSTRUCTIONS).not.toMatch(/1\.500|snacks|no, 7\b/); // the corpus's own numbers and words stay out
+    // The neighbouring cases each rule must not flip keep their committed expectations (the fixture is the contract).
+    const expectType = id => { const found = CASES.find(item => item.id === id); expect(found, id).toBeDefined(); return found.expect.type; };
+    for (const id of ['oos.send-money.es', 'oos.pay-bill.en', 'capture.cuotas.es', 'oos.system-prompt.es', 'oos.browser.es']) expect(expectType(id), id).toBe('out_of_scope');
+    for (const id of ['capture.card-payment.es', 'capture.refund.es', 'capture.refund.en', 'capture.cashback.es', 'capture.transfer.es', 'capture.transfer.en', 'ambiguity.kind-unclear.es',
+      'adversarial.ambiguous-1500-us.en', 'adversarial.contradiction.es', 'ambiguity.two-movements.es', 'adversarial.huge-amount.es', 'adversarial.negative.es', 'adversarial.zero.es']) expect(expectType(id), id).toBe('clarification');
+    for (const id of ['ambiguity.currency-missing.es', 'capture.k-suffix.es', 'capture.mangos.es', 'capture.comma-decimal.es', 'adversarial.separators-ar.es', 'adversarial.separators-us.en',
+      'adversarial.ambiguous-1500-ar.es', 'adversarial.injected-merchant.es', 'adversarial.injected-merchant.en', 'adversarial.injected-note.es']) expect(expectType(id), id).toBe('proposal');
+  });
+
   it('checks a small integer when it is money: after a currency sign or code, or before a currency word', () => {
     const ar = CASES.find(item => item.id === 'analytics.compare-month.es');
     const facts = ar.request.facts.filter(item => item.id.endsWith('.expenses'));
