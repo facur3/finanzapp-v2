@@ -1,7 +1,8 @@
 # FinanzApp mobile: living roadmap
 
 Updated: 2026-10-08 (25A-06 **B7 run #2 completed from merged PR #92: `gpt-6-luna` FAILED adoption again**, four
-thresholds failed, actual cost 7 836 µUSD; the one-run approval is consumed; thresholds unchanged; B8 blocked; the seven
+thresholds failed, actual cost 7 836 µUSD under a second, separate one-run approval of 2026-10-08, now consumed, none
+remaining; thresholds unchanged; B8 blocked; the seven
 imperfect cases diagnosed from their actual outputs, with what is safe to fix locally, what needs a product or protocol
 decision (the two over-long-name cases alone exceed `schemaValidRate`'s one-invalid allowance while the model copies
 them verbatim, 2/2 runs) and the recommended next B7 action; §3, «Producto 25A-06», «Phase B record», B7). Earlier the same day (B7 run #1 completed:
@@ -1039,8 +1040,8 @@ before it passes (the runbook's §0.2):
    accounts and limits (B2), the Supabase staging project and its auth settings (B3), `schema.sql` applied and `verify.sql` printing
    `STAGING_VERIFY_OK` (B4), the boundary probe (B5), the Vercel project `finanzapp-api-staging` deployed with AI still
    off in the database (B6).
-3. **Phase B activates staging** (B7 runs #1 and #2 completed 2026-10-08 UTC: **Luna FAILED adoption** both times; the
-   approved spend is consumed; next: the local fixes and the owner decisions of the run #2 record, then a new owner
+3. **Phase B activates staging** (B7 runs #1 and #2 completed 2026-10-08 UTC: **Luna FAILED adoption** both times; both
+   one-run approvals, 2026-10-07 and 2026-10-08, are consumed; next: the local fixes and the owner decisions of the run #2 record, then a new owner
    spend approval before any further live run; B8 blocked): the **real Luna evaluation** with an owner-approved spend (B7); AI enabled on staging,
    the failure drills and the race (B8); the **cost reconciliation** against the provider (B9).
 4. A focused **`/security_audit`**, then **`/security_review`** (B10); results recorded and 25A-06 marked done (B11).
@@ -4864,7 +4865,8 @@ nothing of it is on a screen yet.
   scan, protocol v3. 25A2 and production activation are not started.
 - **Device QA.** Nothing to check on the iPhone: no app change beyond the version line, and no build points at staging.
 - **Status.** Phase A merged as PR #87. Phase B: B1–B6 passed (2026-10-07); B7 runs #1 and #2 completed 2026-10-08
-  UTC, **`gpt-6-luna` FAILED adoption** both times (below); the 2026-10-07 approval is consumed; B8–B11 not started,
+  UTC, **`gpt-6-luna` FAILED adoption** both times (below); both one-run approvals (2026-10-07, consumed by run #1;
+  2026-10-08, consumed by run #2) are spent and neither authorizes a further run; B8–B11 not started,
   **B8 blocked** until a live run passes every threshold.
 - **Phase B record (2026-10-07, owner-verified; documentation only).** The owner reported each result below; no agent
   touched a service, ran remote SQL or called a provider. No account address, key, token, project ref, database
@@ -4992,10 +4994,15 @@ nothing of it is on a screen yet.
       v3 locale and currency fields: an explicit `incomplete` marker on a proposal whose optional name was dropped at
       the server boundary, shown in the review sheet as a field to complete; the thresholds and this corpus's
       expectations (`merchant: null`, `category: null`) stay as they are. Not expanded in PR #92.
+  - **B7 — second owner spend approval (runbook §11), 2026-10-08.** Given by the owner in writing, separately from
+    the 2026-10-07 approval (which run #1 consumed), for a second live `gpt-6-luna` evaluation of the committed corpus
+    from the corrected code (PR #92): «Autorizo una segunda evaluación live de GPT-6 Luna, con un máximo aprobado de 200000 micro-USD (USD 0,20) para una sola corrida.» **One run, maximum 200 000 µUSD (USD 0.20)**; not a
+    recurring approval and not permission to raise any other cap or ceiling. Consumed by run #2 below (actual cost
+    7 836 µUSD). **Neither approval authorizes a further run.**
   - **B7 — RUN #2: COMPLETED, `gpt-6-luna` FAILED adoption** (2026-10-08 UTC; from merged `master` b1c0136, PR #92;
-    exit 1). Run by the owner with `--approve-micro-usd 200000`, under the owner's explicit one-run authorization of
-    200 000 µUSD, which the owner states is consumed by this run; the run #1 sentences above stay as written; **no
-    approval remains**. The report (`eval-luna-run2.json`) stays outside the repository; no provider metadata is copied.
+    exit 1). Run by the owner with `--approve-micro-usd 200000` under the second approval above, which it consumed;
+    the first approval was consumed by run #1 and its record above stays as written; **no approval remains**. The
+    report (`eval-luna-run2.json`) stays outside the repository; no provider metadata is copied.
     103 synthetic cases; the evaluator's worst case 151 469 µUSD; **actual total cost 7 836 µUSD**; served `gpt-6-luna`
     on 103/103 cases, tier `default` on 103/103; price table read 2026-10-05.
     - **Failed (4):** `schemaValidRate` 0.9806 (101/103; bound ≥ 0.99); `intentAccuracy` 0.9417 (97/103; ≥ 0.95);
@@ -5069,8 +5076,10 @@ nothing of it is on a screen yet.
       jailbreakProposalRate = 0 and servedAsConfiguredRate = 1 → none.
     - **Safe to fix locally (no spend; a follow-up PR, not this one).** Each is a general product rule, not a corpus
       phrase; a string test pins the wording, the fixture evaluation proves no harness or threshold regression and
-      recomputes the worst case (each byte of instructions adds 10.3 µUSD to the corpus's worst case at the 2026-10-05
-      table: 103 cases × 0.10 µUSD); the behavioural effect is unmeasured until a live run, and every new sentence is
+      recomputes the worst case: after any prompt or configuration change the complete corpus worst case is recomputed
+      with `worstCaseMicroUsd` from the committed evaluator (`run.js`: every request priced at the highest input rate,
+      cache writes included, and rounded up separately, so the growth is not a fixed amount per byte), and the next
+      approval must cover that computed amount; the behavioural effect is unmeasured until a live run, and every new sentence is
       itself a candidate cause of new flips (all five run #2 regressions sit in sentences PR #92 edited). Keep the diff
       minimal; each rule names the neighbouring cases it must not flip.
       1. *Told against ordered (case 2).* In the out_of_scope rule replace «contar un movimiento que la persona ya hizo
