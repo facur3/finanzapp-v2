@@ -133,20 +133,22 @@ ownership, quota, Assistant reservation and ceiling tests, with two-connection c
 
 ## Hosting
 
-Two Vercel projects deploy `api/mobile/*` as functions from this repository
-(Producto 25A-06, [docs/ai-staging-runbook.md](docs/ai-staging-runbook.md) §2 and §4):
+The Vercel project `finanzapp-api-staging` deploys `api/mobile/*` as functions from this repository
+(Producto 25A-06, [docs/ai-staging-runbook.md](docs/ai-staging-runbook.md) §2 and §4). Created by the owner at runbook
+checkpoint B6 (passed 2026-10-07), it is the Assistant's **staging**: its Production environment is staging, with
+variables in the Production scope only (runbook §4.4), never Preview or Development.
 
-- `finanzapp-v2`, which exists today, is the planned **production** host of the mobile API. It is
-  to hold no AI or Supabase variable until a production release decision.
-- `finanzapp-api-staging`, created by the owner at runbook checkpoint B6 (passed 2026-10-07), is the
-  Assistant's **staging**: its Production environment is staging, with variables in the Production
-  scope only (runbook §4.4), never Preview or Development.
+- `finanzapp-v2`, the retired PWA's project, is **legacy**: the owner decided on 2026-10-07 to delete it and not to
+  reuse it as the production host; deletion is pending (runbook §0.6).
+- Production will be a **separate new** project (working name `finanzapp-api-production` until the naming gate) with
+  its own Supabase project, provider project, credentials, quotas and kill switch; nothing from staging is promoted,
+  renamed or copied into it. The public landing page is not the API backend (launch, brand and go-to-market slices).
 
-Each project's static output holds only a plain `404.html` (Vercel refuses an empty output
+The project's static output holds only a plain `404.html` (Vercel refuses an empty output
 directory), so `/` and every other path answer 404 and no web page is served. `vercel.json` builds
 only Production deployments (`ignoreCommand`), so Previews are not built; the code closes them too,
 because a route runs only with Vercel's own `VERCEL_ENV=production`. One region, `gru1` (São Paulo), next to the
-planned staging Supabase project in sa-east-1 (runbook §4.2); `maxDuration` 60 s for `api/mobile/*.js`; Node.js `24.x`
+staging Supabase project in sa-east-1 (runbook §4.2); `maxDuration` 60 s for `api/mobile/*.js`; Node.js `24.x`
 (root `package.json`). Without the owner's configuration (`server/mobile/runtime.js` reads
 `MOBILE_ENVIRONMENT`, which must be `staging`, the only enabled environment, `MOBILE_INTEGRATIONS_ENABLED`,
 `MOBILE_SUPABASE_URL`, `MOBILE_SUPABASE_PUBLISHABLE_KEY`, `MOBILE_SUPABASE_SECRET_KEY`, and for the
@@ -155,7 +157,7 @@ docs/production-plan.md §4.7) every endpoint fails closed: `GET` answers 405, `
 once configured, a request without a session answers 401. The app's API origin is
 `EXPO_PUBLIC_MOBILE_API_ORIGIN` (apps/mobile/README.md).
 
-These projects are the mobile API's hosts on purpose, not a leftover of the retired web frontend: the two functions are
+The API project is the mobile API's host on purpose, not a leftover of the retired web frontend: the two functions are
 the only thing they serve. How they relate to Supabase and the AI provider, and the criteria for reconsidering them, are
 in [docs/production-plan.md](docs/production-plan.md) (§2 to §4); bringing up staging, step by step and by whom, is
 [docs/ai-staging-runbook.md](docs/ai-staging-runbook.md); the path to TestFlight and the App Store is in
