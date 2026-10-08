@@ -132,7 +132,10 @@ function navigation(value, cited) {
 // request's region. A bare integer (no separator, suffix or money mark) may also be a day (≤ 31), a fact's count or a
 // period's year. The reader sees Western digits: a figure in words («el doble», «medio millón»), a direction word or
 // a small computed count rests on the instructions and on reading a live report, never on this check.
-const FIGURE = /(\d[\d.,]*\d|\d)(\s*(?:%|％|por\s*ciento\b|porciento\b|per\s*cent\b|percent\b)|\s*(?:mil|k|lucas)\b|\s*mill[oó]n(?:es)?\b)?/giu;
+// An exponent («2e6») is one token; a minus attached to the figure or to its currency mark (never a dash between
+// digits, as in an ISO date) rewrites a non-negative fact: both are refused (Codex review of this change).
+const FIGURE = /(\d[\d.,]*\d(?:[eE][+-]?\d+)?|\d(?:[eE][+-]?\d+)?)(\s*(?:%|％|por\s*ciento\b|porciento\b|per\s*cent\b|percent\b)|\s*(?:mil|k|lucas)\b|\s*mill[oó]n(?:es)?\b)?/giu;
+const SIGNED_BEFORE = /(?<!\d)[-−](?:(?:\$|u\$s|USD|ARS)\s?)?$/i;
 const PERCENT = /^(?:%|％|por\s*ciento|porciento|per\s*cent|percent)$/i;
 const MONEY_BEFORE = /(?:\$|u\$s|\b(?:USD|ARS))\s*$/i;
 const MONEY_AFTER = /^\s*(?:pesos|mangos|d[oó]lares|dollars|bucks|USD|ARS)\b/i;
@@ -172,7 +175,7 @@ export function unsupportedFigures(message, request) {
   if (foreign) found.push(foreign[0]);
   for (const match of message.matchAll(FIGURE)) {
     const before = message.slice(0, match.index), after = message.slice(match.index + match[0].length);
-    if (GLUED_BEFORE.test(before) || GLUED_AFTER.test(after)) { found.push(match[0]); continue; }
+    if (GLUED_BEFORE.test(before) || GLUED_AFTER.test(after) || SIGNED_BEFORE.test(before) || /[eE]/.test(match[1])) { found.push(match[0]); continue; }
     const suffix = (match[2] ?? '').trim();
     if (PERCENT.test(suffix)) { if (!writtenPercents.has(flat(match[0]))) found.push(match[0]); continue; }
     const money = MONEY_BEFORE.test(before) || MONEY_AFTER.test(after);

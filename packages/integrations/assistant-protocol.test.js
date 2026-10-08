@@ -20,7 +20,7 @@ describe('an answer states only the figures the request holds', () => {
     for (const ok of ['Llevás $ 184.500 en 14 movimientos; el mes pasado a esta altura, $ 152.300: más.', 'Llevás 184.500 pesos.', 'Llevás $184,500.00.', 'Llevás 184500.', 'Llevás 184,5 mil.',
       'Del 1 al 5 de octubre de 2026 registraste 14 movimientos, 12 en septiembre.', 'Ingresos: $ 842,50 (uno).', 'Ingresos: US$ 842.50.',
       'En Plan 2030 llevás $ 78.200 en 5 compras.', 'No, no llegaste a 100 mil este mes: $ 184.500.', 'No, no llegaste a $ 100.000 este mes.', // the person's number, in another writing
-      'Fuiste 5 veces al super: 5 compras.', 'Hoy, 05/10/2026, a las 14:30.']) {
+      'Fuiste 5 veces al super: 5 compras.', 'Hoy, 05/10/2026, a las 14:30.', 'Del 2026-10-01 al 2026-10-05.', 'Gastos registrados - 14 movimientos.']) {
       expect(unsupportedFigures(ok, ask('¿Gasté más de 100 mil este mes?')), ok).toEqual([]);
       expect(() => validateAssistantResultV2(answer(ok), ask('¿Gasté más de 100 mil este mes?')), ok).not.toThrow();
     }
@@ -36,7 +36,9 @@ describe('an answer states only the figures the request holds', () => {
       // («50.000» in «150.000»); colloquial money marks; another script's digits; a format character glued to digits.
       ['Subió un 21 por ciento.', ['21 por ciento']], ['Spending fell 7 percent.', ['7 percent']], ['Unos 22.000 más.', ['22.000']], ['Gastaste $ 14.000 más.', ['14.000']],
       ['Gastaste 50.000 este mes.', ['50.000']], ['Llevás 31 mangos más.', ['31']], ['You spent u$s 12 more.', ['12']], ['Gastaste $ ٣٢٢٠٠ más.', ['٣']],
-      ['Gastaste 2\u200d1\u200d8\u200d0\u200d0 más.', ['2', '1', '8', '0', '0']]]) {
+      ['Gastaste 2\u200d1\u200d8\u200d0\u200d0 más.', ['2', '1', '8', '0', '0']],
+      // Codex review: a minus attached to a non-negative fact, a currency mark between, or an exponent as one token.
+      ['Llevás -$ 184.500.', ['184.500']], ['Llevás $-184.500.', ['184.500']], ['Llevás −184.500 pesos.', ['184.500']], ['Gastaste 2e6.', ['2e6']], ['Gastaste 1.845e5 pesos.', ['1.845e5']]]) {
       expect(unsupportedFigures(bad, ask('¿Gasté más de 150.000 este mes?')), bad).toEqual(figures);
       expect(() => validateAssistantResultV2(answer(bad), ask('¿Gasté más de 150.000 este mes?')), bad).toThrow();
     }
