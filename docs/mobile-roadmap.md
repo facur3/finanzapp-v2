@@ -1,6 +1,8 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-05 (owner decisions on the operational and support identity, documentation only: a private
+Updated: 2026-10-07 (25A-06 Phase B, documentation only: staging checkpoints B1–B6 passed, owner-verified, and the
+owner approved one B7 live evaluation of at most 200 000 µUSD; no provider call made yet; §3, «Producto 25A-06»,
+«Phase B record»). Earlier, 2026-10-05 (owner decisions on the operational and support identity, documentation only: a private
 product-operations account owns new infrastructure and is never public, public domain aliases only after the naming
 gate, «Ayuda y comentarios» in Más before launch, the Apple seller identity gate; §3, «Producto 26»). Producto 25A-06
 Phase A merged as PR #87, merge commit ce4b4b3: AI staging activation, the repository preflight, code and
@@ -1020,11 +1022,11 @@ scripts, the live-evaluation gates, [ai-staging-runbook.md](ai-staging-runbook.m
 no secret, no paid call, nothing applied or deployed. The activation order is binding, each step only after the one
 before it passes (the runbook's §0.2):
 1. **25A-06 Phase A** → reviewed and merged by the owner as PR #87 (checkpoint A, done).
-2. **OWNER creates and configures staging**: remote inventory recorded (B1), the OpenAI staging project, service
+2. **Done, owner-verified 2026-10-07** («Producto 25A-06», «Phase B record»). **OWNER creates and configures staging**: remote inventory recorded (B1), the OpenAI staging project, service
    accounts and limits (B2), the Supabase staging project and its auth settings (B3), `schema.sql` applied and `verify.sql` printing
    `STAGING_VERIFY_OK` (B4), the boundary probe (B5), the Vercel project `finanzapp-api-staging` deployed with AI still
    off in the database (B6).
-3. **Phase B activates staging**: the **real Luna evaluation** with an owner-approved spend (B7); AI enabled on staging,
+3. **Phase B activates staging** (next: B7, spend approved 2026-10-07, not run): the **real Luna evaluation** with an owner-approved spend (B7); AI enabled on staging,
    the failure drills and the race (B8); the **cost reconciliation** against the provider (B9).
 4. A focused **`/security_audit`**, then **`/security_review`** (B10); results recorded and 25A-06 marked done (B11).
 5. **Only then 25A-07 — Real Assistant product contract and polish** («Producto 25A», «Slices»), with the session slice
@@ -4827,8 +4829,8 @@ nothing of it is on a screen yet.
   committed. Vercel: the project `finanzapp-v2` deploys `api/mobile/*` and also hosted the retired PWA
   (`finanzapp-v2.vercel.app` and a `-rho` alias in history). Git: 63 of 79 remote branches carry
   `api/mobile/assistant.js`; one, `origin/feat/producto-24rep-native-first-web-retirement`, carries the pre-25A-05
-  runtime. OpenAI: no project id, key or organization referenced anywhere. OWNER CHECKS pending (B1, to be recorded
-  here): the legacy Supabase project (existence, plan, region, tables and row counts, real data, auth providers,
+  runtime. OpenAI: no project id, key or organization referenced anywhere. OWNER CHECKS (B1, passed 2026-10-07, «Phase B
+  record» below): the legacy Supabase project (existence, plan, region, tables and row counts, real data, auth providers,
   whether its legacy `anon` key is still active) and every other Supabase project; `finanzapp-v2`'s plan, Node
   version, Fluid compute, variable names and scopes, domains and aliases, Deployment Protection, system-variable
   exposure and Ignored Build Step; other Vercel projects; any variable in a Preview or Development scope; the OpenAI
@@ -4845,7 +4847,41 @@ nothing of it is on a screen yet.
   Later: the session slice (Sign in with Apple), the consent screen, the literal origin read and an EAS-built bundle
   scan, protocol v3. 25A2 and production activation are not started.
 - **Device QA.** Nothing to check on the iPhone: no app change beyond the version line, and no build points at staging.
-- **Status.** This PR; not merged. Phase B not started.
+- **Status.** Phase A merged as PR #87. Phase B: B1–B6 passed (2026-10-07); B7 approved, not run; B8–B11 not started.
+- **Phase B record (2026-10-07, owner-verified; documentation only).** The owner reported each result below; no agent
+  touched a service, ran remote SQL or called a provider. No account address, key, token, project ref, database
+  password or secret value is recorded here, and none may be.
+  - **B1 — remote inventory: PASSED.** Nothing deleted. The per-item answers are not recorded in this public
+    repository.
+  - **B2 — OpenAI staging (runbook §7): PASSED.** Under the private operations identity (production-plan.md §2.6):
+    project `finanzapp-staging`; model access `gpt-6-luna` only; Standard service tier only; two project-scoped
+    service accounts, `finanzapp-staging-api` and `finanzapp-staging-eval`, each with Restricted permissions, only
+    `/v1/responses` Write; a project hard spend limit of USD 5; a small prepaid balance with auto-reload OFF; sharing
+    of feedback, evaluation data and inputs and outputs OFF; API logging set per call; no provider key in the app, EAS
+    or GitHub; the local evaluation env file outside the repository, mode 0600.
+  - **B3 — Supabase staging (runbook §5.3, §6.1, §6.2): PASSED.** Under the private operations organization: project
+    `finanzapp-staging` in São Paulo (sa-east-1); public sign-up OFF, anonymous sign-in OFF, e-mail auth for test
+    people only (test people A and B); the current signing key asymmetric ECC P-256; distinct publishable, server API
+    secret and owner-probe secret keys. No financial ledger is mirrored to Supabase.
+  - **B4 — real schema verification (runbook §6.3, §6.4): PASSED.** `schema.sql` applied once; `verify.sql` returned
+    `STAGING_VERIFY_OK`.
+  - **B5 — real network boundary probe (runbook §6.5): PASSED.** Every check passed, including: both test people
+    authenticate; anonymous and authenticated clients cannot execute the privileged RPCs; RLS prevents reading the AI
+    control row, the reservations and the usage counters; A and B's inboxes are isolated; the server secret reaches
+    the controlled server paths; AI starts disabled; the wrong environment is refused.
+  - **B6 — Vercel staging API (runbook §4): PASSED.** A separate Vercel project `finanzapp-api-staging`, production
+    branch `master`, region `gru1` (São Paulo) from the repository's `vercel.json`; variables in the Production scope
+    only, the secrets scoped to the staging backend; Preview and Development receive no secret. `probe.js api`: GET
+    405; no session 401; a malformed bearer 401; a forged or wrong-project token 401; a non-JSON body 415; a valid
+    authenticated request 503, because the database kill switch (`mobile_ai_control.enabled`) stays OFF. **No
+    provider call was made during B6.**
+  - **B7 — owner spend approval (runbook §11), 2026-10-07.** The owner approves **one** live `gpt-6-luna` evaluation
+    of the committed synthetic 103-case corpus, with an explicit maximum of **200 000 µUSD (USD 0.20)**:
+    `--approve-micro-usd 200000`. It is not a recurring approval and not permission to raise any other cap or
+    ceiling. The evaluator still computes its own worst case (145 272 µUSD at the table recorded in 25A-06 Phase A)
+    and refuses, sending nothing, if the approval is insufficient. No threshold in `thresholds.js` is lowered after
+    seeing the result; a failure is recorded as a failure (the adoption rule above). **Not run yet**; its numbers are
+    recorded here when it is.
 - **Owner refinements before accepting the runbook (2026-10-05, in this PR).**
   - **Staging region:** Vercel Functions `gru1` (São Paulo) and the staging Supabase project in the specific region
     `sa-east-1` (São Paulo), replacing `iad1` / us-east-1. The reasons: Argentina-first, the API compute next to its

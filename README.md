@@ -133,12 +133,12 @@ ownership, quota, Assistant reservation and ceiling tests, with two-connection c
 
 ## Hosting
 
-Two Vercel projects are planned to deploy `api/mobile/*` as functions from this repository
+Two Vercel projects deploy `api/mobile/*` as functions from this repository
 (Producto 25A-06, [docs/ai-staging-runbook.md](docs/ai-staging-runbook.md) §2 and §4):
 
 - `finanzapp-v2`, which exists today, is the planned **production** host of the mobile API. It is
   to hold no AI or Supabase variable until a production release decision.
-- `finanzapp-api-staging`, not created yet (the owner creates it at runbook checkpoint B6), is the
+- `finanzapp-api-staging`, created by the owner at runbook checkpoint B6 (passed 2026-10-07), is the
   Assistant's **staging**: its Production environment is staging, with variables in the Production
   scope only (runbook §4.4), never Preview or Development.
 

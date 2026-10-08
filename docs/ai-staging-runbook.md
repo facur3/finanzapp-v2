@@ -13,6 +13,10 @@ only in the services' own settings and in local env files outside the repository
 **Phase A merged as PR #87** (merge commit ce4b4b3, 2026-10-05): checkpoint A passed. **Phase B** proceeds only
 through the checkpoints of §0.2, in order, once the owner has read this runbook. Each Phase B step names who acts. Production is out of scope: no step here touches it, enables AI there or decides its numbers.
 
+**Phase B progress (recorded 2026-10-07, owner-verified):** B1–B6 passed; the B7 spend is approved, not yet run. The
+results, with no account address, key, token, project ref or secret, are in [mobile-roadmap.md](mobile-roadmap.md),
+«Producto 25A-06», «Phase B record».
+
 Related: [production-plan.md](production-plan.md) (§2 environments, §3 Vercel, §4 Supabase, §5 the Assistant, §6 cost,
 §14.1 audits), [decision 006](decisions/006-cloud-identity.md) (the cloud identity), [mobile-roadmap.md](mobile-roadmap.md)
 («Producto 25A-06»).
@@ -36,13 +40,13 @@ Each checkpoint must pass before the next one starts. Do not skip ahead.
 | # | Checkpoint | Who | Passes when |
 | --- | --- | --- | --- |
 | A | Phase A PR reviewed and merged | Owner | **Passed**: PR #87 merged by the owner, 2026-10-05 |
-| B1 | Remote inventory recorded (§2) | Owner checks | Every OWNER CHECK answered in the roadmap; nothing deleted |
-| B2 | OpenAI staging project, service accounts and limits, under the operations identity (§7) | Owner | Key in a password manager only; limits, budget and alerts set; auto-recharge off |
-| B3 | Supabase staging project and auth settings, under the operations identity (§5, §6.1) | Owner | Settings of §5.3 set; keys of §6.2 created |
-| B4 | Schema applied and verified (§6.3, §6.4) | Owner | `verify.sql` prints `STAGING_VERIFY_OK` |
-| B5 | Boundary probe (§6.5) | Owner runs a script | Every line PASS |
-| B6 | Vercel staging project deployed, AI off in the database (§4) | Owner | `probe.js api` all PASS |
-| B7 | Real Luna evaluation (§11) | Owner approves the spend and runs it | Every threshold passes, or the run is recorded as a failure, never re-graded |
+| B1 | Remote inventory recorded (§2) | Owner checks | **Passed** 2026-10-07 (owner-verified; the per-item answers are not recorded in this public repository). Every OWNER CHECK answered; nothing deleted |
+| B2 | OpenAI staging project, service accounts and limits, under the operations identity (§7) | Owner | **Passed** 2026-10-07. Key in a password manager only; limits, budget and alerts set; auto-recharge off |
+| B3 | Supabase staging project and auth settings, under the operations identity (§5, §6.1) | Owner | **Passed** 2026-10-07. Settings of §5.3 set; keys of §6.2 created |
+| B4 | Schema applied and verified (§6.3, §6.4) | Owner | **Passed** 2026-10-07. `verify.sql` prints `STAGING_VERIFY_OK` |
+| B5 | Boundary probe (§6.5) | Owner runs a script | **Passed** 2026-10-07. Every line PASS |
+| B6 | Vercel staging project deployed, AI off in the database (§4) | Owner | **Passed** 2026-10-07. `probe.js api` all PASS |
+| B7 | Real Luna evaluation (§11) | Owner approves the spend and runs it | Every threshold passes, or the run is recorded as a failure, never re-graded. **Spend approved** 2026-10-07 (200 000 µUSD, one run); not run yet |
 | B8 | AI enabled on staging, failure drills (§12), race (§6.6) | Owner | Every drill as expected; race PASS; kill switch tested |
 | B9 | Cost reconciliation (§9.3) | Owner runs a script | No day `investigate`; `estimate_exceeded` = 0 |
 | B10 | Focused `/security_audit`, then `/security_review` (§14) | Claude, on the owner's request | No open High or Medium; findings fixed or recorded |
@@ -804,7 +808,8 @@ reservation maximum.
 The eval calls the provider **directly**: they bypass the database reservations. They are bounded by the
 `--approve-micro-usd` amount (refused below the worst case) and by the provider project's hard limit (§7.2).
 
-- [ ] The owner approves an amount, for example `--approve-micro-usd 200000` (USD 0.20), in writing, in the roadmap.
+- [x] The owner approves an amount, for example `--approve-micro-usd 200000` (USD 0.20), in writing, in the roadmap.
+  **Approved 2026-10-07:** 200 000 µUSD for one run (roadmap, «Producto 25A-06», «Phase B record»).
 - [ ] Run, from the merged `master`, with no personal financial data (the corpus is synthetic):
 
   ```
