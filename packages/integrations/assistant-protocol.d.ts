@@ -36,6 +36,8 @@ export declare function validateAssistantResultV2(value: unknown, request: Assis
  * or a count, a period's year, a number in a cited label, a day-sized integer): each is a reason to refuse a reply to a
  * question. Nothing else supports a figure: not an uncited fact, not the person's question. */
 export declare function unsupportedFigures(message: string, request: Pick<AssistantRequestV2, 'facts'> & Partial<Pick<AssistantRequestV2, 'todayISO'>>, evidenceIds?: readonly string[]): string[];
-/** Every exact minor-unit value a digit token may mean under a multiplier suffix («mil», «millones»), by its shape. */
+/** The exact minor-unit value of a figure token written under the reply's numeric contract (Argentine writing: a point
+ * groups thousands, a comma precedes one or two centavos), under a multiplier suffix («mil», «millones»): one value, or
+ * none when the writing is not the contract's. */
 export declare function figureMinorUnits(token: string, suffix?: string): bigint[];
 export declare const ASSISTANT_RESULT_SCHEMA: Readonly<Record<string, unknown>>;

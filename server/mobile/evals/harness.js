@@ -38,13 +38,11 @@ const COPY = {
     same: 'The same as the same days last month.', movements: 'movements' },
 };
 
-// ponytail: two number conventions (lang en or region US: dot decimal; otherwise comma decimal), enough for the corpus
-// regions; a per-region table when the corpus grows beyond AR/US/MX.
-const dotDecimal = testCase => testCase.lang === 'en' || testCase.request.region === 'US';
+// An amount as the v2 reply writes it, whatever the case's language: the reply is rioplatense Spanish, so Argentine
+// writing (a point groups thousands, a comma precedes the centavos), the one writing the protocol's figure reader accepts.
 function money(minor, currency, testCase) {
-  const [thousands, decimal] = dotDecimal(testCase) ? [',', '.'] : ['.', ','];
-  const whole = String(Math.trunc(minor / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, thousands);
-  const cents = minor % 100 ? decimal + String(minor % 100).padStart(2, '0') : '';
+  const whole = String(Math.trunc(minor / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  const cents = minor % 100 ? ',' + String(minor % 100).padStart(2, '0') : '';
   return (currency === 'USD' && testCase.lang === 'es' ? 'US$ ' : '$') + whole + cents;
 }
 

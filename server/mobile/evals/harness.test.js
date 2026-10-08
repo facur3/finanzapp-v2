@@ -179,22 +179,26 @@ describe('eval harness', () => {
     expect(underivedNumbers('Llevás $ 184.500 contra $ 152.300 (32.200 más), unos 184 mil, un 21% más, en 14 compras.', facts, ar)).toEqual(['32.200', '184 mil', '21%']);
     expect(underivedNumbers('Llevás $ 190.000.', facts, ar)).toEqual(['190.000']);
     const us = CASES.find(item => item.id === 'analytics.month-total.en');
-    expect(underivedNumbers('You spent $842.50 so far in 2026.', us.request.facts.slice(0, 1), us)).toEqual([]);
-    expect(underivedNumbers('You spent $1,842.50.', us.request.facts.slice(0, 1), us)).toEqual(['1,842.50']);
+    // The reply writes amounts as in Argentina whatever the request's language (the v2 contract): «842,50», never «842.50».
+    expect(underivedNumbers('You spent US$ 842,50 so far in 2026.', us.request.facts.slice(0, 1), us)).toEqual([]);
+    expect(underivedNumbers('You spent $1.842,50, or $842.50.', us.request.facts.slice(0, 1), us)).toEqual(['1.842,50', '842.50']);
   });
 
   // B7 run #1: replies are rioplatense Spanish whatever the request's language, so «US$ 842,50» (a cited fact) was read
   // in US convention as 84 250 and flagged; the old scorer failed grounding and hallucination on these words alone.
-  it('reads a decimal mark its shape fixes, whatever the case\'s convention; a lone separator before three digits reads both ways', () => {
+  // The reply is rioplatense Spanish whatever the request's region (the v2 contract), so its amounts are written as in
+  // Argentina: «842,50», «184.500». A US writing («842.50», «184,500.00») is not read the other way: it is refused.
+  it('reads amounts under the reply\'s numeric contract (Argentine writing) and refuses every other writing', () => {
     const us = CASES.find(item => item.id === 'analytics.month-total.en');
     const facts = us.request.facts.slice(0, 1);
     expect(underivedNumbers('Llevás gastados US$ 842,50 en 9 movimientos.', facts, us)).toEqual([]);
-    expect(underivedNumbers('Llevás US$ 1.842,50 o US$ 842.5.', facts, us)).toEqual(['1.842,50']);
+    expect(underivedNumbers('Llevás US$ 1.842,50 o US$ 842.5 o US$ 842.50.', facts, us)).toEqual(['1.842,50', '842.5', '842.50']);
     expect(underivedNumbers('Llevás US$ 84.250.', facts, us)).toEqual(['84.250']);
     expect(underivedNumbers('Llevás US$ 842.', facts, us)).toEqual(['842']); // the cents dropped: a rounding, not the fact
     const ar = CASES.find(item => item.id === 'analytics.compare-month.es');
-    // «184,500» is 184.5 in Spanish and 184 500 in US writing: the reply is Spanish whatever the request, so both are tried.
-    expect(underivedNumbers('Llevás $ 184500.00, o $ 184,500, o $ 184.500.', ar.request.facts.filter(item => item.id === 'current.expenses'), ar)).toEqual([]);
+    const current = ar.request.facts.filter(item => item.id === 'current.expenses');
+    expect(underivedNumbers('Llevás $ 184.500, o $ 184500, o 184,5 mil.', current, ar)).toEqual([]);
+    expect(underivedNumbers('Llevás $ 184500.00, o $ 184,500, o $ 184,500.00.', current, ar)).toEqual(['184500.00', '184,500', '184,500.00']);
   });
 
   // B7 run #2: the model cited the right two facts for the why-question and wrote the wrong difference (Restaurantes
@@ -236,7 +240,7 @@ describe('eval harness', () => {
     expect(ASSISTANT_INSTRUCTIONS).toMatch(/otra moneda que la de los facts, no hay tipo de cambio: pedí aclaración de moneda/);
     // Decision B (2026-10-08): no model arithmetic; a comparison names both verified amounts; the device draws the difference.
     expect(ASSISTANT_INSTRUCTIONS).toMatch(/Las cuentas las hace FinanzApp, nunca vos: no calcules nada \(ni saldos, ni deuda de tarjeta, ni uso de presupuesto, ni cuotas, ni conversiones de moneda, ni flujo neto, ni diferencias entre períodos, ni porcentajes, ni redondeos, ni totales\)/);
-    expect(ASSISTANT_INSTRUCTIONS).toMatch(/solo podés repetir, con sus centavos exactos, importes y cantidades de los facts que citás en evidenceIds \(citá cada fact cuyo importe nombrás\); no repitas una cifra de la pregunta de la persona, referite a ella \("ese monto"\); para comparar, nombrá los dos importes y decí cuál es mayor: la app muestra los números verificados y la diferencia\. Una respuesta con una cifra que no esté en los facts citados es inválida y se descarta\./);
+    expect(ASSISTANT_INSTRUCTIONS).toMatch(/solo podés repetir, con sus centavos exactos, importes y cantidades de los facts que citás en evidenceIds \(citá cada fact cuyo importe nombrás\), escritos como en la Argentina: punto para los miles y coma para los centavos \(1\.234,56; 1\.000; 0,50\), nunca 1,234\.56 ni 842\.50; no repitas una cifra de la pregunta de la persona, referite a ella \("ese monto"\); para comparar, nombrá los dos importes y decí cuál es mayor: la app muestra los números verificados y la diferencia\. Una respuesta con una cifra que no esté en los facts citados es inválida y se descarta\./);
     expect(ASSISTANT_INSTRUCTIONS).not.toMatch(/la diferencia del mismo dato entre este período y el anterior/);
     expect(ASSISTANT_INSTRUCTIONS).toMatch(/Un pedido de que FinanzApp pague, transfiera o envíe dinero es out_of_scope/);
   });

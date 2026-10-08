@@ -19,9 +19,9 @@ describe('a reply to a question states only the figures of the facts it cites, e
   const BOTH = ['current.expenses', 'previous.expenses'];
   const answer = (message, evidenceIds = BOTH) => ({ type: 'answer', message, evidenceIds, navigation: null, proposals: [], clarification: null });
   it('accepts a cited fact\'s amount or count restated in any writing, the periods\' days and years, and a number in a cited label', () => {
-    for (const [ok, cited] of [['Llevás $ 184.500 en 14 movimientos; el mes pasado a esta altura, $ 152.300: más.', BOTH], ['Llevás 184.500 pesos.', BOTH], ['Llevás $184,500.00.', BOTH],
+    for (const [ok, cited] of [['Llevás $ 184.500 en 14 movimientos; el mes pasado a esta altura, $ 152.300: más.', BOTH], ['Llevás 184.500 pesos.', BOTH], ['Llevás $184.500,00.', BOTH],
       ['Llevás 184500.', BOTH], ['Llevás 184,5 mil.', BOTH], ['Del 1 al 5 de octubre de 2026 registraste 14 movimientos, 12 en septiembre.', BOTH],
-      ['Ingresos: $ 842,50 (uno).', ['current.income']], ['Ingresos: US$ 842.50.', ['current.income']], ['En Plan 2030 llevás $ 78.200 en 5 compras.', ['current.category.0']],
+      ['Ingresos: $ 842,50 (uno).', ['current.income']], ['Ingresos: US$ 842,5.', ['current.income']], ['En Plan 2030 llevás $ 78.200 en 5 compras.', ['current.category.0']],
       ['No llegaste a ese monto este mes: $ 184.500.', BOTH], ['Fuiste 5 veces al super: 5 compras.', BOTH], ['Hoy, 05/10/2026, a las 14:30.', BOTH],
       ['Del 2026-10-01 al 2026-10-05.', BOTH], ['Gastos registrados - 14 movimientos.', BOTH]]) {
       expect(unsupportedFigures(ok, ask('¿Gasté más de 100 mil este mes?'), cited), ok).toEqual([]);
@@ -29,29 +29,48 @@ describe('a reply to a question states only the figures of the facts it cites, e
     }
   });
   // Owner invariant (2026-10-08): every amount keeps its exact minor units. The first reader compared floats within
-  // 0.005, so «1,005» passed for a fact of 1,00; now every reading is exact integer minor units, never rounded.
-  it('compares exact minor units: no tolerance, no rounding, decimals beyond the second only when they are zeros', () => {
+  // 0.005, so «1,005» passed for a fact of 1,00; now every amount is exact integer minor units, never rounded.
+  it('compares exact minor units: no tolerance, no rounding', () => {
     const cents = [fact('current.refunds', 'Devoluciones', 100, 1), fact('current.expenses', 'Gastos registrados', 199, 1), fact('current.income', 'Ingresos registrados', PROTOCOL_LIMITS.maxAmountMinor, 1)];
     const request = validateAssistantRequestV2({ version: 2, requestId: 'fixture-request-0001', action: 'explain', text: '¿Cuánto?', todayISO: '2026-10-05', currency: 'ARS', region: 'AR', facts: cents });
     const all = cents.map(item => item.id);
-    for (const ok of ['Te devolvieron $ 1.', 'Te devolvieron $ 1,00.', 'Te devolvieron $ 1.000 … no: $ 1,000.', 'Gastaste $ 1,99.', 'Gastaste 1.99 pesos.',
-      'Cobraste $ 9.999.999.999.999,99.', 'Cobraste $ 9,999,999,999,999.99.']) expect(unsupportedFigures(ok, request, all), ok).toEqual([]);
+    for (const ok of ['Te devolvieron $ 1.', 'Te devolvieron $ 1,00.', 'Te devolvieron 1 peso: $ 1,0.', 'Gastaste $ 1,99.', 'Gastaste 1,99 pesos.', 'Cobraste $ 9.999.999.999.999,99.'])
+      expect(unsupportedFigures(ok, request, all), ok).toEqual([]);
     for (const [bad, figures] of [['Te devolvieron $ 1,005.', ['1,005']], ['Te devolvieron $ 1,004.', ['1,004']], ['Gastaste $ 2.', ['2']], ['Gastaste $ 2,00.', ['2,00']], ['Gastaste $ 1,9.', ['1,9']],
       ['Cobraste $ 9.999.999.999.999,98.', ['9.999.999.999.999,98']], ['Cobraste $ 10.000.000.000.000.', ['10.000.000.000.000']], ['Cobraste 1e13 pesos.', ['1e13']]]) {
       expect(unsupportedFigures(bad, request, all), bad).toEqual(figures);
     }
     expect(figureMinorUnits('184,5', 'mil')).toEqual([18450000n]);
     expect(figureMinorUnits('0,5', 'millones')).toEqual([50000000n]);
-    expect(figureMinorUnits('1.005')).toEqual([100500n]); // a thousand with Argentine separators; 1,005 is no amount
-    expect(figureMinorUnits('1.23.456')).toEqual([]); // badly grouped: no reading
   });
-  it('reads digits exactly as the domain does (drift test over both separator conventions)', () => {
+  // Owner review (2026-10-08): a figure's visible value is what a reader of rioplatense Spanish understands. The earlier
+  // reader read «1.000» both as a thousand and as 1,000 (three decimals) and accepted whichever matched a fact, so a
+  // fact of 1,00 could be shown as «$1.000». The reply's numeric writing is now a contract: Argentine writing only.
+  it('reads «1.000» as one thousand only, and refuses a US writing or a non-canonical one even when a reading would match', () => {
+    const one = fact('current.refunds', 'Devoluciones', 100, 1), thousand = fact('current.expenses', 'Gastos registrados', 100000, 1), usd = fact('current.income', 'Ingresos registrados', 199, 1);
+    const request = validateAssistantRequestV2({ version: 2, requestId: 'fixture-request-0001', action: 'explain', text: '¿Cuánto?', todayISO: '2026-10-05', currency: 'ARS', region: 'AR', facts: [one, thousand, usd] });
+    expect(unsupportedFigures('Te devolvieron $ 1.000.', request, [one.id])).toEqual(['1.000']); // one thousand is not one peso
+    expect(unsupportedFigures('Gastaste $ 1.000.', request, [thousand.id])).toEqual([]);
+    expect(unsupportedFigures('Gastaste $ 1.000,00 (mil pesos: 1000).', request, [thousand.id])).toEqual([]);
+    for (const bad of ['Gastaste $ 1,000.', 'Gastaste $ 1,000.00.', 'Gastaste $1000.00.']) expect(unsupportedFigures(bad, request, [thousand.id]), bad).toEqual([bad.match(/[\d.,]+\d/)[0]]);
+    for (const bad of ['Cobraste US$ 2,00.', 'Cobraste US$ 1,9.', 'Cobraste US$ 1.99.', 'Cobraste US$ 1,990.']) expect(unsupportedFigures(bad, request, [usd.id]), bad).toEqual([bad.match(/[\d.,]+\d/)[0]]);
+    expect(unsupportedFigures('Cobraste US$ 1,99.', request, [usd.id])).toEqual([]);
+    expect(figureMinorUnits('1.000')).toEqual([100000n]);
+    for (const token of ['1,000', '842.50', '1,234.56', '1.23.456', '0500', '007', '1.0', '12.5', '184,500', '1.2345']) expect(figureMinorUnits(token), token).toEqual([]);
+  });
+  it('is the domain\'s Argentine reading of a canonical amount, and stricter where the domain forgives extra zero decimals (drift test)', () => {
     for (const currency of PROTOCOL_CURRENCIES) expect(minorUnitExponent(currency), currency).toBe(2);
-    const conventions = [{ decimal: ',', group: '.' }, { decimal: '.', group: ',' }];
-    for (const token of ['184.500', '184,500', '1.234,56', '1,234.56', '842,50', '842.50', '0,500', '0.500', '1.005', '1,005', '12.5', '12,5', '184500', '1.000', '1,000', '1.234.567', '1,234,567', '1.23.456', '0.1.2', '007']) {
-      const domain = new Set(conventions.map(separators => parseLocalizedAmount(token, 'ARS', separators)).filter(read => read.ok).map(read => BigInt(read.minor)));
-      expect(new Set(figureMinorUnits(token)), token).toEqual(domain);
+    const argentine = { decimal: ',', group: '.' };
+    const forgiven = [];
+    for (const token of ['184.500', '184,500', '1.234,56', '1,234.56', '842,50', '842.50', '842,5', '0,500', '0.500', '1.005', '1,005', '12.5', '12,5', '184500', '1.000', '1,000', '1.234.567', '1,234,567', '1.23.456', '0.1.2', '007', '0,50', '1,0']) {
+      const domain = parseLocalizedAmount(token, 'ARS', argentine);
+      const contract = figureMinorUnits(token);
+      if (contract.length) expect(domain.ok && BigInt(domain.minor), token).toBe(contract[0]); // never a value the domain would not read
+      else if (domain.ok) forgiven.push(token);
     }
+    // The input reader forgives decimals beyond the second when they are zeros, and leading zeros; the reply's contract
+    // refuses both: a reader of «1,000» cannot tell one peso from a thousand at a glance, and «007» is no amount.
+    expect(forgiven).toEqual(['184,500', '0,500', '1,000', '007']);
   });
   // Owner invariant (2026-10-08): a number from the person's question is never a ledger figure, and an uncited fact's
   // figure is not what the rows show. The first reader accepted both; a false assertion built on the question's own

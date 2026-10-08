@@ -128,14 +128,15 @@ function navigation(value, cited) {
 // a count, a year of their periods, a number written in a cited fact's label, a day-sized bare integer, and nothing
 // else: nothing computed (no difference, percentage, rounding or total), nothing from an uncited fact, and never a
 // number from the person's question (a threshold the person asked about is not a ledger figure; the model refers to it
-// without repeating it). A figure is read by its shape, whatever the convention: the last of two different separators
-// is the decimal mark, a repeated separator groups thousands, one separator before one or two digits is decimals, and
-// one before exactly three digits is read both ways (a thousand, or decimals), since the reply is Spanish whatever the
-// request's region. Every reading is converted to minor units exactly, by digits, with the domain's rule (decimals
-// beyond the currency's two are accepted only when they are zeros, never rounded; packages/domain/money.ts, pinned by
-// a drift test) and compared as integers: 1,99 is 199, never 200. The reader sees Western digits: a figure in words
-// («el doble», «medio millón»), the direction word or a small computed count rests on the instructions and on reading
-// a live report, never on this check, which is a partial defence in depth, not a verification of what the prose claims.
+// without repeating it). The prose's numeric writing is a contract, not a guess: a v2 reply is rioplatense Spanish
+// whatever the request's region (assistant-prompt.js), so an amount is written as in Argentina, a point grouping
+// thousands and a comma before one or two centavos («1.234,56», «1.000», «0,50»); any other writing («1,000»,
+// «842.50», «1,234.56», «1.23.456», «0500») is refused, since what a person reads («$1.000» is one thousand) must be
+// the fact's value. Each amount is converted to minor units exactly, by digits (never a float, never rounded;
+// stricter than the domain's input reader, which also accepts extra zero decimals: pinned by a drift test) and
+// compared as integers: 1,99 is 199, never 200. The reader sees Western digits: a figure in words («el doble»,
+// «medio millón»), the direction word or a small computed count rests on the instructions and on reading a live
+// report, never on this check, which is a partial defence in depth, not a verification of what the prose claims.
 // An exponent («2e6») is one token; a minus attached to the figure or to its currency mark (never a dash between
 // digits, as in an ISO date) rewrites a non-negative fact: both are refused (Codex review of this change).
 const FIGURE = /(\d[\d.,]*\d(?:[eE][+-]?\d+)?|\d(?:[eE][+-]?\d+)?)(\s*(?:%|％|por\s*ciento\b|porciento\b|per\s*cent\b|percent\b)|\s*(?:mil|k|lucas)\b|\s*mill[oó]n(?:es)?\b)?/giu;
@@ -151,36 +152,17 @@ const GLUED_AFTER = /^[\p{Cf}\p{Mn}\p{Me}]/u;
 const flat = value => value.replace(/\s+/g, '').toLowerCase();
 /** Minor digits of every protocol currency (ARS, USD): the domain's `minorUnitExponent`, pinned by a drift test. */
 const MINOR_DIGITS = 2;
-const MAX_MINOR_DIGITS = String(PROTOCOL_LIMITS.maxAmountMinor).length;
-// Digit groups: one to three digits first, three in each further group, no leading zero (ui/money-input.ts wellGrouped).
-const wellGrouped = groups => /^[1-9]\d{0,2}$/.test(groups[0]) && groups.slice(1).every(group => /^\d{3}$/.test(group));
-/** The ways a digit token reads, as whole and fraction digit strings: by shape, both ways where only a convention
- * decides (one separator before exactly three digits), never as a float. */
-function readings(token) {
-  const separators = token.match(/[.,]/g) ?? [];
-  if (!separators.length) return [{ whole: token, fraction: '' }];
-  const last = Math.max(token.lastIndexOf('.'), token.lastIndexOf(','));
-  const groups = token.split(/[.,]/);
-  const grouped = wellGrouped(groups) ? [{ whole: groups.join(''), fraction: '' }] : [];
-  const head = groups.slice(0, -1);
-  const decimal = head.length === 1 || wellGrouped(head) ? [{ whole: head.join(''), fraction: groups[groups.length - 1] }] : [];
-  if (new Set(separators).size === 2) return decimal;
-  if (separators.length > 1) return grouped;
-  return token.length - last - 1 === 3 ? [...grouped, ...decimal] : decimal;
-}
-/** A reading, shifted by a multiplier («mil», «millones»), as exact minor units: null when the digits do not fit the
- * currency (decimals beyond its two that are not zeros, or more digits than an amount may have). Never rounded. */
-function minorUnits({ whole, fraction }, shift) {
-  const digits = whole + fraction, point = whole.length + shift;
-  const integer = digits.slice(0, point).padEnd(point, '0'), rest = digits.slice(point);
-  if (/[^0]/.test(rest.slice(MINOR_DIGITS))) return null;
-  const minor = (integer + rest.slice(0, MINOR_DIGITS).padEnd(MINOR_DIGITS, '0')).replace(/^0+(?=\d)/, '');
-  return minor.length > MAX_MINOR_DIGITS ? null : BigInt(minor);
-}
-/** Every exact minor-unit value a figure token may mean under a multiplier suffix. */
+/** The one writing of an amount in a v2 reply: whole pesos as plain digits or in groups of three separated by a point
+ * (no leading zero but a lone «0»), then optionally a comma and one or two centavos. */
+const AMOUNT = /^(0|[1-9]\d{0,2}(?:\.\d{3})*|[1-9]\d*)(?:,(\d{1,2}))?$/;
+/** The exact minor-unit value of a figure token written under the reply's numeric contract, under a multiplier suffix
+ * («mil», «millones»): one value, or none when the writing is not the contract's or the amount is out of bounds. */
 export function figureMinorUnits(token, suffix = '') {
+  const match = AMOUNT.exec(token);
+  if (!match) return [];
   const shift = suffix.toLowerCase().startsWith('mill') ? 6 : suffix ? 3 : 0;
-  return readings(token).map(reading => minorUnits(reading, shift)).filter(value => value !== null);
+  const minor = BigInt(match[1].replace(/\./g, '') + (match[2] ?? '').padEnd(MINOR_DIGITS, '0')) * 10n ** BigInt(shift);
+  return minor > BigInt(PROTOCOL_LIMITS.maxAmountMinor) ? [] : [minor];
 }
 /** The figures of a reply's prose that the facts it cites do not support exactly: each is a reason to refuse the reply.
  * `evidenceIds` are the cited facts; nothing else in the request supports a figure (not an uncited fact, not the

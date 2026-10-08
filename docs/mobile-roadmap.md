@@ -3,11 +3,13 @@
 Updated: 2026-10-08 (25A-06 B7, **owner decision B: financial calculations belong to FinanzApp's deterministic code,
 never to the model**, on `fix/25a-06-b7-arithmetic-ownership`: the v2 allowance for the model to state the difference
 between the two periods is withdrawn; a reply to a question may restate only the figures of the facts it cites, in
-exact minor units (1,99 is 199, never 200; no tolerance, no rounding), never a number from the person's question, and
+exact minor units (1,99 is 199, never 200; no tolerance, no rounding), written as in Argentina since the reply is
+Spanish («1.000» is one thousand only; any other writing is refused), never a number from the person's question, and
 the shared protocol validator refuses, on the server and on the device, a reply whose prose holds any other figure, a
-partial defence in depth; comparisons name both verified amounts and the device keeps drawing the verified difference
+partial defence in depth; the capture path audited read-only (an amount's agreement with the person's words is not
+validated today: a separate slice); comparisons name both verified amounts and the device keeps drawing the verified difference
 row; the scorer, the golden fixture and the device fixture follow; the owner's currency-inference rule recorded for its
-own PR (decision D); the corpus worst case recomputed, 171 091 µUSD for `gpt-6-luna` and 373 030 for `gpt-5.6-luna`;
+own PR (decision D); the corpus worst case recomputed, 172 739 µUSD for `gpt-6-luna` and 376 326 for `gpt-5.6-luna`;
 both live runs stay FAILED as recorded, thresholds and corpus expectations unchanged; §3, «Producto 25A-06», «Phase B
 record», B7). Earlier the same day (25A-06 B7, the two general instruction rules the run #2 diagnosis called safe to fix
 locally, PR #94: a movement the person tells as already made against an order to move money, with the
@@ -5266,11 +5268,13 @@ nothing of it is on a screen yet.
       amounts and says which is larger; the device draws the verified difference row from the cited pair
       (`answerContent`, unchanged), so the person keeps the number.
     - *Enforced deterministically, not only instructed.* `unsupportedFigures(message, request, evidenceIds)` in
-      `packages/integrations/assistant-protocol.js` reads every figure of the prose by its shape (a lone separator
-      before exactly three digits is read both ways, since the reply is Spanish whatever the request's region),
-      converts each reading to minor units by digits with the domain's rule (`packages/domain/money.ts`, pinned by a
-      drift test over both separator conventions; no float, no separate parser) and compares integers against the
-      cited facts; `validateAssistantResultV2` refuses the reply on any unsupported figure: the server refuses the
+      `packages/integrations/assistant-protocol.js` reads every amount under the reply's **numeric contract**: a v2
+      reply is rioplatense Spanish whatever the request's region, so an amount is written as in Argentina, a point
+      grouping thousands and a comma before one or two centavos («1.234,56», «1.000», «0,50»), and any other writing
+      («1,000», «842.50», «1,234.56», «1.23.456», «0500») is refused, fail closed, since what a reader of Spanish sees
+      («$1.000» is one thousand) must be the fact's value; each amount is converted to minor units by digits (no float,
+      no separate parser: the domain's Argentine input reading, pinned by a drift test that also lists where the
+      contract is stricter, extra zero decimals and leading zeros) and compared as integers against the cited facts; `validateAssistantResultV2` refuses the reply on any unsupported figure: the server refuses the
       provider's output (502 `output_invalid`, billed, nothing saved), the device refuses the server's reply with the
       same function. Pinned in `assistant-protocol.test.js` (accepted writings; refused computations, the cents dropped,
       «1,005» for 1,00, the question's threshold, an uncited fact's figure; the drift test) and
@@ -5282,7 +5286,11 @@ nothing of it is on a screen yet.
       minus attached to a fact's figure («-$ 184.500», a rewrite of a non-negative fact; a dash between digits, as in an
       ISO date, is not a sign) and exponent notation («2e6»), both from the Codex review of the PR. The owner's review
       of `1a97a0d` then removed two weaknesses: a float comparison within 0,005 (so «1,005» passed for a fact of 1,00)
-      became exact minor units, and the person's question and uncited facts stopped supporting figures.
+      became exact minor units, and the person's question and uncited facts stopped supporting figures; the owner's
+      review of `3484c57` removed a third: a lone separator before three digits was read both ways and whichever
+      reading matched a fact passed, so a fact of 1,00 could be shown as «$1.000» and a US writing could pass in a
+      Spanish reply; the numeric contract above replaced it (request.region never decides the reply's writing: the
+      contract is the reply's language, Spanish until v3).
       **Partial defence in depth, not verification:** the check pins every figure to a cited fact exactly; it cannot
       verify what the prose claims about it (which label, period or direction it is attributed to), a figure in words
       («el doble», «medio millón», «veintidós mil»), the direction word («más»/«menos» is the model's claim; the
@@ -5296,7 +5304,9 @@ nothing of it is on a screen yet.
       narrows what reaches the person.
     - *Instructions* (`assistant-prompt.js`): «Las cuentas las hace FinanzApp, nunca vos: no calcules nada …; solo
       podés repetir, con sus centavos exactos, importes y cantidades de los facts que citás en evidenceIds (citá cada
-      fact cuyo importe nombrás); no repitas una cifra de la pregunta de la persona, referite a ella ("ese monto"); para
+      fact cuyo importe nombrás), escritos como en la Argentina: punto para los miles y coma para los centavos
+      (1.234,56; 1.000; 0,50), nunca 1,234.56 ni 842.50; no repitas una cifra de la pregunta de la persona, referite a
+      ella ("ese monto"); para
       comparar, nombrá los dos importes y decí cuál es mayor: la app muestra los números verificados y la diferencia.
       Una respuesta con una cifra que no esté en los facts citados es inválida y se descarta.» String-tested; a string
       test does not predict a live result.
@@ -5306,7 +5316,8 @@ nothing of it is on a screen yet.
       names them behind the `invalid_schema`. The 25A-05 scorer's 1 % tolerance on a restated amount is gone too:
       «unos 184 mil» and «US$ 842» (the cents dropped), which it accepted, are flagged and the answer refused. The golden
       fixture names both amounts and compares in words («Más que …», «Menos que …», «Lo mismo que …») instead of a
-      «Diferencia» line. The device's scripted fixture answer
+      «Diferencia» line, written as in Argentina whatever the case's language (the reply's contract). The device's
+      scripted fixture answer
       (`fixtures.ts`, a development view) follows the rule, and one device test's server reply states only the figure
       its request holds.
     - *Effect on scores, explicitly.* Corpus expectations: none changed. Fixture evaluation: every threshold passes
@@ -5330,11 +5341,25 @@ nothing of it is on a screen yet.
       real ledger (where sums almost always have cents) raises the refusal rate the next live run cannot yet measure.
       The smallest safe solution for the prose is the 25A-07 item above (a derived `difference.<subject>` fact inside
       v2's shape and its 60-fact bound); it is not forced into this PR.
-    - *Worst case, recomputed with `worstCaseMicroUsd`:* **171 091 µUSD for `gpt-6-luna`** (166 834 at PR #94; the
-      instructions are 5 499 bytes) and **373 030 µUSD for `gpt-5.6-luna`** (364 519). Any further live run needs a new
+    - *Capture path, audited read-only (owner request).* For a `parse` request, `validateAssistantResultV2` checks
+      that a draft's `amountMinor` is a positive safe integer within the bound and its currency ARS, USD or null; it
+      never compares them with the person's words. Probed offline: «Gasté 1,99 dólares» with 200 / USD, 1 990 / USD,
+      199 / ARS or 199 / null; «Gasté 10 mil pesos» with 100 000 or 10 000 minor; «Gasté 0,50 dólares» with 5 or 500:
+      every one accepted. **Guaranteed today:** the bounds; nothing is written without the person's confirmation in the
+      review sheet, where the amount and the currency are visible and editable (25A-04; AGENTS rule 12); the evaluation
+      measures amount accuracy on the corpus (`captureFieldAccuracy`; run #2: 234/234 fields, the cases with centavos
+      and multipliers among them). **Not guaranteed deterministically:** that `amountMinor` equals the amount the person
+      wrote. **The separate slice, deterministic capture validation:** the shared validator reads the person's text with
+      the domain's own amount reader (`readPastedAmount` / `parseLocalizedAmount` with the region's separators, the
+      multipliers mil / k / lucas and the explicit currency words) and refuses, fail closed into a clarification, a
+      draft whose amount matches no reading of the text or whose currency contradicts an explicit currency word; no
+      natural-language parser beyond the domain's reader; its own tests and worst-case recomputation. Not in this PR.
+    - *Worst case, recomputed with `worstCaseMicroUsd`:* **172 739 µUSD for `gpt-6-luna`** (166 834 at PR #94; the
+      instructions are 5 627 bytes) and **376 326 µUSD for `gpt-5.6-luna`** (364 519). Any further live run needs a new
       written owner approval of at least the figure the script computes at that commit.
     - *Not in this PR:* the over-long-name marker (decision A), the currency inference (decision D, taken below,
-      its own PR), the transfer sentence (C), the approval's shape (E). No paid call, no staging configuration, no B8,
+      its own PR), the deterministic capture validation (audited above), the transfer sentence (C), the approval's
+      shape (E). No paid call, no staging configuration, no B8,
       no EAS build; both live runs remain **FAILED**; B8 **BLOCKED**.
   - **B7 — decision D taken (owner, 2026-10-08): currency inference, recorded for a subsequent focused PR; not
     implemented in the arithmetic-ownership PR.** The rule the next PR implements, in this order of precedence:

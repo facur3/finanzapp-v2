@@ -673,8 +673,11 @@ Rules that follow:
   from the person's question** (a threshold the person asked about is not a ledger total). To compare, the model names
   both verified amounts and says which is larger; the device draws the verified difference row from the cited pair.
   **EXISTS TODAY (25A-06, B7):** `unsupportedFigures(message, request, evidenceIds)` in the shared protocol module,
-  reading digits with the domain's own rule (`packages/domain/money.ts`, pinned by a drift test, no separate parser)
-  and applied by `validateAssistantResultV2` to every reply to a question, so the server refuses the provider's output
+  reading amounts under the reply's numeric contract (a v2 reply is rioplatense Spanish, so Argentine writing: a point
+  groups thousands, a comma precedes one or two centavos; any other writing, «1,000» or «842.50», is refused, fail
+  closed, because what the reader sees must be the fact's value), converted to minor units by digits (the domain's
+  Argentine input reading, `packages/domain/money.ts`, pinned by a drift test; no separate parser) and applied by
+  `validateAssistantResultV2` to every reply to a question, so the server refuses the provider's output
   and the device refuses the server's reply (the v2 instructions say so too; the evaluation measures it, §5.8). **A
   partial defence in depth, not a verification:** the check pins each figure to a cited fact; it cannot verify what the
   prose claims about it (label, period, direction), a figure in words («el doble», «medio millón»), the direction word
@@ -682,7 +685,10 @@ Rules that follow:
   on the instructions and on reading the live report. The robust design is protocol v3's: typed figure references in
   the prose, rendered by the device from its own evidence, and no digits in the model's text. The prose therefore
   cannot name the difference; the 25A-07 item «a verified difference as a fact» (roadmap) is the smallest safe way to
-  give it back inside v2's fact shape and its 60-fact bound.
+  give it back inside v2's fact shape and its 60-fact bound. On the capture path (`parse`) the validator checks a
+  draft's amount bounds and currency, never their agreement with the person's words; that deterministic capture
+  validation (the domain's amount reader over the text; a mismatch fails closed into a clarification) is a separate
+  slice (roadmap, «Producto 25A-06», B7).
 
 ### 5.3 The one write path
 
