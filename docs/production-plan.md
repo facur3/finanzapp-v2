@@ -663,12 +663,23 @@ Rules that follow:
   from the cited fact ids over local evidence (`answerContent` in `apps/mobile/src/assistant/conversation.ts`), never
   parsed out of prose. A model's typed navigation intent (protocol v2) only moves to the front a link the device already
   derived from the same cited fact; it never adds a link or a route.
-- Prose may restate a cited fact's amount, or the difference of the same fact between the two periods (`current.X`
-  and `previous.X`), and nothing else numeric: never two different facts subtracted (income minus expenses, expenses
-  minus refunds), never a
-  balance, a card debt, a budget's usage, an instalment's state, a conversion, a net flow or a refund's state. Those come
-  from the domain code and the evidence rows the device draws (the v2 instructions say so; the evaluation measures it,
-  §5.8).
+- **Prose may restate the figures of the facts it cites, exactly, and nothing computed (owner decision B, 2026-10-08;
+  it replaces the 25A-05 allowance for the difference of the same fact between the two periods).** A cited fact's
+  amount in exact minor units (1,99 is 199, never 200; no rounding) or its count; never a difference, a percentage, a
+  total, two facts subtracted (income minus expenses, expenses minus refunds), a balance, a card debt, a budget's
+  usage, an instalment's state, a conversion, a net flow or a refund's state. To compare, the model names both verified
+  amounts and says which is larger; the device draws the verified difference row from the cited pair. The model
+  explains and compares in natural language; the figures are the ledger's. **How it holds today (25A-06, B7):** the
+  v2 instructions state it, and the evaluation's scorer flags every figure of an answer that no cited fact holds
+  exactly (a difference, a percentage, a rounding, a cents-dropped amount; §5.8, `groundedEvidenceAccuracy` and
+  `hallucinatedFactRate`), so a model that computes fails the adoption bar. **It is instructed and measured, not
+  deterministically verified:** the shared validator checks the result's shape, the cited ids, the navigation intent
+  and the safety of the text; it does not read figures out of prose (the prose-figure validator of PR #95 was not
+  adopted, owner direction 2026-10-09: no general validator of generated prose; roadmap «Producto 25A-06», B7). A
+  computed figure the model writes anyway reaches the person as words; the figures a person can rely on are the
+  evidence rows the device computes from its own ledger. On the capture path (`parse`) the validator checks a draft's
+  amount bounds and currency, never their agreement with the person's words; the review sheet and the person's
+  confirmation are the guarantee (§5.3), and a deterministic capture validation is a separate slice (roadmap, B7).
 
 ### 5.3 The one write path
 
@@ -1772,7 +1783,7 @@ Nothing below is complete unless it says **EXISTS TODAY**. "Launch §n" is a sec
 | Closed Assistant protocol v2, validated on the server and the device | 25A | **EXISTS TODAY** (25A-05); v1 retired, never deployed | v3 (locale, currencies) server first, later |
 | Cloud-AI consent screen | 25A | **NOT IMPLEMENTED**, **LAUNCH BLOCKER** | Built and shown before any send |
 | Provider port, model as configuration | 25A | **EXISTS TODAY** (25A-05); the OpenAI adapter disabled, nothing configured | — |
-| Model evaluation and choice | 25A | Corpus, harness and thresholds **EXIST TODAY** (25A-05; fixture run only, not model results); `estimateExceededCount` = 0 and the live-run gates added (25A-06 Phase A); B7 runs #1 and #2 (2026-10-08 UTC): **`gpt-6-luna` FAILED adoption** both times (run #1 five thresholds, run #2 four: `schemaValidRate` 0.9806, `intentAccuracy` 0.9417, `clarificationAccuracy` 0.8696, `groundedEvidenceAccuracy` 0.9; thresholds unchanged; both one-run approvals, 2026-10-07 and 2026-10-08, consumed; roadmap «Producto 25A-06», B7); **RESEARCH GATE**, **OWNER ACTION** (paid, approved amount) | The two general instruction rules of the run #2 record are in the ambiguity-rules PR (string and fixture tests only: not a prediction of a live result); then the owner decisions of that record (over-long optional names at the protocol boundary; model arithmetic; the non-AR currency precedence; the transfer sentence; the approval's shape), then a further live run only with a new owner spend approval covering the worst case the evaluator recomputes (runbook B7) |
+| Model evaluation and choice | 25A | Corpus, harness and thresholds **EXIST TODAY** (25A-05; fixture run only, not model results); `estimateExceededCount` = 0 and the live-run gates added (25A-06 Phase A); B7 runs #1 and #2 (2026-10-08 UTC): **`gpt-6-luna` FAILED adoption** both times (run #1 five thresholds, run #2 four: `schemaValidRate` 0.9806, `intentAccuracy` 0.9417, `clarificationAccuracy` 0.8696, `groundedEvidenceAccuracy` 0.9; thresholds unchanged; both one-run approvals, 2026-10-07 and 2026-10-08, consumed; roadmap «Producto 25A-06», B7); **RESEARCH GATE**, **OWNER ACTION** (paid, approved amount) | The two general instruction rules of the run #2 record are merged (PR #94; string and fixture tests only: not a prediction of a live result); model arithmetic is decided and applied (decision B, 2026-10-08: no model arithmetic, stated in the instructions and measured by the scorer, §5.2; PR #95's prose-figure validator left unmerged by owner direction 2026-10-09); the non-AR currency precedence is decided (decision D, 2026-10-08, recorded on PR #95's branch, its own PR); over-long optional names at the protocol boundary, the transfer sentence and the approval's shape are still pending; then a further live run only with a new owner spend approval covering the worst case the evaluator recomputes (runbook B7) |
 | Replacement of `gpt-5-mini` before 2026-12-11 | 25A | **DONE in code** (25A-05: removed; no model in code) | The model chosen by 25A-06's evaluation |
 | Monetary ceilings as atomic pre-call reservations, settlement, usage accounting, kill switch | 25A | **EXISTS TODAY** in the repository (25A-05), staging placeholders, applied to staging only with AI disabled (runbook B4, 2026-10-07); **IMPLEMENTATION GATE**, **LAUNCH BLOCKER** for enabling AI | Tripped deliberately in staging (runbook B4, B8: `verify.sql`, the drills, `probe.js race`), including concurrent requests against the last unit of capacity (§6.3) |
 | Alerts, anomaly stop, reconciliation against the provider's cost report | 25A | The owner-run reconciliation (`usage-report.sql`, `reconcile.js`) **EXISTS TODAY** (25A-06 Phase A); staging alerts are the provider's budget e-mails (**OWNER ACTION**); the automated owner alert and the anomaly stop **NOT IMPLEMENTED**, **LAUNCH BLOCKER** for enabling AI beyond staging | Reconciliation at runbook B9 (no `investigate` day, `estimate_exceeded` = 0); the automated alert before production (25A-07 or 25F) |
