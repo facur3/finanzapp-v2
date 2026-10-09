@@ -1,6 +1,6 @@
 import { isLegacyCurrency, type Account, type Currency, type Entry, type EntryKind, type LegacyCurrency, type ReviewDraft } from '@finanzapp/domain';
 import type { AssistantFact, CaptureDraft } from '../../../../packages/integrations/contracts.js';
-import type { AssistantResultV2, ClarificationField, NavigationIntent } from '../../../../packages/integrations/assistant-protocol.js';
+import type { AssistantResultV2, ClarificationField, DroppableField, NavigationIntent } from '../../../../packages/integrations/assistant-protocol.js';
 import { factCategory } from '../integrations/evidence.ts';
 import type { LanguageCode } from '../i18n/locale.ts';
 import { translator, type MessageKey, type Translate } from '../i18n/messages.ts';
@@ -477,3 +477,8 @@ export const REASON_TEXT: Record<AssistantReason, MessageKey | ''> = {
   failed: 'assistant.reasons.failed',
   info: '',
 };
+
+/** 25A-06 (decision A): the note for an optional name the server boundary left null because the model copied the
+ * person's words past the protocol's bound (never cut): which one, and that the review asks for it. An `info` system
+ * message after the reply; the person's own message stays in the thread as written. */
+export const DROPPED_TEXT: Record<DroppableField, MessageKey> = { merchant: 'assistant.dropped.merchant', category: 'assistant.dropped.category' };

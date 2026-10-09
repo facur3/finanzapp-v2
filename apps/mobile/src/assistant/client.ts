@@ -1,5 +1,5 @@
 import type { AssistantFact } from '../../../../packages/integrations/contracts.js';
-import type { AssistantResultV2 } from '../../../../packages/integrations/assistant-protocol.js';
+import type { AssistantResultV2, DroppableField } from '../../../../packages/integrations/assistant-protocol.js';
 import { integrationClient, type AssistantQuery } from '../integrations/client.ts';
 import type { AssistantReason } from './conversation.ts';
 
@@ -20,7 +20,9 @@ export type AssistantAsk = AssistantQuery;
 
 export type AssistantEvent =
   | { type: 'delta'; text: string }
-  | { type: 'result'; result: AssistantResultV2; facts: AssistantFact[] }
+  /** `dropped` (25A-06, decision A): the optional names of the proposal the server boundary left null because the model
+   * copied them past their bound, never cut; the screen says which in the thread and the review asks for them. Absent is none. */
+  | { type: 'result'; result: AssistantResultV2; facts: AssistantFact[]; dropped?: DroppableField[] }
   /** `message` is a catalogue key the screen translates, or '' for the reason's own note (see `failureMessage`). */
   | { type: 'error'; reason: AssistantReason; message: string };
 
@@ -66,9 +68,9 @@ export function remoteAssistant(origin: string, getAccessToken: () => Promise<st
   return { mode: 'remote', async *ask(input, signal) {
     if (signal?.aborted) return;
     try {
-      const { evidence, ...result } = await client.assistant(input);
+      const { evidence, dropped, ...result } = await client.assistant(input);
       if (signal?.aborted) return;
-      yield { type: 'result', result, facts: evidence };
+      yield { type: 'result', result, facts: evidence, dropped };
     } catch (cause) {
       if (signal?.aborted) return;
       yield { type: 'error', reason: failureReason(cause), message: failureMessage(cause) };

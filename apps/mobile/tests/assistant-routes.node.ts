@@ -775,6 +775,91 @@ test('25A-06 (decision D): no currency said with accounts in two currencies: the
   assert.deepEqual([card3.props.content.capture.draft.currency, card3.props.content.capture.draft.destinationId], ['ARS', 'visa']);
 });
 
+// 25A-06, owner decision A (2026-10-09): a merchant the model copied past the protocol's bound used to lose the whole
+// draft to a billed 502; the server now sends the draft with that name null and `dropped` naming it. The screen keeps
+// the person's words in the thread, captures the draft as it arrived (the name a gap the review asks for), says why
+// under the reply, and writes nothing.
+test('25A-06 (decision A): a draft whose merchant the server dropped is captured with the name missing, the thread says why under the reply, the person\'s message stays as written, nothing is cut or written', async () => {
+  const files = await reviewFiles([cash]);
+  try {
+    const review = await sqliteReview(() => files.store);
+    const scripted = scriptedClient();
+    const view = harness({ client: scripted.client, accounts: [cash], review });
+    const said = 'Gasté 3 mil pesos en Almacén de Ramos Generales y Despensa La Esquina del Barrio Sucursal Norte Número Dos Abierto Las Veinticuatro Horas Todos Los Días';
+    assert.ok(said.length > 120 + 'Gasté 3 mil pesos en '.length);
+    view.render().composer.props.onChange(said);
+    view.render().composer.props.onSend();
+    await tick();
+    const blank = { ...FIXTURE_DRAFT_NO_ACCOUNT, proposals: [{ ...FIXTURE_DRAFT_NO_ACCOUNT.proposals[0], amountMinor: 300000, merchant: null }] };
+    scripted.reply([{ type: 'result', result: blank, facts: [], dropped: ['merchant'] }]);
+    await settle();
+    const screen = view.render();
+    assert.deepEqual(screen.messages.map(message => message.role), ['user', 'assistant', 'system']);
+    assert.equal(screen.messages[0].text, said, 'the person\'s words stay in the thread exactly as written');
+    const note = find([screen.items[2]], 'SystemNote')[0];
+    assert.deepEqual([note.props.message.reason, note.props.message.text, note.props.message.retryText], ['info', 'assistant.dropped.merchant', null], 'one calm note, nothing to retry');
+    assert.match(es.errorText('assistant.dropped.merchant'), /más de 120 caracteres/);
+    const card = find([screen.items[1]], 'ProposalCard')[0];
+    assert.equal(card.props.content.status, 'captured');
+    const item = (await files.tray()).items[0];
+    assert.deepEqual([item.draft.merchant, item.draft.category, item.draft.amountMinor, item.draft.currency, item.draft.destinationId], [null, 'Supermercado', 300000, 'ARS', 'cash'],
+      'the exact amount, the currency and the implied account arrive; the name is missing, never cut');
+    assert.ok(domain.reviewGaps(item.draft, { accounts: [cash], records: [], debts: [], cards: [], categories: [] }, domain.todayKey()).includes('merchant'), 'the review asks for the merchant');
+    assert.deepEqual(await files.entries(), [], 'nothing written');
+    assert.equal(JSON.stringify(view.pushed), JSON.stringify([{ pathname: '/review-sheet/[id]', params: { id: item.id } }]), 'the review sheet is presented as for any proposal');
+  } finally { await files.dispose(); }
+  // Both names dropped behind a question (two currencies on the device): the notes follow the question, in the server's
+  // order, and the question still completes the parked draft; the category is then asked, as for any draft without one.
+  const both = scriptedClient();
+  const view = harness({ client: both.client });
+  view.render().empty.props.onPick('Gasté 3 mil pesos, categoría: Gastos varios del hogar y mantenimiento general de la casa y el jardín, en Almacén de Ramos Generales y Despensa La Esquina del Barrio Sucursal Norte Número Dos Abierto Las Veinticuatro Horas');
+  await tick();
+  both.reply([{ type: 'result', result: { ...FIXTURE_DRAFT_NO_ACCOUNT, proposals: [{ ...FIXTURE_DRAFT_NO_ACCOUNT.proposals[0], currency: null, merchant: null, category: null }] }, facts: [], dropped: ['merchant', 'category'] }]);
+  await settle();
+  let screen = view.render();
+  assert.deepEqual(screen.messages.map(message => message.role), ['user', 'assistant', 'system', 'system']);
+  assert.equal(find([screen.items[1]], 'AssistantText')[0].props.text, '¿En qué moneda fue?');
+  assert.deepEqual(screen.messages.slice(2).map(message => message.text), ['assistant.dropped.merchant', 'assistant.dropped.category']);
+  assert.match(es.errorText('assistant.dropped.category'), /más de 60 caracteres/);
+  const currencies = find([screen.items[1]], 'ClarificationChoices')[0];
+  currencies.props.onChoose(currencies.props.options[0], 'Pesos argentinos');
+  screen = view.render();
+  assert.equal(find([screen.items[5]], 'AssistantText')[0].props.text, '¿Con qué lo pagaste?', 'the chip on the question above the notes still completes the parked draft');
+  assert.equal(view.review.captures.length, 0);
+});
+
+test('25A-06 (decision A): the development fixture of a dropped merchant shows the preview card with the merchant missing and the note under the reply; with several peso destinations the account is asked first and the note follows the question', async () => {
+  const sentence = 'Gasté 3 mil pesos en Almacén de Ramos Generales y Despensa La Esquina del Barrio Sucursal Norte Número Dos Abierto Las Veinticuatro Horas Todos Los Días';
+  const one = harness({ client: fixtureAssistant(0), accounts: [cash] });
+  one.render().composer.props.onChange(sentence);
+  one.render().composer.props.onSend();
+  await settle();
+  let screen = one.render();
+  assert.deepEqual(screen.messages.map(message => message.role), ['user', 'assistant', 'system']);
+  assert.equal(screen.messages[0].text, sentence);
+  const card = find([screen.items[1]], 'ProposalCard')[0];
+  assert.deepEqual([card.props.content.status, card.props.content.capture.draft.merchant, card.props.content.capture.draft.category, card.props.content.capture.draft.amountMinor, card.props.content.capture.draft.currency],
+    ['preview', null, 'Supermercado', 300000, 'ARS'], 'the preview card, the merchant missing, nothing cut');
+  assert.deepEqual([screen.messages[2].role === 'system' && screen.messages[2].reason, screen.messages[2].text], ['info', 'assistant.dropped.merchant']);
+  assert.equal(one.review.captures.length, 0, 'a fixture proposal is never captured');
+  const several = harness({ client: fixtureAssistant(0) });
+  several.render().composer.props.onChange(sentence);
+  several.render().composer.props.onSend();
+  await settle();
+  screen = several.render();
+  assert.deepEqual(screen.messages.map(message => message.role), ['user', 'assistant', 'system']);
+  assert.equal(find([screen.items[1]], 'AssistantText')[0].props.text, '¿Con qué lo pagaste?', 'the account question first, the note under it');
+  assert.equal(screen.messages[2].text, 'assistant.dropped.merchant');
+  const chips = find([screen.items[1]], 'ClarificationChoices')[0];
+  assert.deepEqual(chips.props.options.map((option: any) => option.id), ['visa', 'cash'], 'the peso destinations: the currency the fixture states');
+  chips.props.onChoose(chips.props.options[1], 'Efectivo');
+  await settle();
+  screen = several.render();
+  assert.deepEqual(screen.messages.map(message => message.role), ['user', 'assistant', 'system', 'user', 'assistant']);
+  const after = find([screen.items[4]], 'ProposalCard')[0];
+  assert.deepEqual([after.props.content.status, after.props.content.capture.draft.merchant, after.props.content.capture.draft.destinationId], ['preview', null, 'cash']);
+});
+
 test('a draft without a payment method asks with the accounts of that currency; the choice becomes the user\'s words and completes the draft', async () => {
   const scripted = scriptedClient();
   const view = harness({ client: scripted.client });

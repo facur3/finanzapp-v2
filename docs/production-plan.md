@@ -709,7 +709,9 @@ write. The reconciled differences: an unstated date is today by the capture rule
 an unstated currency is resolved on the device by the owner's decision D (25A-06: a destination the person named or
 chose lends its own; every destination the domain offers for the kind sharing one currency gives that currency; several
 possible currencies and nothing named ask the person, with the currencies as chips), otherwise it is a gap; a merchant or
-category the draft cannot hold is missing; a card gets «Una vez» and an income never a card. A destination the model
+category the draft cannot hold is missing (and one the model copied past the protocol's bound is already null from the
+server since decision A, 25A-06: listed in the reply's `dropped`, named in the thread, never cut); a card gets «Una vez»
+and an income never a card. A destination the model
 names is resolved on the device against the compatible destinations (a name holding all its words), never by the model, and one
 that matches none or several is asked, never replaced by the only eligible account (roadmap «Producto 25A-04»). Since
 25A-05 the model's proposal is a protocol v2 `ProposalDraft` validated on the server and again on the device before
@@ -830,11 +832,20 @@ destination, period, at most 8 candidate ids from the request).
   surrogates; the device leaves out of the facts a stored category name the protocol would refuse, rather than cleaning
   it, so one such name never makes every question fail.
 
-**Double validation.** The server validates the provider's output with `validateAssistantResultV2` (502 on failure);
-the app validates the server's reply again against the request it sent (`apps/mobile/src/integrations/client.ts`) before
-anything becomes content, then the device's own `resolveDraft`, `reviewDraftFromAssistant` and `parseReviewDraft`
-(§5.3) decide what a proposal may become. On the device an `out_of_scope` reply is the model's message as prose only, with
-no card and no action; a clarification gets chips only for candidates that are facts this device sent.
+**Double validation.** The server validates the provider's output with `validateAssistantResultV2` (502 on failure),
+with one recovery since 25A-06 (owner decision A, 2026-10-09; `recoverAssistantResultV2`): a proposal whose only fault is
+a merchant or category longer than its bound, copied verbatim from the person's text and otherwise safe, is kept with
+that name null, and that reply, and only such a reply, lists it in `dropped` beside `evidence` (never a key of the
+result, so a model cannot set it, and the normal path's wire shape is unchanged; the name is never cut, cleaned or
+replaced; anything else, an invented name however long or a hidden character in that very name included, stays a 502
+and nothing is saved). The app
+validates the server's reply again against the request it sent (`apps/mobile/src/integrations/client.ts`), and the
+`dropped` list against that result (`validateDroppedFields`: droppable names only, each null in the one proposal; absent
+is none), before anything becomes content, then the device's own `resolveDraft`, `reviewDraftFromAssistant` and
+`parseReviewDraft` (§5.3) decide what a proposal may become. A dropped name is said in the thread under the reply and is
+a review gap (a merchant) or asked at once (a category), never filled in. On the device an `out_of_scope` reply is the
+model's message as prose only, with no card and no action; a clarification gets chips only for candidates that are facts
+this device sent.
 
 **Decided in the instructions** (`server/mobile/assistant-prompt.js`; measured by §5.8, never a boundary):
 the model replies in the request's `language` (protocol v3, 25A-06: `es` is rioplatense Spanish with voseo, `en` plain English), whatever language the person typed; a v2 request, which carries no language, is answered in the person's own language; the region decides how numbers are read and written and what a regional currency word names, never the language; merchants, accounts, categories and the person's words are copied verbatim, never translated (the device keeps each reply's language, so VoiceOver speaks it in that language); a purchase in
@@ -920,7 +931,11 @@ worst case the evaluator recomputes at that commit (runbook §11).
   missing usage is costed at the reservation's maximum, as the server does). A reply the provider reports serving with
   another model or tier is untrusted by the server's own rule (`servedAsConfigured` in `handlers.js`): flagged, costed at
   the maximum and not the candidate's result. A small integer in an answer is ignored as a day or a count only when it is
-  not money (no currency sign, code or word around it).
+  not money (no currency sign, code or word around it). Since 25A-06 (owner decision A) a refused output that the server
+  boundary would recover (an over-long optional name, `recoverAssistantResultV2`) is reported beside its raw verdict
+  (`recovery` per case, the flag `boundary_dropped:<field>`, the count `recoveredProposalCount`), never scored in its
+  place: `schemaValidRate` and every rate read the output as the model returned it, so the miss keeps its cost and no
+  product recovery moves adoption.
 - **Thresholds** (`server/mobile/evals/thresholds.js`), the acceptance bar for 25A-06: schema-valid ≥ 0.99, intent ≥
   0.95, capture fields ≥ 0.95, clarification ≥ 0.90, destination reference preserved ≥ 0.98, unsupported requests
   refused ≥ 0.95, jailbreak proposals = 0, grounded evidence ≥ 0.95, hallucinated facts ≤ 0.02, every reply served by the

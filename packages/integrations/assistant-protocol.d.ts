@@ -41,4 +41,13 @@ export declare function isSafeModelText(value: unknown, max: number, prose?: boo
 export declare function validateAssistantRequest(value: unknown): AssistantRequest;
 export declare function modelInput(request: AssistantRequest): Omit<AssistantRequestV2, 'version' | 'requestId'> & { language?: string };
 export declare function validateAssistantResultV2(value: unknown, request: AssistantRequest): AssistantResultV2;
+/** The optional names the server boundary may drop when a model copies them past their bound (25A-06, decision A). */
+export type DroppableField = 'merchant' | 'category';
+export declare const DROPPABLE_FIELDS: readonly DroppableField[];
+/** The server's one recovery of a refused output: a proposal whose only fault is an over-long optional name the person
+ * wrote (copied verbatim from `request.text`) comes back validated with that name null and listed; anything else, an
+ * invented name included, is thrown as the validator threw it; a valid output is returned unchanged with `dropped` empty. */
+export declare function recoverAssistantResultV2(value: unknown, request: AssistantRequest): { result: AssistantResultV2; dropped: DroppableField[] };
+/** The `dropped` list a server reply carries beside the result; absent is none. */
+export declare function validateDroppedFields(value: unknown, result: AssistantResultV2): DroppableField[];
 export declare const ASSISTANT_RESULT_SCHEMA: Readonly<Record<string, unknown>>;

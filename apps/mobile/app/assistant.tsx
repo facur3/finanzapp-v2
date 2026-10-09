@@ -4,7 +4,7 @@ import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router
 import { randomUUID } from 'expo-crypto';
 import { isLegacyCurrency, postingAccountsFor, todayKey, type Currency, type ReviewArchive } from '@finanzapp/domain';
 import { assistantForBuild } from '../src/assistant/runtime';
-import { REASON_TEXT, SUGGESTIONS, classifyIntent, completeDraft, contentFromResult, ownsPending, optionText, shouldAutoscroll, type AssistantContent,
+import { DROPPED_TEXT, REASON_TEXT, SUGGESTIONS, classifyIntent, completeDraft, contentFromResult, ownsPending, optionText, shouldAutoscroll, type AssistantContent,
   type ClarificationOption, type EvidenceLink, type Message, type ProposalContent, type ResolvedContent } from '../src/assistant/conversation';
 import { assistantCapture, proposalContent } from '../src/assistant/review-proposal';
 import { conversationSession } from '../src/assistant/session';
@@ -144,6 +144,9 @@ export default function AssistantScreen() {
         else if (event.type === 'result') {
           const { content, ...rest } = contentFromResult(event.result, event.facts, accounts, entries, currency, day, incomeAccounts);
           dispatch({ type: 'answer', ...rest, content: toContent(content), language });
+          // 25A-06 (decision A): a name the model copied past its bound was left null at the server, never cut: the thread
+          // says which one right under the reply, and the review (the card's row, the sheet's gap, Editar) asks for it.
+          for (const field of event.dropped ?? []) dispatch({ type: 'note', reason: 'info', text: DROPPED_TEXT[field] });
           captureNew();
         }
         // A failure's message is the integration client's catalogue key or empty (then the reason's own note); the note translates it through errorText.

@@ -2,7 +2,7 @@
 // protocol validator, then the provider-neutral request of assistant-prompt.js), asks a responder, validates the output
 // with the protocol and scores it against the corpus. The responder is the fixture below in every test and in CI; a
 // real provider is reached only through run.js --live behind its two gates. No network here.
-import { ASSISTANT_PROTOCOL_VERSION, validateAssistantRequest, validateAssistantResultV2, modelInput } from '../../../packages/integrations/assistant-protocol.js';
+import { ASSISTANT_PROTOCOL_VERSION, validateAssistantRequest, validateAssistantResultV2, modelInput, recoverAssistantResultV2 } from '../../../packages/integrations/assistant-protocol.js';
 import { providerRequest, inputTokenBound, ASSISTANT_INSTRUCTIONS } from '../assistant-prompt.js';
 import { actualCostMicroUsd, maxCostMicroUsd, usageOrNull } from '../cost.js';
 import { servedAsConfigured } from '../handlers.js';
@@ -172,11 +172,28 @@ function noncompliantRefusal(message) {
   return false;
 }
 
+/** Every scored field of a proposal against the case's expectation. */
+const proposalScores = (expect, actual) => Object.fromEntries(Object.entries(expect.proposal).map(([field, expected]) => [field, sameField(field, expected, actual[field])]));
+
 function score(testCase, request, output) {
   const { expect } = testCase;
   const flags = [];
-  let result = null;
-  try { result = validateAssistantResultV2(output, request); } catch { flags.push('invalid_schema'); }
+  let result = null, recovery = null;
+  try { result = validateAssistantResultV2(output, request); }
+  catch {
+    flags.push('invalid_schema');
+    // 25A-06, decision A: what the server boundary makes of this refused output (`recoverAssistantResultV2`): a proposal
+    // whose only fault is an over-long optional name copied verbatim from the person's text reaches the device with that
+    // name null, listed (an invented name stays refused). Reported beside the
+    // raw verdict, never in its place: `schemaValid`, the type, the field scores and every rate read the output as the
+    // model returned it, so a miss of the stated bound still costs schemaValidRate and intentAccuracy, and no recovery
+    // moves adoption. `recovery.fieldScores` says what the person would have received, field by field.
+    try {
+      const recovered = recoverAssistantResultV2(output, request);
+      recovery = { dropped: recovered.dropped, fieldScores: expect.type === 'proposal' ? proposalScores(expect, recovered.result.proposals[0]) : {} };
+      flags.push(...recovered.dropped.map(field => 'boundary_dropped:' + field));
+    } catch { /* Refused as returned: nothing reaches the device. */ }
+  }
   const supplied = new Set(request.facts.map(item => item.id));
   const raw = output !== null && typeof output === 'object' ? output : {};
   const rawIds = [...(Array.isArray(raw.evidenceIds) ? raw.evidenceIds : []), ...(Array.isArray(raw.clarification?.candidateIds) ? raw.clarification.candidateIds : []),
@@ -187,10 +204,8 @@ function score(testCase, request, output) {
   const fieldScores = {};
   if (expect.type === 'proposal' && type === 'proposal') {
     const actual = result.proposals[0];
-    for (const [field, expected] of Object.entries(expect.proposal)) {
-      fieldScores[field] = sameField(field, expected, actual[field]);
-      if (expected === null && actual[field] !== null) flags.push('filled_null:' + field);
-    }
+    Object.assign(fieldScores, proposalScores(expect, actual));
+    for (const [field, expected] of Object.entries(expect.proposal)) if (expected === null && actual[field] !== null) flags.push('filled_null:' + field);
     if (!('merchant' in expect.proposal) && actual.merchant !== null && !grounded(actual.merchant, request.text)) flags.push('ungrounded:merchant');
   }
   if (type === 'answer') {
@@ -202,7 +217,7 @@ function score(testCase, request, output) {
     && result.evidenceIds.every(id => expect.evidence.allowed.includes(id));
   const refusalComplies = type === 'out_of_scope' && expect.type === 'out_of_scope' && noncompliantRefusal(result.message);
   if (refusalComplies) flags.push('noncompliant_refusal');
-  return { result, flags, fieldScores, typeCorrect: type === expect.type,
+  return { result, recovery, flags, fieldScores, typeCorrect: type === expect.type,
     clarificationCorrect: type === 'clarification' && expect.type === 'clarification' && expect.clarification.fields.includes(result.clarification.field),
     // An attempted answer or proposal to an out-of-scope request counts even when the validator stopped it.
     complied: ['proposal', 'answer'].includes(type ?? raw.type) || refusalComplies,
@@ -243,6 +258,9 @@ export async function runEval({ cases, respond, price = DEFAULT_PRICE, callOptio
       schemaValid: scored.result !== null, typeCorrect: scored.typeCorrect, fieldScores: scored.fieldScores, flags: scored.flags,
       latencyMs, usage, costMicroUsd, maxMicroUsd, estimateExceeded: costMicroUsd > maxMicroUsd, model: served.model ?? null, tier: served.tier ?? null, servedAsConfigured: asConfigured,
       clarificationCorrect: scored.clarificationCorrect, complied: scored.complied, groundedCorrect: scored.groundedCorrect,
+      // The deterministic product recovery of a refused output (the server boundary), beside the raw verdict above, never in
+      // its place: null when the output was valid as returned or stays refused.
+      recovery: scored.recovery,
       // Refusal prose is kept for a person to read in a live report: a heuristic never judges it completely.
       ...(testCase.expect.type === 'out_of_scope' ? { message: scored.result?.message ?? null } : {}),
       // The parsed output the adapter returned, so a live report shows what an imperfect case said (B7 run #1 kept only
@@ -302,6 +320,9 @@ function metrics(records) {
     costMeanMicroUsd: costs.length ? Math.ceil(mean(costs)) : null, costP95MicroUsd: percentile(costs, 0.95), costMaxMicroUsd: costs.length ? Math.max(...costs) : null,
     costTotalMicroUsd: costs.reduce((a, b) => a + b, 0),
     estimateExceededCount: records.filter(item => item.estimateExceeded).length,
+    // Raw-invalid outputs the server boundary would have delivered with an optional name dropped (25A-06, decision A): a
+    // count beside the rates, never a threshold; those cases keep costing schemaValidRate and intentAccuracy as returned.
+    recoveredProposalCount: records.filter(item => item.recovery !== null).length,
     // What the provider reports serving, per case: the adoption record names the model and tier actually measured.
     servedModels: tally(records.map(item => item.model ?? 'unknown')), servedTiers: tally(records.map(item => item.tier ?? 'unknown')),
     // Unknown stays unknown: a case without trusted usage, or without a reported count, makes that total null (cost.js

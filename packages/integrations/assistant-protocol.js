@@ -168,6 +168,46 @@ export function validateAssistantResultV2(value, request) {
   }
 }
 
+/** The optional names of a proposal the server boundary may drop (`recoverAssistantResultV2`): the person's words for
+ * the merchant and the category, which a model copies verbatim past their bounds (B7 runs #1 and #2, 2026-10-08), and
+ * which a null leaves as a gap the review asks for. Never the amount, the currency, the date or the payment reference. */
+export const DROPPABLE_FIELDS = ['merchant', 'category'];
+const NAME_BOUNDS = { merchant: PROTOCOL_LIMITS.merchantChars, category: PROTOCOL_LIMITS.categoryChars };
+/** A name whose only fault is its length: over its bound, measured on the string as returned (as the strict check
+ * measures it), occurring verbatim in the person's text (a name the model invented, however long, is not their words and
+ * stays refused: the Codex review of PR #99), and otherwise what `modelText` accepts. The person's text is bounded, so
+ * the safety checks run on at most that many characters. */
+const overlongName = (value, max, text) => typeof value === 'string' && value.length > max && text.includes(value) && isSafeModelText(value, PROTOCOL_LIMITS.textChars);
+
+/** The server's one recovery of a refused output (25A-06, owner decision A, 2026-10-09): a proposal whose only fault is
+ * an over-long optional name (merchant, category) the person wrote, copied verbatim from their text, is returned
+ * validated with that name null and listed in `dropped`, so the kind, the exact amount, the currency, the date and the
+ * payment reference reach the person and the name is completed in the review. The name is never cut, cleaned or
+ * replaced, and nothing else is recovered: an invented name, a hidden character, an address, another bound overrun, a
+ * malformed shape or any other refusal is thrown exactly as `validateAssistantResultV2` threw it. A valid output is
+ * returned unchanged, with `dropped` empty. Run by the server only: the device validates the result and the list it
+ * receives (`validateDroppedFields`). */
+export function recoverAssistantResultV2(value, request) {
+  try { return { result: validateAssistantResultV2(value, request), dropped: [] }; }
+  catch (error) {
+    const draft = object(value) && value.type === 'proposal' && Array.isArray(value.proposals) && value.proposals.length === 1 && object(value.proposals[0]) ? value.proposals[0] : null;
+    const dropped = draft ? DROPPABLE_FIELDS.filter(field => overlongName(draft[field], NAME_BOUNDS[field], request.text)) : [];
+    if (!dropped.length) throw error;
+    const result = validateAssistantResultV2({ ...value, proposals: [{ ...draft, ...Object.fromEntries(dropped.map(field => [field, null])) }] }, request);
+    return { result, dropped };
+  }
+}
+
+/** The `dropped` list a server reply carries beside the validated result (never a key of the result: the result
+ * validator refuses it from a model): the droppable names the boundary dropped, each null in the one proposal, without
+ * repetition. Absent is none. */
+export function validateDroppedFields(value, result) {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || new Set(value).size !== value.length || value.some(field => !DROPPABLE_FIELDS.includes(field))
+    || (value.length > 0 && (result.type !== 'proposal' || value.some(field => result.proposals[0][field] !== null)))) refuse();
+  return [...value];
+}
+
 /** The output schema handed to a model's structured-output mode. Only the portable subset of JSON Schema: every key
  * required, nullable where unknown, no numeric or length bounds (vendors differ; the validators above enforce them). */
 const nullable = type => ({ type: [type, 'null'] });

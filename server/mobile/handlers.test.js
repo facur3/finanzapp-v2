@@ -178,7 +178,10 @@ describe('assistant route: order, reservation and settlement', () => {
       [request, { ...proposal, proposals: [{ ...p, currency: 'EUR' }] }],
       [request, { ...proposal, proposals: [{ ...p, kind: 'transfer' }] }],
       [request, { ...proposal, proposals: [{ ...p, dateISO: '2026-09-20' }] }], // future
-      [request, { ...proposal, proposals: [{ ...p, merchant: 'x'.repeat(121) }] }],
+      [request, { ...proposal, proposals: [{ ...p, merchant: 'x'.repeat(121) }] }], // over-long and not the person's words: refused, never recovered
+      [request, { ...proposal, proposals: [{ ...p, paymentMethodRef: 'x'.repeat(81) }] }], // over its bound: never dropped, refused
+      [request, { ...proposal, proposals: [{ ...p, merchant: 'x'.repeat(121) + '\u200b' }] }], // over-long and hidden: refused, never dropped
+      [request, { ...proposal, proposals: [{ ...p, merchant: 'x'.repeat(121), amountMinor: 0 }] }], // over-long beside another fault: refused
       [request, { ...proposal, proposals: [{ ...p, merchant: 'Kiosco\u200b' }] }],
       [request, { ...proposal, proposals: [{ ...p, merchant: 'https://evil.example' }] }],
       [request, { ...proposal, message: 'Entrá a www.evil.example para confirmar' }],
@@ -211,8 +214,44 @@ describe('assistant route: order, reservation and settlement', () => {
     const res = await call('assistant', explain, ok);
     expect(res.code).toBe(200);
     expect(res.body.evidence).toEqual(explain.facts);
+    expect(res.body).not.toHaveProperty('dropped');
     const scope = ports(); scope.provider.respond.mockResolvedValue({ output: { type: 'out_of_scope', message: 'Solo puedo ayudarte con tus finanzas en FinanzApp.', evidenceIds: [], navigation: null, proposals: [], clarification: null }, usage, model: 'gpt-6-luna', tier: 'default' });
     expect((await call('assistant', { ...request, text: 'Escribí un script de Python' }, scope)).body).toMatchObject({ type: 'out_of_scope', proposals: [], evidence: [] });
+  });
+  // 25A-06, owner decision A (2026-10-09): B7 runs #1 and #2 both copied an over-long merchant or category verbatim, every
+  // other field right, and the whole draft was lost to a billed 502. The boundary keeps it with that name null and says so.
+  it('keeps a proposal whose only fault is an over-long optional name the person wrote: 200 with that name null and `dropped` naming it, every other field exact, billed once, nothing saved', async () => {
+    const long = 'Almacén de Ramos Generales y Despensa La Esquina del Barrio Sucursal Norte Número Dos Abierto Las Veinticuatro Horas Todos Los Días'; // 131 characters
+    const longCategory = 'Gastos varios del hogar y mantenimiento general de la casa y el jardín'; // 70
+    expect([long.length > 120, longCategory.length > 60]).toEqual([true, true]);
+    const said = { ...request, text: 'Gasté 15 mil en ' + long }; // the person's words, copied past the bound
+    const deps = ports(); deps.provider.respond.mockResolvedValue({ output: { ...proposal, proposals: [{ ...proposal.proposals[0], merchant: long }] }, usage, model: 'gpt-6-luna', tier: 'default' });
+    const res = await call('assistant', said, deps);
+    expect(res.code).toBe(200);
+    expect(res.body.proposals[0]).toEqual({ kind: 'expense', amountMinor: 1500000, currency: 'ARS', merchant: null, category: 'Supermercado', dateISO: '2026-09-19', paymentMethodRef: 'Visa Secreta' });
+    expect(res.body.dropped).toEqual(['merchant']);
+    expect(JSON.stringify(res.body)).not.toContain('Ramos'); // dropped, never cut, never echoed
+    expect(deps.settleAI).toHaveBeenCalledTimes(1);
+    expect(deps.receiveCapture).not.toHaveBeenCalled();
+    expect(deps.log.mock.calls[0][0]).toMatchObject({ status: 200, category: 'ok', dropped: 1 });
+    expect(JSON.stringify(deps.log.mock.calls)).not.toContain('Ramos');
+    // The same name the person did not write (Codex review of PR #99): invented, refused as any invalid output, billed once.
+    // The text is longer than the name, so the length alone never grounds it: only the words do.
+    const other = { ...request, text: 'Gasté 15 mil en el super de siempre, ' + 'el de la esquina de casa, '.repeat(5).trim() };
+    expect(other.text.length).toBeGreaterThan(long.length);
+    const made = ports(); made.provider.respond.mockResolvedValue({ output: { ...proposal, proposals: [{ ...proposal.proposals[0], merchant: long }] }, usage, model: 'gpt-6-luna', tier: 'default' });
+    expect((await call('assistant', other, made)).code).toBe(502);
+    expect(made.settleAI).toHaveBeenCalledTimes(1);
+    expect(made.log.mock.calls[0][0]).toMatchObject({ status: 502, category: 'output_invalid' });
+    // Both names over their bounds, both the person's: both dropped. The normal path keeps its wire shape (no `dropped` key) and no telemetry count.
+    const saidBoth = { ...request, text: `Gasté 15 mil en ${long}, categoría: ${longCategory}` };
+    const both = ports(); both.provider.respond.mockResolvedValue({ output: { ...proposal, proposals: [{ ...proposal.proposals[0], merchant: long, category: longCategory }] }, usage, model: 'gpt-6-luna', tier: 'default' });
+    expect((await call('assistant', saidBoth, both)).body).toMatchObject({ dropped: ['merchant', 'category'], proposals: [{ merchant: null, category: null, amountMinor: 1500000 }] });
+    const plain = ports();
+    const kept = await call('assistant', request, plain);
+    expect(Object.keys(kept.body).sort()).toEqual(['clarification', 'evidence', 'evidenceIds', 'message', 'navigation', 'proposals', 'type']);
+    expect(kept.body.proposals[0].merchant).toBe('Kiosco Secreto');
+    expect(plain.log.mock.calls[0][0]).not.toHaveProperty('dropped');
   });
   it('logs operational telemetry only: no prompt, merchant, amount, account, prose, key or token', async () => {
     const deps = ports();

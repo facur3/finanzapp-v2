@@ -20,6 +20,10 @@ export const assistant: Pick<Messages, 'assistant'> = {
       limit: 'You’ve reached today’s question limit. You can still record transactions manually.',
       failed: 'The request couldn’t be completed. Your transactions didn’t change.',
     },
+    dropped: {
+      merchant: 'The merchant or description you wrote is longer than 120 characters, so it was left blank: enter a shorter one when you review.',
+      category: 'The category you wrote is longer than 60 characters, so it was left blank: choose one you already use.',
+    },
     composer: {
       placeholder: 'Ask or record something…',
       label: 'Message for the Assistant',
