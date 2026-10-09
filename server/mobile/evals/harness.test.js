@@ -185,9 +185,15 @@ describe('eval harness', () => {
   // a cent off or a rounding is not the fact; the 25A-05 scorer's 1 % tolerance (and its 0,005 floor) is gone.
   it('matches a restated amount in exact minor units: the cents dropped or a cent off is a computed figure', () => {
     const ar = CASES.find(item => item.id === 'analytics.compare-month.es');
-    const cents = [{ id: 'current.expenses', label: 'Gastos registrados', amountMinor: 199, count: 1, startISO: '2026-10-01', endISO: EVAL_TODAY }];
+    const cents = [{ id: 'current.expenses', label: 'Gastos registrados', amountMinor: 199, count: 45, startISO: '2026-10-01', endISO: EVAL_TODAY }];
     expect(underivedNumbers('Gastaste $ 1,99 en 1 movimiento.', cents, ar)).toEqual([]);
     expect(underivedNumbers('Gastaste $ 2, casi $ 1,98.', cents, ar)).toEqual(['2', '1,98']);
+    // A restated count above the day-sized integers is matched against the cited counts, exactly (no corpus count is
+    // above 31, so the golden run never reaches this path: the review of this PR asked for it to be pinned).
+    expect(underivedNumbers('Gastaste $ 1,99 en 45 movimientos.', cents, ar)).toEqual([]);
+    expect(underivedNumbers('Gastaste $ 1,99 en 46 movimientos.', cents, ar)).toEqual(['46']);
+    // Codex review of PR #96: a figure finer than the currency's two decimals is not the fact, never rounded to it.
+    expect(underivedNumbers('Gastaste $ 1,994, o $ 1,9900.', cents, ar)).toEqual(['1,994']);
     const us = CASES.find(item => item.id === 'analytics.month-total.en');
     const facts = us.request.facts.slice(0, 1);
     expect(facts[0].amountMinor).toBe(84250);
@@ -301,6 +307,10 @@ describe('eval harness', () => {
     expect(underivedNumbers('Del 1 al 15 llevás $ 184.500, en 14 compras.', facts, ar)).toEqual([]);
     const us = CASES.find(item => item.id === 'analytics.month-total.en');
     expect(underivedNumbers('You spent 20 dollars by day 15.', us.request.facts.slice(0, 1), us)).toEqual(['20']);
+    // Codex review of PR #96: a monetary token is supported only by a cited amount, never by a cited count or a year.
+    expect(facts.map(item => item.count)).toEqual([14, 12]);
+    expect(underivedNumbers('Gastaste $14 en 14 compras, y US$ 2026 en 2026.', facts, ar)).toEqual(['14', '2026']);
+    expect(underivedNumbers('Gastaste 12 mil en 12 compras.', facts, ar)).toEqual(['12 mil']);
   });
 
   it('applies the server\'s served-model rule: another model or tier is flagged, costed at the maximum and fails the bar', async () => {

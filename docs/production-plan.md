@@ -670,8 +670,9 @@ Rules that follow:
   usage, an instalment's state, a conversion, a net flow or a refund's state. To compare, the model names both verified
   amounts and says which is larger; the device draws the verified difference row from the cited pair. The model
   explains and compares in natural language; the figures are the ledger's. **How it holds today (25A-06, B7):** the
-  v2 instructions state it, and the evaluation's scorer flags every figure of an answer that no cited fact holds
-  exactly (a difference, a percentage, a rounding, a cents-dropped amount; §5.8, `groundedEvidenceAccuracy` and
+  v2 instructions state it, and the evaluation's scorer flags the digit figures it reads in an answer that no cited
+  fact holds exactly (a difference, a percentage, a rounding, a cents-dropped amount; a heuristic, §5.8: a figure in
+  words or a bare count of 31 or less escapes it, roadmap «Producto 25A-06» B7; `groundedEvidenceAccuracy` and
   `hallucinatedFactRate`), so a model that computes fails the adoption bar. **It is instructed and measured, not
   deterministically verified:** the shared validator checks the result's shape, the cited ids, the navigation intent
   and the safety of the text; it does not read figures out of prose (the prose-figure validator of PR #95 was not

@@ -5281,10 +5281,14 @@ nothing of it is on a screen yet.
     - *Evaluator* (`server/mobile/evals/harness.js`): the scorer's `underivedNumbers` keeps its existing reader (digit
       groups by shape or by the case's convention, the «mil»/«k»/«lucas»/«millones» suffixes, the ≤ 31 bare-integer
       rule) and changes what it accepts: a figure must equal a cited fact's amount in exact minor units, a cited count
-      or a year of the request's dates; the difference of a current/previous pair, any percentage and the 1 % tolerance
+      or a year of the request's dates; a monetary token (a currency mark beside it, or a multiplier) only a cited
+      amount, never a count or a year («$14» with a count of 14 is invented), and a figure finer than the currency's two
+      decimals («1,994») is no fact's amount, never rounded to one (both from the Codex review of this PR); the
+      difference of a current/previous pair, any percentage and the 1 % tolerance
       (which let «unos 184 mil» and «US$ 842» pass for 842,50) are gone. The golden fixture names both amounts and
       compares in words («Más que …», «Menos que …», «Lo mismo que …») instead of a «Diferencia» line; the device's
-      scripted fixture answer (`fixtures.ts`, a development view) names the two verified amounts of each pair.
+      scripted fixture answer (`fixtures.ts`, a development view) names both verified amounts of the total and of the
+      Restaurantes pair instead of a computed difference (the other two cited pairs appear only as evidence rows).
     - *Effect on scores, explicitly.* Corpus expectations: none changed. Fixture evaluation: every threshold passes
       (not a model result). A live answer that states a correct difference, which the 25A-05 scorer accepted, now costs
       `groundedEvidenceAccuracy` and `hallucinatedFactRate`; so does a rounded or cents-dropped amount: the bar is
@@ -5293,7 +5297,8 @@ nothing of it is on a screen yet.
       be flagged is unknown (their prose was not retained): a next live run measures it. Changed tests, each
       deliberate: the scorer test that accepted «32.200 más», «unos 184 mil» and «un 21% más» now expects them flagged;
       the run #2 pin test expects «21.800» flagged too and the comparison in words accepted; a new test pins the exact
-      minor units (1,99 against 2 and 1,98; 842,50 against 842 and 843); the instruction wording is pinned.
+      minor units (1,99 against 2, 1,98 and 1,994; 842,50 against 842 and 843) and the money-only binding («$14»,
+      «US$ 2026», «12 mil» against a count of 14 or 12 and the year); the instruction wording is pinned.
     - *Limitation, stated honestly.* **The prose is instructed and measured, not deterministically verified.** The
       shared validator still checks the result's shape, the cited ids, the navigation intent and the safety of the text
       (no link, code or hidden character); it does not read figures out of prose. A model that computes a figure anyway

@@ -131,9 +131,15 @@ export function underivedNumbers(message, cited, testCase) {
     let value = Number(token.split(mark === '.' ? ',' : '.').join('').replace(mark, '.'));
     const suffix = (match[2] ?? '').trim().toLowerCase();
     if (suffix === '%') { found.push(match[0]); continue; }
+    // A monetary token (a currency mark beside it, or a multiplier) is supported only by a cited amount, never by a
+    // count or a year («$14» with a count of 14 is invented); a bare integer may be either (Codex review of PR #96).
+    const money = Boolean(suffix) || isMoney(match);
     if (suffix === 'millones') value *= 1e6; else if (suffix) value *= 1000;
-    if (!Number.isFinite(value) || (Number.isInteger(value) && value <= 31 && !suffix && !isMoney(match))) continue;
-    if (!amounts.has(Math.round(value * 100)) && !plain.has(value)) found.push(match[0]);
+    if (!Number.isFinite(value) || (Number.isInteger(value) && value <= 31 && !money)) continue;
+    // Exact minor units: a figure finer than the currency's two decimals («1,994») is no fact's amount, never rounded to one.
+    const minor = Math.round(value * 100);
+    const amount = Math.abs(value * 100 - minor) < 1e-6 && amounts.has(minor);
+    if (!amount && (money || !plain.has(value))) found.push(match[0]);
   }
   return found;
 }
