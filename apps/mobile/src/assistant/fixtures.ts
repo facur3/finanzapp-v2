@@ -49,6 +49,19 @@ export const FIXTURE_CLARIFICATION: AssistantResultV2 = { ...none, type: 'clarif
 export const FIXTURE_OUT_OF_SCOPE: AssistantResultV2 = { ...none, type: 'out_of_scope',
   message: 'Eso no lo puedo hacer. Puedo ayudarte a registrar un gasto o un ingreso, o a entender en qué gastaste.' };
 
+/** The same scripted replies in English, for an ask whose `language` is 'en': protocol v3 sends the interface language
+ * and the reply follows it (docs/i18n.md §11). Only the prose changes; evidence, drafts and clarification fields are the
+ * same. Category and account names stay the person's own words, never translated; the amounts keep the writing of
+ * the fixture ledger (Argentine), as a model told region AR would write them. */
+const ENGLISH = new Map<AssistantResultV2, string>([
+  [FIXTURE_ANSWER, 'You spent more this month: $412.300 against $328.000 at this point last month, over the same 21 days. In Restaurantes, $98.500 against $56.000.'],
+  [FIXTURE_CATEGORY_ANSWER, 'In Supermercado you have spent $121.200 this month, across 11 purchases.'],
+  [FIXTURE_DRAFT, 'I prepared this expense. Review it before saving it.'],
+  [FIXTURE_DRAFT_NO_ACCOUNT, 'I prepared this expense.'],
+  [FIXTURE_CLARIFICATION, 'Do you mean what you spent this month, or the total for the year?'],
+  [FIXTURE_OUT_OF_SCOPE, 'I can’t do that. I can help you record an expense or an income, or understand what you spent on.'],
+]);
+
 type Script = { match: RegExp; reply: { result: AssistantResultV2; facts: AssistantFact[] } | { error: AssistantEvent & { type: 'error' } } };
 
 const SCRIPTS: Script[] = [
@@ -64,8 +77,12 @@ const SCRIPTS: Script[] = [
   { match: /^(l[ií]mite|limit)$/i, reply: { error: { type: 'error', reason: 'limit', message: '' } } },
 ];
 
+/** The scripted reply for an ask, in the language the ask names ('en' gets the English twin; anything else the Spanish
+ * original): the fixture behaves like a server that follows protocol v3's `language`. */
 export function fixtureReply(ask: AssistantAsk): Script['reply'] {
-  return SCRIPTS.find(script => script.match.test(ask.text))?.reply ?? { result: FIXTURE_CLARIFICATION, facts: [] };
+  const reply = SCRIPTS.find(script => script.match.test(ask.text))?.reply ?? { result: FIXTURE_CLARIFICATION, facts: [] };
+  if ('error' in reply || ask.language !== 'en') return reply;
+  return { result: { ...reply.result, message: ENGLISH.get(reply.result) ?? reply.result.message }, facts: reply.facts };
 }
 
 /** Replays the scripted reply word by word so the streaming states can be seen; `delayMs` 0 keeps tests instant. */

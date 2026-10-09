@@ -2,7 +2,7 @@
 // protocol validator, then the provider-neutral request of assistant-prompt.js), asks a responder, validates the output
 // with the protocol and scores it against the corpus. The responder is the fixture below in every test and in CI; a
 // real provider is reached only through run.js --live behind its two gates. No network here.
-import { validateAssistantRequestV2, validateAssistantResultV2, modelInput } from '../../../packages/integrations/assistant-protocol.js';
+import { ASSISTANT_PROTOCOL_VERSION, validateAssistantRequest, validateAssistantResultV2, modelInput } from '../../../packages/integrations/assistant-protocol.js';
 import { providerRequest, inputTokenBound, ASSISTANT_INSTRUCTIONS } from '../assistant-prompt.js';
 import { actualCostMicroUsd, maxCostMicroUsd, usageOrNull } from '../cost.js';
 import { servedAsConfigured } from '../handlers.js';
@@ -17,10 +17,11 @@ export const FIXTURE_SERVED = Object.freeze({ model: 'fixture', serviceTier: 'de
 /** Deterministic and injective for corpus ids (kebab with dots, no '_'), and inside the protocol's requestId bound. */
 export const requestIdFor = id => ('eval-' + id.replace(/\./g, '_').replace(/[^A-Za-z0-9_-]/g, '-')).padEnd(16, '-').slice(0, 100);
 
-/** The validated request, as the handler holds it after validateAssistantRequestV2. */
+/** The validated request, as the handler holds it after validateAssistantRequest: protocol v3, the case's `lang` as the
+ * interface language the reply is written in (what the device sends from `useI18n()`). */
 export function buildRequest(testCase) {
   const { action, text, currency, region, facts } = testCase.request;
-  return validateAssistantRequestV2({ version: 2, requestId: requestIdFor(testCase.id), action, text, todayISO: EVAL_TODAY, currency, region, facts });
+  return validateAssistantRequest({ version: ASSISTANT_PROTOCOL_VERSION, requestId: requestIdFor(testCase.id), action, text, todayISO: EVAL_TODAY, currency, region, language: testCase.lang, facts });
 }
 
 // ── The fixture provider ─────────────────────────────────────────────────────────────────────────────────────────
@@ -144,6 +145,20 @@ export function underivedNumbers(message, cited, testCase) {
   return found;
 }
 
+// Diagnostic only, no rate (25A-06, protocol v3): the reply's language against the one the request asked for, by the
+// function words of the two released languages. Conservative: flagged only when the prose holds three or more words of
+// the other language and none of the asked one, so a verbatim Spanish category name inside an English reply never
+// counts; a short reply may escape it. A live report lists the flag in `imperfect`; a threshold is a later decision.
+const FUNCTION_WORDS = {
+  es: /\b(?:el|la|los|las|que|en|por|para|con|más|menos|este|esta|mes|gastaste|llevás|registraste|podés|puedo|sos|vos|tu|tus)\b/giu,
+  en: /\b(?:the|you|your|and|this|month|than|spent|spend|which|what|only|can|did|have|with|is|are)\b/giu,
+};
+export function replyLanguageMismatch(message, language) {
+  if (!(language in FUNCTION_WORDS)) return false;
+  const count = code => (message.match(FUNCTION_WORDS[code]) ?? []).length;
+  return count(language) === 0 && count(language === 'es' ? 'en' : 'es') >= 3;
+}
+
 const words = value => fold(value).split(/[^\p{L}\p{N}]+/u).filter(word => word.length >= 3);
 /** A proposed merchant must be the person's own words: every word of it appears in their text. An invented one
  * («Carrefour Express» for «el super») is a hallucination even where the case does not name the expected merchant. */
@@ -167,6 +182,7 @@ function score(testCase, request, output) {
     ...(raw.navigation?.factId !== undefined ? [raw.navigation.factId] : [])];
   if (rawIds.some(id => !supplied.has(id))) flags.push('unsupplied_id');
   const type = result?.type ?? null;
+  if (result && request.language && replyLanguageMismatch(result.message, request.language)) flags.push('reply_language:' + request.language);
   const fieldScores = {};
   if (expect.type === 'proposal' && type === 'proposal') {
     const actual = result.proposals[0];

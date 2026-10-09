@@ -1,5 +1,5 @@
 import { InputError, validateCapture } from '../../packages/integrations/contracts.js';
-import { PROTOCOL_LIMITS, validateAssistantRequestV2, validateAssistantResultV2 } from '../../packages/integrations/assistant-protocol.js';
+import { PROTOCOL_LIMITS, validateAssistantRequest, validateAssistantResultV2 } from '../../packages/integrations/assistant-protocol.js';
 import { providerRequest, inputTokenBound } from './assistant-prompt.js';
 import { actualCostMicroUsd, maxCostMicroUsd, usageOrNull } from './cost.js';
 
@@ -59,7 +59,7 @@ function trustedUsage(ai, served) {
  * no retry → settle (actual cost only from trustworthy usage; otherwise the reservation stays at its maximum) →
  * validate the output again with the protocol → reply with the result and the cited evidence. */
 async function assistant(session, body, deps, telemetry) {
-  const request = validateAssistantRequestV2(body);
+  const request = validateAssistantRequest(body);
   telemetry.requestId = request.requestId;
   const { ai } = deps;
   const call = providerRequest(request, ai);

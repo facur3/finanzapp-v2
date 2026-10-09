@@ -18,7 +18,7 @@
 //   packages/integrations/assistant-protocol.test.js;
 // - duplicated proposals (one requestId reserved once; one review item per proposal) and a stale review basis (a
 //   destination or category edited after the proposal): packages/domain/review-drafts.test.ts;
-// - hidden bidirectional characters in the person's text: refused by validateAssistantRequestV2 before any provider
+// - hidden bidirectional characters in the person's text: refused by validateAssistantRequest before any provider
 //   call, so they are a request-validation test (harness.test.js), never a corpus text.
 export const EVAL_TODAY = '2026-10-05';
 

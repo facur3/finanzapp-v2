@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { postingAccountsFor, validateAccount, validateLiabilityProfiles, type Account, type CreditCardProfile, type Currency } from '@finanzapp/domain';
-import { validateAssistantResultV2, type AssistantRequestV2, type AssistantResultV2 } from '../../../packages/integrations/assistant-protocol.js';
+import { validateAssistantResultV2, type AssistantRequest, type AssistantResultV2 } from '../../../packages/integrations/assistant-protocol.js';
 import { CASES } from '../../../server/mobile/evals/corpus.js';
 import { buildRequest, goldenOutput } from '../../../server/mobile/evals/harness.js';
 import { contentFromResult } from '../src/assistant/conversation.ts';
@@ -28,7 +28,7 @@ function ledger(device: NonNullable<EvalCase['device']>) {
 }
 
 function onDevice(testCase: EvalCase, output: unknown = goldenOutput(testCase)) {
-  const request = buildRequest(testCase) as AssistantRequestV2;
+  const request = buildRequest(testCase) as AssistantRequest;
   const result = validateAssistantResultV2(output, request) as AssistantResultV2;
   const { accounts, incomeAccounts } = testCase.device ? ledger(testCase.device) : { accounts: [], incomeAccounts: [] };
   const resolved = contentFromResult(result, request.facts, accounts, [], request.currency, request.todayISO, incomeAccounts);

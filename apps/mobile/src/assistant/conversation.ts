@@ -2,6 +2,7 @@ import { isLegacyCurrency, type Account, type Currency, type Entry, type EntryKi
 import type { AssistantFact, CaptureDraft } from '../../../../packages/integrations/contracts.js';
 import type { AssistantResultV2, ClarificationField, NavigationIntent } from '../../../../packages/integrations/assistant-protocol.js';
 import { factCategory } from '../integrations/evidence.ts';
+import type { LanguageCode } from '../i18n/locale.ts';
 import { translator, type MessageKey, type Translate } from '../i18n/messages.ts';
 
 /** The Assistant conversation as pure data: one current conversation, messages
@@ -86,8 +87,9 @@ export type AssistantContent = AnswerContent | ProposalContent | ClarificationCo
 export type Message =
   | { id: string; role: 'user'; text: string }
   /** `text` is the model's prose, untouched. `textKey` is set instead when the
-   * app itself speaks (a clarification it asks); the screen translates it. */
-  | { id: string; role: 'assistant'; status: 'streaming' | 'done' | 'stopped'; text: string; textKey?: MessageKey; content: AssistantContent | null }
+   * app itself speaks (a clarification it asks); the screen translates it. `language` is the interface language the
+   * reply was asked in (protocol v3), kept with the message so VoiceOver reads it in that language after a change. */
+  | { id: string; role: 'assistant'; status: 'streaming' | 'done' | 'stopped'; text: string; textKey?: MessageKey; content: AssistantContent | null; language?: LanguageCode }
   /** `text` is a catalogue key (the app's own notes) or a caught message; the note shows it through `errorText`. */
   | { id: string; role: 'system'; reason: AssistantReason; text: string; retryText: string | null };
 
@@ -107,8 +109,8 @@ export const emptyConversation: ConversationState = { messages: [], composer: ''
 export type ConversationAction =
   | { type: 'compose'; text: string }
   | { type: 'send'; text: string }
-  | { type: 'delta'; text: string }
-  | { type: 'answer'; text: string; textKey?: MessageKey; content: AssistantContent | null; pending?: ConversationState['pending'] }
+  | { type: 'delta'; text: string; language?: LanguageCode }
+  | { type: 'answer'; text: string; textKey?: MessageKey; content: AssistantContent | null; pending?: ConversationState['pending']; language?: LanguageCode }
   | { type: 'fail'; reason: AssistantReason; text: string; sent: string }
   | { type: 'stop' }
   | { type: 'choose'; messageId: string; optionId: string; label: string; next: { textKey: MessageKey; content: AssistantContent; pending: ConversationState['pending'] } | null }
@@ -143,12 +145,13 @@ export function conversationReducer(state: ConversationState, action: Conversati
         return { ...state, phase: 'streaming', messages: [...state.messages.slice(0, -1), { ...last, text: last.text + action.text }] };
       }
       return { ...state, phase: 'streaming', nextId: state.nextId + 1,
-        messages: [...state.messages, { id: id(state, 'a'), role: 'assistant', status: 'streaming', text: action.text, content: null }] };
+        messages: [...state.messages, { id: id(state, 'a'), role: 'assistant', status: 'streaming', text: action.text, content: null, ...(action.language ? { language: action.language } : {}) }] };
     }
     case 'answer': {
       if (state.phase === 'idle') return state;
       const last = state.messages.at(-1);
-      const done = { role: 'assistant' as const, status: 'done' as const, text: action.text, content: action.content, ...(action.textKey ? { textKey: action.textKey } : {}) };
+      const done = { role: 'assistant' as const, status: 'done' as const, text: action.text, content: action.content, ...(action.textKey ? { textKey: action.textKey } : {}),
+        ...(action.language ? { language: action.language } : {}) };
       const messages = last?.role === 'assistant' && last.status === 'streaming'
         ? [...state.messages.slice(0, -1), { ...last, ...done, text: action.textKey ? '' : action.text || last.text }]
         : [...state.messages, { id: id(state, 'a'), ...done }];

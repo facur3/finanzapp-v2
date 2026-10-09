@@ -861,10 +861,11 @@ Every real run is an owner-approved spend. Its worst case is computed by the scr
 every case at its reservation maximum, every input token at the highest rate, cache writes included, each request
 rounded up), and it changes with the instructions and the configuration, so it is recomputed at the commit a run uses,
 never estimated per byte.
-- **169 803 µUSD (about USD 0.17)** for the 103 committed cases on `gpt-6-luna` at the 2026-10-05 table, after the B7
-  instruction rules of PR #94 and the no-model-arithmetic rule of decision B (145 272 at Phase A; 151 469 at PR #92;
-  166 834 at PR #94).
-- For comparison, 370 455 µUSD on `gpt-5.6-luna` (321 388 at Phase A; 333 787 at PR #92; 364 519 at PR #94).
+- **176 364 µUSD (about USD 0.18)** for the 103 committed cases on `gpt-6-luna` at the 2026-10-05 table, after the B7
+  instruction rules of PR #94, the no-model-arithmetic rule of decision B (PR #96) and the protocol v3 reply language
+  (145 272 at Phase A; 151 469 at PR #92; 166 834 at PR #94; 169 803 at PR #96).
+- For comparison, 383 574 µUSD on `gpt-5.6-luna` (321 388 at Phase A; 333 787 at PR #92; 364 519 at PR #94; 370 455
+  at PR #96).
 - The real cost is a fraction of that (runs #1 and #2: 7 818 and 7 836 µUSD).
 
 The eval calls the provider **directly**: they bypass the database reservations. They are bounded by the

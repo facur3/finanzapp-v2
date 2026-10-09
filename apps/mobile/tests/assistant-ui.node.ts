@@ -412,8 +412,8 @@ test('VoiceOver: with an interface language that differs from the device\'s, eve
       { id: 'previous.category.1', label: 'Categoría de gasto: Supermercado', amountMinor: 12200000, count: 10, startISO: '2026-08-01', endISO: '2026-08-21' }], 'ARS');
   const rendered = (ui: ReturnType<typeof load>) => [
     ui.render('UserMessage', { text: 'Spent 500' }),
-    ui.render('AssistantText', { text: 'Gastaste más.', status: 'done' }),
-    ui.render('AssistantText', { text: '', status: 'streaming' }),
+    ui.render('AssistantText', { text: 'Gastaste más.', status: 'done', language: 'es' }),
+    ui.render('AssistantText', { text: '', status: 'streaming', language: 'en' }),
     ui.render('SystemNote', { message: { id: 's', role: 'system', reason: 'offline', text: 'assistant.reasons.offline', retryText: null } }),
     ui.render('AnswerEvidence', { content, currency: 'ARS', onOpen: () => {} }),
     ui.render('ProposalCard', { content: proposal(), state: { kind: 'pending', item: itemOf(reviewDraft()), conflict: false, writable: true }, ...handlers }),
@@ -423,11 +423,16 @@ test('VoiceOver: with an interface language that differs from the device\'s, eve
   assert.equal(elements.length, 10, 'user, answer, thinking, note, one evidence row, four proposal rows, the collapsed card');
   const answerLabel = (node: { props: { accessibilityLabel?: string } }) => /^Assistant: /.test(String(node.props.accessibilityLabel));
   assert.deepEqual([...new Set(elements.filter(node => !answerLabel(node)).map(node => node.props.accessibilityLanguage))], ['en']);
-  // The model's prose is content: the v1 server writes Spanish, so it keeps a Spanish voice whatever the interface says.
+  // The model's prose is content in the language it was asked in (protocol v3, kept on the message): a Spanish reply still
+  // on screen after English was chosen keeps a Spanish voice whatever the interface says.
   assert.equal(elements.find(answerLabel)!.props.accessibilityLanguage, 'es');
-  const englishDevice = nodes(load('assistant-messages.tsx', { locale: 'en-US', deviceLanguage: 'en' }).render('AssistantText', { text: 'Gastaste más.', status: 'done' }))
-    .find(node => node.type === 'View' && node.props.accessible)!;
-  assert.equal(englishDevice.props.accessibilityLanguage, 'es', 'an English iPhone reading an English interface still hears the Spanish answer in Spanish');
+  const spoken = (locale: AppLocale, deviceLanguage: string, language?: 'es' | 'en') => nodes(load('assistant-messages.tsx', { locale, deviceLanguage })
+    .render('AssistantText', { text: 'Gastaste más.', status: 'done', language })).find(node => node.type === 'View' && node.props.accessible)!.props.accessibilityLanguage;
+  assert.equal(spoken('en-US', 'en', 'es'), 'es', 'an English iPhone reading an English interface still hears a Spanish answer in Spanish');
+  assert.equal(spoken('en-US', 'en', 'en'), undefined, 'a reply asked in the interface language follows the usual rule: nothing set when the device agrees');
+  assert.equal(spoken('en-US', 'es', 'en'), 'en', 'an English reply on a Spanish iPhone with English chosen speaks English');
+  assert.equal(spoken('es-AR', 'en', 'en'), 'en', 'an English reply kept on screen after switching back to Spanish keeps its English voice');
+  assert.equal(spoken('en-US', 'es', undefined), 'en', 'a message without a recorded language is read as the interface language');
   // The app's own turns (a clarification question, "review the draft") are interface copy, not model prose: the usual rule.
   const own = (locale: AppLocale, deviceLanguage: string) => nodes(load('assistant-messages.tsx', { locale, deviceLanguage })
     .render('AssistantText', { text: 'What did you pay with?', status: 'done', ownWords: true })).find(node => node.type === 'View' && node.props.accessible)!.props.accessibilityLanguage;

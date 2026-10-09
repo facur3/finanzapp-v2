@@ -9,7 +9,7 @@ import { integrationClient } from '../src/integrations/client.ts';
 import { translator } from '../src/i18n/messages.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 import { assistantForEnvironment, disconnectedAssistant, failureMessage, failureReason, remoteAssistant, type AssistantEvent } from '../src/assistant/client.ts';
-import { validateAssistantRequestV2, validateAssistantResultV2, type AssistantRequestV2 } from '../../../packages/integrations/assistant-protocol.js';
+import { validateAssistantRequest, validateAssistantResultV2, type AssistantRequestV3 } from '../../../packages/integrations/assistant-protocol.js';
 import type { CaptureDraft } from '../../../packages/integrations/contracts.js';
 import { assistantForBuild } from '../src/assistant/runtime.ts';
 import { FIXTURE_ANSWER, FIXTURE_CATEGORY_ANSWER, FIXTURE_CLARIFICATION, FIXTURE_DRAFT, FIXTURE_DRAFT_NO_ACCOUNT, FIXTURE_FACTS, FIXTURE_OUT_OF_SCOPE, fixtureAssistant,
@@ -231,13 +231,13 @@ test('categoryOptions counts by identity and caps the chips', () => {
 });
 
 test('the disconnected client sends nothing and reports unavailable; a fixture-free environment stays disconnected', async () => {
-  const events = await collect(disconnectedAssistant().ask({ action: 'parse', text: 'x', todayISO: today, currency: 'ARS', region: 'AR', facts: [] }));
+  const events = await collect(disconnectedAssistant().ask({ action: 'parse', text: 'x', todayISO: today, currency: 'ARS', region: 'AR', language: 'es', facts: [] }));
   assert.deepEqual(events, [{ type: 'error', reason: 'unavailable', message: '' }]);
   assert.equal(assistantForEnvironment({}).mode, 'disconnected');
   let fetched = 0;
   const withOrigin = assistantForEnvironment({ EXPO_PUBLIC_MOBILE_API_ORIGIN: 'https://finanzapp.example' }, undefined, (async () => { fetched += 1; throw new Error('never'); }) as unknown as typeof fetch);
   assert.equal(withOrigin.mode, 'disconnected', 'an origin without a session is still disconnected');
-  const sessionless = await collect(withOrigin.ask({ action: 'parse', text: 'x', todayISO: today, currency: 'ARS', region: 'AR', facts: [] }));
+  const sessionless = await collect(withOrigin.ask({ action: 'parse', text: 'x', todayISO: today, currency: 'ARS', region: 'AR', language: 'es', facts: [] }));
   assert.equal(sessionless[0].type === 'error' && sessionless[0].reason, 'session');
   assert.equal(fetched, 0);
   assert.equal(assistantForEnvironment({ EXPO_PUBLIC_MOBILE_API_ORIGIN: 'http://insecure' }, async () => 't').mode, 'disconnected', 'a non-HTTPS origin is refused by the integration client');
@@ -257,11 +257,11 @@ test('the remote client wraps the existing endpoint contract and maps failures t
   const client = remoteAssistant('https://finanzapp.example', async () => 'jwt', fetcher);
   assert.equal(client.mode, 'remote');
   const facts = FIXTURE_FACTS.slice(0, 1);
-  const events = await collect(client.ask({ action: 'explain', text: '¿Por qué gasté más?', todayISO: today, currency: 'ARS', region: 'AR', facts }));
+  const events = await collect(client.ask({ action: 'explain', text: '¿Por qué gasté más?', todayISO: today, currency: 'ARS', region: 'AR', language: 'es', facts }));
   assert.equal(calls.length, 1);
   assert.equal(calls[0].url, 'https://finanzapp.example/api/mobile/assistant');
   assert.equal(calls[0].auth, 'Bearer jwt');
-  assert.equal(calls[0].body.version, 2);
+  assert.equal(calls[0].body.version, 3, 'protocol v3');
   assert.match(calls[0].body.requestId, /^[A-Za-z0-9_-]{16,100}$/);
   assert.equal(calls[0].body.region, 'AR');
   assert.equal(events.length, 1);
@@ -269,7 +269,7 @@ test('the remote client wraps the existing endpoint contract and maps failures t
   assert.deepEqual(events[0].type === 'result' && events[0].facts, facts, 'the evidence attached is the local fact the answer cites, never the server\'s copy');
   assert.equal(events[0].type === 'result' && 'evidence' in events[0].result, false);
   const refused = await collect(remoteAssistant('https://finanzapp.example', async () => 'jwt', (async () => ({ ok: false, status: 503 })) as unknown as typeof fetch)
-    .ask({ action: 'parse', text: 'x', todayISO: today, currency: 'ARS', region: 'AR', facts: [] }));
+    .ask({ action: 'parse', text: 'x', todayISO: today, currency: 'ARS', region: 'AR', language: 'es', facts: [] }));
   assert.equal(refused[0].type === 'error' && refused[0].reason, 'unavailable');
   assert.equal(failureReason(Object.assign(new Error('x'), { name: 'AbortError' })), 'offline');
   assert.equal(failureReason(new TypeError('Network request failed')), 'offline');
@@ -284,20 +284,20 @@ test('the remote client wraps the existing endpoint contract and maps failures t
   // An aborted ask yields nothing after the abort: the screen stopped listening.
   const controller = new AbortController();
   controller.abort();
-  assert.deepEqual(await collect(client.ask({ action: 'parse', text: 'x', todayISO: today, currency: 'ARS', region: 'AR', facts: [] }, controller.signal)), []);
+  assert.deepEqual(await collect(client.ask({ action: 'parse', text: 'x', todayISO: today, currency: 'ARS', region: 'AR', language: 'es', facts: [] }, controller.signal)), []);
 });
 
 test('fixtures are scripted, stream word by word and stay out of the production client module', async () => {
   const client = fixtureAssistant(0);
   assert.equal(client.mode, 'fixture');
-  const events = await collect(client.ask({ action: 'explain', text: '¿Por qué gasté más este mes?', todayISO: today, currency: 'ARS', region: 'AR', facts: [] }));
+  const events = await collect(client.ask({ action: 'explain', text: '¿Por qué gasté más este mes?', todayISO: today, currency: 'ARS', region: 'AR', language: 'es', facts: [] }));
   assert.equal(events.at(-1)?.type, 'result');
   assert.equal(events.filter(event => event.type === 'delta').map(event => event.type === 'delta' ? event.text : '').join(''), FIXTURE_ANSWER.message);
-  assert.equal('result' in fixtureReply({ action: 'parse', text: 'Gasté 18.500 en Carrefour con la Visa', todayISO: today, currency: 'ARS', region: 'AR', facts: [] }), true);
-  const failed = await collect(client.ask({ action: 'parse', text: 'error', todayISO: today, currency: 'ARS', region: 'AR', facts: [] }));
+  assert.equal('result' in fixtureReply({ action: 'parse', text: 'Gasté 18.500 en Carrefour con la Visa', todayISO: today, currency: 'ARS', region: 'AR', language: 'es', facts: [] }), true);
+  const failed = await collect(client.ask({ action: 'parse', text: 'error', todayISO: today, currency: 'ARS', region: 'AR', language: 'es', facts: [] }));
   assert.deepEqual(failed.map(event => event.type), ['error']);
   const controller = new AbortController();
-  const aborted = client.ask({ action: 'explain', text: '¿Por qué gasté más este mes?', todayISO: today, currency: 'ARS', region: 'AR', facts: [] }, controller.signal);
+  const aborted = client.ask({ action: 'explain', text: '¿Por qué gasté más este mes?', todayISO: today, currency: 'ARS', region: 'AR', language: 'es', facts: [] }, controller.signal);
   const first = await aborted[Symbol.asyncIterator]().next();
   controller.abort();
   assert.equal(first.done, false);
@@ -343,14 +343,14 @@ test('English: the app\'s own words translate, the model\'s words, the user\'s d
   // The integration client's own failures are keys, translated at display.
   assert.throws(() => integrationClient('http://insecure', async () => 't'), /^Error: assistant\.integration\.httpsOrigin$/);
   const signedOut = integrationClient('https://finanzapp.example', async () => null);
-  await assert.rejects(signedOut.assistant({ action: 'parse', text: 'x', todayISO: today, currency: 'ARS', region: 'AR', facts: [] }), /^Error: assistant\.integration\.signIn$/);
+  await assert.rejects(signedOut.assistant({ action: 'parse', text: 'x', todayISO: today, currency: 'ARS', region: 'AR', language: 'es', facts: [] }), /^Error: assistant\.integration\.signIn$/);
   assert.equal(bindLocale('es-AR').errorText('assistant.integration.signIn'), 'Iniciá sesión para usar la integración. El registro manual sigue disponible.');
   assert.equal(english.errorText('assistant.integration.signIn'), 'Sign in to use the integration. Manual entry is still available.');
 });
 
 test('a failure carries only the integration client\'s own keys: a contract rejection or an engine message becomes the reason\'s note in the interface language', async () => {
   const origin = 'https://finanzapp.example';
-  const ask = { action: 'parse' as const, text: 'Spent 12 at Target', todayISO: today, currency: 'ARS' as const, region: 'AR', facts: [] };
+  const ask = { action: 'parse' as const, text: 'Spent 12 at Target', todayISO: today, currency: 'ARS' as const, region: 'AR', language: 'es', facts: [] };
   const replying = (body: () => unknown, status = 200) => remoteAssistant(origin, async () => 'jwt', (async () => ({ ok: status < 400, status, json: async () => body() })) as unknown as typeof fetch);
   const failed = [{ type: 'error', reason: 'failed', message: '' }];
   // 200 with a result the protocol refuses (an answer to a parse): "Datos del asistente inválidos." never reaches the screen.
@@ -371,51 +371,66 @@ test('a failure carries only the integration client\'s own keys: a contract reje
     assert.deepEqual(await collect(fixtureAssistant(0).ask({ ...ask, text })), [{ type: 'error', reason, message: '' }], text);
   }
   const explain = { ...ask, action: 'explain' as const };
-  const why = fixtureReply({ ...explain, text: en('assistant.suggestions.whySpentMore') });
-  assert.equal(why, fixtureReply({ ...explain, text: es('assistant.suggestions.whySpentMore') }));
-  assert.equal('result' in why && why.result, FIXTURE_ANSWER, 'the scripted answer, still in Spanish');
+  // The scripted reply follows the ask's language (protocol v3): the same evidence and shape, English prose for 'en'.
+  const porQue = fixtureReply({ ...explain, text: es('assistant.suggestions.whySpentMore') });
+  assert.equal('result' in porQue && porQue.result, FIXTURE_ANSWER, 'the scripted answer in Spanish for a Spanish ask');
+  const why = fixtureReply({ ...explain, text: en('assistant.suggestions.whySpentMore'), language: 'en' });
+  assert.ok('result' in why && why.result !== FIXTURE_ANSWER && why.result.message.startsWith('You spent more this month'), 'the English twin for an English ask');
+  assert.deepEqual('result' in why && { ...why.result, message: FIXTURE_ANSWER.message }, FIXTURE_ANSWER, 'only the prose differs: evidence, navigation and shape are the same');
+  assert.equal('result' in why && why.facts, FIXTURE_FACTS);
+  // The English chip tapped in a Spanish interface (ask language 'es') still gets the Spanish reply: the ask's language decides, never the words.
   assert.equal(fixtureReply({ ...explain, text: en('assistant.suggestions.foodSpending') }), fixtureReply({ ...explain, text: es('assistant.suggestions.foodSpending') }));
+  const groceries = fixtureReply({ ...explain, text: en('assistant.suggestions.foodSpending'), language: 'en' });
+  assert.equal('result' in groceries && groceries.result.message, 'In Supermercado you have spent $121.200 this month, across 11 purchases.', 'a category name stays the person\'s word, never translated');
+  assert.deepEqual('result' in groceries && groceries.result.navigation, FIXTURE_CATEGORY_ANSWER.navigation);
 });
 
-test('25A-05: the client posts protocol v2 only: version 2, a fresh request id per ask (injectable), the configured region, no language', async () => {
+test('25A-06: the client posts protocol v3: version 3, a fresh request id per ask (injectable), the configured region and the interface language', async () => {
   const bodies: any[] = [];
   const fetcher = (async (_url: string, init: any) => { bodies.push(JSON.parse(init.body)); return { ok: true, status: 200, json: async () => FIXTURE_CLARIFICATION }; }) as unknown as typeof fetch;
-  const ask = { action: 'parse' as const, text: 'Spent 12 at Target', todayISO: today, currency: 'ARS' as const, region: 'US', facts: [] };
+  const ask = { action: 'parse' as const, text: 'Spent 12 at Target', todayISO: today, currency: 'ARS' as const, region: 'US', language: 'en', facts: [] };
   const client = integrationClient('https://finanzapp.example', async () => 'jwt', fetcher);
   await client.assistant(ask);
   await client.assistant(ask);
-  // Even a caller that still names version 1 posts version 2: the client sets it.
-  await client.assistant({ ...ask, version: 1 } as unknown as typeof ask);
-  assert.deepEqual(bodies.map(body => body.version), [2, 2, 2], 'never version 1');
+  // Even a caller that still names version 2 posts version 3: the client sets it.
+  await client.assistant({ ...ask, version: 2 } as unknown as typeof ask);
+  assert.deepEqual(bodies.map(body => body.version), [3, 3, 3], 'never version 2 from this client');
   assert.ok(bodies.every(body => /^[A-Za-z0-9_-]{16,100}$/.test(body.requestId)));
   assert.equal(new Set(bodies.map(body => body.requestId)).size, 3, 'every ask has its own request id');
-  assert.ok(bodies.every(body => body.region === 'US'), 'the region asked with');
-  assert.deepEqual(Object.keys(bodies[0]).sort(), ['action', 'currency', 'facts', 'region', 'requestId', 'text', 'todayISO', 'version'], 'no language, no locale');
+  assert.ok(bodies.every(body => body.region === 'US' && body.language === 'en'), 'the region and the language asked with');
+  assert.deepEqual(Object.keys(bodies[0]).sort(), ['action', 'currency', 'facts', 'language', 'region', 'requestId', 'text', 'todayISO', 'version'], 'the language beside the region; no locale object');
   let n = 0;
   const fixed = integrationClient('https://finanzapp.example', async () => 'jwt', fetcher, () => 'fixed-request-id-' + String(++n).padStart(4, '0'));
   await fixed.assistant(ask);
   assert.equal(bodies.at(-1).requestId, 'fixed-request-id-0001', 'the id generator is injected (the app passes expo-crypto\'s randomUUID)');
-  // The wire shape is exactly the protocol's: a locale or a language is refused, so the server must accept one before any client sends it.
-  const request: AssistantRequestV2 = bodies[0];
-  assert.deepEqual(validateAssistantRequestV2(request), request);
-  assert.throws(() => validateAssistantRequestV2({ ...request, locale: { language: 'en', region: 'US' } }));
-  assert.throws(() => validateAssistantRequestV2({ ...request, replyLanguage: 'en-US' }));
-  assert.throws(() => validateAssistantRequestV2({ ...request, language: 'en' }));
-  // A request the protocol refuses never leaves the device (a region that is not two capitals, a bad id generator).
+  // The wire shape is exactly the protocol's: a locale object or any other key is refused. A v2 request, as an older client
+  // would send it, still validates (the server-first rollout of docs/i18n.md §11); a language never rides on v2.
+  const request: AssistantRequestV3 = bodies[0];
+  assert.deepEqual(validateAssistantRequest(request), request);
+  assert.throws(() => validateAssistantRequest({ ...request, locale: { language: 'en', region: 'US' } }));
+  assert.throws(() => validateAssistantRequest({ ...request, replyLanguage: 'en-US' }));
+  assert.throws(() => validateAssistantRequest({ ...request, language: 'EN' }), 'two lowercase letters only');
+  const { language: _dropped, ...v2 } = request;
+  assert.deepEqual(validateAssistantRequest({ ...v2, version: 2 }), { ...v2, version: 2 }, 'a v2 request stays accepted by the shared validator');
+  assert.throws(() => validateAssistantRequest(v2), 'v3 without its language');
+  assert.throws(() => validateAssistantRequest({ ...request, version: 2 }), 'a language never rides on v2');
+  // A request the protocol refuses never leaves the device (a region that is not two capitals, a language that is not two
+  // lowercase letters, a bad id generator).
   const before = bodies.length;
   await assert.rejects(client.assistant({ ...ask, region: 'es-AR' }));
+  await assert.rejects(client.assistant({ ...ask, language: 'en-US' }));
   await assert.rejects(integrationClient('https://finanzapp.example', async () => 'jwt', fetcher, () => 'short').assistant(ask));
   assert.equal(bodies.length, before);
-  // The screen sends the interface's region and reaches the client through the runtime with expo-crypto's generator.
+  // The screen sends the interface's region and language and reaches the client through the runtime with expo-crypto's generator.
   const route = readFileSync(new URL('../app/assistant.tsx', import.meta.url), 'utf8');
-  assert.match(route, /client\.ask\(\{ action, text, todayISO: day, currency, region, facts \}/);
+  assert.match(route, /client\.ask\(\{ action, text, todayISO: day, currency, region, language, facts \}/);
   assert.match(route, /assistantForBuild\(undefined, undefined, randomUUID\)/);
 });
 
 test('25A-05: the device validates the server\'s reply again against its own request: anything the protocol refuses is a failure, nothing is shown', async () => {
   const origin = 'https://finanzapp.example';
   const replying = (body: unknown, status = 200) => remoteAssistant(origin, async () => 'jwt', (async () => ({ ok: status < 400, status, json: async () => body })) as unknown as typeof fetch);
-  const parse = { action: 'parse' as const, text: 'Gasté 18.500 en Carrefour con la Visa', todayISO: today, currency: 'ARS' as const, region: 'AR', facts: [] };
+  const parse = { action: 'parse' as const, text: 'Gasté 18.500 en Carrefour con la Visa', todayISO: today, currency: 'ARS' as const, region: 'AR', language: 'es', facts: [] };
   const explain = { ...parse, action: 'explain' as const, text: '¿Por qué gasté más?', facts: FIXTURE_FACTS };
   const failed = [{ type: 'error', reason: 'failed', message: '' }];
   const proposal = FIXTURE_DRAFT.proposals[0];
@@ -446,10 +461,10 @@ test('25A-05: the device validates the server\'s reply again against its own req
 
 test('25A-05: every development fixture is a valid protocol v2 result for the request it scripts', () => {
   const request = (action: 'parse' | 'explain', facts = action === 'explain' ? FIXTURE_FACTS : []) =>
-    validateAssistantRequestV2({ version: 2, requestId: 'fixture-request-0001', action, text: 'x', todayISO: today, currency: 'ARS', region: 'AR', facts });
+    validateAssistantRequest({ version: 2, requestId: 'fixture-request-0001', action, text: 'x', todayISO: today, currency: 'ARS', region: 'AR', facts });
   for (const result of [FIXTURE_DRAFT, FIXTURE_DRAFT_NO_ACCOUNT, FIXTURE_CLARIFICATION, FIXTURE_OUT_OF_SCOPE]) assert.deepEqual(validateAssistantResultV2(result, request('parse')), result);
   for (const result of [FIXTURE_ANSWER, FIXTURE_CATEGORY_ANSWER]) assert.deepEqual(validateAssistantResultV2(result, request('explain')), result);
-  const program = fixtureReply({ action: 'parse', text: 'Escribime un programa en Python', todayISO: today, currency: 'ARS', region: 'AR', facts: [] });
+  const program = fixtureReply({ action: 'parse', text: 'Escribime un programa en Python', todayISO: today, currency: 'ARS', region: 'AR', language: 'es', facts: [] });
   assert.equal('result' in program && program.result, FIXTURE_OUT_OF_SCOPE, 'a programming request is out of scope');
 });
 
@@ -588,7 +603,7 @@ test('24T3 (A25): devoluciones reach the evidence as one positive «Devoluciones
   // Net = gross − devoluciones: the facts reconcile with the report without ever sending the net.
   assert.equal(byId(facts, 'current.expenses')!.amountMinor - byId(facts, 'current.refunds')!.amountMinor, -20000);
   // The request the server receives passes protocol v2 (which refuses negatives) and stays within its 60 facts.
-  assert.doesNotThrow(() => validateAssistantRequestV2({ version: 2, requestId: 'req-0000000000000001', action: 'explain', text: '¿Cuánto gasté?', todayISO: today, currency: 'ARS', region: 'AR', facts }));
+  assert.doesNotThrow(() => validateAssistantRequest({ version: 2, requestId: 'req-0000000000000001', action: 'explain', text: '¿Cuánto gasté?', todayISO: today, currency: 'ARS', region: 'AR', facts }));
   // A month made only of a devolución is still evidence (not an untracked month), with gross spending 0.
   const only = monthlyEvidence(domain.snapshotFromArchive({ accounts: [cash], records: [ropa].map(domain.initialRecord), purchaseOperations: [refund(5000, '2026-09-08')] }), 'ARS', today);
   assert.deepEqual(only.filter(fact => fact.id.startsWith('current.')).map(fact => [fact.id, fact.amountMinor, fact.count]),
@@ -631,5 +646,5 @@ test('25A-05: a stored category name the protocol refuses is left out of the evi
   const facts = monthlyEvidence(snapshot, 'ARS', today);
   assert.ok(facts.some(fact => fact.label === 'Categoría de gasto: Supermercado'));
   assert.ok(!facts.some(fact => fact.label.includes('\u2068')));
-  assert.doesNotThrow(() => validateAssistantRequestV2({ version: 2, requestId: 'fixture-request-0001', action: 'explain', text: '¿Cuánto gasté?', todayISO: today, currency: 'ARS', region: 'AR', facts }));
+  assert.doesNotThrow(() => validateAssistantRequest({ version: 2, requestId: 'fixture-request-0001', action: 'explain', text: '¿Cuánto gasté?', todayISO: today, currency: 'ARS', region: 'AR', facts }));
 });
