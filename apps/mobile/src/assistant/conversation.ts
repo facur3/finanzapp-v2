@@ -352,15 +352,19 @@ export function resolveDraft(draft: DraftInput, accounts: Account[], entries: En
       if (offered.length) return ask('currency', 'assistant.clarify.currency', offered.map(code => ({ id: code, currency: code })), { currency, currencyInferred: false });
     }
   }
-  const amountMinor = minorIn(draft.amount, resolvedCurrency);
+  // Scaled only by a currency actually resolved (stated or inferred), never by the screen's stand-in: with no destination
+  // in a carried currency the decimal stays parked unscaled and the destination is asked (Codex review of PR #100). Such
+  // a ledger has no eligible destination, so a draft is never confirmable without a resolved currency.
+  const known = draft.currency !== null || currencyInferred;
+  const amountMinor = known ? minorIn(draft.amount, resolvedCurrency) : undefined;
   if (amountMinor === null) return { kind: 'clarification', field: 'amount', question: 'assistant.clarify.amount', options: [],
     partial: { ...base, amount: undefined, currency: resolvedCurrency, currencyInferred } };
   const eligible = carried.filter(account => account.currency === resolvedCurrency);
   const named = matches(eligible);
   const accountId = ref !== null ? (named.length === 1 ? named[0].id : null) : eligible.length === 1 ? eligible[0].id : null;
   const destinationStated = named.length === 1;
-  const resolved: Partial<ResolvedDraft> = { currency: resolvedCurrency, currencyInferred, amountMinor };
-  if (!accountId) return ask('paymentMethod', paidWith, chips(eligible), resolved);
+  const resolved: Partial<ResolvedDraft> = { currency: resolvedCurrency, currencyInferred, ...(amountMinor !== undefined ? { amountMinor } : {}) };
+  if (!accountId || amountMinor === undefined) return ask('paymentMethod', paidWith, chips(eligible), resolved);
   if (!draft.category) return { kind: 'clarification', field: 'category', question: 'assistant.clarify.category', options: categoryOptions(entries, draft.kind), partial: { ...base, ...resolved, accountId, destinationStated } };
   return { kind: 'draft', draft: { kind: draft.kind, amountMinor, amount: draft.amount, currency: resolvedCurrency, merchant: draft.merchant ?? '',
     category: draft.category, dateISO: draft.dateISO ?? todayISO, accountId, ...stated, currencyInferred, destinationStated } };

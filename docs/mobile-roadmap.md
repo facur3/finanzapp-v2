@@ -5660,7 +5660,9 @@ nothing of it is on a screen yet.
       decimal exacto … ("15 mil" = "15000"; "1,99" en AR = "1.99"; …) El límite es 15 dígitos enteros y 4 decimales.»
       Nothing else changed: the currency, region and ambiguity rules are as they were.
     - *The device* (`conversation.ts`). `resolveDraft` reads a `DraftInput` (the v4 proposal, kind nullable); the parked
-      draft carries `amount` unscaled; once the currency is resolved, `minorIn` scales it with `majorStringToMinor` and an
+      draft carries `amount` unscaled; once the currency is resolved (stated or inferred, never the screen's stand-in:
+      with no destination in a carried currency the decimal stays parked unscaled and the destination is asked; the
+      Codex review of this PR), `minorIn` scales it with `majorStringToMinor` and an
       amount the currency cannot hold exactly is the amount question again (the decimal dropped from the parked draft,
       the currency kept); `ResolvedDraft` keeps `amountMinor` (what the review adapter captures) and the stated `amount`.
       `completeDraft` re-resolves from the decimal, so a currency chosen in a chip scales it. The client sends v4. Rule 9

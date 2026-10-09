@@ -303,3 +303,15 @@ test('protocol v4: the stated decimal is scaled to minor units by the resolved c
   const dollars = completeDraft(pendingOf(resolveDraft(said({ amount: '1.99' }), [cash, usd], [], 'ARS', day)), 'USD', [cash, usd], [], day);
   assert.deepEqual(dollars.content.kind === 'draft' ? [dollars.content.draft.currency, dollars.content.draft.amountMinor, dollars.content.draft.accountId] : null, ['USD', 199, 'usd']);
 });
+
+// Codex review of PR #100: with no destination in a currency the device can resolve (an empty ledger, or only accounts
+// in currencies the protocol does not carry yet), the currency is unknown, so the decimal is never scaled by the
+// screen's stand-in: it stays parked exactly as stated, «1.999» included, and the destination is asked.
+test('protocol v4: an unresolved currency never scales the decimal; it stays parked exactly as stated', () => {
+  const jpyOnly: Account = { id: 'jpy', name: 'Yenes', currency: 'JPY', openingMinor: 0, createdAt };
+  for (const accounts of [[], [jpyOnly]]) for (const amount of ['1.99', '1.999', '100']) {
+    const question = asked(resolveDraft(said({ amount }), accounts, [], 'ARS', day), 'paymentMethod');
+    assert.deepEqual([question.partial.amount, question.partial.amountMinor, question.partial.currencyInferred, question.options],
+      [amount, undefined, false, []], `${amount} with ${accounts.length} account(s)`);
+  }
+});
