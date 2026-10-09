@@ -1,7 +1,15 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-09 (25A-06 B7, **owner decision A applied: an over-long merchant or category no longer loses the
-draft**, on `fix/25a-06-b7-overlong-names`, owner decision of the same day: the server's one recovery of a refused output
+Updated: 2026-10-09 (25A-06, **protocol v4: the proposal's amount is an exact decimal in major units, scaled on the
+device after the currency is resolved**, on `feat/25a-06-assistant-decimal-amount`, the preparation slice of the owner
+direction of the same day (Luna with the currencies FinanzApp supports, without a regional dictionary): the model writes
+the number the person meant («15000», «1.99») and never cents, because before the currency is known no scale is right
+for every currency (100 yen are 100 minor units, 100 pesos 10 000); `resolveDraft` scales it with `majorStringToMinor`
+once the currency is resolved and asks again for an amount the currency cannot hold, never rounding; v2 and v3 clients
+get the same amount in exact cents from the server; currencies stay ARS/USD (the next slice widens them); corpus values
+unchanged, written as decimals; worst case recomputed, 179 588 / 390 025 µUSD; both live runs stay FAILED, B8 blocked;
+§2, §3, «Producto 25A-06», B7). Earlier the same day (25A-06 B7, **owner decision A applied: an over-long merchant or
+category no longer loses the draft**, PR #99, owner decision of the same day: the server's one recovery of a refused output
 keeps a proposal whose only fault is an optional name the person wrote, longer than its bound, with that name null and listed in the reply
 (`dropped`), never cut, cleaned or replaced, so the kind, the exact amount, the currency, the date and the payment
 reference reach the person; every other refusal stays 502; the device validates the list, keeps the person's words in
@@ -846,7 +854,10 @@ it was checked in). Metro from `master` (or a delivery's branch) on the installe
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
-- **25A-06 B7 — over-long names, decision A (branch `fix/25a-06-b7-overlong-names`; no EAS build; nothing
+- **25A-06 — protocol v4, the decimal amount (branch `feat/25a-06-assistant-decimal-amount`; no EAS build; nothing
+  device-verified):** every build stays disconnected; in the fixture view the scripted proposals show the same amounts
+  as before (18 500, 18 000 and 3 000 pesos), now stated as decimals and scaled on the device. Nothing else is visible.
+- **25A-06 B7 — over-long names, decision A (PR #99; no EAS build; nothing
   device-verified):** every build stays disconnected, so the only device-visible change is in the fixture view (a
   development bundle with `EXPO_PUBLIC_ASSISTANT_FIXTURES=1`): the corpus's over-long sentence («Gasté 3 mil pesos en
   Almacén de Ramos Generales …») is scripted as a dropped merchant: with one peso destination, the preview card
@@ -1107,7 +1118,8 @@ before it passes (the runbook's §0.2):
    one-run approvals, 2026-10-07 and 2026-10-08, are consumed; the local fixes are merged (PR #94), decision B is
    applied as an instruction plus the scorer (PR #96; PR #95 closed unmerged), and the reply language is protocol v3
    (PR #97, owner direction 2026-10-09), the device infers the currency (decision D, PR #98) and an over-long optional
-   name no longer loses the draft (decision A, owner decision 2026-10-09, the over-long-names PR); next: the owner's
+   name no longer loses the draft (decision A, owner decision 2026-10-09, PR #99) and the proposal's amount is an exact
+   decimal scaled on the device (protocol v4, the decimal-amount PR; the currency widening is the next slice); next: the owner's
    decisions C and E, then a new owner spend approval before any further live run; B8 blocked): the **real Luna evaluation** with an owner-approved spend (B7); AI enabled on staging,
    the failure drills and the race (B8); the **cost reconciliation** against the provider (B9).
 4. A focused **`/security_audit`**, then **`/security_review`** (B10); results recorded and 25A-06 marked done (B11).
@@ -5521,7 +5533,7 @@ nothing of it is on a screen yet.
     - *Device checklist* (`docs/mobile-device-checklist.md`, Producto 25A-04 section): a release-gate item for the
       inferred currency shown and editable in the review sheet, with a connected Assistant.
   - **B7 — decision A applied (owner decision 2026-10-09): a name that exceeds a field limit must not lose the
-    otherwise valid draft (branch `fix/25a-06-b7-overlong-names`, this PR; no provider call, no prompt change).** The
+    otherwise valid draft (PR #99; no provider call, no prompt change).** The
     owner's rule: preserve the validated fields, never truncate the person's words silently, and make the missing field
     visible and editable in the review. A bounded product-reliability change, narrowly limited to this understood
     length-boundary case: not a general validator of model output, and not a change of the acceptance bar.
@@ -5617,6 +5629,69 @@ nothing of it is on a screen yet.
       written owner approval of at least the figure the script computes at that commit.
     - *Not in this PR:* decisions C and E, any prompt change, a live call, B8, a service change, an EAS build, a merge.
       Both live runs remain **FAILED**; B8 **BLOCKED**.
+  - **Protocol v4 — the proposal's amount as an exact decimal in major units (owner direction 2026-10-09: Luna with the
+    currencies FinanzApp already supports, without a regional dictionary; branch `feat/25a-06-assistant-decimal-amount`,
+    this PR; the preparation slice; no provider call).**
+    - *The problem.* The domain opens 146 ledger currencies with ISO exponents 0 and 2 (three-decimal ones held), but
+      the v2/v3 proposal carried `amountMinor`, cents the model computed («15 mil ARS = 1500000»). A model that emits
+      minor units before the currency is known cannot be right for every currency: «Gasté 100 yenes» is 100 minor units,
+      «100 pesos» 10 000. That is why decision D's rule 9 kept every non-ARS/USD destination out of inference.
+    - *Alternatives compared.* (a) Keep `amountMinor` as fixed hundredths and divide on the device: no shape change, but
+      the field's name lies, three-decimal currencies cannot be expressed, and the model still multiplies (decision B:
+      the app owns arithmetic). (b) `amountMinor` plus an exponent the model states: the model must know the currency's
+      ISO exponent, which it does not reliably, and a wrong one is a silent ×100. (c) A number in major units: JSON
+      numbers are floats («1.99» is not exact) and providers' structured output differs on decimals. (d) **Chosen:** a
+      canonical decimal string in major units, `amount` («15000», «1.99», «0.50»), converted on the device with the
+      domain's own `majorStringToMinor` after the currency is resolved. It is exact for every exponent 0–4, the model
+      only transcribes the person's number (multipliers like «mil», «k», «lucas» stay its language work), and
+      «12.5» yen or «1.999» pesos are refused by the domain (`precision`) and asked again, never rounded.
+    - *The contract* (`packages/integrations/assistant-protocol.js`). v4 = v3's request (`version: 4`); a proposal's
+      `amount` is null or matches digits, one optional dot and 1–4 decimals, no sign, grouping or exponent, no leading
+      zero, above zero, at most 15 whole digits (`isProtocolAmount`; the bounds are the domain's `MAX_AMOUNT_DIGITS` and
+      `MAX_UNIT_EXPONENT`, pinned by a drift test). The structured-output schema carries `amount` as a nullable string.
+      The model always writes the v4 result, whatever the request's version; `validateAssistantResultV2` validates that
+      shape (an `amountMinor` from a model is an unknown key, refused). `wireResult(result, request)` hands a v2 or v3
+      client each proposal with `amountMinor` in exact cents, in the old key order, read digit by digit (no float); an
+      amount with a third non-zero decimal or more than 13 whole digits has no exact cents and is a 502, never rounded.
+      The over-long-name recovery of PR #99 is unchanged (names only, never the amount).
+    - *The server* (`handlers.js`): recovery, then `wireResult`, inside the same `output_invalid` guard.
+    - *The instructions*: «amountMinor en centavos enteros, de 1 a 999999999999999 (15 mil ARS = 1500000 …)» becomes
+      «amount es el monto que la persona quiso decir, en la unidad principal de la moneda (no en centavos), como texto
+      decimal exacto … ("15 mil" = "15000"; "1,99" en AR = "1.99"; …) El límite es 15 dígitos enteros y 4 decimales.»
+      Nothing else changed: the currency, region and ambiguity rules are as they were.
+    - *The device* (`conversation.ts`). `resolveDraft` reads a `DraftInput` (the v4 proposal, kind nullable); the parked
+      draft carries `amount` unscaled; once the currency is resolved (stated or inferred, never the screen's stand-in:
+      with no destination in a carried currency the decimal stays parked unscaled and the destination is asked; the
+      Codex review of this PR), `minorIn` scales it with `majorStringToMinor` and an
+      amount the currency cannot hold exactly is the amount question again (the decimal dropped from the parked draft,
+      the currency kept); `ResolvedDraft` keeps `amountMinor` (what the review adapter captures) and the stated `amount`.
+      `completeDraft` re-resolves from the decimal, so a currency chosen in a chip scales it. The client sends v4. Rule 9
+      (only ARS/USD destinations lend, are inferred or offered) is **unchanged** here: lifting it belongs with the
+      currency fields, so an explicit «euros» is never silently a peso account's currency.
+    - *The evaluator.* The corpus's 48 proposal expectations are written as decimals (`expense('15000', 'ARS')`), each
+      the same value as before (a mechanical rewrite from the cents); `amount` is compared as an exact decimal
+      (trailing zeros equal: «45.9» is «45.90»; «4590» is wrong). No threshold or expectation changed; historical runs #1
+      and #2 stay recorded as measured (they ran v3).
+    - *Tests.* Protocol: v4 request, schema, 18 refused amount shapes, `amountMinor` from a model refused, the domain
+      scaling of one decimal in JPY, MXN, COP, USD, ARS (and «1.99» JPY `precision`), the legacy wire shape in cents with
+      its refusals. Server: v4 replies keep the decimal, v2 and v3 get cents (199, 50, 1 000 000, the 10^15 − 1 bound,
+      trailing zeros) and a 502 for «1.999» or 14 whole digits; six new refusals (negative, 16 digits, a number, grouping,
+      a third decimal for a v2 client, v2's field). Evaluator: the decimal scoring and the instruction pins. Device: exact
+      1.99 USD, 0.50, 10 000, 0.01, 45.9 and the largest amount captured exactly; «1.999», «0.001» and 14 digits asked
+      again; the decimal parked across a currency question and scaled by the chosen USD.
+    - *Effect on scores and thresholds.* Fixture evaluation passes every threshold. Instructions 5 892 → 6 154 bytes;
+      the worst case recomputed with `worstCaseMicroUsd`: **179 588 µUSD for `gpt-6-luna`** (176 364) and **390 025 for
+      `gpt-5.6-luna`** (383 574). Any further live run needs a new written owner approval of at least that figure.
+    - *Next slices, in order.* (1) **Currency fields**: `PROTOCOL_CURRENCIES` from the domain's `LEDGER_CURRENCIES`
+      (three-decimal currencies stay held), the request's screen currency widened (today a non-ARS/USD screen makes the
+      Assistant unavailable), the instructions' regional-word rule made general (the region names the local currency
+      for «pesos», «$» and colloquial names such as «lucas», the model's own knowledge, never a table), an explicit
+      currency carried instead of asked, and decision D's rule 9 lifted on the device now that the amount is scaled
+      after the currency (the owner's MXN «10 mil pesos», COP «20 lucas» and JPY «100 yenes» scenarios). (2) **Corpus
+      expansion** for B7, recorded separately: MXN, COP and JPY cases, a mixed-currency ledger and «pesos» outside AR;
+      no threshold change. (3) Language-neutral facts with an explicit exponent (docs/currency.md §11).
+    - *Not in this PR:* the currency widening, any corpus case, decisions C and E, a live call, B8, a service change, an
+      EAS build, a merge. Both live runs remain **FAILED**; B8 **BLOCKED**.
 - **Owner refinements before accepting the runbook (2026-10-05, in this PR).**
   - **Staging region:** Vercel Functions `gru1` (São Paulo) and the staging Supabase project in the specific region
     `sa-east-1` (São Paulo), replacing `iad1` / us-east-1. The reasons: Argentina-first, the API compute next to its

@@ -1,7 +1,8 @@
 import type { AssistantFact } from './contracts.js';
-/** The version a client sends today (v3: v2 plus the reply `language`); the server accepts every version listed. */
-export declare const ASSISTANT_PROTOCOL_VERSION: 3;
-export declare const ASSISTANT_PROTOCOL_VERSIONS: readonly [2, 3];
+/** The version a client sends today (v4: v3's request; a proposal states `amount`, an exact decimal in major units);
+ * the server accepts every version listed. */
+export declare const ASSISTANT_PROTOCOL_VERSION: 4;
+export declare const ASSISTANT_PROTOCOL_VERSIONS: readonly [2, 3, 4];
 export type ResultType = 'answer' | 'proposal' | 'clarification' | 'out_of_scope';
 export type ProposalKind = 'expense' | 'income';
 export type ProtocolCurrency = 'ARS' | 'USD';
@@ -15,6 +16,7 @@ export declare const NAVIGATION_TARGETS: readonly NavigationTarget[];
 export declare const PROTOCOL_LIMITS: Readonly<{
   requestBytes: number; requestId: RegExp; textChars: number; facts: number; factIdChars: number; factLabelChars: number;
   messageChars: number; proposals: number; candidateIds: number; merchantChars: number; categoryChars: number; referenceChars: number; maxAmountMinor: number;
+  amountWholeDigits: number; amountFractionDigits: number;
 }>;
 export interface AssistantRequestV2 {
   version: 2; requestId: string; action: 'parse' | 'explain'; text: string; todayISO: string; currency: ProtocolCurrency; region: string; facts: AssistantFact[];
@@ -24,12 +26,20 @@ export interface AssistantRequestV2 {
 export interface AssistantRequestV3 extends Omit<AssistantRequestV2, 'version'> {
   version: 3; language: string;
 }
-export type AssistantRequest = AssistantRequestV2 | AssistantRequestV3;
-/** Financial facts only; every unknown is null. No account or card id: `paymentMethodRef` is the person's words. */
+/** v3's request; its reply states a proposal's amount as an exact decimal in major units (`ProposalDraft.amount`). */
+export interface AssistantRequestV4 extends Omit<AssistantRequestV3, 'version'> {
+  version: 4;
+}
+export type AssistantRequest = AssistantRequestV2 | AssistantRequestV3 | AssistantRequestV4;
+/** Financial facts only; every unknown is null. No account or card id: `paymentMethodRef` is the person's words.
+ * `amount` (v4) is the number the person meant, in major units, as a canonical decimal («15000», «1.99»); the device
+ * scales it to minor units once the currency is resolved. */
 export interface ProposalDraft {
-  kind: ProposalKind; amountMinor: number | null; currency: ProtocolCurrency | null; merchant: string | null; category: string | null;
+  kind: ProposalKind; amount: string | null; currency: ProtocolCurrency | null; merchant: string | null; category: string | null;
   dateISO: string | null; paymentMethodRef: string | null;
 }
+/** A proposal as a v2 or v3 client reads it: the amount in cents. */
+export interface LegacyProposalDraft extends Omit<ProposalDraft, 'amount'> { amountMinor: number | null }
 export interface NavigationIntent { target: NavigationTarget; factId: string }
 export interface Clarification { field: ClarificationField; candidateIds: string[] }
 export interface AssistantResultV2 {
@@ -37,10 +47,16 @@ export interface AssistantResultV2 {
 }
 export declare function isSafeInputText(value: unknown, max: number): boolean;
 export declare function isSafeModelText(value: unknown, max: number, prose?: boolean): boolean;
-/** Accepts v2 and v3 and returns the wire shape of the version received. */
+/** Accepts v2, v3 and v4 and returns the wire shape of the version received. */
 export declare function validateAssistantRequest(value: unknown): AssistantRequest;
 export declare function modelInput(request: AssistantRequest): Omit<AssistantRequestV2, 'version' | 'requestId'> & { language?: string };
+/** A canonical decimal amount a v4 proposal may state: digits, one optional dot and up to four decimals, above zero. */
+export declare function isProtocolAmount(value: unknown): value is string;
+/** Validates the v4 result (what a model writes) against the request it answers, whatever the request's version. */
 export declare function validateAssistantResultV2(value: unknown, request: AssistantRequest): AssistantResultV2;
+/** The validated result in the request's wire shape: unchanged for v4; v2 and v3 get `amountMinor` in cents, or a throw
+ * when the amount has no exact cents. */
+export declare function wireResult(result: AssistantResultV2, request: AssistantRequest): AssistantResultV2 | (Omit<AssistantResultV2, 'proposals'> & { proposals: LegacyProposalDraft[] });
 /** The optional names the server boundary may drop when a model copies them past their bound (25A-06, decision A). */
 export type DroppableField = 'merchant' | 'category';
 export declare const DROPPABLE_FIELDS: readonly DroppableField[];

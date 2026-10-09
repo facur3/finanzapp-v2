@@ -797,20 +797,24 @@ build was disconnected. Captures keep their contract v1 (`contracts.js`).
 
 **Request:** exactly `{ version: 2, requestId, action, text, todayISO, currency, region, facts }` (v2), or the same
 keys plus `language` with `version: 3` (**v3, EXISTS TODAY since 25A-06**: the interface language the reply is written
-in, two lowercase letters, ISO 639-1, beside the region). `requestId` matches `^[A-Za-z0-9_-]{16,100}$` and is fresh
+in, two lowercase letters, ISO 639-1, beside the region), or v3's keys with `version: 4` (**v4, EXISTS TODAY since
+25A-06**: the same request; its proposal states the amount as an exact decimal, below). `requestId` matches `^[A-Za-z0-9_-]{16,100}$` and is fresh
 per ask (the app uses expo-crypto's `randomUUID`); `action` is `parse` or `explain`; `text` is at most 2 000 characters
 with control characters and bidirectional overrides refused (emoji joiners allowed); `currency` is ARS or USD; `region`
 is two capital letters; `facts` at most 60, none on `parse`. Unknown keys are refused, so no account, card or locale
-object can ride along, and a language never rides on v2. The shared validator (`validateAssistantRequest`) accepts both
-versions and returns the wire shape it received, the server-first rollout of [i18n.md](i18n.md) §11; the app sends v3;
-the model reads the language only when it was sent. The result shape is the same in both versions. The rest of the
-planned contract, language-neutral facts and the currency fields of [currency.md](currency.md) §11, is still ahead,
-with the same rollout.
+object can ride along, and a language never rides on v2. The shared validator (`validateAssistantRequest`) accepts the
+three versions and returns the wire shape it received, the server-first rollout of [i18n.md](i18n.md) §11; the app sends
+v4; the model reads the language only when it was sent. The model always writes the v4 result; the server hands a v2 or
+v3 client the same result with each proposal's amount in exact cents (`amountMinor`, `wireResult`; an amount without
+exact cents is a 502, never rounded). The rest of the planned contract, language-neutral facts and the currency fields
+of [currency.md](currency.md) §11, is still ahead, with the same rollout.
 
 **Result:** one flat object with every key required: `type` (`answer`, `proposal`, `clarification` or `out_of_scope`),
 `message` (at most 1 200 characters of safe prose), `evidenceIds` (ids of facts in the request only), `navigation`
 (null or `{ target: movements | category | budget, factId }`), `proposals` (empty, or exactly one `ProposalDraft`:
-`kind` expense or income, `amountMinor` null or 1 to 10^15 − 1, `currency` null, ARS or USD, `merchant` up to 120,
+`kind` expense or income, `amount` null or a canonical decimal in major units above zero (digits, one optional dot and
+up to four decimals, at most 15 whole digits, no sign or grouping: «15000», «1.99»; v2 and v3 read `amountMinor`, 1 to
+10^15 − 1 cents), `currency` null, ARS or USD, `merchant` up to 120,
 `category` up to 60, `dateISO` null or not after `todayISO`, `paymentMethodRef` up to 80, each null when unknown) and
 `clarification` (null or `{ field, candidateIds }`, `field` one of kind, amount, currency, date, merchant, category,
 destination, period, at most 8 candidate ids from the request).

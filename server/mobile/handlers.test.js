@@ -9,7 +9,9 @@ import disabledAssistant from '../../api/mobile/assistant.js';
 const draft = { kind: 'expense', amountMinor: 1500000, currency: 'ARS', merchant: 'Fixture', category: 'Supermercado', dateISO: '2026-09-19', paymentMethodRef: null };
 const capture = { version: 1, requestId: 'fixture-event-0001', source: 'shortcut', draft };
 const request = { version: 2, requestId: 'fixture-request-0001', action: 'parse', text: 'Gasté 15 mil en el super', todayISO: '2026-09-19', currency: 'ARS', region: 'AR', facts: [] };
-const proposal = { type: 'proposal', message: 'Revisá el gasto.', evidenceIds: [], navigation: null, proposals: [{ ...draft, merchant: 'Kiosco Secreto', paymentMethodRef: 'Visa Secreta' }], clarification: null };
+// What a model writes (protocol v4: the amount as an exact decimal in major units); a v2 request gets it in cents.
+const { amountMinor: _cents, ...said } = draft;
+const proposal = { type: 'proposal', message: 'Revisá el gasto.', evidenceIds: [], navigation: null, proposals: [{ kind: 'expense', amount: '15000', ...said, merchant: 'Kiosco Secreto', paymentMethodRef: 'Visa Secreta' }], clarification: null };
 const usage = { inputTokens: 3000, cachedInputTokens: 1000, cacheWriteTokens: 0, outputTokens: 400, reasoningTokens: 100 };
 const headers = { authorization: 'Bearer fixture-access-token', 'content-type': 'application/json' };
 // Fixture Supabase keys of the current kinds, too short to match the repository's secret scanner (never real keys).
@@ -137,6 +139,28 @@ describe('assistant route: order, reservation and settlement', () => {
       expect(refused.provider.respond).not.toHaveBeenCalled();
     }
   });
+  // 25A-06: the model writes v4 (the amount as an exact decimal in major units, for the device to scale once it knows the
+  // currency); a v4 client reads it as written and a v2 or v3 client reads the same amount in cents, as it always did.
+  it('replies to v4 with the decimal amount and to v2 and v3 with the same amount in exact cents', async () => {
+    const v3 = { ...request, version: 3, language: 'es' };
+    const v4 = { ...v3, version: 4 };
+    const reply = async (asked, amount) => {
+      const deps = ports(); deps.provider.respond.mockResolvedValue({ output: { ...proposal, proposals: [{ ...proposal.proposals[0], amount }] }, usage, model: 'gpt-6-luna', tier: 'default' });
+      const res = await call('assistant', asked, deps);
+      return res.code === 200 ? res.body.proposals[0] : res.code;
+    };
+    expect(await reply(v4, '1.99')).toEqual({ ...proposal.proposals[0], amount: '1.99' });
+    expect(await reply(v4, '15000.005')).toMatchObject({ amount: '15000.005' }); // the device decides with the currency's exponent
+    for (const legacy of [request, v3]) {
+      expect(await reply(legacy, '1.99')).toEqual({ kind: 'expense', amountMinor: 199, ...said, merchant: 'Kiosco Secreto', paymentMethodRef: 'Visa Secreta' });
+      expect(Object.keys(await reply(legacy, '0.5'))).toEqual(['kind', 'amountMinor', 'currency', 'merchant', 'category', 'dateISO', 'paymentMethodRef']);
+      expect((await reply(legacy, '0.5')).amountMinor).toBe(50);
+      expect((await reply(legacy, '10000')).amountMinor).toBe(1000000);
+      expect((await reply(legacy, '9999999999999.99')).amountMinor).toBe(10 ** 15 - 1);
+      expect((await reply(legacy, '1.990')).amountMinor).toBe(199); // trailing zeros are exact
+      for (const unrepresentable of ['1.999', '10000000000000']) expect(await reply(legacy, unrepresentable), unrepresentable).toBe(502);
+    }
+  });
   it('keeps the reservation at its maximum when the cost is unknown, never releasing it', async () => {
     const cases = [
       [{ category: 'timeout' }, 502], [{ category: 'network' }, 502], [{ category: 'http' }, 502], [{ category: 'spend_limit' }, 503], [{ category: 'refusal' }, 422],
@@ -172,16 +196,19 @@ describe('assistant route: order, reservation and settlement', () => {
       [request, { ...proposal, proposals: [p, p] }], // duplicated proposal
       [request, { ...proposal, proposals: [] }],
       [request, { ...proposal, proposals: [{ ...p, accountId: 'acct-1' }] }], // a model-created id
-      [request, { ...proposal, proposals: [{ ...p, amountMinor: -5 }] }],
-      [request, { ...proposal, proposals: [{ ...p, amountMinor: 10 ** 15 }] }],
-      [request, { ...proposal, proposals: [{ ...p, amountMinor: 1.5 }] }],
+      [request, { ...proposal, proposals: [{ ...p, amount: '-5' }] }],
+      [request, { ...proposal, proposals: [{ ...p, amount: '1' + '0'.repeat(15) }] }], // 16 whole digits
+      [request, { ...proposal, proposals: [{ ...p, amount: 1.5 }] }], // a number, not the decimal text
+      [request, { ...proposal, proposals: [{ ...p, amount: '15.000,50' }] }], // grouped: never read by the server
+      [request, { ...proposal, proposals: [{ ...p, amount: '15000.005' }] }], // valid v4, but a v2 client reads cents: never rounded
+      [request, { ...proposal, proposals: [{ kind: 'expense', amountMinor: 1500000, ...said }] }], // v2's field from a model
       [request, { ...proposal, proposals: [{ ...p, currency: 'EUR' }] }],
       [request, { ...proposal, proposals: [{ ...p, kind: 'transfer' }] }],
       [request, { ...proposal, proposals: [{ ...p, dateISO: '2026-09-20' }] }], // future
       [request, { ...proposal, proposals: [{ ...p, merchant: 'x'.repeat(121) }] }], // over-long and not the person's words: refused, never recovered
       [request, { ...proposal, proposals: [{ ...p, paymentMethodRef: 'x'.repeat(81) }] }], // over its bound: never dropped, refused
       [request, { ...proposal, proposals: [{ ...p, merchant: 'x'.repeat(121) + '\u200b' }] }], // over-long and hidden: refused, never dropped
-      [request, { ...proposal, proposals: [{ ...p, merchant: 'x'.repeat(121), amountMinor: 0 }] }], // over-long beside another fault: refused
+      [request, { ...proposal, proposals: [{ ...p, merchant: 'x'.repeat(121), amount: '0' }] }], // over-long beside another fault: refused
       [request, { ...proposal, proposals: [{ ...p, merchant: 'Kiosco\u200b' }] }],
       [request, { ...proposal, proposals: [{ ...p, merchant: 'https://evil.example' }] }],
       [request, { ...proposal, message: 'Entrá a www.evil.example para confirmar' }],

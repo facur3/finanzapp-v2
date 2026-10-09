@@ -1,24 +1,28 @@
-// Assistant protocol v2 (Producto 25A-05) and v3 (25A-06: v2 plus the reply `language`): the one closed contract between
-// the app, the server and any model. Pure JS, no dependencies: the server validates a provider's output with it, and the
-// app validates the server's reply with it again before anything becomes a review draft. Structured-output validity is
-// never trusted on its own. The result shape is the same in v2 and v3.
+// Assistant protocol v2 (Producto 25A-05), v3 (25A-06: v2 plus the reply `language`) and v4 (25A-06: v3 whose proposal
+// states its amount as an exact decimal in major units, `amount`): the one closed contract between the app, the server
+// and any model. Pure JS, no dependencies: the server validates a provider's output with it, and the app validates the
+// server's reply with it again before anything becomes a review draft. Structured-output validity is never trusted on its
+// own. The model always writes the v4 result; a v2 or v3 request gets it in its own wire shape (`wireResult`).
 //
 // The model is untrusted. Its output is exactly one of four types and carries financial facts only:
 // - `answer`: prose that cites ids of the facts the device sent (never others), and at most one typed navigation intent
 //   pointing at one of those cited facts (the device builds the route from its own evidence, never from the model);
 // - `proposal`: one draft of a supported kind (expense or income) with every unknown fact `null`; no account or card id
-//   exists in it, only the person's own words for the means of payment (`paymentMethodRef`), resolved on the device;
+//   exists in it, only the person's own words for the means of payment (`paymentMethodRef`), resolved on the device; its
+//   amount is the number the person meant, never scaled to a currency the model may not know: the device scales it to
+//   minor units once the currency is resolved (packages/domain `majorStringToMinor`), or asks;
 // - `clarification`: one question about one typed field, with candidate ids only from those the request supplied;
 // - `out_of_scope`: a short redirection to what FinanzApp does.
 // No field carries code, SQL, a command, a URL, a tool name, a route or a database operation, and the validators refuse
 // prose that tries to smuggle one (a URL, a code fence, a markdown link, a hidden character).
 import { InputError, isDate } from './contracts.js';
 
-/** The version a client sends today: v3, which is v2 plus the interface `language` the reply is written in. The server
- * accepts v2 unchanged and v3 (the server-first rollout of docs/i18n.md §11): a v2 request carries no language, and the
- * instructions then follow the language the person wrote in. */
-export const ASSISTANT_PROTOCOL_VERSION = 3;
-export const ASSISTANT_PROTOCOL_VERSIONS = [2, 3];
+/** The version a client sends today: v4. Its request is v3's (v2 plus the interface `language` the reply is written in);
+ * its proposal carries `amount`, an exact decimal in major units, instead of v2's `amountMinor` in cents. The server
+ * accepts v2, v3 and v4 (the server-first rollout of docs/i18n.md §11): a v2 request carries no language, and the
+ * instructions then follow the language the person wrote in; a v2 or v3 reply keeps `amountMinor` (`wireResult`). */
+export const ASSISTANT_PROTOCOL_VERSION = 4;
+export const ASSISTANT_PROTOCOL_VERSIONS = [2, 3, 4];
 export const RESULT_TYPES = ['answer', 'proposal', 'clarification', 'out_of_scope'];
 export const PROPOSAL_KINDS = ['expense', 'income'];
 export const PROTOCOL_CURRENCIES = ['ARS', 'USD'];
@@ -30,7 +34,7 @@ export const NAVIGATION_TARGETS = ['movements', 'category', 'budget'];
 export const PROTOCOL_LIMITS = Object.freeze({
   requestBytes: 24000, requestId: /^[A-Za-z0-9_-]{16,100}$/, textChars: 2000, facts: 60, factIdChars: 100, factLabelChars: 160,
   messageChars: 1200, proposals: 1, candidateIds: 8, merchantChars: 120, categoryChars: 60, referenceChars: 80,
-  maxAmountMinor: 10 ** 15 - 1,
+  maxAmountMinor: 10 ** 15 - 1, amountWholeDigits: 15, amountFractionDigits: 4,
 });
 
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -77,14 +81,16 @@ function fact(value, todayISO) {
 
 const REQUEST_KEYS_V2 = ['version', 'requestId', 'action', 'text', 'todayISO', 'currency', 'region', 'facts'];
 const REQUEST_KEYS_V3 = [...REQUEST_KEYS_V2, 'language'];
+const withLanguage = version => version >= 3;
 /** The request the app sends, in the wire shape of the version received (a v2 request stays v2). `requestId` is fresh
  * per ask: the server reserves budget once per id, so a repeated delivery of the same request is refused instead of
  * charged twice. `region` is the configured region (two letters), the only thing that lets a regional currency word
  * («pesos») resolve; it never decides the reply's language. A v3 request adds `language`, the interface language the
- * reply is written in (ISO 639-1, two lowercase letters). A `parse` request carries no ledger facts. */
+ * reply is written in (ISO 639-1, two lowercase letters); a v4 request is a v3 request whose reply states amounts as
+ * decimals. A `parse` request carries no ledger facts. */
 export function validateAssistantRequest(value) {
   if (!object(value) || !ASSISTANT_PROTOCOL_VERSIONS.includes(value.version)) refuse();
-  const v3 = value.version === 3;
+  const v3 = withLanguage(value.version);
   exact(value, v3 ? REQUEST_KEYS_V3 : REQUEST_KEYS_V2);
   if (typeof value.requestId !== 'string' || !PROTOCOL_LIMITS.requestId.test(value.requestId)
     || !['parse', 'explain'].includes(value.action) || !isDate(value.todayISO) || !PROTOCOL_CURRENCIES.includes(value.currency)
@@ -97,22 +103,30 @@ export function validateAssistantRequest(value) {
     todayISO: value.todayISO, currency: value.currency, region: value.region, ...(v3 ? { language: value.language } : {}), facts };
 }
 
-/** What the model reads: the request without its id or version. Nothing else of the ledger. A v3 request adds the
+/** What the model reads: the request without its id or version. Nothing else of the ledger. A v3 or v4 request adds the
  * reply `language`; a v2 request has none, and the instructions then follow the person's own language. */
 export function modelInput(request) {
   const { action, text, todayISO, currency, region, facts } = request;
-  return { action, text, todayISO, currency, region, ...(request.version === 3 ? { language: request.language } : {}), facts };
+  return { action, text, todayISO, currency, region, ...(withLanguage(request.version) ? { language: request.language } : {}), facts };
 }
 
-const PROPOSAL_KEYS = ['kind', 'amountMinor', 'currency', 'merchant', 'category', 'dateISO', 'paymentMethodRef'];
+/** The amount a model states (v4): the number the person meant, in major units of the currency they meant, written as
+ * a canonical decimal: digits, at most one dot followed by digits, no sign, no grouping, no exponent, no leading zero
+ * («15000», «1.99», «0.50»), above zero. Bounded by the widest the domain stores (15 whole digits: a zero-decimal
+ * currency; 4 decimals: `MAX_UNIT_EXPONENT`); whether it fits the currency resolved later (a «12.5» in yen, a 14-digit
+ * amount in pesos) is the device's to decide with that currency's exponent, which asks instead of rounding. */
+const AMOUNT = new RegExp(`^(?:0|[1-9]\\d{0,${PROTOCOL_LIMITS.amountWholeDigits - 1}})(?:\\.\\d{1,${PROTOCOL_LIMITS.amountFractionDigits}})?$`);
+export const isProtocolAmount = value => typeof value === 'string' && AMOUNT.test(value) && /[1-9]/.test(value);
+
+const PROPOSAL_KEYS = ['kind', 'amount', 'currency', 'merchant', 'category', 'dateISO', 'paymentMethodRef'];
 function proposal(value, todayISO) {
   exact(value, PROPOSAL_KEYS);
   if (!PROPOSAL_KINDS.includes(value.kind)
-    || (value.amountMinor !== null && (!Number.isSafeInteger(value.amountMinor) || value.amountMinor <= 0 || value.amountMinor > PROTOCOL_LIMITS.maxAmountMinor))
+    || (value.amount !== null && !isProtocolAmount(value.amount))
     || (value.currency !== null && !PROTOCOL_CURRENCIES.includes(value.currency))
     // A movement already made is never in the future of the person's own day.
     || (value.dateISO !== null && (!isDate(value.dateISO) || value.dateISO > todayISO))) refuse();
-  return { kind: value.kind, amountMinor: value.amountMinor, currency: value.currency,
+  return { kind: value.kind, amount: value.amount, currency: value.currency,
     merchant: nullableName(value.merchant, PROTOCOL_LIMITS.merchantChars), category: nullableName(value.category, PROTOCOL_LIMITS.categoryChars),
     dateISO: value.dateISO, paymentMethodRef: nullableName(value.paymentMethodRef, PROTOCOL_LIMITS.referenceChars) };
 }
@@ -135,7 +149,8 @@ function navigation(value, cited) {
 }
 
 const RESULT_KEYS = ['type', 'message', 'evidenceIds', 'navigation', 'proposals', 'clarification'];
-/** Validate a result against the request it answers; returns a fresh object holding only the protocol's keys.
+/** Validate a result against the request it answers; returns a fresh object holding only the protocol's keys. The result
+ * is the v4 one whatever the request's version (a proposal states `amount`): what a model writes and a v4 client reads.
  * Run by the server on the provider's output and by the app on the server's reply. */
 export function validateAssistantResultV2(value, request) {
   exact(value, RESULT_KEYS);
@@ -198,6 +213,28 @@ export function recoverAssistantResultV2(value, request) {
   }
 }
 
+/** The cents a v2 or v3 client reads (`amountMinor`) for a v4 amount: its ARS and USD both have two decimals, so the
+ * decimal is read digit by digit, never through a float, and a third non-zero decimal or an amount past the protocol's
+ * old bound is refused (the server answers 502, nothing saved), never rounded or cut. */
+function legacyMinor(amount) {
+  if (amount === null) return null;
+  const [whole, fraction = ''] = amount.split('.');
+  if (/[1-9]/.test(fraction.slice(2))) refuse();
+  const digits = (whole + fraction.slice(0, 2).padEnd(2, '0')).replace(/^0+/, '');
+  if (digits.length > String(PROTOCOL_LIMITS.maxAmountMinor).length) refuse();
+  const minor = Number(digits);
+  if (!(minor > 0 && minor <= PROTOCOL_LIMITS.maxAmountMinor)) refuse();
+  return minor;
+}
+
+/** The validated (v4) result in the wire shape of the request it answers: unchanged for v4; for v2 and v3, each proposal
+ * with `amountMinor` (cents) in place of `amount`, in the same key order, so a client built before v4 reads exactly the
+ * shape it always read. Run by the server only. */
+export function wireResult(result, request) {
+  if (request.version >= 4) return result;
+  return { ...result, proposals: result.proposals.map(({ amount, ...rest }) => ({ kind: rest.kind, amountMinor: legacyMinor(amount), ...rest })) };
+}
+
 /** The `dropped` list a server reply carries beside the validated result (never a key of the result: the result
  * validator refuses it from a model): the droppable names the boundary dropped, each null in the one proposal, without
  * repetition. Absent is none. */
@@ -212,7 +249,7 @@ export function validateDroppedFields(value, result) {
  * required, nullable where unknown, no numeric or length bounds (vendors differ; the validators above enforce them). */
 const nullable = type => ({ type: [type, 'null'] });
 const PROPOSAL_SCHEMA = { type: 'object', additionalProperties: false, required: PROPOSAL_KEYS, properties: {
-  kind: { type: 'string', enum: PROPOSAL_KINDS }, amountMinor: nullable('integer'),
+  kind: { type: 'string', enum: PROPOSAL_KINDS }, amount: nullable('string'),
   currency: { type: ['string', 'null'], enum: [...PROTOCOL_CURRENCIES, null] }, merchant: nullable('string'), category: nullable('string'),
   dateISO: nullable('string'), paymentMethodRef: nullable('string') } };
 export const ASSISTANT_RESULT_SCHEMA = Object.freeze({ type: 'object', additionalProperties: false, required: RESULT_KEYS, properties: {

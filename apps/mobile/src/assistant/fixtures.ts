@@ -36,18 +36,18 @@ export const FIXTURE_CATEGORY_ANSWER: AssistantResultV2 = { ...none, type: 'answ
   message: 'En Supermercado llevás $121.200 este mes, en 11 compras.', evidenceIds: ['current.category.1'], navigation: { target: 'category', factId: 'current.category.1' } };
 
 export const FIXTURE_DRAFT: AssistantResultV2 = { ...none, type: 'proposal', message: 'Preparé este gasto. Revisalo antes de guardarlo.',
-  proposals: [{ kind: 'expense', amountMinor: 1850000, currency: 'ARS', merchant: 'Carrefour', category: 'Supermercado', dateISO: null, paymentMethodRef: 'Visa' }] };
+  proposals: [{ kind: 'expense', amount: '18500', currency: 'ARS', merchant: 'Carrefour', category: 'Supermercado', dateISO: null, paymentMethodRef: 'Visa' }] };
 
 /** Same sentence without a payment method: the app must ask, not guess. */
 export const FIXTURE_DRAFT_NO_ACCOUNT: AssistantResultV2 = { ...none, type: 'proposal', message: 'Preparé este gasto.',
-  proposals: [{ kind: 'expense', amountMinor: 1800000, currency: 'ARS', merchant: 'Súper', category: 'Supermercado', dateISO: null, paymentMethodRef: null }] };
+  proposals: [{ kind: 'expense', amount: '18000', currency: 'ARS', merchant: 'Súper', category: 'Supermercado', dateISO: null, paymentMethodRef: null }] };
 
 /** 25A-06 (decision A): the server left the merchant blank because the model copied a name longer than its bound (the
  * reply carries `dropped: ['merchant']`): the amount, the currency and the rest arrive; the thread says which name is
  * missing and the review asks for it. A category is scripted so the preview card follows the reply with one peso
  * destination (with several, the account is asked first, as for any draft). */
 export const FIXTURE_DRAFT_DROPPED: AssistantResultV2 = { ...none, type: 'proposal', message: 'Preparé este gasto. Revisalo antes de guardarlo.',
-  proposals: [{ kind: 'expense', amountMinor: 300000, currency: 'ARS', merchant: null, category: 'Supermercado', dateISO: null, paymentMethodRef: null }] };
+  proposals: [{ kind: 'expense', amount: '3000', currency: 'ARS', merchant: null, category: 'Supermercado', dateISO: null, paymentMethodRef: null }] };
 
 export const FIXTURE_CLARIFICATION: AssistantResultV2 = { ...none, type: 'clarification', clarification: { field: 'period', candidateIds: [] },
   message: '¿Te referís a lo que gastaste este mes o al total del año?' };

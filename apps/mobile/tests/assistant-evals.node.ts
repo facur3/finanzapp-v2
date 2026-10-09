@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { postingAccountsFor, reviewGaps, validateAccount, validateLiabilityProfiles, type Account, type CreditCardProfile, type Currency } from '@finanzapp/domain';
+import { majorStringToMinor, postingAccountsFor, reviewGaps, validateAccount, validateLiabilityProfiles, type Account, type CreditCardProfile, type Currency } from '@finanzapp/domain';
 import { recoverAssistantResultV2, validateAssistantResultV2, validateDroppedFields, type AssistantRequest, type AssistantResultV2 } from '../../../packages/integrations/assistant-protocol.js';
 import { CASES } from '../../../server/mobile/evals/corpus.js';
 import { buildRequest, goldenOutput } from '../../../server/mobile/evals/harness.js';
 import { completeDraft, contentFromResult } from '../src/assistant/conversation.ts';
 import { reviewDraftFromAssistant } from '../src/assistant/review-proposal.ts';
+const minorFromDecimal = (amount: string, currency: Currency) => { const reading = majorStringToMinor(amount, currency); assert.ok(reading.ok); return reading.ok ? reading.minor : NaN; };
 
 // Producto 25A-05: the eval corpus run through the device. A perfect provider's output (the harness golden) is validated
 // again with the app's own validator against the request the case sends, then resolved by the app's own deterministic code
@@ -73,7 +74,7 @@ function deviceFailures(subset: EvalCase[]) {
     assert.equal(result.type, 'proposal', testCase.id);
     const proposal = result.proposals[0];
     // The model's draft has no destination field at all: only the person's words.
-    assert.deepEqual(Object.keys(proposal).sort(), ['amountMinor', 'category', 'currency', 'dateISO', 'kind', 'merchant', 'paymentMethodRef'], testCase.id);
+    assert.deepEqual(Object.keys(proposal).sort(), ['amount', 'category', 'currency', 'dateISO', 'kind', 'merchant', 'paymentMethodRef'], testCase.id);
     // The destinations compatible with the currency the device resolved: the model's when stated, the device's inference
     // otherwise (decision D, 25A-06; every device block is single-currency, so it equals the request's currency).
     const resolvedCurrency = resolved.content?.kind === 'draft' ? resolved.content.draft.currency : resolved.pending?.draft.currency ?? proposal.currency ?? testCase.request.currency;
@@ -141,7 +142,7 @@ test('25A-06 (decision A): an over-long merchant or category copied verbatim rea
     assert.equal(next.content.kind, 'draft', id);
     const draft = reviewDraftFromAssistant(next.content.kind === 'draft' ? next.content.draft : null!, archive, '2026-10-05T12:00:00.000Z', request.todayISO);
     assert.deepEqual([draft.kind, draft.amountMinor, draft.currency, draft.destinationId, draft.merchant, draft.category, draft.dateISO],
-      ['expense', golden.proposals[0].amountMinor, 'ARS', account.id, null, 'Varios', request.todayISO], id);
+      ['expense', minorFromDecimal(golden.proposals[0].amount!, 'ARS'), 'ARS', account.id, null, 'Varios', request.todayISO], id);
     assert.ok(reviewGaps(draft, archive, request.todayISO).includes('merchant'), id + ': the review asks for the merchant, never fills it');
   }
 });
