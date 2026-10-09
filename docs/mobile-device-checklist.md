@@ -63,6 +63,17 @@ SQLite where persistence matters). Synthetic proposals are never written to the 
   argentinos» and «Dólares estadounidenses» as chips, then the account among that currency's; «Gasté 1,99 en Dólares»
   (an account named «Dólares») goes straight to that account in dollars with 1,99 exactly; the review sheet shows the inferred currency with
   the amount, and Editar lets both be changed; nothing is written before Confirmar.
+- [ ] **Over-long names (25A-06, owner decision A).** *Now, in the fixture view* (a development bundle with
+  `EXPO_PUBLIC_ASSISTANT_FIXTURES=1`): «Gasté 3 mil pesos en Almacén de Ramos Generales y Despensa La Esquina del Barrio
+  Sucursal Norte Número Dos Abierto Las Veinticuatro Horas Todos Los Días» is scripted as a dropped merchant. With one
+  peso account or card: the preview card with «Comercio: Falta completar» and, under the reply, one calm note that the
+  merchant has more than 120 characters and is completed in the review. With several: «¿Con qué lo pagaste?» with the
+  peso destinations as chips, the note under that question, and the preview card after the chip. In both: the message
+  stays in the thread as written; with English chosen the note is English; VoiceOver reads the note; nothing in Para
+  revisar. *Release gate, connected Assistant:* the same sentence gives the proposal with the amount, the
+  currency and the account, the note, then the review sheet with «Falta el comercio o concepto.» and Confirmar withheld;
+  Editar accepts a shorter name (the field stops at 120) and Confirmar then records one movement; a category longer than
+  60 characters is asked right away with the categories in use as chips. Never a cut name, never a 502 for this alone.
 - [ ] **When the Assistant connects (25A-06 on staging, 25A-07 for the product flow), in the release gate:**
   - the review sheet appears by itself right after the proposal is saved, as a native form sheet fitted to its content
     with a grabber, over the Assistant, safe areas respected, light and dark; at the largest text sizes and on an

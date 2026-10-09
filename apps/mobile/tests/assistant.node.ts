@@ -9,11 +9,11 @@ import { integrationClient } from '../src/integrations/client.ts';
 import { translator } from '../src/i18n/messages.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 import { assistantForEnvironment, disconnectedAssistant, failureMessage, failureReason, remoteAssistant, type AssistantEvent } from '../src/assistant/client.ts';
-import { validateAssistantRequest, validateAssistantResultV2, type AssistantRequestV3 } from '../../../packages/integrations/assistant-protocol.js';
+import { PROTOCOL_LIMITS, validateAssistantRequest, validateAssistantResultV2, type AssistantRequestV3 } from '../../../packages/integrations/assistant-protocol.js';
 import type { CaptureDraft } from '../../../packages/integrations/contracts.js';
 import { assistantForBuild } from '../src/assistant/runtime.ts';
-import { FIXTURE_ANSWER, FIXTURE_CATEGORY_ANSWER, FIXTURE_CLARIFICATION, FIXTURE_DRAFT, FIXTURE_DRAFT_NO_ACCOUNT, FIXTURE_FACTS, FIXTURE_OUT_OF_SCOPE, fixtureAssistant,
-  fixtureReply } from '../src/assistant/fixtures.ts';
+import { FIXTURE_ANSWER, FIXTURE_CATEGORY_ANSWER, FIXTURE_CLARIFICATION, FIXTURE_DRAFT, FIXTURE_DRAFT_DROPPED, FIXTURE_DRAFT_NO_ACCOUNT, FIXTURE_FACTS, FIXTURE_OUT_OF_SCOPE,
+  fixtureAssistant, fixtureReply } from '../src/assistant/fixtures.ts';
 import type { AssistantCapture, ClarificationContent } from '../src/assistant/conversation.ts';
 
 // Producto 21: the Assistant conversation model, its client boundary and the
@@ -459,10 +459,47 @@ test('25A-05: the device validates the server\'s reply again against its own req
   assert.deepEqual(await collect(replying({}, 503).ask(parse)), [{ type: 'error', reason: 'unavailable', message: 'assistant.integration.unavailable' }]);
 });
 
+// 25A-06, owner decision A (2026-10-09): the server's reply may carry `dropped`, the optional names its boundary left null
+// because the model copied them past their bound (never cut). The device validates the list against the result it
+// validated itself, carries it on the result event, and reads an older server's reply (no key) as nothing dropped.
+test('25A-06 (decision A): the remote client carries the names the server boundary dropped, validated against the result; absent is none; a list the result contradicts is a failure', async () => {
+  const origin = 'https://finanzapp.example';
+  const replying = (body: unknown) => remoteAssistant(origin, async () => 'jwt', (async () => ({ ok: true, status: 200, json: async () => body })) as unknown as typeof fetch);
+  const parse = { action: 'parse' as const, text: 'Gasté 3 mil pesos en ' + 'Almacén de Ramos Generales '.repeat(5).trim(), todayISO: today, currency: 'ARS' as const, region: 'AR', language: 'es', facts: [] };
+  const blank = { ...FIXTURE_DRAFT, proposals: [{ ...FIXTURE_DRAFT.proposals[0], merchant: null }] };
+  assert.deepEqual(await collect(replying({ ...blank, dropped: ['merchant'], evidence: [] }).ask(parse)), [{ type: 'result', result: blank, facts: [], dropped: ['merchant'] }],
+    'the draft with the name null, and which name, reach the screen');
+  assert.deepEqual(await collect(replying({ ...blank, evidence: [] }).ask(parse)), [{ type: 'result', result: blank, facts: [], dropped: [] }], 'an older server sends no list: nothing dropped');
+  assert.deepEqual(await collect(replying({ ...FIXTURE_DRAFT, dropped: [], evidence: [] }).ask(parse)), [{ type: 'result', result: FIXTURE_DRAFT, facts: [], dropped: [] }], 'the normal path is unchanged');
+  const failed = [{ type: 'error', reason: 'failed', message: '' }];
+  const contradicted: [string, unknown][] = [
+    ['a dropped name that is present in the draft', { ...FIXTURE_DRAFT, dropped: ['merchant'] }],
+    ['a name the boundary never drops', { ...blank, dropped: ['amountMinor'] }],
+    ['a repeated name', { ...blank, dropped: ['merchant', 'merchant'] }],
+    ['a list that is no list', { ...blank, dropped: 'merchant' }],
+    ['a dropped name on a reply that proposes nothing', { ...FIXTURE_OUT_OF_SCOPE, dropped: ['merchant'] }],
+    ['the marker inside the proposal itself', { ...blank, proposals: [{ ...blank.proposals[0], dropped: ['merchant'] }], dropped: ['merchant'] }],
+  ];
+  for (const [what, body] of contradicted) assert.deepEqual(await collect(replying(body).ask(parse)), failed, what);
+  // The thread's notes name the protocol's own bounds, so a bound change is caught here before the copy drifts.
+  for (const t of [es, en]) {
+    assert.ok(t('assistant.dropped.merchant').includes(String(PROTOCOL_LIMITS.merchantChars)));
+    assert.ok(t('assistant.dropped.category').includes(String(PROTOCOL_LIMITS.categoryChars)));
+  }
+  // The development fixture of a dropped merchant: the corpus's over-long sentence, the reply marked, in both languages.
+  const ask = { ...parse, text: 'Gasté 3 mil pesos en Almacén de Ramos Generales y Despensa La Esquina del Barrio Sucursal Norte' };
+  const scripted = fixtureReply(ask);
+  assert.deepEqual('result' in scripted && [scripted.result, scripted.dropped], [FIXTURE_DRAFT_DROPPED, ['merchant']]);
+  assert.deepEqual('result' in fixtureReply({ ...ask, language: 'en' }) && fixtureReply({ ...ask, language: 'en' }), { result: { ...FIXTURE_DRAFT_DROPPED, message: 'I prepared this expense. Review it before saving it.' }, facts: [], dropped: ['merchant'] });
+  const streamed = await collect(fixtureAssistant(0).ask(ask));
+  assert.deepEqual(streamed.at(-1), { type: 'result', result: FIXTURE_DRAFT_DROPPED, facts: [], dropped: ['merchant'] });
+  assert.equal('dropped' in (await collect(fixtureAssistant(0).ask({ ...parse, text: 'Gasté 18.500 en Carrefour con la Visa' }))).at(-1)!, false, 'the other fixtures carry no list');
+});
+
 test('25A-05: every development fixture is a valid protocol v2 result for the request it scripts', () => {
   const request = (action: 'parse' | 'explain', facts = action === 'explain' ? FIXTURE_FACTS : []) =>
     validateAssistantRequest({ version: 2, requestId: 'fixture-request-0001', action, text: 'x', todayISO: today, currency: 'ARS', region: 'AR', facts });
-  for (const result of [FIXTURE_DRAFT, FIXTURE_DRAFT_NO_ACCOUNT, FIXTURE_CLARIFICATION, FIXTURE_OUT_OF_SCOPE]) assert.deepEqual(validateAssistantResultV2(result, request('parse')), result);
+  for (const result of [FIXTURE_DRAFT, FIXTURE_DRAFT_NO_ACCOUNT, FIXTURE_DRAFT_DROPPED, FIXTURE_CLARIFICATION, FIXTURE_OUT_OF_SCOPE]) assert.deepEqual(validateAssistantResultV2(result, request('parse')), result);
   for (const result of [FIXTURE_ANSWER, FIXTURE_CATEGORY_ANSWER]) assert.deepEqual(validateAssistantResultV2(result, request('explain')), result);
   const program = fixtureReply({ action: 'parse', text: 'Escribime un programa en Python', todayISO: today, currency: 'ARS', region: 'AR', language: 'es', facts: [] });
   assert.equal('result' in program && program.result, FIXTURE_OUT_OF_SCOPE, 'a programming request is out of scope');

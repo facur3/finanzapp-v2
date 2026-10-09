@@ -1,5 +1,5 @@
 import type { AssistantFact } from '../../../../packages/integrations/contracts.js';
-import type { AssistantResultV2 } from '../../../../packages/integrations/assistant-protocol.js';
+import type { AssistantResultV2, DroppableField } from '../../../../packages/integrations/assistant-protocol.js';
 import type { AssistantAsk, AssistantClient, AssistantEvent } from './client.ts';
 
 /** TEST FIXTURES. Deterministic, scripted Assistant replies so every UI state
@@ -42,6 +42,13 @@ export const FIXTURE_DRAFT: AssistantResultV2 = { ...none, type: 'proposal', mes
 export const FIXTURE_DRAFT_NO_ACCOUNT: AssistantResultV2 = { ...none, type: 'proposal', message: 'Preparé este gasto.',
   proposals: [{ kind: 'expense', amountMinor: 1800000, currency: 'ARS', merchant: 'Súper', category: 'Supermercado', dateISO: null, paymentMethodRef: null }] };
 
+/** 25A-06 (decision A): the server left the merchant blank because the model copied a name longer than its bound (the
+ * reply carries `dropped: ['merchant']`): the amount, the currency and the rest arrive; the thread says which name is
+ * missing and the review asks for it. A category is scripted so the preview card follows the reply with one peso
+ * destination (with several, the account is asked first, as for any draft). */
+export const FIXTURE_DRAFT_DROPPED: AssistantResultV2 = { ...none, type: 'proposal', message: 'Preparé este gasto. Revisalo antes de guardarlo.',
+  proposals: [{ kind: 'expense', amountMinor: 300000, currency: 'ARS', merchant: null, category: 'Supermercado', dateISO: null, paymentMethodRef: null }] };
+
 export const FIXTURE_CLARIFICATION: AssistantResultV2 = { ...none, type: 'clarification', clarification: { field: 'period', candidateIds: [] },
   message: '¿Te referís a lo que gastaste este mes o al total del año?' };
 
@@ -58,14 +65,17 @@ const ENGLISH = new Map<AssistantResultV2, string>([
   [FIXTURE_CATEGORY_ANSWER, 'In Supermercado you have spent $121.200 this month, across 11 purchases.'],
   [FIXTURE_DRAFT, 'I prepared this expense. Review it before saving it.'],
   [FIXTURE_DRAFT_NO_ACCOUNT, 'I prepared this expense.'],
+  [FIXTURE_DRAFT_DROPPED, 'I prepared this expense. Review it before saving it.'],
   [FIXTURE_CLARIFICATION, 'Do you mean what you spent this month, or the total for the year?'],
   [FIXTURE_OUT_OF_SCOPE, 'I can’t do that. I can help you record an expense or an income, or understand what you spent on.'],
 ]);
 
-type Script = { match: RegExp; reply: { result: AssistantResultV2; facts: AssistantFact[] } | { error: AssistantEvent & { type: 'error' } } };
+type Script = { match: RegExp; reply: { result: AssistantResultV2; facts: AssistantFact[]; dropped?: DroppableField[] } | { error: AssistantEvent & { type: 'error' } } };
 
 const SCRIPTS: Script[] = [
   { match: /carrefour.*visa/i, reply: { result: FIXTURE_DRAFT, facts: [] } },
+  // The corpus's over-long merchant («… en Almacén de Ramos Generales y Despensa …», 131 characters): the server's boundary dropped it.
+  { match: /ramos generales/i, reply: { result: FIXTURE_DRAFT_DROPPED, facts: [], dropped: ['merchant'] } },
   { match: /s[uú]per/i, reply: { result: FIXTURE_DRAFT_NO_ACCOUNT, facts: [] } },
   // The English suggestion chips reach the same scripted replies; the replies stay Spanish (content, as the server answers).
   { match: /por qu[eé] gast[eé] m[aá]s|why did i spend more/i, reply: { result: FIXTURE_ANSWER, facts: FIXTURE_FACTS } },
@@ -82,7 +92,7 @@ const SCRIPTS: Script[] = [
 export function fixtureReply(ask: AssistantAsk): Script['reply'] {
   const reply = SCRIPTS.find(script => script.match.test(ask.text))?.reply ?? { result: FIXTURE_CLARIFICATION, facts: [] };
   if ('error' in reply || ask.language !== 'en') return reply;
-  return { result: { ...reply.result, message: ENGLISH.get(reply.result) ?? reply.result.message }, facts: reply.facts };
+  return { ...reply, result: { ...reply.result, message: ENGLISH.get(reply.result) ?? reply.result.message } };
 }
 
 /** Replays the scripted reply word by word so the streaming states can be seen; `delayMs` 0 keeps tests instant. */
@@ -98,6 +108,6 @@ export function fixtureAssistant(delayMs = 45, wait: (ms: number) => Promise<voi
       if (delayMs) await wait(delayMs);
     }
     if (signal?.aborted) return;
-    yield { type: 'result', result: reply.result, facts: reply.facts };
+    yield { type: 'result', result: reply.result, facts: reply.facts, ...(reply.dropped ? { dropped: reply.dropped } : {}) };
   } };
 }

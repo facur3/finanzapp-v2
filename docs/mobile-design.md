@@ -867,6 +867,12 @@ staging en 25A-06 (runbook §13): la conexión de una build es 25A-07, y Sign in
 ([decisión 006](decisions/006-cloud-identity.md)).
 
 - La línea de versión de Más dice «FinanzApp 0.1.0 (25A-06)». Nada que revisar en el iPhone ahora.
+- Decisión A de B7 (rama `fix/25a-06-b7-overlong-names`): cuando el modelo copia un comercio o una categoría más largos
+  que su límite (120 y 60 caracteres), el servidor deja ese dato vacío en vez de perder la propuesta; en el hilo aparece
+  una nota informativa debajo de la respuesta (`SystemNote`, el mismo renglón calmo de las notas existentes, ícono de
+  información, sin Reintentar), y la propuesta sigue su camino normal (tarjeta con «Falta completar», hoja de revisión
+  con «Falta el comercio o concepto.», Editar). Nada nuevo de color ni de movimiento; el mensaje de la persona queda en
+  el hilo tal como lo escribió.
 
 ## Producto 25A-05 — seguridad de la IA, contrato del proveedor y evaluación (sin cambios visuales)
 
@@ -3067,6 +3073,9 @@ color propio.
 
 ## Pendiente de revisión en iPhone
 
+- Producto 25A-06 B7, decisión A (en su rama; sin build de EAS): en la vista de prueba, la nota debajo de la respuesta
+  para el comercio demasiado largo, en español y en inglés; el resto con el Asistente conectado
+  (docs/mobile-device-checklist.md, «Producto 25A-04», «Over-long names»).
 - Producto 25A-06 fase A (en su rama; sin build de EAS): nada visual que revisar ahora; solo la línea de versión
   «FinanzApp 0.1.0 (25A-06)». Se suma a 25A-07 y al control previo al lanzamiento (docs/mobile-device-checklist.md,
   «Producto 25A-06»).

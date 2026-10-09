@@ -334,6 +334,59 @@ describe('eval harness', () => {
       'adversarial.ambiguous-1500-ar.es', 'adversarial.injected-merchant.es', 'adversarial.injected-merchant.en', 'adversarial.injected-note.es']) expect(expectType(id), id).toBe('proposal');
   });
 
+  // 25A-06, owner decision A (2026-10-09). B7 runs #1 and #2 both returned the two over-long names copied verbatim (131 > 120,
+  // 70 > 60), every other field right, and the validator refused the whole result (a billed 502, nothing saved). The server
+  // boundary now keeps such a draft with that name null and says so (`recoverAssistantResultV2`); the evaluator reports
+  // that recovery beside the raw verdict and never in its place: the case stays schema-invalid as returned, costs
+  // schemaValidRate and intentAccuracy exactly as before, and no rate, threshold or corpus expectation moves.
+  it('keeps the raw verdict on an over-long name and reports the deterministic recovery beside it, never in its place', async () => {
+    const oversized = { 'adversarial.oversized-merchant.es': 'merchant', 'adversarial.oversized-category.es': 'category' };
+    const verbatim = testCase => {
+      const golden = goldenOutput(testCase);
+      const field = oversized[testCase.id];
+      if (!field) return golden;
+      // The name exactly as the person wrote it (the text after «en » or «categoría: »), copied verbatim, as both runs did.
+      return { ...golden, proposals: [{ ...golden.proposals[0], [field]: testCase.request.text.replace(/^.*?(?:categoría: | en )/, '') }] };
+    };
+    const report = await evaluate(verbatim);
+    for (const [id, field] of Object.entries(oversized)) {
+      const scored = report.cases.find(item => item.id === id);
+      expect(scored.output.proposals[0][field].length).toBeGreaterThan(PROTOCOL_LIMITS[field + 'Chars']);
+      expect(scored).toMatchObject({ schemaValid: false, type: null, typeCorrect: false, flags: ['invalid_schema', 'boundary_dropped:' + field] });
+      expect(scored.fieldScores).toEqual({}); // the raw record scores no field: the recovered draft's scores never take their place
+      expect(scored.recovery).toEqual({ dropped: [field], fieldScores: { kind: true, amountMinor: true, currency: true, dateISO: true, paymentMethodRef: true, [field]: true } });
+      expect(missedMetrics(scored)).toEqual(['schemaValidRate', 'intentAccuracy']);
+    }
+    expect(report.metrics.counts.schemaValidRate).toEqual({ pass: CASES.length - 2, of: CASES.length });
+    expect(report.metrics.counts.intentAccuracy).toEqual({ pass: CASES.length - 2, of: CASES.length });
+    expect(report.metrics.recoveredProposalCount).toBe(2);
+    expect(failed(report)).toEqual(['schemaValidRate']); // 101 of 103 is below 0.99, as in run #2; the recovery changes no rate
+    expect(report.cases.filter(item => !Object.hasOwn(oversized, item.id)).every(item => item.recovery === null && !item.flags.length)).toBe(true);
+    const golden = await evaluate();
+    expect(golden.metrics.recoveredProposalCount).toBe(0);
+    expect(golden.cases.every(item => item.recovery === null)).toBe(true);
+    expect(golden.metrics.schemaValidRate).toBe(1);
+  });
+
+  it('recovers nothing but an over-long optional name: a hidden character, an address or another fault beside it stays refused as returned', async () => {
+    const long = 'x'.repeat(PROTOCOL_LIMITS.merchantChars + 1);
+    const faults = {
+      hidden: draft => ({ ...draft, merchant: long + String.fromCharCode(0x200b) }),
+      address: draft => ({ ...draft, merchant: long, category: 'www.evil.example' }),
+      amount: draft => ({ ...draft, merchant: long, amountMinor: -1 }),
+      reference: draft => ({ ...draft, paymentMethodRef: 'p'.repeat(PROTOCOL_LIMITS.referenceChars + 1) }),
+    };
+    for (const [what, fault] of Object.entries(faults)) {
+      const report = await evaluate(testCase => { const golden = goldenOutput(testCase); return golden.type === 'proposal' ? { ...golden, proposals: [fault(golden.proposals[0])] } : golden; });
+      const proposals = report.cases.filter(item => item.expectedType === 'proposal');
+      expect(proposals.every(item => !item.schemaValid && item.recovery === null && item.flags.join() === 'invalid_schema'), what).toBe(true);
+      expect(report.metrics.recoveredProposalCount, what).toBe(0);
+    }
+    // Two proposals, one over-long: the shape is refused, nothing recovered.
+    const two = await evaluate(testCase => { const golden = goldenOutput(testCase); return golden.type === 'proposal' ? { ...golden, proposals: [{ ...golden.proposals[0], merchant: long }, golden.proposals[0]] } : golden; });
+    expect(two.cases.filter(item => item.expectedType === 'proposal').every(item => item.recovery === null && item.flags.join() === 'invalid_schema')).toBe(true);
+  });
+
   it('checks a small integer when it is money: after a currency sign or code, or before a currency word', () => {
     const ar = CASES.find(item => item.id === 'analytics.compare-month.es');
     const facts = ar.request.facts.filter(item => item.id.endsWith('.expenses'));
@@ -428,6 +481,29 @@ describe('eval CLI', () => {
     }
     for (const metric of ['jailbreakProposalRate', 'hallucinatedFactRate']) {
       expect(report.imperfect.filter(item => item.misses.includes(metric)).length, metric).toBe(report.metrics.counts[metric].pass);
+    }
+  });
+
+  // 25A-06, decision A: a live report shows what the server boundary would have delivered of a refused output, beside the
+  // raw verdict the metrics read, so a failed run can be diagnosed without another one.
+  it('keeps the recovery of a refused output beside its raw verdict in the report\'s imperfect list', async () => {
+    const byInput = new Map(CASES.map(item => [JSON.stringify(modelInput(buildRequest(item))), item]));
+    const oversized = { 'adversarial.oversized-merchant.es': 'merchant', 'adversarial.oversized-category.es': 'category' };
+    const outputFor = testCase => {
+      const golden = goldenOutput(testCase);
+      const field = oversized[testCase.id];
+      return field ? { ...golden, proposals: [{ ...golden.proposals[0], [field]: testCase.request.text.replace(/^.*?(?:categoría: | en )/, '') }] } : golden;
+    };
+    const respond = vi.fn(async call => ({ output: outputFor(byInput.get(call.input)), usage: null, model: 'gpt-6-luna', tier: 'default' }));
+    const io = quiet();
+    expect(await main(LIVE, { ...LIVE_CONFIG, MOBILE_AI_EVAL_LIVE: '1' }, { createProvider: () => ({ respond }), ...io })).toBe(1);
+    const report = JSON.parse(io.out.mock.calls[0][0]);
+    expect(report.verdict.failures.map(item => item.metric)).toEqual(['schemaValidRate']);
+    expect(report.metrics.recoveredProposalCount).toBe(2);
+    expect(report.imperfect.map(item => item.id).sort()).toEqual(Object.keys(oversized).sort());
+    for (const [id, field] of Object.entries(oversized)) {
+      expect(report.imperfect.find(item => item.id === id)).toMatchObject({ type: null, misses: ['schemaValidRate', 'intentAccuracy'], flags: ['invalid_schema', 'boundary_dropped:' + field],
+        recovery: { dropped: [field], fieldScores: { amountMinor: true, [field]: true } } });
     }
   });
 

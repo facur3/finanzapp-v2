@@ -26,6 +26,13 @@ export const assistant = {
       limit: 'Llegaste al límite de consultas de hoy. Podés registrar manualmente.',
       failed: 'No se pudo completar la consulta. Tus movimientos no cambiaron.',
     },
+    /** 25A-06 (decision A): one calm line after a reply whose merchant or category the server left blank because the
+     * model copied the person's words past the protocol's bound (120 and 60 characters, never cut). A missing merchant is
+     * completed in the review; a missing category is asked right away (chips of the categories in use) or in the review. */
+    dropped: {
+      merchant: 'El comercio o concepto que escribiste tiene más de 120 caracteres, así que quedó sin completar: escribilo más corto al revisar.',
+      category: 'La categoría que escribiste tiene más de 60 caracteres, así que quedó sin completar: elegí una que ya uses.',
+    },
     composer: {
       placeholder: 'Preguntá o registrá algo…',
       /** VoiceOver name of the message field. */

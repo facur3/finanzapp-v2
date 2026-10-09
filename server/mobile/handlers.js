@@ -1,5 +1,5 @@
 import { InputError, validateCapture } from '../../packages/integrations/contracts.js';
-import { PROTOCOL_LIMITS, validateAssistantRequest, validateAssistantResultV2 } from '../../packages/integrations/assistant-protocol.js';
+import { PROTOCOL_LIMITS, recoverAssistantResultV2, validateAssistantRequest } from '../../packages/integrations/assistant-protocol.js';
 import { providerRequest, inputTokenBound } from './assistant-prompt.js';
 import { actualCostMicroUsd, maxCostMicroUsd, usageOrNull } from './cost.js';
 
@@ -8,9 +8,11 @@ export class ApiError extends Error {
 }
 
 /** Operational telemetry: only these keys, only identifiers, enums and integers. Never a prompt, a merchant, an
- * account or card name, an amount of the person's money, provider prose, a key or a bearer token. */
+ * account or card name, an amount of the person's money, provider prose, a key or a bearer token. `dropped` counts the
+ * optional names the boundary dropped from a proposal (never which, never their text), so a model's miss of the stated
+ * bound stays visible once it no longer ends in `output_invalid`. */
 const TELEMETRY_KEYS = ['route', 'requestId', 'userId', 'status', 'category', 'latencyMs', 'model', 'tier', 'inputTokens', 'cachedInputTokens',
-  'cacheWriteTokens', 'outputTokens', 'reasoningTokens', 'inputTokenBound', 'reservedMicroUsd', 'chargedMicroUsd', 'settlement'];
+  'cacheWriteTokens', 'outputTokens', 'reasoningTokens', 'inputTokenBound', 'reservedMicroUsd', 'chargedMicroUsd', 'settlement', 'dropped'];
 const TOKEN = /^[A-Za-z0-9_.:-]{1,100}$/;
 export function telemetryEvent(fields) {
   const event = {};
@@ -57,7 +59,9 @@ function trustedUsage(ai, served) {
  * validate the request → bound its input tokens and price its worst case → reserve that worst case atomically
  * (kill switch, idempotency, rate, concurrency, per-user and global ceilings: all in the database) → one provider call,
  * no retry → settle (actual cost only from trustworthy usage; otherwise the reservation stays at its maximum) →
- * validate the output again with the protocol → reply with the result and the cited evidence. */
+ * validate the output again with the protocol → reply with the result and the cited evidence. The output validation has
+ * one recovery (25A-06, decision A): a proposal whose only fault is an over-long merchant or category comes back with
+ * that name null and `dropped` naming it, never cut; every other refusal is 502 `output_invalid`, nothing saved. */
 async function assistant(session, body, deps, telemetry) {
   const request = validateAssistantRequest(body);
   telemetry.requestId = request.requestId;
@@ -91,10 +95,13 @@ async function assistant(session, body, deps, telemetry) {
     const [status, message] = PROVIDER_STATUS[failure.category] ?? [502, 'La IA no respondió. No se guardó ningún movimiento.'];
     throw new ApiError(status, message, category);
   }
-  let result;
-  try { result = validateAssistantResultV2(served.output, request); }
+  let result, dropped;
+  try { ({ result, dropped } = recoverAssistantResultV2(served.output, request)); }
   catch { throw new ApiError(502, 'La IA devolvió una respuesta inválida. No se guardó ningún movimiento.', 'output_invalid'); }
-  return { ...result, evidence: request.facts.filter(fact => result.evidenceIds.includes(fact.id)) };
+  if (dropped.length) telemetry.dropped = dropped.length;
+  // `dropped` rides only on a recovered reply: the normal path keeps its wire shape, so a client built before this
+  // recovery still takes every reply it took before (and refuses a recovered one, which it got as a 502 until now).
+  return { ...result, ...(dropped.length ? { dropped } : {}), evidence: request.facts.filter(fact => result.evidenceIds.includes(fact.id)) };
 }
 
 /** Dependencies are mandatory: never replace durable quotas/inbox with process memory. */

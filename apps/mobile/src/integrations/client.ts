@@ -1,5 +1,5 @@
 import { validateCapture, type CaptureRequest } from '../../../../packages/integrations/contracts.js';
-import { ASSISTANT_PROTOCOL_VERSION, validateAssistantRequest, validateAssistantResultV2, type AssistantRequestV3 } from '../../../../packages/integrations/assistant-protocol.js';
+import { ASSISTANT_PROTOCOL_VERSION, validateAssistantRequest, validateAssistantResultV2, validateDroppedFields, type AssistantRequestV3 } from '../../../../packages/integrations/assistant-protocol.js';
 
 /** What a caller asks (protocol v3: the interface `language` the reply is written in travels with the region); the
  * client adds the protocol version and a fresh request id. */
@@ -46,10 +46,13 @@ export function integrationClient(baseURL: string, getAccessToken: () => Promise
       const request = validateAssistantRequest({ version: ASSISTANT_PROTOCOL_VERSION, requestId: newId(), action, text, todayISO, currency, region, language, facts });
       // The server's reply is validated again here, against the request this device sent; its copy of the evidence is
       // dropped: the evidence is this device's own facts, the ones the validated result cites or offers as candidates.
-      const { evidence: _served, ...reply } = await post('assistant', request);
+      // `dropped` (25A-06, decision A) names the optional names the server boundary left null because the model copied
+      // them past their bound; it is validated against the result (absent from an older server is none).
+      const { evidence: _served, dropped: served, ...reply } = await post('assistant', request);
       const result = validateAssistantResultV2(reply, request);
+      const dropped = validateDroppedFields(served, result);
       const named = new Set([...result.evidenceIds, ...(result.clarification?.candidateIds ?? [])]);
-      return { ...result, evidence: request.facts.filter(f => named.has(f.id)) };
+      return { ...result, evidence: request.facts.filter(f => named.has(f.id)), dropped };
     },
   };
 }

@@ -911,6 +911,7 @@ The eval calls the provider **directly**: they bypass the database reservations.
   | Refusals' prose, for a person to read | `refusals` |
   | Grounding and hallucination | `metrics.groundedEvidenceAccuracy`, `metrics.hallucinatedFactRate` |
   | Reply language (protocol v3, since 2026-10-09) | `metrics.replyLanguageAccuracy`; the flagged cases carry `reply_language:<asked>` in `imperfect` |
+  | Boundary recovery of a refused output (decision A, since 2026-10-09) | `metrics.recoveredProposalCount` (a count, no threshold); such a case carries `boundary_dropped:<field>` and `imperfect[].recovery` beside its raw verdict, which the rates read |
   | p50 and p95 latency | `metrics.latencyP50Ms`, `metrics.latencyP95Ms` |
   | Token usage | `metrics.tokens`, means and p95 |
   | Cost in µUSD | `metrics.costMeanMicroUsd`, `costP95MicroUsd`, `costMaxMicroUsd`, `costTotalMicroUsd` |
@@ -927,7 +928,10 @@ The eval calls the provider **directly**: they bypass the database reservations.
   token counts per case. Since run #1 the report lists every case that costs a metric, with the metrics it costs
   (`imperfect[].misses`) and the parsed output the adapter returned (`imperfect[].output`, synthetic), so a failed run
   can be diagnosed without another one; it stays outside the repository like the rest. A response the adapter itself
-  rejected (`provider_<category>` in the flags) has no output to show: the port keeps no partial or unparsed body.
+  rejected (`provider_<category>` in the flags) has no output to show: the port keeps no partial or unparsed body. Since
+  decision A (2026-10-09) a refused output the server boundary would recover (an over-long merchant or category) also
+  shows `imperfect[].recovery` (the names dropped and the recovered draft's field scores) beside its raw verdict; the
+  rates and the verdict read the raw output only.
 
 ## 12. Staging smoke and failure drills (OWNER, at B8)
 

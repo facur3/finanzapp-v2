@@ -67,9 +67,10 @@ export async function main(argv = process.argv.slice(2), env = process.env, { cr
   const verdict = checkThresholds(metrics);
   // Every case that costs a metric or carries a flag, with the metrics it costs: the same table the metrics are computed
   // from (harness.js RATES), so the list and the numbers cannot diverge. `output` is the adapter's parsed output, null
-  // when the adapter threw (then flags[0] is `provider_<category>` and no body was kept).
+  // when the adapter threw (then flags[0] is `provider_<category>` and no body was kept). `recovery` is what the server
+  // boundary would have delivered of a refused output (an optional name dropped), beside the raw verdict, never in its place.
   const imperfect = cases.filter(isImperfect)
-    .map(item => ({ id: item.id, expectedType: item.expectedType, type: item.type, misses: missedMetrics(item), fieldScores: item.fieldScores, flags: item.flags, output: item.output }));
+    .map(item => ({ id: item.id, expectedType: item.expectedType, type: item.type, misses: missedMetrics(item), fieldScores: item.fieldScores, flags: item.flags, recovery: item.recovery, output: item.output }));
   // A live run lists every refusal's words for a human reading: the refusal metrics are heuristics, not a judgement.
   const refusals = live ? cases.filter(item => item.expectedType === 'out_of_scope').map(({ id, type, message }) => ({ id, type, message })) : undefined;
   if (stale && !live) err(`WARNING: the price table was read on ${PRICING.readOn}; a live run or a release must re-read it first.`);

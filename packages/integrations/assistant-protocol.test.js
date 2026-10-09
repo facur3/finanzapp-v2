@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { ASSISTANT_PROTOCOL_VERSION, ASSISTANT_PROTOCOL_VERSIONS, PROTOCOL_LIMITS, PROTOCOL_CURRENCIES, PROPOSAL_KINDS, modelInput, validateAssistantResultV2, validateAssistantRequest,
-  isSafeModelText, isSafeInputText } from './assistant-protocol.js';
+import { ASSISTANT_PROTOCOL_VERSION, ASSISTANT_PROTOCOL_VERSIONS, DROPPABLE_FIELDS, PROTOCOL_LIMITS, PROTOCOL_CURRENCIES, PROPOSAL_KINDS, modelInput, validateAssistantResultV2,
+  validateAssistantRequest, isSafeModelText, isSafeInputText, recoverAssistantResultV2, validateDroppedFields } from './assistant-protocol.js';
 import { MAX_ENTRY_MINOR } from '../domain/money.ts';
 import { REVIEW_KINDS, parseReviewDraft } from '../domain/review-drafts.ts';
 
@@ -54,6 +54,58 @@ describe('protocol v2 stays inside what a review draft can hold', () => {
     }
     // The result shape is the same in both versions: a reply validates the same against either request.
     expect(validateAssistantResultV2(proposal({}), validateAssistantRequest(v3))).toEqual(validateAssistantResultV2(proposal({}), validateAssistantRequest(v2)));
+  });
+
+  // 25A-06, owner decision A (2026-10-09) after B7 runs #1 and #2: a model that copies the person's words verbatim past the
+  // merchant or category bound lost the whole draft (502, billed, nothing saved). The server's one recovery keeps such a
+  // draft with that name null and listed; the strict validator is unchanged and nothing else is recovered.
+  it('recovers a proposal whose only fault is an over-long optional name: that name null and listed, every other field exact', () => {
+    const long = 'm'.repeat(PROTOCOL_LIMITS.merchantChars + 1), longCategory = 'c'.repeat(PROTOCOL_LIMITS.categoryChars + 1);
+    const stated = { amountMinor: 1850000, currency: 'USD', dateISO: '2026-09-18', paymentMethodRef: 'la Visa' };
+    expect([...DROPPABLE_FIELDS]).toEqual(['merchant', 'category']);
+    expect(recoverAssistantResultV2(proposal({ ...stated, merchant: long }), request))
+      .toEqual({ result: validateAssistantResultV2(proposal({ ...stated, merchant: null }), request), dropped: ['merchant'] });
+    expect(recoverAssistantResultV2(proposal({ ...stated, merchant: 'Kiosco', category: longCategory }), request))
+      .toEqual({ result: validateAssistantResultV2(proposal({ ...stated, merchant: 'Kiosco', category: null }), request), dropped: ['category'] });
+    expect(recoverAssistantResultV2(proposal({ merchant: long, category: longCategory }), request).dropped).toEqual(['merchant', 'category']);
+    // Exactly at the bound is kept as returned (nothing dropped); one more is dropped, never cut to the bound.
+    const atBound = proposal({ merchant: 'm'.repeat(PROTOCOL_LIMITS.merchantChars), category: 'c'.repeat(PROTOCOL_LIMITS.categoryChars) });
+    expect(recoverAssistantResultV2(atBound, request)).toEqual({ result: validateAssistantResultV2(atBound, request), dropped: [] });
+    expect(recoverAssistantResultV2(proposal({ merchant: long }), request).result.proposals[0].merchant).toBeNull();
+    // Up to the length of the person's whole text is recoverable (their words copied verbatim); longer cannot be and stays refused.
+    expect(recoverAssistantResultV2(proposal({ merchant: 'm'.repeat(PROTOCOL_LIMITS.textChars) }), request).dropped).toEqual(['merchant']);
+    expect(() => recoverAssistantResultV2(proposal({ merchant: 'm'.repeat(PROTOCOL_LIMITS.textChars + 1) }), request)).toThrow();
+    // The strict validator itself still refuses the over-long name: the recovery is the server boundary's step, never the model's allowance.
+    expect(() => validateAssistantResultV2(proposal({ merchant: long }), request)).toThrow();
+    // A valid output of any type comes back unchanged.
+    const scope = { type: 'out_of_scope', message: 'Solo finanzas.', evidenceIds: [], navigation: null, proposals: [], clarification: null };
+    expect(recoverAssistantResultV2(scope, request)).toEqual({ result: scope, dropped: [] });
+    // Nothing else is recovered: the same over-long name with a hidden or invisible character or an address, another
+    // fault beside it, a reference or a message over its bound, two proposals, an extra key (the marker itself included),
+    // a blank over-long name, a shape that is no object.
+    const zeroWidth = String.fromCharCode(0x200b);
+    for (const bad of [proposal({ merchant: long + zeroWidth }), proposal({ merchant: long + '\u{E0041}' }), proposal({ category: longCategory + ' www.evil.example' }),
+      proposal({ merchant: long, amountMinor: 0 }), proposal({ merchant: long, currency: 'EUR' }), proposal({ merchant: long, dateISO: '2026-09-20' }),
+      proposal({ merchant: long, category: 'Kiosco' + zeroWidth }), proposal({ paymentMethodRef: 'p'.repeat(PROTOCOL_LIMITS.referenceChars + 1) }),
+      { ...proposal({ merchant: long }), message: 'x'.repeat(PROTOCOL_LIMITS.messageChars + 1) }, { ...proposal({ merchant: long }), extra: true },
+      { ...proposal({ merchant: long }), dropped: ['merchant'] }, { ...proposal({ merchant: long }), proposals: [proposal({ merchant: long }).proposals[0], proposal({}).proposals[0]] },
+      { ...proposal({ merchant: long }), proposals: [{ ...proposal({ merchant: long }).proposals[0], accountId: 'acct-1' }] }, { ...proposal({ merchant: long }), type: 'answer' },
+      proposal({ merchant: ' '.repeat(PROTOCOL_LIMITS.merchantChars + 1) }), { ...proposal({}), proposals: [] }, null, 'texto', { type: 'proposal', proposals: 'x' }]) {
+      expect(() => recoverAssistantResultV2(bad, request), JSON.stringify(bad)).toThrow();
+    }
+  });
+  it('validates the dropped list a server reply carries beside the result: droppable names only, each null in the one proposal, absent is none', () => {
+    const kept = validateAssistantResultV2(proposal({}), request);
+    expect(validateDroppedFields(undefined, kept)).toEqual([]);
+    expect(validateDroppedFields([], kept)).toEqual([]);
+    expect(validateDroppedFields(['merchant'], kept)).toEqual(['merchant']);
+    expect(validateDroppedFields(['category', 'merchant'], kept)).toEqual(['category', 'merchant']);
+    for (const bad of [null, 'merchant', ['paymentMethodRef'], ['merchant', 'merchant'], [1], { merchant: true }, ['amountMinor']]) expect(() => validateDroppedFields(bad, kept), JSON.stringify(bad)).toThrow();
+    // A name listed as dropped must be absent from the draft, and only a proposal can have dropped one.
+    expect(() => validateDroppedFields(['merchant'], validateAssistantResultV2(proposal({ merchant: 'Kiosco' }), request))).toThrow();
+    const scope = validateAssistantResultV2({ type: 'out_of_scope', message: 'No.', evidenceIds: [], navigation: null, proposals: [], clarification: null }, request);
+    expect(() => validateDroppedFields(['merchant'], scope)).toThrow();
+    expect(validateDroppedFields([], scope)).toEqual([]);
   });
 
   it('allows emoji joiners in the person\'s text but refuses direction overrides and controls', () => {

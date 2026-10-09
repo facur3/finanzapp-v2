@@ -1,7 +1,16 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-09 (25A-06, **owner decision D applied: device-side currency inference, ARS and USD**, on
-`feat/25a-06-assistant-currency-inference`, owner direction of the same day, so Luna stops asking a currency the app
+Updated: 2026-10-09 (25A-06 B7, **owner decision A applied: an over-long merchant or category no longer loses the
+draft**, on `fix/25a-06-b7-overlong-names`, owner decision of the same day: the server's one recovery of a refused output
+keeps a proposal whose only fault is an optional name longer than its bound, with that name null and listed in the reply
+(`dropped`), never cut, cleaned or replaced, so the kind, the exact amount, the currency, the date and the payment
+reference reach the person; every other refusal stays 502; the device validates the list, keeps the person's words in
+the thread, says under the reply which name was left blank and why, and the review asks for it before any confirmation;
+the evaluator reports the recovery beside the raw verdict and never in its place (the two corpus cases stay
+schema-invalid as returned and keep costing `schemaValidRate` and `intentAccuracy`; no threshold, corpus expectation,
+prompt or result-shape change; the worst case is unchanged); both live runs stay FAILED, B8 blocked; §2, §3, «Producto
+25A-06», «Phase B record», B7). Earlier the same day (25A-06, **owner decision D applied: device-side currency inference,
+ARS and USD**, PR #98, owner direction of the same day, so Luna stops asking a currency the app
 already knows: the model keeps `null` for a currency the person did not say and `resolveDraft` resolves it with the
 destination, in the owner's order (an explicit currency first; a named, uniquely matched account or card lends its own;
 one currency shared by every destination offered for the kind is inferred; several possible currencies ask, with the
@@ -837,6 +846,15 @@ it was checked in). Metro from `master` (or a delivery's branch) on the installe
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
+- **25A-06 B7 — over-long names, decision A (branch `fix/25a-06-b7-overlong-names`; no EAS build; nothing
+  device-verified):** every build stays disconnected, so the only device-visible change is in the fixture view (a
+  development bundle with `EXPO_PUBLIC_ASSISTANT_FIXTURES=1`): the corpus's over-long sentence («Gasté 3 mil pesos en
+  Almacén de Ramos Generales …») is scripted as a dropped merchant: with one peso destination, the preview card
+  («Comercio: Falta completar») and, under the reply, the calm note that the merchant has more than 120 characters and
+  is completed in the review (in English with English chosen); with several, the account question first, the note under
+  it, and the card after the chip; the person's message stays in the thread as written. The connected flow (the note,
+  then the sheet's «Falta el comercio o concepto.» and Editar) joins the release gate with 25A-07 (the checklist section
+  Producto 25A-04, «Over-long names»).
 - **25A-06 — the reply language, protocol v3 (branch `feat/25a-06-assistant-reply-language`; no EAS build; nothing
   device-verified):** every build stays disconnected, so the only device-visible change is in the fixture view (a
   development bundle with `EXPO_PUBLIC_ASSISTANT_FIXTURES=1`): with English chosen in Más the scripted replies arrive in
@@ -1088,8 +1106,9 @@ before it passes (the runbook's §0.2):
 3. **Phase B activates staging** (B7 runs #1 and #2 completed 2026-10-08 UTC: **Luna FAILED adoption** both times; both
    one-run approvals, 2026-10-07 and 2026-10-08, are consumed; the local fixes are merged (PR #94), decision B is
    applied as an instruction plus the scorer (PR #96; PR #95 closed unmerged), and the reply language is protocol v3
-   (PR #97, owner direction 2026-10-09) and the device infers the currency (decision D, the currency-inference PR);
-   next: the owner's decisions A, C and E, then a new owner spend approval before any further live run; B8 blocked): the **real Luna evaluation** with an owner-approved spend (B7); AI enabled on staging,
+   (PR #97, owner direction 2026-10-09), the device infers the currency (decision D, PR #98) and an over-long optional
+   name no longer loses the draft (decision A, owner decision 2026-10-09, the over-long-names PR); next: the owner's
+   decisions C and E, then a new owner spend approval before any further live run; B8 blocked): the **real Luna evaluation** with an owner-approved spend (B7); AI enabled on staging,
    the failure drills and the race (B8); the **cost reconciliation** against the provider (B9).
 4. A focused **`/security_audit`**, then **`/security_review`** (B10); results recorded and 25A-06 marked done (B11).
 5. **Only then 25A-07 — Real Assistant product contract and polish** («Producto 25A», «Slices»), with the session slice
@@ -5422,7 +5441,7 @@ nothing of it is on a screen yet.
       (`subject`, `name`) so an English reply does not read Spanish labels, and the category-name match for English
       drafts. Not in this PR: any of them, a live call, B8, a service change, an EAS build, a merge.
   - **Decision D applied: device-side currency inference, ARS and USD (owner, decision 2026-10-08, direction
-    2026-10-09; branch `feat/25a-06-assistant-currency-inference`, this PR; no provider call, no prompt change).** Luna
+    2026-10-09; PR #98; no provider call, no prompt change).** Luna
     should feel intelligent and natural: no currency question when the app already knows enough to resolve it safely;
     the model understands the language, the device keeps accounts and currency consistent.
     - *The owner's rule, carried onto master from PR #95's branch (closed unmerged), in this order of precedence:*
@@ -5501,6 +5520,96 @@ nothing of it is on a screen yet.
       the editing paths. Nothing about the accounts is sent to the model to infer a currency.
     - *Device checklist* (`docs/mobile-device-checklist.md`, Producto 25A-04 section): a release-gate item for the
       inferred currency shown and editable in the review sheet, with a connected Assistant.
+  - **B7 — decision A applied (owner decision 2026-10-09): a name that exceeds a field limit must not lose the
+    otherwise valid draft (branch `fix/25a-06-b7-overlong-names`, this PR; no provider call, no prompt change).** The
+    owner's rule: preserve the validated fields, never truncate the person's words silently, and make the missing field
+    visible and editable in the review. A bounded product-reliability change, narrowly limited to this understood
+    length-boundary case: not a general validator of model output, and not a change of the acceptance bar.
+    - *The failure, from the two runs.* `adversarial.oversized-merchant.es` and `adversarial.oversized-category.es`:
+      the output was refused in 4 of 4 observations (2 cases × 2 runs); run #2's retained outputs show the name copied
+      verbatim (131 > 120 and 70 > 60 characters), every other field right (run #1 kept scores and flags only);
+      `validateAssistantResultV2` refuses an over-long name (`isSafeModelText`, the review draft's own
+      bound, pinned by the drift test) and with it the whole result; the server answered 502 `output_invalid` after
+      settling the call, and nothing reached the device. The strict structured-output schema carries no length bound on
+      purpose (the portable subset; a constrained decoder would cut a name mid-word).
+    - *The protocol* (`packages/integrations/assistant-protocol.js`, shared by the server and the device). The result
+      shape, its keys, the strict validator and the structured-output schema are unchanged: no v2.1, no new result key,
+      so a model can never set the marker (`exact()` still refuses any extra key). Two pure additions.
+      `recoverAssistantResultV2(value, request)` is the server's one recovery of a refused output: when the output is a
+      proposal with exactly one draft and its only fault is that `merchant` or `category` (`DROPPABLE_FIELDS`) is longer
+      than its bound (measured on the string as returned, as the strict check measures it) and otherwise what
+      `modelText` accepts (no hidden or invisible character, no address, not blank, and at most as long as the person's
+      whole text, 2 000 characters: a longer one cannot be their words copied verbatim, and that bound also keeps the
+      safety checks cheap), that name is set to null and the whole result is validated again, strictly; the validated
+      result comes back with `dropped` naming the fields. Any other refusal (a hidden character in that very name, an
+      address, another bound overrun, a reference over 80, a message over 1 200, two proposals, an extra key, a
+      malformed shape, the wrong type for the action) is thrown exactly as before, and a valid output comes back
+      unchanged with `dropped` empty.
+      `validateDroppedFields(value, result)` is the device's check of the list the server sends beside the result:
+      droppable names only, no repetition, each null in the one proposal, only on a proposal; absent is none, so a reply
+      from the server as deployed today, which sends no list, still validates. The name is never cut to the bound,
+      cleaned or replaced: a cut name is a different merchant.
+    - *The server* (`server/mobile/handlers.js`). After settlement the output goes through the recovery instead of the
+      bare validator; a recovered reply carries `dropped` beside `evidence`, and only such a reply, so the normal path's
+      wire shape is unchanged and a client built before this change keeps taking every reply it took (it would refuse a
+      recovered one, which reached it as a 502 until now: no regression); every other refusal stays 502 «La IA devolvió
+      una respuesta inválida. No se guardó ningún movimiento.», category `output_invalid`. Telemetry
+      gains `dropped`, the count of names dropped (never which, never their text), so the model's miss of the stated
+      bound stays visible operationally once it no longer ends in a 502. The server saves nothing in any case.
+    - *The device.* `integrations/client.ts` strips `dropped` like `evidence` before the second validation, validates it
+      against the validated result and returns it; the Assistant client carries it on the result event (absent from the
+      other fixtures and from an older server); the screen (`app/assistant.tsx`) dispatches, after the reply, one `info` system
+      note per dropped name (`DROPPED_TEXT`: «El comercio o concepto que escribiste tiene más de 120 caracteres, así que quedó sin
+      completar: escribilo más corto al revisar.», «La categoría que escribiste tiene más de 60 caracteres, así que quedó
+      sin completar: elegí una que ya uses.», with English twins; the notes name the protocol's own bounds and a test pins
+      that). The person's message stays in the thread exactly as written (nothing of it was changed); the draft is
+      resolved and captured as any other, with the exact amount, the currency, the date and the payment reference as the
+      model stated them: a missing category is asked right away with the categories in use as chips, as for any draft
+      without one; a missing merchant is a review gap (the card's row reads «Falta completar», the sheet withholds
+      Confirmar and says «Falta el comercio o concepto.», Editar completes it within the same bound). No write before
+      Confirmar; the review store and the editing paths are untouched. The development fixtures script the corpus's
+      over-long sentence as a dropped merchant (`dropped: ['merchant']`, a category present, so with one peso destination
+      the preview card follows the reply and with several the account question comes first), so the note can be seen in
+      the fixture view.
+    - *The evaluator* (`harness.js`, `run.js`). The owner's rule for the evaluation is stricter than either option of the
+      run #2 record (A(i)(a) or (b)): the raw output stays the measured one. A refused output is `schemaValid: false`,
+      type null, and costs `schemaValidRate` and `intentAccuracy` exactly as in runs #1 and #2; beside that verdict, and
+      never in its place, each case records `recovery` (null, or the names the boundary would drop and the recovered
+      draft's field scores against the expectation), the flag `boundary_dropped:<field>`, and the report counts
+      `recoveredProposalCount`, a count and never a threshold; the imperfect list shows the recovery next to the raw
+      output. The corpus and every expectation (that name null) are unchanged; no threshold moves. A fixture that copies
+      both names verbatim scores 101/103 on `schemaValidRate` and on `intentAccuracy` with two recovered proposals, fails
+      `schemaValidRate` as run #2 did and nothing else; the golden fixture recovers nothing. So a further live run of
+      Luna still fails `schemaValidRate` while it copies long names verbatim (the run #2 projection under A(iii) stands,
+      a property of the model, the corpus and the bound); what changes is the person's outcome, not the bar.
+    - *Tests.* Protocol: the recovery of each name and of both, exactly at the bound kept against one over dropped, a
+      name as long as the person's whole text recovered against one character more refused, a valid output of another
+      type unchanged, the strict validator still refusing, twenty outputs that must not be recovered (a hidden or a tag
+      character in the over-long name, an address, a fault beside it, the reference and the message bounds, two
+      proposals, an extra key, the marker as a model key, a blank over-long name, a name longer than the person's text,
+      no proposal, no object), and the device's list validator with its refusals. Server: the over-long merchant kept
+      with every other field exact and `dropped: ['merchant']`, both names, the normal path with its unchanged key set
+      (no `dropped`) and no telemetry count, the name never in the reply's JSON nor in the log; the refusal list keeps an
+      over-long name as a refusal where another fault rides along (a hidden character, a zero amount) and gains the
+      over-long reference. Evaluator: the two over-long cases copied verbatim (the raw verdict kept with no field score,
+      the recovery beside it, `schemaValidRate` 101/103 and its failure as in run #2, nothing else failing; the recovery
+      and the count in a live report's imperfect list) and four faults that recover nothing. Device: the remote client
+      with and without the list, six contradicted lists refused, the fixture in both languages; the screen on real SQLite
+      (the person's words kept, the note under the reply with no Reintentar, the capture with the exact amount and the
+      merchant missing, the review gap, the sheet presented, nothing written); the screen on the in-memory harness with
+      both names dropped behind a currency question (the notes in the server's order, the chip still completing the
+      parked draft) and with the real fixture (the preview card with the merchant missing and the note under the reply;
+      with several peso destinations the account question first, the note under it, the card after the chip); the
+      corpus's two cases through the recovery, the resolver, the category question and the review adapter (the merchant
+      a gap, every other field exact). Changed tests, each deliberate: the handler's refusal list (an over-long merchant
+      alone is now kept) and the fixture list.
+    - *Effect on scores and thresholds.* Fixture evaluation: every threshold passes, 0 imperfect cases,
+      `recoveredProposalCount` 0 (not a model result). Runs #1 and #2 stay recorded as measured. No threshold, corpus
+      expectation, prompt or result-shape change; the worst case is unchanged, **176 364 µUSD for `gpt-6-luna`** and
+      **383 574 for `gpt-5.6-luna`** (the instructions are the same 5 892 bytes). Any further live run needs a new
+      written owner approval of at least the figure the script computes at that commit.
+    - *Not in this PR:* decisions C and E, any prompt change, a live call, B8, a service change, an EAS build, a merge.
+      Both live runs remain **FAILED**; B8 **BLOCKED**.
 - **Owner refinements before accepting the runbook (2026-10-05, in this PR).**
   - **Staging region:** Vercel Functions `gru1` (São Paulo) and the staging Supabase project in the specific region
     `sa-east-1` (São Paulo), replacing `iad1` / us-east-1. The reasons: Argentina-first, the API compute next to its
