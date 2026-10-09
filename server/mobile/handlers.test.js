@@ -236,8 +236,11 @@ describe('assistant route: order, reservation and settlement', () => {
     expect(deps.log.mock.calls[0][0]).toMatchObject({ status: 200, category: 'ok', dropped: 1 });
     expect(JSON.stringify(deps.log.mock.calls)).not.toContain('Ramos');
     // The same name the person did not write (Codex review of PR #99): invented, refused as any invalid output, billed once.
+    // The text is longer than the name, so the length alone never grounds it: only the words do.
+    const other = { ...request, text: 'Gasté 15 mil en el super de siempre, ' + 'el de la esquina de casa, '.repeat(5).trim() };
+    expect(other.text.length).toBeGreaterThan(long.length);
     const made = ports(); made.provider.respond.mockResolvedValue({ output: { ...proposal, proposals: [{ ...proposal.proposals[0], merchant: long }] }, usage, model: 'gpt-6-luna', tier: 'default' });
-    expect((await call('assistant', request, made)).code).toBe(502);
+    expect((await call('assistant', other, made)).code).toBe(502);
     expect(made.settleAI).toHaveBeenCalledTimes(1);
     expect(made.log.mock.calls[0][0]).toMatchObject({ status: 502, category: 'output_invalid' });
     // Both names over their bounds, both the person's: both dropped. The normal path keeps its wire shape (no `dropped` key) and no telemetry count.

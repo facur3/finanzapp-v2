@@ -183,7 +183,8 @@ function score(testCase, request, output) {
   catch {
     flags.push('invalid_schema');
     // 25A-06, decision A: what the server boundary makes of this refused output (`recoverAssistantResultV2`): a proposal
-    // whose only fault is an over-long optional name reaches the device with that name null, listed. Reported beside the
+    // whose only fault is an over-long optional name copied verbatim from the person's text reaches the device with that
+    // name null, listed (an invented name stays refused). Reported beside the
     // raw verdict, never in its place: `schemaValid`, the type, the field scores and every rate read the output as the
     // model returned it, so a miss of the stated bound still costs schemaValidRate and intentAccuracy, and no recovery
     // moves adoption. `recovery.fieldScores` says what the person would have received, field by field.

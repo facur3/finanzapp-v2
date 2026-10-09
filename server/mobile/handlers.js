@@ -60,8 +60,9 @@ function trustedUsage(ai, served) {
  * (kill switch, idempotency, rate, concurrency, per-user and global ceilings: all in the database) → one provider call,
  * no retry → settle (actual cost only from trustworthy usage; otherwise the reservation stays at its maximum) →
  * validate the output again with the protocol → reply with the result and the cited evidence. The output validation has
- * one recovery (25A-06, decision A): a proposal whose only fault is an over-long merchant or category comes back with
- * that name null and `dropped` naming it, never cut; every other refusal is 502 `output_invalid`, nothing saved. */
+ * one recovery (25A-06, decision A): a proposal whose only fault is an over-long merchant or category copied verbatim
+ * from the person's text comes back with that name null and `dropped` naming it, never cut; an invented name and every
+ * other refusal is 502 `output_invalid`, nothing saved. */
 async function assistant(session, body, deps, telemetry) {
   const request = validateAssistantRequest(body);
   telemetry.requestId = request.requestId;
