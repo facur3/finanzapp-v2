@@ -1192,15 +1192,16 @@ the person's own dated rate) and must not be modelled with one.
 
 The Assistant's contract v1 is retired (Producto 25A-05; never deployed). **Protocol v2**
 (`packages/integrations/assistant-protocol.js`) is the closed result plus the configured
-region (two letters) and a `requestId`, with **no language**; like v1 it knows ARS and USD
-only, and the client does not send anything else (24B1). The region lets a regional word
-(«pesos», a bare «$») resolve only when it is unambiguous (AR → ARS, US → USD); an explicit
-currency wins; anything else stays null or is asked. The planned next version is therefore
-**v3** (docs/i18n.md §11, stage 7 of §7.5), with the same server-first rollout: it carries
-language and region as two separate preferences, validates currencies against a generated
-superset independent of the client gate, states the scale instead of "centavos", and returns
-draft amounts as canonical major-unit strings that the client converts and checks. Nothing
-below is active; no paid AI is enabled and v2 is not modified by it.
+region (two letters) and a `requestId`; **protocol v3** (25A-06) adds the interface
+`language` the reply is written in, beside the region, and the server accepts both versions.
+Like v1 they know ARS and USD only, and the client does not send anything else (24B1). The
+region lets a regional word («pesos», a bare «$») resolve only when it is unambiguous (AR →
+ARS, US → USD); an explicit currency wins; anything else stays null or is asked. The currency
+part of this design is therefore still ahead (docs/i18n.md §11, stage 7 of §7.5), with the
+same server-first rollout: it validates currencies against a generated superset independent of
+the client gate, states the scale instead of "centavos", and returns draft amounts as canonical
+major-unit strings that the client converts and checks. Nothing below is active beyond the
+reply language; no paid AI is enabled.
 
 ### 11.1 "Gasté 30 dólares en Steam."
 
@@ -1245,9 +1246,9 @@ does not show why" is a valid answer. Each reply records the language it was ask
 ### 11.3 Languages and voice
 
 The model must understand a message written in any language, including one different from
-the interface language, and reply in the interface language unless the person explicitly
-asks otherwise in the message (from v3; protocol v2 carries no language, so its instructions
-keep answering in rioplatense Spanish, as v1 did, 25A-05). Merchant names, custom categories and the person's words
+the interface language, and reply in the interface language (protocol v3 carries it since
+25A-06; a v2 request without a language is answered in the person's own language; "unless the
+person explicitly asks otherwise in the message" is not instructed yet). Merchant names, custom categories and the person's words
 are copied verbatim, never translated or "corrected". Voice needs a transcription provider
 with proven multilingual coverage before it is offered; a transcript is shown and editable
 before it becomes a draft.

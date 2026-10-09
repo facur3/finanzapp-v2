@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { PROTOCOL_LIMITS, PROTOCOL_CURRENCIES, PROPOSAL_KINDS, validateAssistantResultV2, validateAssistantRequestV2, isSafeModelText, isSafeInputText } from './assistant-protocol.js';
+import { ASSISTANT_PROTOCOL_VERSION, ASSISTANT_PROTOCOL_VERSIONS, PROTOCOL_LIMITS, PROTOCOL_CURRENCIES, PROPOSAL_KINDS, modelInput, validateAssistantResultV2, validateAssistantRequest,
+  isSafeModelText, isSafeInputText } from './assistant-protocol.js';
 import { MAX_ENTRY_MINOR } from '../domain/money.ts';
 import { REVIEW_KINDS, parseReviewDraft } from '../domain/review-drafts.ts';
 
-const request = validateAssistantRequestV2({ version: 2, requestId: 'fixture-request-0001', action: 'parse', text: 'Gasté 15 mil', todayISO: '2026-09-19', currency: 'ARS', region: 'AR', facts: [] });
+const request = validateAssistantRequest({ version: 2, requestId: 'fixture-request-0001', action: 'parse', text: 'Gasté 15 mil', todayISO: '2026-09-19', currency: 'ARS', region: 'AR', facts: [] });
 const proposal = (fields) => ({ type: 'proposal', message: 'Revisalo.', evidenceIds: [], navigation: null, clarification: null,
   proposals: [{ kind: 'expense', amountMinor: 1500000, currency: null, merchant: null, category: null, dateISO: null, paymentMethodRef: null, ...fields }] });
 
@@ -36,8 +37,27 @@ describe('protocol v2 stays inside what a review draft can hold', () => {
     expect(isSafeInputText('Categoría de gasto: Comida\u{E0041}', 160)).toBe(false);
     expect(isSafeInputText('Categoría de gasto: Comida', 160)).toBe(true);
   });
+  // 25A-06: protocol v3 is v2 plus `language`, the interface language the reply is written in; the server accepts both
+  // (the server-first rollout of docs/i18n.md §11) and returns the wire shape it received. A language never rides on v2.
+  it('accepts protocol v3 next to v2, in the wire shape received, hands the model the language only when sent, and refuses a language on v2', () => {
+    const v2 = { version: 2, requestId: 'fixture-request-0001', action: 'parse', text: 'Gasté 15 mil', todayISO: '2026-09-19', currency: 'ARS', region: 'AR', facts: [] };
+    const v3 = { ...v2, version: 3, language: 'en' };
+    expect(ASSISTANT_PROTOCOL_VERSION).toBe(3);
+    expect([...ASSISTANT_PROTOCOL_VERSIONS]).toEqual([2, 3]);
+    expect(validateAssistantRequest(v3)).toEqual(v3);
+    expect(validateAssistantRequest(v2)).toEqual(v2);
+    expect(modelInput(validateAssistantRequest(v3))).toEqual({ action: 'parse', text: 'Gasté 15 mil', todayISO: '2026-09-19', currency: 'ARS', region: 'AR', language: 'en', facts: [] });
+    expect(modelInput(validateAssistantRequest(v2))).not.toHaveProperty('language');
+    for (const bad of [{ ...v2, language: 'en' }, { ...v3, language: undefined }, { ...v3, language: null }, { ...v3, language: 'EN' }, { ...v3, language: 'spa' }, { ...v3, language: '' },
+      { ...v3, locale: { language: 'en' } }, { ...v3, version: 4 }, { ...v3, version: 1 }, { ...v3, version: '3' }, null, 'v3']) {
+      expect(() => validateAssistantRequest(bad), JSON.stringify(bad)).toThrow();
+    }
+    // The result shape is the same in both versions: a reply validates the same against either request.
+    expect(validateAssistantResultV2(proposal({}), validateAssistantRequest(v3))).toEqual(validateAssistantResultV2(proposal({}), validateAssistantRequest(v2)));
+  });
+
   it('allows emoji joiners in the person\'s text but refuses direction overrides and controls', () => {
-    const ask = text => validateAssistantRequestV2({ version: 2, requestId: 'fixture-request-0001', action: 'parse', text, todayISO: '2026-09-19', currency: 'ARS', region: 'AR', facts: [] });
+    const ask = text => validateAssistantRequest({ version: 2, requestId: 'fixture-request-0001', action: 'parse', text, todayISO: '2026-09-19', currency: 'ARS', region: 'AR', facts: [] });
     expect(ask('Gasté 500 en 👨\u200d👩\u200d👧 regalos').text).toContain('\u200d');
     for (const bad of ['a\u202eb', 'a\u2066b', 'a\u0000b', 'a\u001bb']) expect(() => ask(bad)).toThrow();
   });

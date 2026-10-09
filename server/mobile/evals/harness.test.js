@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
-import { CLARIFICATION_FIELDS, PROTOCOL_LIMITS, modelInput, validateAssistantRequestV2 } from '../../../packages/integrations/assistant-protocol.js';
+import { CLARIFICATION_FIELDS, PROTOCOL_LIMITS, modelInput, validateAssistantRequest } from '../../../packages/integrations/assistant-protocol.js';
 import { ASSISTANT_INSTRUCTIONS } from '../assistant-prompt.js';
 import { CASES, EVAL_TODAY } from './corpus.js';
-import { buildRequest, fixtureResponder, goldenOutput, isImperfect, missedMetrics, requestIdFor, runEval, underivedNumbers } from './harness.js';
+import { buildRequest, fixtureResponder, goldenOutput, isImperfect, missedMetrics, replyLanguageMismatch, requestIdFor, runEval, underivedNumbers } from './harness.js';
 import { THRESHOLDS, checkThresholds } from './thresholds.js';
 import { main, worstCaseMicroUsd } from './run.js';
 import { aiConfig } from '../runtime.js';
@@ -42,7 +42,7 @@ describe('eval corpus', () => {
       expect(Object.keys(item.request).sort()).toEqual(['action', 'currency', 'facts', 'region', 'text']);
       const request = buildRequest(item);
       expect(request.todayISO).toBe(EVAL_TODAY);
-      expect(validateAssistantRequestV2(request)).toEqual(request);
+      expect(validateAssistantRequest(request)).toEqual(request);
     }
   });
 
@@ -76,7 +76,7 @@ describe('eval corpus', () => {
   it('refuses hidden bidirectional characters in the person\'s text before any provider call', () => {
     const base = buildRequest(CASES[0]);
     for (const hidden of ['\u202a', '\u202e', '\u2066', '\u2069']) {
-      expect(() => validateAssistantRequestV2({ ...base, text: 'Gasté 15 mil ' + hidden + 'pesos' })).toThrow();
+      expect(() => validateAssistantRequest({ ...base, text: 'Gasté 15 mil ' + hidden + 'pesos' })).toThrow();
     }
   });
 });
@@ -235,11 +235,36 @@ describe('eval harness', () => {
     expect(failed(report)).toEqual(['groundedEvidenceAccuracy']); // one of ten answers: 0.9 < 0.95; 1 of 103 stays within ≤ 0.02
   });
 
-  it('grounds an answer in rioplatense Spanish to an English or US question, as the instructions require until v3', async () => {
-    const rioplatense = testCase => goldenOutput({ ...testCase, lang: 'es', request: { ...testCase.request, region: 'AR' } });
-    const report = await evaluate(rioplatense);
+  // 25A-06, protocol v3: the request carries the case's language as the interface language and the reply is written in
+  // it. A Spanish reply to an English case is no longer the expected behaviour (B7 runs #1 and #2 measured it as such):
+  // its figures are read as before, since grounding and hallucination never depended on the language, and a reply
+  // clearly written in the other released language is flagged `reply_language:<asked>` and costs `replyLanguageAccuracy`
+  // (min 0.95, thresholds.js; Codex review of PR #97). The flag is conservative (three function words of the other
+  // language and none of the asked one), so a short golden answer escapes it and a verbatim Spanish category name never
+  // counts: what it flags is an unmistakable miss.
+  it('sends the case\'s language as protocol v3 and fails adoption for a model that answers English requests in Spanish', async () => {
+    for (const testCase of CASES) expect(buildRequest(testCase), testCase.id).toMatchObject({ version: 3, language: testCase.lang });
+    expect(modelInput(buildRequest(CASES[0]))).toHaveProperty('language', CASES[0].lang);
+    expect(THRESHOLDS.replyLanguageAccuracy).toEqual({ min: 0.95 });
+    const spanish = testCase => goldenOutput({ ...testCase, lang: 'es', request: { ...testCase.request, region: 'AR' } });
+    const report = await evaluate(spanish);
     expect(report.cases.find(item => item.id === 'analytics.month-total.en').flags).toEqual([]);
     expect(report.metrics).toMatchObject({ groundedEvidenceAccuracy: 1, hallucinatedFactRate: 0 });
+    const refusal = report.cases.find(item => item.id === 'oos.programming.en');
+    expect(refusal).toMatchObject({ language: 'en', flags: ['reply_language:en'] });
+    expect(missedMetrics(refusal)).toEqual(['replyLanguageAccuracy']);
+    // The eight English refusals answered in Spanish are the unmistakable misses (the Spanish answers and questions to
+    // the other English cases are too short for the flag): 95 of 103 is below 0.95, and no other bound moves.
+    expect(report.metrics.counts.replyLanguageAccuracy).toEqual({ pass: 95, of: 103 });
+    expect(failed(report)).toEqual(['replyLanguageAccuracy']);
+    const golden = await evaluate();
+    expect(golden.cases.every(item => !item.flags.length)).toBe(true); // the golden replies in each case's language carry no flag
+    expect(golden.metrics.replyLanguageAccuracy).toBe(1);
+    expect(replyLanguageMismatch('Llevás gastados US$ 842,50 en 9 movimientos este mes, más que el mes pasado.', 'en')).toBe(true);
+    expect(replyLanguageMismatch('You spent US$ 842.50 across 9 movements this month, more than last month.', 'es')).toBe(true);
+    expect(replyLanguageMismatch('Gastos registrados (this month): $842.50, 9 movements. In Supermercado, $312.75.', 'en')).toBe(false);
+    expect(replyLanguageMismatch('¿En qué moneda?', 'en')).toBe(false);
+    expect(replyLanguageMismatch('Which account or card?', 'pt')).toBe(false);
   });
 
   // The general rules B7 run #1 showed missing or contradictory (docs/mobile-roadmap.md, «Producto 25A-06», B7). A string
@@ -263,6 +288,17 @@ describe('eval harness', () => {
     // The 25A-05 allowance for the model's own difference is gone; the causal and insufficient-facts rules stay.
     expect(ASSISTANT_INSTRUCTIONS).not.toMatch(/la diferencia del mismo dato entre este período y el anterior/);
     expect(ASSISTANT_INSTRUCTIONS).toMatch(/Diferencias entre períodos no prueban causas: no afirmes por qué\. Si los facts no alcanzan, pedí aclaración en vez de responder\./);
+  });
+
+  // 25A-06, protocol v3: the reply follows the interface language the request names; a v2 request (no language) falls
+  // back to the person's own language; the region decides numbers and regional currency words, never the language;
+  // names and the person's words are copied, never translated. A string test proves the rule is stated, not followed.
+  it('states the reply language rule of protocol v3 and no longer forces Spanish', () => {
+    expect(ASSISTANT_INSTRUCTIONS).toMatch(/en el idioma que indica language \(código ISO 639-1: "es" es español rioplatense con voseo; "en" es inglés llano\), aunque la persona escriba en otro idioma; si el pedido no trae language, respondé en el idioma en que escribió la persona\./);
+    expect(ASSISTANT_INSTRUCTIONS).toMatch(/Copiá tal cual, sin traducir ni corregir, los nombres de comercios, cuentas y categorías y las palabras de la persona\./);
+    expect(ASSISTANT_INSTRUCTIONS).toMatch(/region es el país de la persona: decide cómo se leen y escriben los números \(AR: 1\.234,56; US: 1,234\.56\) y qué moneda nombra una palabra regional, nunca el idioma de la respuesta\./);
+    expect(ASSISTANT_INSTRUCTIONS).not.toMatch(/el idioma de la respuesta llega con el contrato v3/);
+    expect(ASSISTANT_INSTRUCTIONS).not.toMatch(/message es breve, en español rioplatense con voseo, aunque/);
   });
 
   // The two general rules B7 run #2 showed missing (docs/mobile-roadmap.md, «Producto 25A-06», B7 run #2: cases

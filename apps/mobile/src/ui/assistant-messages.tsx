@@ -6,6 +6,7 @@ import { todayKey, type ReviewArchive } from '@finanzapp/domain';
 import type { AnswerContent, ClarificationOption, Message, ProposalContent } from '../assistant/conversation';
 import { evidenceLabel, optionText } from '../assistant/conversation';
 import type { ReviewItem } from '../storage/review-database';
+import type { LanguageCode } from '../i18n/locale';
 import { useI18n } from '../i18n/provider';
 import { useCategoryLook, useCategoryLookOf } from './category-hues';
 import { AccountBadge, ActionButton, AppText, CategoryBadge, Money, PressFeedback, Surface, type IconName } from './components';
@@ -36,19 +37,18 @@ export function UserMessage({ text }: { text: string }) {
 
 /** Streaming shows the words as they arrive, or "Pensando…" with a pulse
  * before the first one; a stopped answer says so under its partial text.
- * The model's words are content in the language they were written in, which
- * for the server is always Spanish (docs/i18n.md §11): VoiceOver reads them
- * with a Spanish voice, the device's own when the device is in Spanish, even
- * with English chosen in Más. Protocol v2 carries no reply language yet.
- * `ownWords` marks a turn the app wrote itself (a clarification question, "review
- * the draft"): it is already in the interface language and follows the usual rule. */
-const REPLY_LANGUAGE_V1 = 'es';
-export function AssistantText({ text, status, ownWords = false }: { text: string; status: 'streaming' | 'done' | 'stopped'; ownWords?: boolean }) {
+ * The model's words are content in the language they were asked in: protocol v3
+ * sends the interface language with each ask (docs/i18n.md §11) and the message
+ * keeps it as `language`, so VoiceOver reads a reply with the voice of that language
+ * even after the interface changes. `ownWords` marks a turn the app wrote itself (a
+ * clarification question, "review the draft"): it is already in the interface
+ * language and follows the usual rule. */
+export function AssistantText({ text, status, ownWords = false, language: replyLanguage }: { text: string; status: 'streaming' | 'done' | 'stopped'; ownWords?: boolean; language?: LanguageCode }) {
   const { t, language, speechLanguage } = useI18n();
   if (!text && status === 'streaming') return <Thinking />;
-  // The interface's own words, or prose already in the interface language: the usual
-  // rule (nothing when the device agrees). Otherwise the prose names its own language.
-  const replyVoice = ownWords || language === REPLY_LANGUAGE_V1 ? speechLanguage : REPLY_LANGUAGE_V1;
+  // The interface's own words, or prose asked in the interface language: the usual rule (nothing when the device
+  // agrees). Prose asked in another language (a reply kept on screen after a change) names its own language.
+  const replyVoice = ownWords || !replyLanguage || replyLanguage === language ? speechLanguage : replyLanguage;
   return <View accessible accessibilityLabel={t('assistant.message.assistant', { text })} accessibilityLanguage={replyVoice} style={styles.assistantRow}>
     <AppText style={styles.assistantText}>{text}{status === 'streaming' ? <Cursor /> : null}</AppText>
     {status === 'stopped' && <AppText tertiary variant="footnote">{t('assistant.message.stopped')}</AppText>}

@@ -120,6 +120,23 @@ describe('assistant route: order, reservation and settlement', () => {
     expect(deps.reserveAI).not.toHaveBeenCalled();
     expect(deps.provider.respond).not.toHaveBeenCalled();
   });
+  // 25A-06: protocol v3 (v2 plus the interface `language` the reply is written in) is accepted next to v2; the model reads
+  // the language only when it was sent, and a language never rides on a v2 request (docs/i18n.md §11, server first).
+  it('accepts protocol v3 next to v2 and hands the model the language only when it was sent', async () => {
+    const v3 = { ...request, version: 3, language: 'en' };
+    const deps = ports();
+    expect((await call('assistant', v3, deps)).code).toBe(200);
+    expect(JSON.parse(deps.provider.respond.mock.calls[0][0].input)).toMatchObject({ language: 'en', region: 'AR', currency: 'ARS' });
+    const legacy = ports();
+    expect((await call('assistant', request, legacy)).code).toBe(200);
+    expect(JSON.parse(legacy.provider.respond.mock.calls[0][0].input)).not.toHaveProperty('language');
+    for (const bad of [{ ...request, language: 'en' }, { ...request, version: 3 }, { ...v3, language: 'EN' }, { ...v3, language: 'spa' }, { ...v3, language: null }, { ...v3, locale: { language: 'en' } }]) {
+      const refused = ports();
+      expect((await call('assistant', bad, refused)).code, JSON.stringify(bad)).toBe(400);
+      expect(refused.reserveAI).not.toHaveBeenCalled();
+      expect(refused.provider.respond).not.toHaveBeenCalled();
+    }
+  });
   it('keeps the reservation at its maximum when the cost is unknown, never releasing it', async () => {
     const cases = [
       [{ category: 'timeout' }, 502], [{ category: 'network' }, 502], [{ category: 'http' }, 502], [{ category: 'spend_limit' }, 503], [{ category: 'refusal' }, 422],

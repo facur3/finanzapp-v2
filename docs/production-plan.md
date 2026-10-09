@@ -719,16 +719,19 @@ device pass is a release blocker, not a merge gate (owner decision, 2026-10-04: 
 ### 5.4 Minimal context: what leaves the device
 
 **EXISTS TODAY, by design** (`apps/mobile/src/integrations/evidence.ts`, `packages/integrations/assistant-protocol.js`).
-Today nothing is sent, because the client is disconnected. When connected, a protocol v2 request (§5.5a) carries only:
+Today nothing is sent, because the client is disconnected. When connected, a protocol v3 request (§5.5a) carries only:
 
 | Action | Sent | Not sent |
 | --- | --- | --- |
-| `parse` (record something) | The person's text (up to 2 000 characters), today's local date, the screen's currency (ARS or USD), the configured region (two letters, read from the interface when the ask is sent), and a fresh `requestId`. **No facts.** | Any ledger data: no account or card name, no merchant history, no balance. |
+| `parse` (record something) | The person's text (up to 2 000 characters), today's local date, the screen's currency (ARS or USD), the configured region and the interface language (two letters each, read from the interface when the ask is sent; the language since protocol v3, 25A-06), and a fresh `requestId`. **No facts.** | Any ledger data: no account or card name, no merchant history, no balance. |
 | `explain` (an analytical question) | The same, plus at most 60 aggregated facts: month-to-date and the comparable previous period, as totals and counts of expenses, income and refunds, and, for each of the two periods, up to 26 category totals labelled with the person's category names. | Merchants, account names, balances, individual movements, cards, debts, budgets, any identifier other than the fact ids. |
 
 The `requestId` is the reservation's idempotency key (§6.3), never shown to the model: the model reads the request
 without its version and id (`modelInput`). The region is sent because it is the only thing that lets a regional word
-(«pesos», a bare «$») resolve to a currency; it is a two-letter code, not a locale, and no language is sent (§5.5a).
+(«pesos», a bare «$») resolve to a currency; it is a two-letter code, not a locale. Since protocol v3 (25A-06) the
+interface language is sent too, as a two-letter code, so the reply is written in it: a preference the person chose or
+the device's first released language, never the device's language list, time zone or any other setting, and no other
+field rides along (§5.5a).
 Using AI does not upload the ledger. A custom category name is the most personal thing an `explain` request carries.
 The consent screen must say exactly this. New fact kinds (budgets, cards, commitments) are added one at a time, each
 with a reason, each visible in the consent text; "send everything and let the model sort it out" is not an option.
@@ -788,12 +791,17 @@ app, with its types in `assistant-protocol.d.ts`). **DECIDED in 25A-05:** the As
 (`validateAssistantRequest` / `validateAssistantResult` in `contracts.js`) is **retired**; it was never deployed and every
 build was disconnected. Captures keep their contract v1 (`contracts.js`).
 
-**Request:** exactly `{ version: 2, requestId, action, text, todayISO, currency, region, facts }`. `requestId` matches
-`^[A-Za-z0-9_-]{16,100}$` and is fresh per ask (the app uses expo-crypto's `randomUUID`); `action` is `parse` or
-`explain`; `text` is at most 2 000 characters with control characters and bidirectional overrides refused (emoji
-joiners allowed); `currency` is ARS or USD; `region` is two capital letters; `facts` at most 60, none on `parse`. Unknown
-keys are refused, so no language, account or card field can ride along. The planned locale and currency contract of
-[i18n.md](i18n.md) §11 and [currency.md](currency.md) §11 becomes **v3**, with the same server-first rollout.
+**Request:** exactly `{ version: 2, requestId, action, text, todayISO, currency, region, facts }` (v2), or the same
+keys plus `language` with `version: 3` (**v3, EXISTS TODAY since 25A-06**: the interface language the reply is written
+in, two lowercase letters, ISO 639-1, beside the region). `requestId` matches `^[A-Za-z0-9_-]{16,100}$` and is fresh
+per ask (the app uses expo-crypto's `randomUUID`); `action` is `parse` or `explain`; `text` is at most 2 000 characters
+with control characters and bidirectional overrides refused (emoji joiners allowed); `currency` is ARS or USD; `region`
+is two capital letters; `facts` at most 60, none on `parse`. Unknown keys are refused, so no account, card or locale
+object can ride along, and a language never rides on v2. The shared validator (`validateAssistantRequest`) accepts both
+versions and returns the wire shape it received, the server-first rollout of [i18n.md](i18n.md) §11; the app sends v3;
+the model reads the language only when it was sent. The result shape is the same in both versions. The rest of the
+planned contract, language-neutral facts and the currency fields of [currency.md](currency.md) §11, is still ahead,
+with the same rollout.
 
 **Result:** one flat object with every key required: `type` (`answer`, `proposal`, `clarification` or `out_of_scope`),
 `message` (at most 1 200 characters of safe prose), `evidenceIds` (ids of facts in the request only), `navigation`
@@ -826,8 +834,8 @@ anything becomes content, then the device's own `resolveDraft`, `reviewDraftFrom
 (§5.3) decide what a proposal may become. On the device an `out_of_scope` reply is the model's message as prose only, with
 no card and no action; a clarification gets chips only for candidates that are facts this device sent.
 
-**Decided for v2, in the instructions** (`server/mobile/assistant-prompt.js`; measured by §5.8, never a boundary):
-the model replies in rioplatense Spanish with voseo, as v1 did (the reply's VoiceOver voice is Spanish; the reply language arrives with v3); a purchase in
+**Decided in the instructions** (`server/mobile/assistant-prompt.js`; measured by §5.8, never a boundary):
+the model replies in the request's `language` (protocol v3, 25A-06: `es` is rioplatense Spanish with voseo, `en` plain English), whatever language the person typed; a v2 request, which carries no language, is answered in the person's own language; the region decides how numbers are read and written and what a regional currency word names, never the language; merchants, accounts, categories and the person's words are copied verbatim, never translated (the device keeps each reply's language, so VoiceOver speaks it in that language); a purchase in
 instalments («en cuotas») is not supported in v2 and is answered `out_of_scope`, pointing to Tarjetas, never proposed
 as one payment (until slice 25A-11); a transfer, a card payment, a loan or a bank reintegro is asked about, never
 proposed as an expense or income; the means of payment is copied as the person's words, never chosen by the model.
@@ -886,8 +894,9 @@ proposed as an expense or income; the means of payment is copied as the person's
 
 **DECIDED** (owner's 25OPS1 brief; roadmap «Producto 25A», Gates): no model is blessed because existing code names
 it. A model is chosen by running a recorded evaluation, and re-chosen the same way whenever the model, the prompt or
-the schema changes. **No paid evaluation has been run**, and no real model has been evaluated; the first run is 25A-06,
-on staging, and needs the owner's configured provider project and approval.
+the schema changes. **Two paid evaluations have been run** (B7 runs #1 and #2, 2026-10-08, on staging: `gpt-6-luna`
+FAILED adoption both times; roadmap «Producto 25A-06», B7); any further run needs a new owner approval covering the
+worst case the evaluator recomputes at that commit (runbook §11).
 
 **EXISTS TODAY (25A-05): the corpus, the harness, the metrics and the thresholds, written before any real test.**
 
@@ -898,11 +907,14 @@ on staging, and needs the owner's configured provider project and approval.
   expected resolution of the payment reference against synthetic accounts. No real person, ledger or secret. Validator
   properties (a URL, code, a hidden character, an unsupplied fact id, two proposals, a future date) are pinned in the
   protocol and handler tests instead, since they do not depend on a model.
-- **Harness** (`server/mobile/evals/harness.js`): builds every request exactly as the server does (the v2 validator,
-  then the provider-neutral request), asks a responder, validates the output with the protocol and scores it. Metrics:
+- **Harness** (`server/mobile/evals/harness.js`): builds every request exactly as the server does (the request
+  validator, protocol v3 with each case's language since 25A-06, then the provider-neutral request), asks a responder,
+  validates the output with the protocol and scores it. Metrics:
   `schemaValidRate`, `intentAccuracy`, `captureFieldAccuracy`, `clarificationAccuracy`,
   `destinationReferencePreservation`, `unsupportedRefusalRate`, `jailbreakProposalRate`, `groundedEvidenceAccuracy`,
-  `servedAsConfiguredRate`, `hallucinatedFactRate`, latency p50/p95 and cost mean/p95/max in integer µUSD (untrusted or
+  `replyLanguageAccuracy` (added 2026-10-09 with protocol v3: the share of schema-valid replies not clearly written in
+  the other released language than the one the request named; a conservative reading, so only unmistakable misses
+  count; ≥ 0.95), `servedAsConfiguredRate`, `hallucinatedFactRate`, latency p50/p95 and cost mean/p95/max in integer µUSD (untrusted or
   missing usage is costed at the reservation's maximum, as the server does). A reply the provider reports serving with
   another model or tier is untrusted by the server's own rule (`servedAsConfigured` in `handlers.js`): flagged, costed at
   the maximum and not the candidate's result. A small integer in an answer is ignored as a day or a count only when it is
@@ -1781,7 +1793,7 @@ Nothing below is complete unless it says **EXISTS TODAY**. "Launch §n" is a sec
 | Privileged path with the Supabase secret key | 25A | **EXISTS TODAY** in code (25A-05; only `sb_secret_…` and `sb_publishable_…` kinds since 25A-06 Phase A); staging keys exist (runbook B3, B6, 2026-10-07); none for production | Production keys at a release decision |
 | Sign-in, session storage, account deletion | 25A | **NOT IMPLEMENTED**; the method **accepted** in [decision 006](decisions/006-cloud-identity.md) (Sign in with Apple; PR #87); **LAUNCH BLOCKER** once accounts exist | The session slice, after 25A-06 and before any build calls the cloud Assistant |
 | Assistant capability boundary (no generic tools) | all | **DECIDED**; **EXISTS TODAY** (no tools; the adapter's request keys are allowlisted and a tool call is refused, 25A-05) | Kept by review of every Assistant change |
-| Closed Assistant protocol v2, validated on the server and the device | 25A | **EXISTS TODAY** (25A-05); v1 retired, never deployed | v3 (locale, currencies) server first, later |
+| Closed Assistant protocol v2 and v3, validated on the server and the device | 25A | **EXISTS TODAY** (v2 in 25A-05; v3 in 25A-06: v2 plus the interface `language` the reply is written in, the server accepting both); v1 retired, never deployed | the remaining v3 fields (language-neutral facts, the currency fields of currency.md §11) server first, later |
 | Cloud-AI consent screen | 25A | **NOT IMPLEMENTED**, **LAUNCH BLOCKER** | Built and shown before any send |
 | Provider port, model as configuration | 25A | **EXISTS TODAY** (25A-05); the OpenAI adapter disabled, nothing configured | — |
 | Model evaluation and choice | 25A | Corpus, harness and thresholds **EXIST TODAY** (25A-05; fixture run only, not model results); `estimateExceededCount` = 0 and the live-run gates added (25A-06 Phase A); B7 runs #1 and #2 (2026-10-08 UTC): **`gpt-6-luna` FAILED adoption** both times (run #1 five thresholds, run #2 four: `schemaValidRate` 0.9806, `intentAccuracy` 0.9417, `clarificationAccuracy` 0.8696, `groundedEvidenceAccuracy` 0.9; thresholds unchanged; both one-run approvals, 2026-10-07 and 2026-10-08, consumed; roadmap «Producto 25A-06», B7); **RESEARCH GATE**, **OWNER ACTION** (paid, approved amount) | The two general instruction rules of the run #2 record are merged (PR #94; string and fixture tests only: not a prediction of a live result); model arithmetic is decided and applied (decision B, 2026-10-08: no model arithmetic, stated in the instructions and measured by the scorer, §5.2; PR #95's prose-figure validator left unmerged by owner direction 2026-10-09); the non-AR currency precedence is decided (decision D, 2026-10-08, recorded on PR #95's branch, its own PR); over-long optional names at the protocol boundary, the transfer sentence and the approval's shape are still pending; then a further live run only with a new owner spend approval covering the worst case the evaluator recomputes (runbook B7) |

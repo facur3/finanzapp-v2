@@ -1,8 +1,19 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-09 (25A-06 B7, **owner decision B applied the simple way: financial calculations belong to FinanzApp's
-deterministic code, never to the model**, on `fix/25a-06-b7-no-model-arithmetic`, the small replacement for PR #95,
-which stays open and unmerged by the owner's direction: the v2 instructions withdraw the allowance for the model to
+Updated: 2026-10-09 (25A-06, **the reply language, protocol v3: the smallest slice toward a multilingual, region-aware
+Luna**, on `feat/25a-06-assistant-reply-language`, owner direction of the same day: the request gains `language`, the
+interface language the reply is written in, beside the existing `region` (version 3; the shared validator accepts v2
+unchanged and v3, the server-first rollout of docs/i18n.md §11, so nothing rides on v2); the instructions stop forcing
+rioplatense Spanish: the reply follows `language`, a request without it follows the person's own language, the region
+decides numbers and regional currency words only, names and the person's words are never translated; the device sends
+`useI18n().language` with each ask and keeps it on the reply, so VoiceOver speaks a reply in its own language after a
+change; the development fixtures answer in English for an English ask; the evaluator sends each case's language and
+flags, as a diagnostic without a threshold, a reply clearly written in the other released language; the worst case
+recomputed, 176 364 µUSD for `gpt-6-luna` and 383 574 for `gpt-5.6-luna`; no threshold, corpus expectation or
+result-shape change; currencies stay ARS/USD and currency inference is the next slice; both live runs stay FAILED, B8
+blocked; §2, §3, «Producto 25A-06», «Phase B record»). Earlier the same day (25A-06 B7, **owner decision B applied the
+simple way: financial calculations belong to FinanzApp's deterministic code, never to the model**, PR #96, the small
+replacement for PR #95, which the owner then closed unmerged: the v2 instructions withdraw the allowance for the model to
 state the difference between the two periods and tell it to compute nothing (no difference, percentage, total, balance,
 conversion or rounding), to restate only the figures of the facts it cites, exactly, and to compare in words while
 explaining naturally; the device keeps drawing the verified difference row; the scorer flags every computed figure and
@@ -815,6 +826,12 @@ it was checked in). Metro from `master` (or a delivery's branch) on the installe
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
+- **25A-06 — the reply language, protocol v3 (branch `feat/25a-06-assistant-reply-language`; no EAS build; nothing
+  device-verified):** every build stays disconnected, so the only device-visible change is in the fixture view (a
+  development bundle with `EXPO_PUBLIC_ASSISTANT_FIXTURES=1`): with English chosen in Más the scripted replies arrive in
+  English and VoiceOver reads them with an English voice; a Spanish reply already on screen keeps a Spanish voice after
+  switching to English (and the reverse); the app's own questions keep following the interface language; the category
+  and account names inside an English reply stay the person's words. Joins the release gate with 25A-07's connected flow.
 - **25A-06 Phase A — AI staging activation, the repository preflight (PR #87, merged; no EAS build): nothing to check
   on the iPhone.** No app change beyond the version line: every build stays disconnected (`assistantForBuild` passes no
   session provider) and no build points at staging in 25A-06 (ai-staging-runbook.md §13). Phase B's checks happen on
@@ -1058,10 +1075,10 @@ before it passes (the runbook's §0.2):
    `STAGING_VERIFY_OK` (B4), the boundary probe (B5), the Vercel project `finanzapp-api-staging` deployed with AI still
    off in the database (B6).
 3. **Phase B activates staging** (B7 runs #1 and #2 completed 2026-10-08 UTC: **Luna FAILED adoption** both times; both
-   one-run approvals, 2026-10-07 and 2026-10-08, are consumed; the local fixes are merged (PR #94) and decision B is
-   applied as an instruction plus the scorer (the no-model-arithmetic PR; PR #95's prose validator stays unmerged by
-   owner direction); decision D is taken and awaits its own PR; next: the owner's decisions A, C and E, then a new owner
-   spend approval before any further live run; B8 blocked): the **real Luna evaluation** with an owner-approved spend (B7); AI enabled on staging,
+   one-run approvals, 2026-10-07 and 2026-10-08, are consumed; the local fixes are merged (PR #94), decision B is
+   applied as an instruction plus the scorer (PR #96; PR #95 closed unmerged), and the reply language is protocol v3
+   (the reply-language PR, owner direction 2026-10-09); next: currency inference on the device (decision D, its own
+   PR), the owner's decisions A, C and E, then a new owner spend approval before any further live run; B8 blocked): the **real Luna evaluation** with an owner-approved spend (B7); AI enabled on staging,
    the failure drills and the race (B8); the **cost reconciliation** against the provider (B9).
 4. A focused **`/security_audit`**, then **`/security_review`** (B10); results recorded and 25A-06 marked done (B11).
 5. **Only then 25A-07 — Real Assistant product contract and polish** («Producto 25A», «Slices»), with the session slice
@@ -1773,8 +1790,9 @@ Assistant's capability boundary and model evaluation, monetary safety).
   movements and edits as drafts, asks the minimum, answers analytical questions with verifiable
   figures from the ledger, in the released languages and by voice.
 - **Scope.** The closed protocol v2 (delivered in 25A-05: one result of four types, the region, a request id), then
-  protocol v3 (docs/i18n.md §11: `locale` as two codes, language-neutral facts; the server accepts v2 and v3, the app
-  sends v3 only where deployed; renumbered from "v2" in 25A-05) and the currency
+  protocol v3 (docs/i18n.md §11; its first slice, the reply `language` beside the region, delivered in 25A-06 with the
+  server accepting v2 and v3 and the app sending v3; language-neutral facts and the currency fields still ahead;
+  renumbered from "v2" in 25A-05) and the currency
   contract of docs/currency.md §11 ("Gasté 30 dólares en Steam": merchant, amount and currency
   read by the model, the category matched to the person's own identities, the paying account
   decided by the app with one question when several fit, a foreign purchase proposed when no
@@ -4607,8 +4625,9 @@ nothing of it is on a screen yet.
   from its own facts (cited or offered), then `resolveDraft` and the 25A-04 review path decide. The **v1 Assistant
   contract is retired** (never deployed); captures keep contract v1. The planned locale/currency contract
   (docs/i18n.md §11) becomes **v3**.
-- **Decided in the v2 instructions** (`server/mobile/assistant-prompt.js`). The model replies in rioplatense Spanish, as
-  v1 did (the reply's VoiceOver voice is Spanish); the reply language arrives with v3. A purchase **en cuotas** is unsupported in v2: `out_of_scope` pointing to Tarjetas, never a one-payment
+- **Decided in the v2 instructions** (`server/mobile/assistant-prompt.js`). The model replied in rioplatense Spanish, as
+  v1 did, until protocol v3's first slice (25A-06, the reply language): the reply now follows the request's `language`,
+  a request without one follows the person's own language, and the device keeps each reply's language for VoiceOver. A purchase **en cuotas** is unsupported in v2: `out_of_scope` pointing to Tarjetas, never a one-payment
   proposal (until 25A-11). Prose may restate the amounts and counts of the facts it cites, exactly, and compare them in
   words; it computes nothing (the 25A-05 allowance for the difference of the same fact between the two periods was
   withdrawn on 2026-10-08, owner decision B; «Producto 25A-06», B7): never a difference, a percentage, a rounding, a
@@ -5313,6 +5332,79 @@ nothing of it is on a screen yet.
     - *Not in this PR:* currency inference (decision D, its own PR), the over-long-name marker (decision A), the
       transfer sentence (C), the approval's shape (E), the deterministic capture validation, any protocol v3 work. No
       paid call, no staging configuration, no B8, no EAS build, no merge; both live runs remain **FAILED**; B8 **BLOCKED**.
+  - **Protocol v3, the reply language (owner direction, 2026-10-09: the quality and usability of Luna as a multilingual,
+    region-aware assistant; branch `feat/25a-06-assistant-reply-language`, this PR; no provider call).** The first and
+    smallest slice of the v3 contract, chosen because it is the user-visible problem: with English chosen in Más the
+    model still answered in Spanish, by instruction, because protocol v2 carried no language (docs/i18n.md §11: «the
+    reply language arrives with v3»). The inspection before it (seven read-only reviews of i18n, currencies and
+    accounts, the device Assistant, the server route, the protocol, the evaluator and the governing documents) found:
+    `useI18n()` gives `language` ('es' | 'en', the released languages) and `region` (the configured region, any of
+    about 234 released catalogue codes); the region travelled, no language did; the reply was spoken with a fixed
+    Spanish voice (`REPLY_LANGUAGE_V1`); the fixtures replied in Spanish only; 27 of 103 corpus cases are English and
+    were pinned to accept Spanish replies; the device infers a currency only from a destination the person named or
+    chose (`review-proposal.ts`), never from the region, and sends nothing about the accounts; the domain's creation
+    gate holds 146 currencies while the protocol allows ARS and USD; the server reads `region` and `currency` nowhere
+    but to pass them to the model.
+    - *The protocol* (`packages/integrations/assistant-protocol.js`). `validateAssistantRequest` accepts **v2 unchanged
+      and v3**: v3 is v2 plus `language`, two lowercase letters (ISO 639-1), beside the existing `region`; the validator
+      returns the wire shape it received, a language never rides on v2, a `locale` object or any other key is refused;
+      `modelInput` hands the model the language only when it was sent; the result shape, its validator and the
+      structured-output schema (still named `finanzapp_assistant_v2`, since the result is v2's) are unchanged.
+      `ASSISTANT_PROTOCOL_VERSION` is 3 (what a client sends), `ASSISTANT_PROTOCOL_VERSIONS` [2, 3]. The server-first
+      rollout the plan asked for, in one PR because no client is deployed (every build is disconnected; the staging
+      probe keeps sending v2 and proves the server still takes it). Deliberate deviation from the recorded plan, written
+      down in docs/i18n.md §11: a flat `language` beside the `region` the device already sends, not a `locale:
+      { language, region }` object, and the region keeps its two-capital-letter shape.
+    - *The instructions* (`assistant-prompt.js`): «message es breve y natural, en el idioma que indica language (código
+      ISO 639-1: "es" es español rioplatense con voseo; "en" es inglés llano), aunque la persona escriba en otro idioma;
+      si el pedido no trae language, respondé en el idioma en que escribió la persona. Entendé el lenguaje coloquial de
+      la persona en cualquier idioma. Copiá tal cual, sin traducir ni corregir, los nombres de comercios, cuentas y
+      categorías y las palabras de la persona. region es el país de la persona: decide cómo se leen y escriben los
+      números (AR: 1.234,56; US: 1,234.56) y qué moneda nombra una palabra regional, nunca el idioma de la respuesta.»
+      The sentence that forced rioplatense Spanish («el idioma de la respuesta llega con el contrato v3») is gone. No
+      list of colloquial expressions is hard-coded: understanding them is the model's job.
+    - *The device.* `app/assistant.tsx` sends `useI18n().language` with the region, both read when the ask is sent;
+      the conversation keeps the language on each model message (`language` on an assistant `Message`, set by the
+      `delta` and `answer` actions) and `AssistantText` speaks a reply with the voice of the language it was asked in,
+      the interface's voice when they agree (`REPLY_LANGUAGE_V1` removed); the app's own words keep following the
+      interface language. The development fixtures (`fixtures.ts`) answer in English for an English ask, with the same
+      evidence, drafts and clarification fields; category and account names stay the person's words. Nothing about the
+      accounts travels: the request still carries one currency, the region, the language and the aggregated facts.
+    - *Evaluator* (`harness.js`, `thresholds.js`). `buildRequest` sends protocol v3 with each case's `lang` as the
+      interface language; a new flag `reply_language:<asked>` marks a reply clearly written in the other released
+      language (three function words of the other language and none of the asked one; a verbatim Spanish category name
+      inside an English reply never counts; a short reply may escape it, so what it flags is an unmistakable miss) and
+      feeds a new adoption metric, **`replyLanguageAccuracy` ≥ 0.95** (the share of schema-valid replies to a request
+      that names a language without the flag): a tightening of the bar, written before any run under it, after the
+      Codex review of this PR found that a diagnostic flag alone would have let a model that answers every English
+      request in Spanish be adopted. No existing bound moves; runs #1 and #2 predate the metric and stay as recorded.
+      The test that pinned Spanish replies to English cases as correct is replaced by one that pins the v3 request, the
+      flag, the new bound (a fixture that answers every case in Spanish fails only `replyLanguageAccuracy`, 95 of 103)
+      and the golden replies in each case's language. The corpus and every expectation are unchanged; the 27 English
+      cases now also measure an English reply, at the next live run.
+    - *Tests.* Protocol (v3 next to v2, the wire shape, twelve refusals), server (v3 and v2 accepted, the model's input
+      with and without the language, six refusals before any reservation), device (the client posts v3 with the
+      language; a v2 request still validates; a language never rides on v2; the English fixture twins; the reply's
+      recorded language on the message after a language change; the next ask in the new language), evaluator (above).
+      Changed tests, each deliberate: the v2-only client test, the harness test that accepted Spanish replies, the
+      fixture language assertions, the key-set assertions of the route test.
+    - *Effect on scores and thresholds.* None on the fixture evaluation (every threshold passes, no flag). Runs #1 and
+      #2 stay recorded as FAILED, as measured, with their Spanish replies to English cases counted as correct then. One
+      threshold added (`replyLanguageAccuracy` ≥ 0.95, above), none lowered; no corpus expectation or result-shape
+      change. Worst case, recomputed with `worstCaseMicroUsd`: **176 364
+      µUSD for `gpt-6-luna`** (169 803 at PR #96; the instructions grew from 5 399 to 5 892 bytes and each request
+      carries its language) and **383 574 µUSD for `gpt-5.6-luna`** (370 455). Any further live run needs a new written
+      owner approval of at least the figure the script computes at that commit.
+    - *Still ahead, in order, each its own PR.* (1) **Currency inference on the device** (decision D, within ARS/USD):
+      `resolveDraft` lends a uniquely matched account's currency to a draft without one, prefills the single currency
+      every eligible account shares, asks when several remain, never picks an account because its currency matches,
+      never converts; the model keeps `null` for an unstated currency; every inferred value visible and editable in the
+      review. (2) **Protocol v3's currency fields**: `currency` and a draft's currency from the domain's catalogue
+      (`LEDGER_CURRENCIES`, 146 codes) instead of ARS/USD, the scale stated, the regional-word table («pesos» by region:
+      AR → ARS, MX → MXN, …) resolved on the device, the device gate `isLegacyCurrency` lifted, corpus cases for MXN and
+      exact cents; the structured-output schema's currency enum grows with it. (3) **Language-neutral facts**
+      (`subject`, `name`) so an English reply does not read Spanish labels, and the category-name match for English
+      drafts. Not in this PR: any of them, a live call, B8, a service change, an EAS build, a merge.
 - **Owner refinements before accepting the runbook (2026-10-05, in this PR).**
   - **Staging region:** Vercel Functions `gru1` (São Paulo) and the staging Supabase project in the specific region
     `sa-east-1` (São Paulo), replacing `iad1` / us-east-1. The reasons: Argentina-first, the API compute next to its

@@ -1,8 +1,9 @@
 import { validateCapture, type CaptureRequest } from '../../../../packages/integrations/contracts.js';
-import { validateAssistantRequestV2, validateAssistantResultV2, type AssistantRequestV2 } from '../../../../packages/integrations/assistant-protocol.js';
+import { ASSISTANT_PROTOCOL_VERSION, validateAssistantRequest, validateAssistantResultV2, type AssistantRequestV3 } from '../../../../packages/integrations/assistant-protocol.js';
 
-/** What a caller asks; the client adds the protocol version and a fresh request id. */
-export type AssistantQuery = Omit<AssistantRequestV2, 'version' | 'requestId'>;
+/** What a caller asks (protocol v3: the interface `language` the reply is written in travels with the region); the
+ * client adds the protocol version and a fresh request id. */
+export type AssistantQuery = Omit<AssistantRequestV3, 'version' | 'requestId'>;
 
 /** Call only after explicit cloud consent. No API key and no financial data in URLs.
  * Its own failures are thrown as catalogue keys (`assistant.integration.*`):
@@ -41,8 +42,8 @@ export function integrationClient(baseURL: string, getAccessToken: () => Promise
       // Inbox receipt is NOT an Entry or a bank payment confirmation.
       return { id: receipt.id as string, status: 'needs_review' as const, duplicate: receipt.duplicate as boolean };
     },
-    async assistant({ action, text, todayISO, currency, region, facts }: AssistantQuery) {
-      const request = validateAssistantRequestV2({ version: 2, requestId: newId(), action, text, todayISO, currency, region, facts });
+    async assistant({ action, text, todayISO, currency, region, language, facts }: AssistantQuery) {
+      const request = validateAssistantRequest({ version: ASSISTANT_PROTOCOL_VERSION, requestId: newId(), action, text, todayISO, currency, region, language, facts });
       // The server's reply is validated again here, against the request this device sent; its copy of the evidence is
       // dropped: the evidence is this device's own facts, the ones the validated result cites or offers as candidates.
       const { evidence: _served, ...reply } = await post('assistant', request);

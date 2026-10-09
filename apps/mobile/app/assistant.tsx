@@ -51,7 +51,7 @@ export default function AssistantScreen() {
   const day = useCurrentDay();
   const p = usePalette();
   const reduced = useReduceMotion();
-  const { t, speechLanguage, region } = useI18n();
+  const { t, speechLanguage, region, language } = useI18n();
   const session = conversationSession();
   const { conversation: state } = useSyncExternalStore(session.subscribe, session.getState, session.getState);
   const dispatch = session.dispatch;
@@ -136,13 +136,14 @@ export default function AssistantScreen() {
     const controller = new AbortController();
     session.request.current = controller;
     try {
-      // The region is the interface's, as configured when the ask is sent: it lets a regional currency word («pesos») resolve.
-      for await (const event of client.ask({ action, text, todayISO: day, currency, region, facts }, controller.signal)) {
+      // The region and the language are the interface's, as configured when the ask is sent (protocol v3): the region lets a
+      // regional currency word («pesos») resolve, the language is the one the reply is written in; the message keeps it.
+      for await (const event of client.ask({ action, text, todayISO: day, currency, region, language, facts }, controller.signal)) {
         if (controller.signal.aborted) break;
-        if (event.type === 'delta') dispatch({ type: 'delta', text: event.text });
+        if (event.type === 'delta') dispatch({ type: 'delta', text: event.text, language });
         else if (event.type === 'result') {
           const { content, ...rest } = contentFromResult(event.result, event.facts, accounts, entries, currency, day, incomeAccounts);
-          dispatch({ type: 'answer', ...rest, content: toContent(content) });
+          dispatch({ type: 'answer', ...rest, content: toContent(content), language });
           captureNew();
         }
         // A failure's message is the integration client's catalogue key or empty (then the reason's own note); the note translates it through errorText.
@@ -153,7 +154,7 @@ export default function AssistantScreen() {
     } finally {
       if (session.request.current === controller) session.request.current = null;
     }
-  }, [client, session, dispatch, snapshot, accounts, incomeAccounts, entries, currency, region, day, toContent, captureNew]);
+  }, [client, session, dispatch, snapshot, accounts, incomeAccounts, entries, currency, region, language, day, toContent, captureNew]);
 
   const stop = useCallback(() => { session.request.current?.abort(); session.request.current = null; dispatch({ type: 'stop' }); }, [session, dispatch]);
 
@@ -225,7 +226,7 @@ export default function AssistantScreen() {
     if (item.role === 'user') return <Appear><UserMessage text={item.text} /></Appear>;
     if (item.role === 'system') return <Appear><SystemNote message={item} onRetry={text => void send(text)} /></Appear>;
     return <View style={{ gap: space.m }}>
-      {(item.text || item.textKey || item.status === 'streaming') && <AssistantText text={item.textKey ? t(item.textKey) : item.text} ownWords={!!item.textKey} status={item.status} />}
+      {(item.text || item.textKey || item.status === 'streaming') && <AssistantText text={item.textKey ? t(item.textKey) : item.text} ownWords={!!item.textKey} status={item.status} language={item.language} />}
       {item.content?.kind === 'answer' && <AnswerEvidence content={item.content} onOpen={open} />}
       {item.content?.kind === 'clarification' && <ClarificationChoices options={item.content.options} chosen={item.content.chosen} onChoose={(option, shown) => choose(item.id, option, shown)} />}
       {item.content?.kind === 'proposal' && <ProposalCard content={item.content} state={proposalState(item.content)} archive={archive as ReviewArchive | null}

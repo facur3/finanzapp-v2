@@ -1,6 +1,7 @@
-// Assistant protocol v2 (Producto 25A-05): the one closed contract between the app, the server and any model.
-// Pure JS, no dependencies: the server validates a provider's output with it, and the app validates the server's reply
-// with it again before anything becomes a review draft. Structured-output validity is never trusted on its own.
+// Assistant protocol v2 (Producto 25A-05) and v3 (25A-06: v2 plus the reply `language`): the one closed contract between
+// the app, the server and any model. Pure JS, no dependencies: the server validates a provider's output with it, and the
+// app validates the server's reply with it again before anything becomes a review draft. Structured-output validity is
+// never trusted on its own. The result shape is the same in v2 and v3.
 //
 // The model is untrusted. Its output is exactly one of four types and carries financial facts only:
 // - `answer`: prose that cites ids of the facts the device sent (never others), and at most one typed navigation intent
@@ -13,7 +14,11 @@
 // prose that tries to smuggle one (a URL, a code fence, a markdown link, a hidden character).
 import { InputError, isDate } from './contracts.js';
 
-export const ASSISTANT_PROTOCOL_VERSION = 2;
+/** The version a client sends today: v3, which is v2 plus the interface `language` the reply is written in. The server
+ * accepts v2 unchanged and v3 (the server-first rollout of docs/i18n.md §11): a v2 request carries no language, and the
+ * instructions then follow the language the person wrote in. */
+export const ASSISTANT_PROTOCOL_VERSION = 3;
+export const ASSISTANT_PROTOCOL_VERSIONS = [2, 3];
 export const RESULT_TYPES = ['answer', 'proposal', 'clarification', 'out_of_scope'];
 export const PROPOSAL_KINDS = ['expense', 'income'];
 export const PROTOCOL_CURRENCIES = ['ARS', 'USD'];
@@ -70,26 +75,33 @@ function fact(value, todayISO) {
     startISO: value.startISO, endISO: value.endISO };
 }
 
-const REQUEST_KEYS = ['version', 'requestId', 'action', 'text', 'todayISO', 'currency', 'region', 'facts'];
-/** The request the app sends. `requestId` is fresh per ask: the server reserves budget once per id, so a repeated
- * delivery of the same request is refused instead of charged twice. `region` is the configured region (two letters),
- * the only thing that lets a regional currency word («pesos») resolve. A `parse` request carries no ledger facts. */
-export function validateAssistantRequestV2(value) {
-  exact(value, REQUEST_KEYS);
-  if (value.version !== ASSISTANT_PROTOCOL_VERSION || typeof value.requestId !== 'string' || !PROTOCOL_LIMITS.requestId.test(value.requestId)
+const REQUEST_KEYS_V2 = ['version', 'requestId', 'action', 'text', 'todayISO', 'currency', 'region', 'facts'];
+const REQUEST_KEYS_V3 = [...REQUEST_KEYS_V2, 'language'];
+/** The request the app sends, in the wire shape of the version received (a v2 request stays v2). `requestId` is fresh
+ * per ask: the server reserves budget once per id, so a repeated delivery of the same request is refused instead of
+ * charged twice. `region` is the configured region (two letters), the only thing that lets a regional currency word
+ * («pesos») resolve; it never decides the reply's language. A v3 request adds `language`, the interface language the
+ * reply is written in (ISO 639-1, two lowercase letters). A `parse` request carries no ledger facts. */
+export function validateAssistantRequest(value) {
+  if (!object(value) || !ASSISTANT_PROTOCOL_VERSIONS.includes(value.version)) refuse();
+  const v3 = value.version === 3;
+  exact(value, v3 ? REQUEST_KEYS_V3 : REQUEST_KEYS_V2);
+  if (typeof value.requestId !== 'string' || !PROTOCOL_LIMITS.requestId.test(value.requestId)
     || !['parse', 'explain'].includes(value.action) || !isDate(value.todayISO) || !PROTOCOL_CURRENCIES.includes(value.currency)
     || typeof value.region !== 'string' || !/^[A-Z]{2}$/.test(value.region)
+    || (v3 && (typeof value.language !== 'string' || !/^[a-z]{2}$/.test(value.language)))
     || !Array.isArray(value.facts) || value.facts.length > PROTOCOL_LIMITS.facts) refuse();
   const facts = value.facts.map(item => fact(item, value.todayISO));
   if (new Set(facts.map(item => item.id)).size !== facts.length || (value.action === 'parse' && facts.length)) refuse();
-  return { version: ASSISTANT_PROTOCOL_VERSION, requestId: value.requestId, action: value.action, text: inputText(value.text, PROTOCOL_LIMITS.textChars),
-    todayISO: value.todayISO, currency: value.currency, region: value.region, facts };
+  return { version: value.version, requestId: value.requestId, action: value.action, text: inputText(value.text, PROTOCOL_LIMITS.textChars),
+    todayISO: value.todayISO, currency: value.currency, region: value.region, ...(v3 ? { language: value.language } : {}), facts };
 }
 
-/** What the model reads: the request without its id or version. Nothing else of the ledger. */
+/** What the model reads: the request without its id or version. Nothing else of the ledger. A v3 request adds the
+ * reply `language`; a v2 request has none, and the instructions then follow the person's own language. */
 export function modelInput(request) {
   const { action, text, todayISO, currency, region, facts } = request;
-  return { action, text, todayISO, currency, region, facts };
+  return { action, text, todayISO, currency, region, ...(request.version === 3 ? { language: request.language } : {}), facts };
 }
 
 const PROPOSAL_KEYS = ['kind', 'amountMinor', 'currency', 'merchant', 'category', 'dateISO', 'paymentMethodRef'];

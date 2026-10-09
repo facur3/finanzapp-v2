@@ -1110,22 +1110,25 @@ test('a language or region change while the Assistant answers: nothing is re-sen
   await settle();
   screen = view.render();
   assert.equal(scripted.asks.length, 1, 'no second request');
-  const v2 = ['action', 'currency', 'facts', 'region', 'text', 'todayISO'];
-  assert.equal(Object.keys(scripted.asks[0]).sort().join(), v2.join(), 'protocol v2 carries the region, never a language');
+  const v3 = ['action', 'currency', 'facts', 'language', 'region', 'text', 'todayISO'];
+  assert.equal(Object.keys(scripted.asks[0]).sort().join(), v3.join(), 'protocol v3 carries the region and the interface language');
   assert.equal(scripted.asks[0].region, 'AR', 'the region when it was sent, not the one chosen while it was answered');
+  assert.equal(scripted.asks[0].language, 'es', 'the language when it was sent, not the one chosen while it was answered');
   assert.equal(scripted.asks[0].currency, 'ARS', 'the region never changes the currency asked about');
   assert.equal(screen.messages.map(message => message.id).join(), 'u-1,a-2');
   assert.equal(screen.messages[0].text, '¿Por qué gasté más este mes?', 'the user\'s words keep the language they were sent in');
   assert.equal(find([screen.items[1]], 'AssistantText')[0].props.text, FIXTURE_ANSWER.message, 'the model\'s words are content');
   assert.equal(find([screen.items[1]], 'AssistantText')[0].props.ownWords, false, 'the model\'s prose keeps its own voice');
+  assert.equal(find([screen.items[1]], 'AssistantText')[0].props.language, 'es', 'the reply keeps the language it was asked in, so VoiceOver reads it in Spanish after the change');
   assert.equal(find([screen.items[1]], 'AnswerEvidence')[0].props.content.rows[1].amountMinor, 4250000, 'the evidence keeps its numbers');
-  // The next question goes out in the new language with the same v2 keys: the language is never on the wire, the new region is.
+  // The next question goes out with the new language and the new region on the wire (protocol v3).
   view.render().composer.props.onChange('Why did I spend more this month?');
   view.render().composer.props.onSend();
   await tick();
   assert.equal(scripted.asks.length, 2);
-  assert.equal(Object.keys(scripted.asks[1]).sort().join(), v2.join());
+  assert.equal(Object.keys(scripted.asks[1]).sort().join(), v3.join());
   assert.equal(scripted.asks[1].region, 'US');
+  assert.equal(scripted.asks[1].language, 'en');
   // A fixture failure carries no words: the note is the reason's key, read in the language on screen when shown.
   const failing = harness({ client: fixtureAssistant(0), locale: 'en-US' });
   failing.render().composer.props.onChange('error');

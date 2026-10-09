@@ -5,9 +5,9 @@ import { providerRequest, inputTokenBound, ASSISTANT_INSTRUCTIONS } from './assi
 import { aiConfig } from './runtime.js';
 import { maxCostMicroUsd, actualCostMicroUsd, usageOrNull, simulateMonthlyCost } from './cost.js';
 import { PRICING } from './pricing.js';
-import { ASSISTANT_RESULT_SCHEMA, validateAssistantRequestV2 } from '../../packages/integrations/assistant-protocol.js';
+import { ASSISTANT_RESULT_SCHEMA, validateAssistantRequest } from '../../packages/integrations/assistant-protocol.js';
 
-const request = validateAssistantRequestV2({ version: 2, requestId: 'fixture-request-0001', action: 'parse', text: 'Gasté 15 mil en el super', todayISO: '2026-09-19', currency: 'ARS', region: 'AR', facts: [] });
+const request = validateAssistantRequest({ version: 2, requestId: 'fixture-request-0001', action: 'parse', text: 'Gasté 15 mil en el super', todayISO: '2026-09-19', currency: 'ARS', region: 'AR', facts: [] });
 const output = { type: 'out_of_scope', message: 'Solo finanzas.', evidenceIds: [], navigation: null, proposals: [], clarification: null };
 const completed = (extra = {}) => ({ status: 'completed', model: 'gpt-6-luna-2026-09-01', service_tier: 'default',
   output: [{ type: 'reasoning', summary: [] }, { type: 'message', content: [{ type: 'output_text', text: JSON.stringify(output) }] }],
