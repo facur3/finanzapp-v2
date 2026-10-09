@@ -277,7 +277,8 @@ export function categoryOptions(entries: Entry[], kind: EntryKind, limit = 4): C
  * 9. only a destination in a currency the protocol carries (ARS, USD: the model's amount is in its minor units) can lend
  *    its currency, be inferred or be offered; an account in another currency (JPY, MXN) never lends one, and a ledger
  *    that holds one next to ARS or USD asks instead of inferring, so «pesos» is never silently another currency (Codex
- *    review of PR #98).
+ *    review of PR #98); a name is ambiguous when it matches several destinations of any currency, carried or not, and
+ *    the carried match is then asked about, never picked for being the only one the protocol can carry.
  * A named payment method matches an account whose name holds all its words, in order (accent- and case-insensitive:
  * "Visa" is "Visa Galicia", never account "a", and "Visa a crédito" is not "a" either). */
 export function resolveDraft(draft: CaptureDraft, accounts: Account[], entries: Entry[], currency: Currency, todayISO: string, incomeAccounts: Account[] = accounts):
@@ -308,19 +309,28 @@ export function resolveDraft(draft: CaptureDraft, accounts: Account[], entries: 
     if (ref && matches(pool.filter(account => account.currency === draft.currency)).length === 0 && matches(pool).length >= 1) {
       return ask('paymentMethod', 'assistant.clarify.currencyConflict', chips(carried.filter(account => account.currency === draft.currency)), { currency: draft.currency });
     }
-  } else {
+  } else if (ref) {
+    // Whether a name is ambiguous is decided against every destination offered for the kind, carried or not: «Galicia»
+    // with a «Galicia» in pesos and a «Galicia MXN» matches two, and the carried one is never picked for being the only
+    // one the protocol can carry (rule 6; an independent review of PR #98).
+    const namedAll = matches(pool);
     const named = matches(carried);
-    // The currencies in play: the named destinations', or every destination's, those the protocol cannot carry included.
-    const currencies = [...new Set((named.length ? named : pool).map(account => account.currency))];
-    if (currencies.length === 1 && isLegacyCurrency(currencies[0])) { resolvedCurrency = currencies[0]; currencyInferred = true; } // rules 2 and 3
-    // Several destinations match the name across currencies: the choice of destination settles both (rule 6).
-    else if (named.length > 1) return ask('paymentMethod', paidWith, chips(named), { currency, currencyInferred: false });
-    // A name that matches nothing the protocol can carry, with several currencies in play: asked for the destination
-    // among the carried ones, never replaced by one of them (25A-04); the choice settles the currency.
-    else if (ref) return ask('paymentMethod', paidWith, chips(carried), { currency, currencyInferred: false });
+    if (namedAll.length === 1 && named.length === 1) { resolvedCurrency = named[0].currency; currencyInferred = true; } // rule 2
+    else {
+      // Several matches, or only one the protocol cannot carry, or none: asked for the destination among the carried
+      // matches, or among every carried destination, never replaced by one of them (25A-04); the choice settles the
+      // currency, known already when every destination offered shares one carried currency.
+      const currencies = [...new Set(pool.map(account => account.currency))];
+      const shared = currencies.length === 1 && isLegacyCurrency(currencies[0]) ? currencies[0] : null;
+      return ask('paymentMethod', paidWith, chips(named.length ? named : carried), shared ? { currency: shared, currencyInferred: true } : { currency, currencyInferred: false });
+    }
+  } else {
+    // The currencies in play: every destination's, those the protocol cannot carry included.
+    const currencies = [...new Set(pool.map(account => account.currency))];
+    if (currencies.length === 1 && isLegacyCurrency(currencies[0])) { resolvedCurrency = currencies[0]; currencyInferred = true; } // rule 3
     else if (currencies.length > 1) {
-      // Nothing named and several currencies possible: the currency is asked, never guessed from the screen (rule 4), with
-      // the currencies the protocol carries as chips; none in play (another currency only) is asked for the destination.
+      // Several currencies possible: the currency is asked, never guessed from the screen (rule 4), with the currencies
+      // the protocol carries as chips; none in play (another currency only) is asked for the destination, with no chips.
       const offered = [...new Set(carried.map(account => account.currency))];
       if (offered.length) return ask('currency', 'assistant.clarify.currency', offered.map(code => ({ id: code, currency: code })), { currency, currencyInferred: false });
     }

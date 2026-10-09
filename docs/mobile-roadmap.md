@@ -5469,7 +5469,11 @@ nothing of it is on a screen yet.
       model's amount is in the minor units of a protocol currency, so a uniquely named JPY account lending its currency
       would turn 100 into ¥10 000); an account in another currency never lends one, a ledger that holds one next to ARS
       or USD asks the currency with the carried currencies as chips instead of inferring, and a ledger in such
-      currencies only is asked for the destination with no chips.
+      currencies only is asked for the destination with no chips. Whether a name is ambiguous is decided against every
+      destination offered for the kind, carried or not (an independent review of this PR at `6ab95d0`: «Gasté 500 con
+      Galicia» with a «Galicia» in pesos and a «Galicia MXN» silently took the peso account): the carried match is asked
+      about, as the only chip, never picked for being the only one the protocol can carry; a name that matches nothing
+      is asked among the carried destinations, with the currency already inferred when every destination shares one.
     - *The adapter* (`review-proposal.ts`): an inferred currency is captured like a stated one (`currencyStated !== false
       || currencyInferred`), so it is shown in the review sheet with the exact amount and editable in Editar; the
       display currency is still never captured. Chips name a currency in the interface language («Pesos argentinos»,

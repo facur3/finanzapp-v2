@@ -210,6 +210,44 @@ test('on real SQLite: an inferred currency is captured, shown with its exact amo
   } finally { await files.dispose(); }
 });
 
+test('a name is ambiguous against every destination offered for the kind, carried or not: the carried match is never picked for being the only one the protocol can carry', () => {
+  // Independent review of PR #98 at 6ab95d0: «Gasté 500 con Galicia» with a «Galicia» in pesos and a «Galicia MXN» silently
+  // took the peso account, because the ambiguity was judged after the MXN account had been filtered out.
+  const galicia: Account = { id: 'galicia', name: 'Galicia', currency: 'ARS', openingMinor: 0, createdAt };
+  const galiciaMxn: Account = { id: 'galicia-mxn', name: 'Galicia MXN', currency: 'MXN', openingMinor: 0, createdAt };
+  const chase: Account = { id: 'chase', name: 'Chase', currency: 'USD', openingMinor: 0, createdAt };
+  const chaseJpy: Account = { id: 'chase-jpy', name: 'Chase JPY', currency: 'JPY', openingMinor: 0, createdAt };
+  const jpy: Account = { id: 'jpy', name: 'Yenes', currency: 'JPY', openingMinor: 0, createdAt };
+  const banorte: Account = { id: 'banorte', name: 'Banorte', currency: 'MXN', openingMinor: 0, createdAt };
+  // One ARS and one MXN account matching «Galicia»: asked, with the carried match as the chip; nothing inferred, no draft.
+  const pesos = asked(resolveDraft(said({ amountMinor: 50000, paymentMethodRef: 'con Galicia' }), [cash, galicia, galiciaMxn], [], 'ARS', day), 'paymentMethod');
+  assert.deepEqual([pesos.question, pesos.options.map(option => option.id), pesos.partial.currencyInferred, pesos.partial.accountId], ['assistant.clarify.paidWith', ['galicia'], false, null]);
+  // One USD and one JPY account matching the same reference: the same question; the USD match is never taken silently.
+  const dollars = asked(resolveDraft(said({ paymentMethodRef: 'Chase' }), [cash, chase, chaseJpy], [], 'ARS', day), 'paymentMethod');
+  assert.deepEqual([dollars.options.map(option => option.id), dollars.partial.currencyInferred], [['chase'], false]);
+  // Once the person confirms the carried match, it lends its currency, as a chosen destination does; the amount is as said.
+  const confirmed = completeDraft(pendingOf(resolveDraft(said({ amountMinor: 50000, paymentMethodRef: 'con Galicia' }), [cash, galicia, galiciaMxn], [], 'ARS', day)), 'galicia', [cash, galicia, galiciaMxn], [], day);
+  const draft = confirmed.content.kind === 'draft' ? confirmed.content.draft : null!;
+  assert.deepEqual([draft.currency, draft.currencyInferred, draft.accountId, draft.destinationStated, draft.amountMinor], ['ARS', true, 'galicia', true, 50000]);
+  assert.deepEqual([captured(draft, [cash, galicia, galiciaMxn]).currency, captured(draft, [cash, galicia, galiciaMxn]).destinationId], ['ARS', 'galicia']);
+  // A genuinely unique carried match while unrelated accounts in other currencies exist: resolved, its currency lent.
+  const unique = draftOf(resolveDraft(said({ paymentMethodRef: 'Galicia' }), [cash, bank, jpy, banorte], [], 'USD', day));
+  assert.deepEqual([unique.currency, unique.currencyInferred, unique.accountId, unique.destinationStated], ['ARS', true, 'bank', true]);
+  // An account in another currency uniquely named: asked among the carried destinations, never replaced by one of them.
+  const yen = asked(resolveDraft(said({ paymentMethodRef: 'Yenes' }), [cash, usd, jpy], [], 'ARS', day), 'paymentMethod');
+  assert.deepEqual([yen.options.map(option => option.id), yen.partial.currencyInferred], [['cash', 'usd'], false]);
+  // The same, with every carried destination in one currency: the currency is known already, the destination still asked.
+  const yenPesos = asked(resolveDraft(said({ paymentMethodRef: 'Yenes' }), [cash, bank, jpy], [], 'USD', day), 'paymentMethod');
+  assert.deepEqual([yenPesos.options.map(option => option.id), yenPesos.partial.currencyInferred], [['cash', 'bank'], false],
+    'two currencies in play (ARS and JPY): nothing inferred until the destination is chosen');
+  const yenOnlyPesos = asked(resolveDraft(said({ paymentMethodRef: 'Yenes' }), [cash, bank], [], 'USD', day), 'paymentMethod');
+  assert.deepEqual([yenOnlyPesos.options.map(option => option.id), yenOnlyPesos.partial.currency, yenOnlyPesos.partial.currencyInferred], [['cash', 'bank'], 'ARS', true],
+    'a name that matches nothing with every destination in pesos: the currency is inferred, the destination asked');
+  // An explicit currency keeps its precedence: «pesos» said with the two Galicias goes to the one in pesos.
+  const stated = draftOf(resolveDraft(said({ currency: 'ARS', paymentMethodRef: 'Galicia' }), [cash, galicia, galiciaMxn], [], 'ARS', day));
+  assert.deepEqual([stated.currency, stated.accountId, stated.destinationStated], ['ARS', 'galicia', true]);
+});
+
 test('only a currency the protocol carries is inferred, lent or offered: an account in another currency (JPY, MXN, COP) never lends one, and a ledger mixing one in asks instead of inferring', () => {
   // Codex review of PR #98: the model's amount is in the minor units of a protocol currency (centavos); a JPY account
   // lending its currency would turn 100 into ¥10 000. Such an account is never a destination the Assistant resolves to.
