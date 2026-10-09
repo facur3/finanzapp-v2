@@ -5370,13 +5370,18 @@ nothing of it is on a screen yet.
       interface language. The development fixtures (`fixtures.ts`) answer in English for an English ask, with the same
       evidence, drafts and clarification fields; category and account names stay the person's words. Nothing about the
       accounts travels: the request still carries one currency, the region, the language and the aggregated facts.
-    - *Evaluator* (`harness.js`). `buildRequest` sends protocol v3 with each case's `lang` as the interface language; a
-      new diagnostic flag `reply_language:<asked>` marks a reply clearly written in the other released language (three
-      function words of the other language and none of the asked one; a verbatim Spanish category name inside an
-      English reply never counts; a short reply may escape it), listed among a report's `imperfect` cases and counted in
-      no rate: the thresholds are untouched. The test that pinned Spanish replies to English cases as correct is
-      replaced by one that pins the v3 request, the flag and the golden replies in each case's language. The corpus and
-      every expectation are unchanged; the 27 English cases now also measure an English reply, at the next live run.
+    - *Evaluator* (`harness.js`, `thresholds.js`). `buildRequest` sends protocol v3 with each case's `lang` as the
+      interface language; a new flag `reply_language:<asked>` marks a reply clearly written in the other released
+      language (three function words of the other language and none of the asked one; a verbatim Spanish category name
+      inside an English reply never counts; a short reply may escape it, so what it flags is an unmistakable miss) and
+      feeds a new adoption metric, **`replyLanguageAccuracy` ≥ 0.95** (the share of schema-valid replies to a request
+      that names a language without the flag): a tightening of the bar, written before any run under it, after the
+      Codex review of this PR found that a diagnostic flag alone would have let a model that answers every English
+      request in Spanish be adopted. No existing bound moves; runs #1 and #2 predate the metric and stay as recorded.
+      The test that pinned Spanish replies to English cases as correct is replaced by one that pins the v3 request, the
+      flag, the new bound (a fixture that answers every case in Spanish fails only `replyLanguageAccuracy`, 95 of 103)
+      and the golden replies in each case's language. The corpus and every expectation are unchanged; the 27 English
+      cases now also measure an English reply, at the next live run.
     - *Tests.* Protocol (v3 next to v2, the wire shape, twelve refusals), server (v3 and v2 accepted, the model's input
       with and without the language, six refusals before any reservation), device (the client posts v3 with the
       language; a v2 request still validates; a language never rides on v2; the English fixture twins; the reply's
@@ -5384,8 +5389,9 @@ nothing of it is on a screen yet.
       Changed tests, each deliberate: the v2-only client test, the harness test that accepted Spanish replies, the
       fixture language assertions, the key-set assertions of the route test.
     - *Effect on scores and thresholds.* None on the fixture evaluation (every threshold passes, no flag). Runs #1 and
-      #2 stay recorded as FAILED, as measured, with their Spanish replies to English cases counted as correct then. No
-      threshold, corpus expectation or result-shape change. Worst case, recomputed with `worstCaseMicroUsd`: **176 364
+      #2 stay recorded as FAILED, as measured, with their Spanish replies to English cases counted as correct then. One
+      threshold added (`replyLanguageAccuracy` ≥ 0.95, above), none lowered; no corpus expectation or result-shape
+      change. Worst case, recomputed with `worstCaseMicroUsd`: **176 364
       µUSD for `gpt-6-luna`** (169 803 at PR #96; the instructions grew from 5 399 to 5 892 bytes and each request
       carries its language) and **383 574 µUSD for `gpt-5.6-luna`** (370 455). Any further live run needs a new written
       owner approval of at least the figure the script computes at that commit.

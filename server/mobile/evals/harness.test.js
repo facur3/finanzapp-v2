@@ -238,21 +238,28 @@ describe('eval harness', () => {
   // 25A-06, protocol v3: the request carries the case's language as the interface language and the reply is written in
   // it. A Spanish reply to an English case is no longer the expected behaviour (B7 runs #1 and #2 measured it as such):
   // its figures are read as before, since grounding and hallucination never depended on the language, and a reply
-  // clearly written in the other released language is flagged `reply_language:<asked>` in the report. Diagnostic only, no
-  // rate and no threshold: the flag is conservative (three function words of the other language and none of the asked
-  // one), so a short golden answer escapes it on purpose and a verbatim Spanish category name never counts.
-  it('sends the case\'s language as protocol v3 and flags a reply clearly written in the other released language', async () => {
+  // clearly written in the other released language is flagged `reply_language:<asked>` and costs `replyLanguageAccuracy`
+  // (min 0.95, thresholds.js; Codex review of PR #97). The flag is conservative (three function words of the other
+  // language and none of the asked one), so a short golden answer escapes it and a verbatim Spanish category name never
+  // counts: what it flags is an unmistakable miss.
+  it('sends the case\'s language as protocol v3 and fails adoption for a model that answers English requests in Spanish', async () => {
     for (const testCase of CASES) expect(buildRequest(testCase), testCase.id).toMatchObject({ version: 3, language: testCase.lang });
     expect(modelInput(buildRequest(CASES[0]))).toHaveProperty('language', CASES[0].lang);
+    expect(THRESHOLDS.replyLanguageAccuracy).toEqual({ min: 0.95 });
     const spanish = testCase => goldenOutput({ ...testCase, lang: 'es', request: { ...testCase.request, region: 'AR' } });
     const report = await evaluate(spanish);
     expect(report.cases.find(item => item.id === 'analytics.month-total.en').flags).toEqual([]);
     expect(report.metrics).toMatchObject({ groundedEvidenceAccuracy: 1, hallucinatedFactRate: 0 });
     const refusal = report.cases.find(item => item.id === 'oos.programming.en');
-    expect(refusal.flags).toEqual(['reply_language:en']);
-    expect(missedMetrics(refusal)).toEqual([]);
-    expect(checkThresholds(report.metrics).pass).toBe(true);
-    expect((await evaluate()).cases.every(item => !item.flags.length)).toBe(true); // the golden replies in each case's language carry no flag
+    expect(refusal).toMatchObject({ language: 'en', flags: ['reply_language:en'] });
+    expect(missedMetrics(refusal)).toEqual(['replyLanguageAccuracy']);
+    // The eight English refusals answered in Spanish are the unmistakable misses (the Spanish answers and questions to
+    // the other English cases are too short for the flag): 95 of 103 is below 0.95, and no other bound moves.
+    expect(report.metrics.counts.replyLanguageAccuracy).toEqual({ pass: 95, of: 103 });
+    expect(failed(report)).toEqual(['replyLanguageAccuracy']);
+    const golden = await evaluate();
+    expect(golden.cases.every(item => !item.flags.length)).toBe(true); // the golden replies in each case's language carry no flag
+    expect(golden.metrics.replyLanguageAccuracy).toBe(1);
     expect(replyLanguageMismatch('Llevás gastados US$ 842,50 en 9 movimientos este mes, más que el mes pasado.', 'en')).toBe(true);
     expect(replyLanguageMismatch('You spent US$ 842.50 across 9 movements this month, more than last month.', 'es')).toBe(true);
     expect(replyLanguageMismatch('Gastos registrados (this month): $842.50, 9 movements. In Supermercado, $312.75.', 'en')).toBe(false);

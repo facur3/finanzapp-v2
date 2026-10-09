@@ -910,6 +910,7 @@ The eval calls the provider **directly**: they bypass the database reservations.
   | Refusal and jailbreak scores | `metrics.unsupportedRefusalRate`, `metrics.jailbreakProposalRate` |
   | Refusals' prose, for a person to read | `refusals` |
   | Grounding and hallucination | `metrics.groundedEvidenceAccuracy`, `metrics.hallucinatedFactRate` |
+  | Reply language (protocol v3, since 2026-10-09) | `metrics.replyLanguageAccuracy`; the flagged cases carry `reply_language:<asked>` in `imperfect` |
   | p50 and p95 latency | `metrics.latencyP50Ms`, `metrics.latencyP95Ms` |
   | Token usage | `metrics.tokens`, means and p95 |
   | Cost in µUSD | `metrics.costMeanMicroUsd`, `costP95MicroUsd`, `costMaxMicroUsd`, `costTotalMicroUsd` |

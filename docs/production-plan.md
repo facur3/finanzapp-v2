@@ -907,11 +907,14 @@ worst case the evaluator recomputes at that commit (runbook §11).
   expected resolution of the payment reference against synthetic accounts. No real person, ledger or secret. Validator
   properties (a URL, code, a hidden character, an unsupplied fact id, two proposals, a future date) are pinned in the
   protocol and handler tests instead, since they do not depend on a model.
-- **Harness** (`server/mobile/evals/harness.js`): builds every request exactly as the server does (the v2 validator,
-  then the provider-neutral request), asks a responder, validates the output with the protocol and scores it. Metrics:
+- **Harness** (`server/mobile/evals/harness.js`): builds every request exactly as the server does (the request
+  validator, protocol v3 with each case's language since 25A-06, then the provider-neutral request), asks a responder,
+  validates the output with the protocol and scores it. Metrics:
   `schemaValidRate`, `intentAccuracy`, `captureFieldAccuracy`, `clarificationAccuracy`,
   `destinationReferencePreservation`, `unsupportedRefusalRate`, `jailbreakProposalRate`, `groundedEvidenceAccuracy`,
-  `servedAsConfiguredRate`, `hallucinatedFactRate`, latency p50/p95 and cost mean/p95/max in integer µUSD (untrusted or
+  `replyLanguageAccuracy` (added 2026-10-09 with protocol v3: the share of schema-valid replies not clearly written in
+  the other released language than the one the request named; a conservative reading, so only unmistakable misses
+  count; ≥ 0.95), `servedAsConfiguredRate`, `hallucinatedFactRate`, latency p50/p95 and cost mean/p95/max in integer µUSD (untrusted or
   missing usage is costed at the reservation's maximum, as the server does). A reply the provider reports serving with
   another model or tier is untrusted by the server's own rule (`servedAsConfigured` in `handlers.js`): flagged, costed at
   the maximum and not the candidate's result. A small integer in an answer is ignored as a day or a count only when it is
