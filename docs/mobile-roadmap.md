@@ -5464,7 +5464,12 @@ nothing of it is on a screen yet.
       `currencyInferred`; `completeDraft` passes a currency on only when it is known (stated, inferred or chosen), so a
       chosen account lends its own and a chosen currency chip is the person's; the literal `'ARS'` default is gone from
       the capture path (it remains only as the display stand-in when nothing is known). No destination at all: nothing
-      inferred, asked with no chips, the review keeps currency and destination as gaps.
+      inferred, asked with no chips, the review keeps currency and destination as gaps. Only a destination in a currency
+      the protocol carries (ARS, USD) can lend its currency, be inferred or be offered (the Codex review of this PR: the
+      model's amount is in the minor units of a protocol currency, so a uniquely named JPY account lending its currency
+      would turn 100 into ¥10 000); an account in another currency never lends one, a ledger that holds one next to ARS
+      or USD asks the currency with the carried currencies as chips instead of inferring, and a ledger in such
+      currencies only is asked for the destination with no chips.
     - *The adapter* (`review-proposal.ts`): an inferred currency is captured like a stated one (`currencyStated !== false
       || currencyInferred`), so it is shown in the review sheet with the exact amount and editable in Editar; the
       display currency is still never captured. Chips name a currency in the interface language («Pesos argentinos»,

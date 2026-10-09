@@ -210,13 +210,32 @@ test('on real SQLite: an inferred currency is captured, shown with its exact amo
   } finally { await files.dispose(); }
 });
 
-test('future coverage, not supported yet: another peso (MXN, COP) is never resolved as ARS by the device; protocol v3 carries ARS and USD only', () => {
-  // A Mexican person's accounts are MXN: the protocol cannot carry MXN yet, so the device gate refuses to send before any
-  // model call (app/assistant.tsx, isLegacyCurrency); the resolver itself infers the pool's currency, never ARS for «pesos».
+test('only a currency the protocol carries is inferred, lent or offered: an account in another currency (JPY, MXN, COP) never lends one, and a ledger mixing one in asks instead of inferring', () => {
+  // Codex review of PR #98: the model's amount is in the minor units of a protocol currency (centavos); a JPY account
+  // lending its currency would turn 100 into ¥10 000. Such an account is never a destination the Assistant resolves to.
+  const jpy: Account = { id: 'jpy', name: 'Yenes', currency: 'JPY', openingMinor: 0, createdAt };
   const mxn: Account = { id: 'mxn', name: 'Cuenta Banorte', currency: 'MXN', openingMinor: 0, createdAt };
-  const resolved = draftOf(resolveDraft(said(), [mxn], [], 'ARS', day));
-  assert.deepEqual([resolved.currency, resolved.currencyInferred], ['MXN', true], 'the accounts decide, the region or the word «pesos» never');
-  assert.equal(domain.isLegacyCurrency('MXN'), false, 'not a protocol currency: a case for the protocol\'s currency fields, recorded as future coverage');
-  const mixed = asked(resolveDraft(said(), [mxn, { ...cash, id: 'cop', name: 'Bancolombia', currency: 'COP' }], [], 'ARS', day), 'currency');
-  assert.deepEqual(mixed.options.map(option => option.id), ['MXN', 'COP']);
+  const cop: Account = { id: 'cop', name: 'Bancolombia', currency: 'COP', openingMinor: 0, createdAt };
+  assert.deepEqual([domain.isLegacyCurrency('JPY'), domain.isLegacyCurrency('MXN'), domain.isLegacyCurrency('COP')], [false, false, false]);
+  // A uniquely named JPY account: never lends JPY; asked, with the carried destinations, never replaced by one of them.
+  const namedJpy = asked(resolveDraft(said({ paymentMethodRef: 'Yenes' }), [cash, jpy], [], 'ARS', day), 'paymentMethod');
+  assert.deepEqual([namedJpy.question, namedJpy.options.map(option => option.id), namedJpy.partial.currencyInferred], ['assistant.clarify.paidWith', ['cash'], false]);
+  // Nothing named, ARS and JPY accounts: the currency is in question, so it is asked, with the carried currency as the only chip.
+  const mixed = asked(resolveDraft(said(), [cash, jpy], [], 'ARS', day), 'currency');
+  assert.deepEqual([mixed.options, mixed.partial.currencyInferred], [[{ id: 'ARS', currency: 'ARS' }], false], 'never inferred over an account the protocol cannot carry');
+  const three = asked(resolveDraft(said(), [cash, usd, jpy], [], 'ARS', day), 'currency');
+  assert.deepEqual(three.options.map(option => option.id), ['ARS', 'USD'], 'the chips are the protocol\'s currencies only');
+  // Chosen pesos: the one ARS destination is implied; the JPY account is never offered.
+  const chosen = completeDraft(pendingOf(resolveDraft(said(), [cash, jpy], [], 'ARS', day)), 'ARS', [cash, jpy], [], day);
+  assert.deepEqual([chosen.content.kind === 'draft' && chosen.content.draft.currency, chosen.content.kind === 'draft' && chosen.content.draft.accountId], ['ARS', 'cash']);
+  // A Mexican person's accounts are MXN (or MXN and COP): nothing is inferred and no chip can offer them; the person is
+  // asked for the destination with no chips, and the review keeps the currency a gap. The protocol's currency fields
+  // (the next slice) are what carries MXN or COP; recorded as future coverage, never pretended supported.
+  for (const accounts of [[mxn], [mxn, cop]]) {
+    const question = asked(resolveDraft(said(), accounts, [], 'ARS', day), 'paymentMethod');
+    assert.deepEqual([question.options, question.partial.currencyInferred], [[], false]);
+  }
+  // Explicit USD said against a named MXN account: the conflict question, with no carried USD destination to offer.
+  const conflict = asked(resolveDraft(said({ currency: 'USD', paymentMethodRef: 'Banorte' }), [cash, mxn], [], 'ARS', day), 'paymentMethod');
+  assert.deepEqual([conflict.question, conflict.options, conflict.partial.currency], ['assistant.clarify.currencyConflict', [], 'USD']);
 });
