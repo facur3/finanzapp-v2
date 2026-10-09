@@ -17,7 +17,7 @@ export const FIXTURE_SERVED = Object.freeze({ model: 'fixture', serviceTier: 'de
 /** Deterministic and injective for corpus ids (kebab with dots, no '_'), and inside the protocol's requestId bound. */
 export const requestIdFor = id => ('eval-' + id.replace(/\./g, '_').replace(/[^A-Za-z0-9_-]/g, '-')).padEnd(16, '-').slice(0, 100);
 
-/** The validated request, as the handler holds it after validateAssistantRequest: protocol v3, the case's `lang` as the
+/** The validated request, as the handler holds it after validateAssistantRequest: the current protocol (v4), the case's `lang` as the
  * interface language the reply is written in (what the device sends from `useI18n()`). */
 export function buildRequest(testCase) {
   const { action, text, currency, region, facts } = testCase.request;
@@ -100,7 +100,9 @@ export function fixtureResponder(cases, { outputFor = goldenOutput } = {}) {
 const fold = value => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
 // A leading article or possessive does not change which account the words name («la Visa» is «Visa»).
 const reference = value => fold(value).replace(/^(?:con |with )?(?:la |el |los |las |mi |mis |my |the )?/, '');
-const FOLDED = { merchant: fold, category: fold, paymentMethodRef: reference };
+// A v4 amount is the same number with or without trailing decimal zeros ('45.90' is '45.9'); nothing else is equal.
+const exactDecimal = value => value.includes('.') ? value.replace(/0+$/, '').replace(/\.$/, '') : value;
+const FOLDED = { merchant: fold, category: fold, paymentMethodRef: reference, amount: exactDecimal };
 function sameField(field, expected, actual) {
   if (expected === null || actual === null || actual === undefined) return expected === actual;
   return FOLDED[field] ? typeof actual === 'string' && FOLDED[field](actual) === FOLDED[field](expected) : actual === expected;

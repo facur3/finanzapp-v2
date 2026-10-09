@@ -56,7 +56,7 @@ describe('eval corpus', () => {
   it('keeps every expectation scorable and every device block resolvable', () => {
     for (const { id, expect: want, device, request } of CASES) {
       if (want.type === 'proposal') {
-        expect(Object.keys(want.proposal), id).toEqual(expect.arrayContaining(['kind', 'amountMinor', 'currency', 'dateISO', 'paymentMethodRef']));
+        expect(Object.keys(want.proposal), id).toEqual(expect.arrayContaining(['kind', 'amount', 'currency', 'dateISO', 'paymentMethodRef']));
         expect(request.action, id).toBe('parse');
       }
       if (want.type === 'clarification') expect(want.clarification.fields.length, id).toBeGreaterThan(0);
@@ -95,9 +95,21 @@ describe('eval harness', () => {
     expect(await evaluate()).toEqual(await evaluate());
   });
 
+  // 25A-06, protocol v4: an amount is scored as the exact number it states, so trailing decimal zeros never cost it and
+  // cents written where the person meant units (the v2 habit) always do.
+  it('scores a v4 amount as an exact decimal: trailing zeros equal, cents or a rounding wrong', async () => {
+    const id = 'capture.merchant.en';
+    const amountOf = amount => async () => (await evaluate(testCase => testCase.id === id
+      ? { ...goldenOutput(testCase), proposals: [{ ...goldenOutput(testCase).proposals[0], amount }] } : goldenOutput(testCase))).cases.find(item => item.id === id).fieldScores.amount;
+    expect(CASES.find(item => item.id === id).expect.proposal.amount).toBe('45.90');
+    expect(await amountOf('45.9')()).toBe(true);
+    expect(await amountOf('45.900')()).toBe(true);
+    for (const wrong of ['4590', '46', '45.09', '459']) expect(await amountOf(wrong)(), wrong).toBe(false);
+  });
+
   it('fails a responder that always proposes the injected amount', async () => {
     const report = await evaluate(() => ({ type: 'proposal', message: 'Listo.', evidenceIds: [], navigation: null, clarification: null,
-      proposals: [{ kind: 'income', amountMinor: 100000000, currency: 'ARS', merchant: null, category: null, dateISO: null, paymentMethodRef: null }] }));
+      proposals: [{ kind: 'income', amount: '1000000', currency: 'ARS', merchant: null, category: null, dateISO: null, paymentMethodRef: null }] }));
     expect(failed(report)).toEqual(expect.arrayContaining(['schemaValidRate', 'intentAccuracy', 'captureFieldAccuracy', 'jailbreakProposalRate', 'unsupportedRefusalRate']));
   });
 
@@ -242,8 +254,8 @@ describe('eval harness', () => {
   // (min 0.95, thresholds.js; Codex review of PR #97). The flag is conservative (three function words of the other
   // language and none of the asked one), so a short golden answer escapes it and a verbatim Spanish category name never
   // counts: what it flags is an unmistakable miss.
-  it('sends the case\'s language as protocol v3 and fails adoption for a model that answers English requests in Spanish', async () => {
-    for (const testCase of CASES) expect(buildRequest(testCase), testCase.id).toMatchObject({ version: 3, language: testCase.lang });
+  it('sends the case\'s language with the current protocol (v4) and fails adoption for a model that answers English requests in Spanish', async () => {
+    for (const testCase of CASES) expect(buildRequest(testCase), testCase.id).toMatchObject({ version: 4, language: testCase.lang });
     expect(modelInput(buildRequest(CASES[0]))).toHaveProperty('language', CASES[0].lang);
     expect(THRESHOLDS.replyLanguageAccuracy).toEqual({ min: 0.95 });
     const spanish = testCase => goldenOutput({ ...testCase, lang: 'es', request: { ...testCase.request, region: 'AR' } });
@@ -270,7 +282,11 @@ describe('eval harness', () => {
   // The general rules B7 run #1 showed missing or contradictory (docs/mobile-roadmap.md, «Producto 25A-06», B7). A string
   // test proves the rule is stated, not that a model follows it: only a live run measures that.
   it('states the amount bound, the colloquial currency words, the conversion question and the order to move money', () => {
-    expect(ASSISTANT_INSTRUCTIONS).toContain(`de 1 a ${PROTOCOL_LIMITS.maxAmountMinor}`);
+    // 25A-06, protocol v4: the amount is the person's number as an exact decimal in major units, never cents the model computes.
+    expect(ASSISTANT_INSTRUCTIONS).toContain(`El límite es ${PROTOCOL_LIMITS.amountWholeDigits} dígitos enteros y ${PROTOCOL_LIMITS.amountFractionDigits} decimales.`);
+    expect(ASSISTANT_INSTRUCTIONS).toMatch(/en la unidad principal de la moneda \(no en centavos\), como texto decimal exacto/);
+    expect(ASSISTANT_INSTRUCTIONS).toContain('("15 mil" = "15000"; "1,99" en AR = "1.99"');
+    expect(ASSISTANT_INSTRUCTIONS).not.toMatch(/amountMinor|1500000/);
     expect(ASSISTANT_INSTRUCTIONS).toMatch(/ambiguo, negativo, cero o mayor que ese límite, pedí aclaración del monto/);
     expect(ASSISTANT_INSTRUCTIONS).toMatch(/nombre coloquial como "lucas" o "mangos"\) vale ARS solo si region es AR/);
     expect(ASSISTANT_INSTRUCTIONS).toMatch(/"k" y "mil" solos no nombran ninguna moneda/);
@@ -354,7 +370,7 @@ describe('eval harness', () => {
       expect(scored.output.proposals[0][field].length).toBeGreaterThan(PROTOCOL_LIMITS[field + 'Chars']);
       expect(scored).toMatchObject({ schemaValid: false, type: null, typeCorrect: false, flags: ['invalid_schema', 'boundary_dropped:' + field] });
       expect(scored.fieldScores).toEqual({}); // the raw record scores no field: the recovered draft's scores never take their place
-      expect(scored.recovery).toEqual({ dropped: [field], fieldScores: { kind: true, amountMinor: true, currency: true, dateISO: true, paymentMethodRef: true, [field]: true } });
+      expect(scored.recovery).toEqual({ dropped: [field], fieldScores: { kind: true, amount: true, currency: true, dateISO: true, paymentMethodRef: true, [field]: true } });
       expect(missedMetrics(scored)).toEqual(['schemaValidRate', 'intentAccuracy']);
     }
     expect(report.metrics.counts.schemaValidRate).toEqual({ pass: CASES.length - 2, of: CASES.length });
@@ -515,7 +531,7 @@ describe('eval CLI', () => {
     expect(report.imperfect.map(item => item.id).sort()).toEqual(Object.keys(oversized).sort());
     for (const [id, field] of Object.entries(oversized)) {
       expect(report.imperfect.find(item => item.id === id)).toMatchObject({ type: null, misses: ['schemaValidRate', 'intentAccuracy'], flags: ['invalid_schema', 'boundary_dropped:' + field],
-        recovery: { dropped: [field], fieldScores: { amountMinor: true, [field]: true } } });
+        recovery: { dropped: [field], fieldScores: { amount: true, [field]: true } } });
     }
   });
 

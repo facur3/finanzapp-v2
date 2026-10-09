@@ -820,7 +820,7 @@ Rules for every stage:
    - v9 without a unit, v9 with a wrong unit, and a v1–v8 file naming JPY are refused
    - a scale-only difference is a conflict
    - a failed import changes nothing
-7. **Assistant contract, server first.** One version carries both docs/i18n.md §11's `locale` and the currency change, and §11 is updated in the same commit. Its sentence "`amountMinor` is integer minor units of the stated currency" becomes: facts keep `amountMinor` at the request's explicit `minorUnitExponent`, and a draft amount is a canonical major-unit string. Protocol v2 (25A-05: the closed result, the region and a request id) shipped first with neither, so this change is v3, with the same rollout.
+7. **Assistant contract, server first.** *(Partly done, 25A-06: protocol v4 carries the draft amount as a canonical major-unit string, scaled on the device after the currency is resolved, and the instructions no longer say "centavos"; facts with an explicit exponent, the currency superset and the `locale` object are still ahead.)* One version carries both docs/i18n.md §11's `locale` and the currency change, and §11 is updated in the same commit. Its sentence "`amountMinor` is integer minor units of the stated currency" becomes: facts keep `amountMinor` at the request's explicit `minorUnitExponent`, and a draft amount is a canonical major-unit string. Protocol v2 (25A-05: the closed result, the region and a request id) shipped first with neither, so this change is v3, with the same rollout.
    - The server validates the currency against a fixed superset that does not depend on the client gate: every catalogue code whose data status is `ready` (or `historical`). `generate.mjs` emits this list as a JS module that `contracts.js` and the enum at `openai.js:6` import.
    - The parse prompt (`openai.js:20`) and the explain prompt (`:24`) drop "centavos" and state the scale.
    - Staging payloads record their version (`schema.sql:9`). `schema.test.sql:19`–`:36` gains a fixture in which a payload without a version reads as v1. This is a reviewed staging migration only.
@@ -1193,8 +1193,13 @@ the person's own dated rate) and must not be modelled with one.
 The Assistant's contract v1 is retired (Producto 25A-05; never deployed). **Protocol v2**
 (`packages/integrations/assistant-protocol.js`) is the closed result plus the configured
 region (two letters) and a `requestId`; **protocol v3** (25A-06) adds the interface
-`language` the reply is written in, beside the region, and the server accepts both versions.
-Like v1 they know ARS and USD only, and the client does not send anything else (24B1). The
+`language` the reply is written in, beside the region; **protocol v4** (25A-06, the first
+currency step) keeps v3's request and states a proposal's amount as an exact decimal in major
+units (`amount`: «15000», «1.99», «0.50»), which the device scales to minor units with
+`majorStringToMinor` only once it has resolved the currency, asking again for an amount the
+currency cannot hold (a third decimal in pesos), never rounding. The server accepts the three
+versions and answers v2 and v3 in exact cents. Like v1 they know ARS and USD only, and the
+client does not send anything else (24B1). The
 region lets a regional word («pesos», a bare «$») resolve only when it is unambiguous (AR →
 ARS, US → USD); an explicit currency wins; anything else stays null from the model, and the
 device then resolves it from the person's own destinations (decision D, 25A-06: a named
@@ -1203,8 +1208,8 @@ several possible currencies are asked with the currencies as chips), never from 
 from the word «pesos». The currency
 part of this design is therefore still ahead (docs/i18n.md §11, stage 7 of §7.5), with the
 same server-first rollout: it validates currencies against a generated superset independent of
-the client gate, states the scale instead of "centavos", and returns draft amounts as canonical
-major-unit strings that the client converts and checks. Nothing below is active beyond the
+the client gate and lifts the device's ARS/USD-only destination rule; the draft amount as a
+canonical major-unit string that the client converts and checks is done (v4). Nothing below is active beyond the
 reply language; no paid AI is enabled.
 
 ### 11.1 "Gasté 30 dólares en Steam."

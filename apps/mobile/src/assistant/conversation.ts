@@ -1,6 +1,6 @@
-import { isLegacyCurrency, type Account, type Currency, type Entry, type EntryKind, type LegacyCurrency, type ReviewDraft } from '@finanzapp/domain';
-import type { AssistantFact, CaptureDraft } from '../../../../packages/integrations/contracts.js';
-import type { AssistantResultV2, ClarificationField, DroppableField, NavigationIntent } from '../../../../packages/integrations/assistant-protocol.js';
+import { isLegacyCurrency, majorStringToMinor, type Account, type Currency, type Entry, type EntryKind, type LegacyCurrency, type ReviewDraft } from '@finanzapp/domain';
+import type { AssistantFact } from '../../../../packages/integrations/contracts.js';
+import type { AssistantResultV2, ClarificationField, DroppableField, NavigationIntent, ProposalDraft } from '../../../../packages/integrations/assistant-protocol.js';
 import { factCategory } from '../integrations/evidence.ts';
 import type { LanguageCode } from '../i18n/locale.ts';
 import { translator, type MessageKey, type Translate } from '../i18n/messages.ts';
@@ -37,8 +37,14 @@ export type EvidenceRow = { id: string; subject: EvidenceSubject; previousOnly: 
 export type EvidenceLinkId = 'movements' | 'category' | 'budget';
 export type EvidenceLink = { id: EvidenceLinkId; href: { pathname: string; params?: Record<string, string> } };
 
+/** What `resolveDraft` reads: a protocol v4 proposal, or a parked draft re-read (its kind may still be unknown). */
+export type DraftInput = Omit<ProposalDraft, 'kind'> & { kind: EntryKind | null };
+
 export type ResolvedDraft = {
-  kind: EntryKind; amountMinor: number; currency: Currency; merchant: string; category: string; dateISO: string;
+  /** `amountMinor` is the model's `amount` scaled by the resolved currency's exponent (`majorStringToMinor`), never before
+   * the currency is known; `amount` is that decimal as the model stated it, kept so a parked draft is scaled again by the
+   * currency it is finally resolved in. */
+  kind: EntryKind; amountMinor: number; amount?: string; currency: Currency; merchant: string; category: string; dateISO: string;
   /** Null until the user names the account: the reducer never picks one when several could pay. */
   accountId: string | null;
   /** 25A-04: whether the model's draft named the currency and the date. When it did not, the conversation still offers
@@ -260,9 +266,20 @@ export function categoryOptions(entries: Entry[], kind: EntryKind, limit = 4): C
     .map(item => ({ id: item.label, label: item.label, category: kind }));
 }
 
+/** The minor units of a stated amount in the resolved currency, or null when it has no exact value there: more decimals
+ * than the currency has («1.999» pesos, «12.5» yen) or more digits than an amount may have. Never rounded or cut. */
+function minorIn(amount: string, currency: Currency): number | null {
+  const reading = majorStringToMinor(amount, currency);
+  return reading.ok && reading.minor > 0 ? reading.minor : null;
+}
+
 /** Turn a draft (a protocol proposal, or a parked draft re-read; every field nullable) into either a confirmable draft
  * or the one clarification that blocks it, in this order: kind, amount, then currency and destination together, then
  * category. `accounts` are the destinations the domain offers an expense; `incomeAccounts` an income (cash only, 24B6).
+ *
+ * Amount (protocol v4, 25A-06): the model states the number the person meant as an exact decimal in major units; it is
+ * scaled to minor units here, by the resolved currency's exponent (`majorStringToMinor`), only once that currency is
+ * known. An amount the currency cannot hold exactly is asked again, never rounded.
  *
  * Currency, by the owner's decision D (25A-06), on the device and never by the model, which knows no account:
  * 1. a currency the person stated (the model's draft) takes precedence;
@@ -281,16 +298,16 @@ export function categoryOptions(entries: Entry[], kind: EntryKind, limit = 4): C
  *    the carried match is then asked about, never picked for being the only one the protocol can carry.
  * A named payment method matches an account whose name holds all its words, in order (accent- and case-insensitive:
  * "Visa" is "Visa Galicia", never account "a", and "Visa a crédito" is not "a" either). */
-export function resolveDraft(draft: CaptureDraft, accounts: Account[], entries: Entry[], currency: Currency, todayISO: string, incomeAccounts: Account[] = accounts):
+export function resolveDraft(draft: DraftInput, accounts: Account[], entries: Entry[], currency: Currency, todayISO: string, incomeAccounts: Account[] = accounts):
   { kind: 'draft'; draft: ResolvedDraft } | { kind: 'clarification'; field: DraftField; question: MessageKey; options: ClarificationOption[]; partial: Partial<ResolvedDraft> } {
   const stated = { currencyStated: draft.currency !== null, dateStated: draft.dateISO !== null, paymentMethodRef: draft.paymentMethodRef };
   const base: Partial<ResolvedDraft> = { merchant: draft.merchant ?? '', category: draft.category ?? '', dateISO: draft.dateISO ?? todayISO, ...stated,
-    ...(draft.kind ? { kind: draft.kind } : {}), ...(draft.amountMinor ? { amountMinor: draft.amountMinor } : {}) };
+    ...(draft.kind ? { kind: draft.kind } : {}), ...(draft.amount ? { amount: draft.amount } : {}) };
   // Until the kind is known the destinations are unknown too: the screen's currency stands in, for the conversation only.
   const partial: Partial<ResolvedDraft> = { currency: draft.currency ?? currency, currencyInferred: false, ...base };
   if (!draft.kind) return { kind: 'clarification', field: 'kind', question: 'assistant.clarify.kind',
     options: [{ id: 'expense', labelKey: 'movement.expense' }, { id: 'income', labelKey: 'movement.income' }], partial };
-  if (!draft.amountMinor) return { kind: 'clarification', field: 'amount', question: 'assistant.clarify.amount', options: [], partial };
+  if (!draft.amount) return { kind: 'clarification', field: 'amount', question: 'assistant.clarify.amount', options: [], partial };
   // An income goes to a cash account (24B6): a card is never offered or implied for it. Only a destination in a currency
   // the protocol carries can hold the draft (rule 9); the whole pool still decides whether the currency is ambiguous.
   const pool = draft.kind === 'income' ? incomeAccounts : accounts;
@@ -335,14 +352,17 @@ export function resolveDraft(draft: CaptureDraft, accounts: Account[], entries: 
       if (offered.length) return ask('currency', 'assistant.clarify.currency', offered.map(code => ({ id: code, currency: code })), { currency, currencyInferred: false });
     }
   }
+  const amountMinor = minorIn(draft.amount, resolvedCurrency);
+  if (amountMinor === null) return { kind: 'clarification', field: 'amount', question: 'assistant.clarify.amount', options: [],
+    partial: { ...base, amount: undefined, currency: resolvedCurrency, currencyInferred } };
   const eligible = carried.filter(account => account.currency === resolvedCurrency);
   const named = matches(eligible);
   const accountId = ref !== null ? (named.length === 1 ? named[0].id : null) : eligible.length === 1 ? eligible[0].id : null;
   const destinationStated = named.length === 1;
-  const resolved: Partial<ResolvedDraft> = { currency: resolvedCurrency, currencyInferred };
+  const resolved: Partial<ResolvedDraft> = { currency: resolvedCurrency, currencyInferred, amountMinor };
   if (!accountId) return ask('paymentMethod', paidWith, chips(eligible), resolved);
   if (!draft.category) return { kind: 'clarification', field: 'category', question: 'assistant.clarify.category', options: categoryOptions(entries, draft.kind), partial: { ...base, ...resolved, accountId, destinationStated } };
-  return { kind: 'draft', draft: { kind: draft.kind, amountMinor: draft.amountMinor, currency: resolvedCurrency, merchant: draft.merchant ?? '',
+  return { kind: 'draft', draft: { kind: draft.kind, amountMinor, amount: draft.amount, currency: resolvedCurrency, merchant: draft.merchant ?? '',
     category: draft.category, dateISO: draft.dateISO ?? todayISO, accountId, ...stated, currencyInferred, destinationStated } };
 }
 
@@ -360,7 +380,7 @@ export function completeDraft(pending: { draft: Partial<ResolvedDraft>; field: D
   const known = (draft.currencyStated ?? true) || (draft.currencyInferred ?? false);
   const fallback: LegacyCurrency = isLegacyCurrency(draft.currency) ? draft.currency : 'ARS';
   // A named account is matched again (it was asked about something else first); a chosen one is already fixed below.
-  const capture: CaptureDraft = { kind: draft.kind ?? null, amountMinor: draft.amountMinor ?? null, currency: known ? fallback : null, merchant: draft.merchant || null,
+  const capture: DraftInput = { kind: draft.kind ?? null, amount: draft.amount ?? null, currency: known ? fallback : null, merchant: draft.merchant || null,
     category: draft.category || null, dateISO: draft.dateISO ?? null, paymentMethodRef: draft.accountId ? null : draft.paymentMethodRef ?? null };
   const chosen = (pool: Account[]) => draft.accountId ? pool.filter(account => account.id === draft.accountId) : pool;
   const next = resolveDraft(capture, chosen(accounts), entries, fallback, todayISO, chosen(incomeAccounts));

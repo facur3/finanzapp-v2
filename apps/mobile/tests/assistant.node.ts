@@ -10,7 +10,7 @@ import { translator } from '../src/i18n/messages.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 import { assistantForEnvironment, disconnectedAssistant, failureMessage, failureReason, remoteAssistant, type AssistantEvent } from '../src/assistant/client.ts';
 import { PROTOCOL_LIMITS, validateAssistantRequest, validateAssistantResultV2, type AssistantRequestV3 } from '../../../packages/integrations/assistant-protocol.js';
-import type { CaptureDraft } from '../../../packages/integrations/contracts.js';
+import type { DraftInput } from '../src/assistant/conversation.ts';
 import { assistantForBuild } from '../src/assistant/runtime.ts';
 import { FIXTURE_ANSWER, FIXTURE_CATEGORY_ANSWER, FIXTURE_CLARIFICATION, FIXTURE_DRAFT, FIXTURE_DRAFT_DROPPED, FIXTURE_DRAFT_NO_ACCOUNT, FIXTURE_FACTS, FIXTURE_OUT_OF_SCOPE,
   fixtureAssistant, fixtureReply } from '../src/assistant/fixtures.ts';
@@ -30,7 +30,7 @@ const entries: Entry[] = [
   { id: 'e4', accountId: 'cash', kind: 'income', amountMinor: 1000, merchant: 'Sueldo', category: 'Trabajo', dateISO: '2026-09-05', createdAt },
 ];
 /** A draft re-read with a gap a v2 proposal never leaves (no kind), parked as the screen parks a clarification. */
-function parked(draft: CaptureDraft, accounts: Account[], incomeAccounts = accounts) {
+function parked(draft: DraftInput, accounts: Account[], incomeAccounts = accounts) {
   const resolved = resolveDraft(draft, accounts, entries, 'ARS', today, incomeAccounts);
   assert.ok(resolved.kind === 'clarification');
   return { field: resolved.field, pending: { draft: resolved.partial, field: resolved.field } };
@@ -135,7 +135,7 @@ test('a draft with a named account resolves; with several possible accounts it a
   assert.equal(noKind.kind === 'clarification' && noKind.field, 'kind');
   assert.deepEqual(noKind.kind === 'clarification' ? noKind.options.map(o => optionText(o)) : [], ['Gasto', 'Ingreso']);
   assert.deepEqual(noKind.kind === 'clarification' ? noKind.options.map(o => optionText(o, en)) : [], ['Expense', 'Income']);
-  const noAmount = resolveDraft({ ...FIXTURE_DRAFT.proposals[0], amountMinor: null }, [visa], entries, 'ARS', today);
+  const noAmount = resolveDraft({ ...FIXTURE_DRAFT.proposals[0], amount: null }, [visa], entries, 'ARS', today);
   assert.equal(noAmount.kind === 'clarification' && noAmount.field, 'amount');
   assert.equal(noAmount.kind === 'clarification' && noAmount.options.length, 0, 'an amount is typed, not picked');
   const noCategory = resolveDraft({ ...FIXTURE_DRAFT.proposals[0], category: null }, [visa], entries, 'ARS', today);
@@ -261,7 +261,7 @@ test('the remote client wraps the existing endpoint contract and maps failures t
   assert.equal(calls.length, 1);
   assert.equal(calls[0].url, 'https://finanzapp.example/api/mobile/assistant');
   assert.equal(calls[0].auth, 'Bearer jwt');
-  assert.equal(calls[0].body.version, 3, 'protocol v3');
+  assert.equal(calls[0].body.version, 4, 'protocol v4');
   assert.match(calls[0].body.requestId, /^[A-Za-z0-9_-]{16,100}$/);
   assert.equal(calls[0].body.region, 'AR');
   assert.equal(events.length, 1);
@@ -385,16 +385,16 @@ test('a failure carries only the integration client\'s own keys: a contract reje
   assert.deepEqual('result' in groceries && groceries.result.navigation, FIXTURE_CATEGORY_ANSWER.navigation);
 });
 
-test('25A-06: the client posts protocol v3: version 3, a fresh request id per ask (injectable), the configured region and the interface language', async () => {
+test('25A-06: the client posts the current protocol (v4): version 4, a fresh request id per ask (injectable), the configured region and the interface language', async () => {
   const bodies: any[] = [];
   const fetcher = (async (_url: string, init: any) => { bodies.push(JSON.parse(init.body)); return { ok: true, status: 200, json: async () => FIXTURE_CLARIFICATION }; }) as unknown as typeof fetch;
   const ask = { action: 'parse' as const, text: 'Spent 12 at Target', todayISO: today, currency: 'ARS' as const, region: 'US', language: 'en', facts: [] };
   const client = integrationClient('https://finanzapp.example', async () => 'jwt', fetcher);
   await client.assistant(ask);
   await client.assistant(ask);
-  // Even a caller that still names version 2 posts version 3: the client sets it.
+  // Even a caller that still names version 2 posts version 4: the client sets it.
   await client.assistant({ ...ask, version: 2 } as unknown as typeof ask);
-  assert.deepEqual(bodies.map(body => body.version), [3, 3, 3], 'never version 2 from this client');
+  assert.deepEqual(bodies.map(body => body.version), [4, 4, 4], 'never an older version from this client');
   assert.ok(bodies.every(body => /^[A-Za-z0-9_-]{16,100}$/.test(body.requestId)));
   assert.equal(new Set(bodies.map(body => body.requestId)).size, 3, 'every ask has its own request id');
   assert.ok(bodies.every(body => body.region === 'US' && body.language === 'en'), 'the region and the language asked with');

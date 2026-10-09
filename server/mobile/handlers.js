@@ -1,5 +1,5 @@
 import { InputError, validateCapture } from '../../packages/integrations/contracts.js';
-import { PROTOCOL_LIMITS, recoverAssistantResultV2, validateAssistantRequest } from '../../packages/integrations/assistant-protocol.js';
+import { PROTOCOL_LIMITS, recoverAssistantResultV2, validateAssistantRequest, wireResult } from '../../packages/integrations/assistant-protocol.js';
 import { providerRequest, inputTokenBound } from './assistant-prompt.js';
 import { actualCostMicroUsd, maxCostMicroUsd, usageOrNull } from './cost.js';
 
@@ -96,8 +96,9 @@ async function assistant(session, body, deps, telemetry) {
     const [status, message] = PROVIDER_STATUS[failure.category] ?? [502, 'La IA no respondió. No se guardó ningún movimiento.'];
     throw new ApiError(status, message, category);
   }
+  // The model writes the v4 result; a v2 or v3 client gets it in its own wire shape (amounts in cents, exact or 502).
   let result, dropped;
-  try { ({ result, dropped } = recoverAssistantResultV2(served.output, request)); }
+  try { ({ result, dropped } = recoverAssistantResultV2(served.output, request)); result = wireResult(result, request); }
   catch { throw new ApiError(502, 'La IA devolvió una respuesta inválida. No se guardó ningún movimiento.', 'output_invalid'); }
   if (dropped.length) telemetry.dropped = dropped.length;
   // `dropped` rides only on a recovered reply: the normal path keeps its wire shape, so a client built before this

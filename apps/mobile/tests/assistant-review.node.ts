@@ -102,7 +102,7 @@ test('currency: a stated currency is kept; with none stated, a destination the p
   assert.equal(mismatch.currency, 'USD');
   assert.ok(domain.reviewGaps(mismatch, withUsd, day).includes('currency'));
   // A chosen account carries through a later clarification (the category asked after it).
-  const twoTurns = completeDraft({ draft: { kind: 'expense', amountMinor: 1000, currency: 'ARS', merchant: 'X', category: '', dateISO: day, accountId: 'cash',
+  const twoTurns = completeDraft({ draft: { kind: 'expense', amountMinor: 1000, amount: '10', currency: 'ARS', merchant: 'X', category: '', dateISO: day, accountId: 'cash',
     currencyStated: false, dateStated: false, destinationStated: true }, field: 'category' }, 'Supermercado', [cash], [], day);
   assert.equal(twoTurns.content.kind === 'draft' && twoTurns.content.draft.destinationStated, true);
 });

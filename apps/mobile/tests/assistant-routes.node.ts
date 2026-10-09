@@ -676,7 +676,7 @@ test('25A-04: an account the model named survives a category clarification: it s
   await tick();
   // Protocol v2: a proposal always names its kind, so the gap asked first here is the category.
   scripted.reply([{ type: 'result', result: { type: 'proposal', message: '', evidenceIds: [], navigation: null, clarification: null, proposals: [{ kind: 'expense',
-    amountMinor: 50000, currency: null, merchant: 'Kiosco', category: null, dateISO: null, paymentMethodRef: 'Efectivo' }] }, facts: [] }]);
+    amount: '500', currency: null, merchant: 'Kiosco', category: null, dateISO: null, paymentMethodRef: 'Efectivo' }] }, facts: [] }]);
   await settle();
   const choices = find([view.render().items[1]], 'ClarificationChoices')[0];
   assert.equal(choices.props.options.map((option: { id: string }) => option.id).join(','), 'Comida,Supermercado');
@@ -790,7 +790,7 @@ test('25A-06 (decision A): a draft whose merchant the server dropped is captured
     view.render().composer.props.onChange(said);
     view.render().composer.props.onSend();
     await tick();
-    const blank = { ...FIXTURE_DRAFT_NO_ACCOUNT, proposals: [{ ...FIXTURE_DRAFT_NO_ACCOUNT.proposals[0], amountMinor: 300000, merchant: null }] };
+    const blank = { ...FIXTURE_DRAFT_NO_ACCOUNT, proposals: [{ ...FIXTURE_DRAFT_NO_ACCOUNT.proposals[0], amount: '3000', merchant: null }] };
     scripted.reply([{ type: 'result', result: blank, facts: [], dropped: ['merchant'] }]);
     await settle();
     const screen = view.render();
