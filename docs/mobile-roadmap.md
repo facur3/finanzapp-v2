@@ -1,7 +1,18 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-08 (25A-06 B7, the two general instruction rules the run #2 diagnosis called safe to fix locally, on
-`fix/25a-06-b7-ambiguity-rules`: a movement the person tells as already made against an order to move money, with the
+Updated: 2026-10-09 (25A-06 B7, **owner decision B applied the simple way: financial calculations belong to FinanzApp's
+deterministic code, never to the model**, on `fix/25a-06-b7-no-model-arithmetic`, the small replacement for PR #95,
+which stays open and unmerged by the owner's direction: the v2 instructions withdraw the allowance for the model to
+state the difference between the two periods and tell it to compute nothing (no difference, percentage, total, balance,
+conversion or rounding), to restate only the figures of the facts it cites, exactly, and to compare in words while
+explaining naturally; the device keeps drawing the verified difference row; the scorer flags every computed figure and
+matches a restated amount in exact minor units (the 1 % tolerance is gone); the golden and device fixtures follow; the
+prose-figure validator of PR #95 is not ported: the prose is instructed and measured, not deterministically verified,
+and the limits are written down; no threshold, corpus expectation, protocol shape or review behaviour changes; the
+worst case recomputed, 169 803 µUSD for `gpt-6-luna` and 370 455 for `gpt-5.6-luna`; both live runs stay FAILED,
+decisions A, C and E pending, D taken and recorded on PR #95's branch for its own PR, B8 blocked; §3, «Producto
+25A-06», «Phase B record», B7). Earlier, 2026-10-08 (25A-06 B7, the two general instruction rules the run #2 diagnosis
+called safe to fix locally, PR #94: a movement the person tells as already made against an order to move money, with the
 both-readings utterance asked; and what makes an amount ambiguous, mirroring the app's own amount reader; string tests
 and the fixture evaluation only, which do not predict how Luna responds; the corpus worst case recomputed by the
 evaluator, 166 834 µUSD for `gpt-6-luna` and 364 519 for `gpt-5.6-luna`; both live runs stay FAILED, no threshold, corpus
@@ -1047,7 +1058,9 @@ before it passes (the runbook's §0.2):
    `STAGING_VERIFY_OK` (B4), the boundary probe (B5), the Vercel project `finanzapp-api-staging` deployed with AI still
    off in the database (B6).
 3. **Phase B activates staging** (B7 runs #1 and #2 completed 2026-10-08 UTC: **Luna FAILED adoption** both times; both
-   one-run approvals, 2026-10-07 and 2026-10-08, are consumed; next: the local fixes and the owner decisions of the run #2 record, then a new owner
+   one-run approvals, 2026-10-07 and 2026-10-08, are consumed; the local fixes are merged (PR #94) and decision B is
+   applied as an instruction plus the scorer (the no-model-arithmetic PR; PR #95's prose validator stays unmerged by
+   owner direction); decision D is taken and awaits its own PR; next: the owner's decisions A, C and E, then a new owner
    spend approval before any further live run; B8 blocked): the **real Luna evaluation** with an owner-approved spend (B7); AI enabled on staging,
    the failure drills and the race (B8); the **cost reconciliation** against the provider (B9).
 4. A focused **`/security_audit`**, then **`/security_review`** (B10); results recorded and 25A-06 marked done (B11).
@@ -4596,8 +4609,10 @@ nothing of it is on a screen yet.
   (docs/i18n.md §11) becomes **v3**.
 - **Decided in the v2 instructions** (`server/mobile/assistant-prompt.js`). The model replies in rioplatense Spanish, as
   v1 did (the reply's VoiceOver voice is Spanish); the reply language arrives with v3. A purchase **en cuotas** is unsupported in v2: `out_of_scope` pointing to Tarjetas, never a one-payment
-  proposal (until 25A-11). Prose may restate cited amounts or the difference of the same fact between the two periods,
-  never a balance, card debt, budget usage, instalment state, conversion, net flow or refund state: those come from the
+  proposal (until 25A-11). Prose may restate the amounts and counts of the facts it cites, exactly, and compare them in
+  words; it computes nothing (the 25A-05 allowance for the difference of the same fact between the two periods was
+  withdrawn on 2026-10-08, owner decision B; «Producto 25A-06», B7): never a difference, a percentage, a rounding, a
+  balance, card debt, budget usage, instalment state, conversion, net flow or refund state: those come from the
   domain code and the evidence rows. Transfers, card payments, loans and bank reintegros are asked about, never proposed
   as an expense or income.
 - **Provider capabilities (none dangerous).** `server/mobile/provider.js`, a neutral port (`respond` → output, usage,
@@ -5177,7 +5192,7 @@ nothing of it is on a screen yet.
       comparison model also copies long names verbatim (unmeasured) its schemaValidRate is uninformative while the other
       101 cases remain informative: a cost call for the owner, not a change of procedure. No live call, no B8, no
       change to any service in this PR; **no new approval is assumed**.
-  - **B7 — the two general instruction rules (branch `fix/25a-06-b7-ambiguity-rules`, this PR; no provider call).**
+  - **B7 — the two general instruction rules (PR #94; no provider call).**
     Implements only items 1 and 2 of «Safe to fix locally» above, in `server/mobile/assistant-prompt.js`:
     - *Told against ordered.* The clause «contar un movimiento que la persona ya hizo es un registro» (a word that read
       as proposal) is replaced by the typed outcomes: an order to FinanzApp to pay, transfer or send money stays
@@ -5214,7 +5229,7 @@ nothing of it is on a screen yet.
       passes every threshold (not a model result).
     - *Worst case, recomputed with the committed `worstCaseMicroUsd` (every request at the highest input rate, cache
       writes included, rounded up separately), not estimated per byte:* **166 834 µUSD for `gpt-6-luna`** (151 469
-      before this PR; the instructions grew from 3 975 to 5 168 bytes) and **364 519 µUSD for `gpt-5.6-luna`**
+      before PR #94; the instructions grew from 3 975 to 5 168 bytes) and **364 519 µUSD for `gpt-5.6-luna`**
       (333 787). Any further live run needs a new written owner approval of at least the figure the script computes at
       that commit.
     - *Not in this PR, awaiting the owner:* decision A (over-long optional names: the `incomplete` marker and the
@@ -5223,6 +5238,81 @@ nothing of it is on a screen yet.
       the corpus still disagree), decision E (the approval's shape). Both live runs remain **FAILED**; no threshold,
       corpus expectation, protocol result shape or review behaviour changes; no paid call, no staging configuration, no
       B8, no EAS build.
+  - **B7 — decision B taken (owner, 2026-10-08) and applied the simple way (owner direction, 2026-10-09): financial
+    calculations belong to FinanzApp's deterministic code, never to the model (branch
+    `fix/25a-06-b7-no-model-arithmetic`, this PR; no provider call).** The model interprets the question, chooses the
+    facts and explains; it never derives a financial figure. The product rule as the owner set it: the Assistant
+    produces editable, explicitly confirmed drafts before any ledger write; monetary amounts are exact integer minor
+    units (1,99 stays 1,99); the model understands ordinary language, colloquial amounts included; financial
+    calculations use deterministic local logic, never model arithmetic; financial answers stay natural, conversational
+    and grounded in evidence; no hard-coded response template replaces the model; no protocol redesign for unusual
+    prose. An intentional product-rule change, not a change of the acceptance bar: thresholds and corpus expectations
+    are untouched; runs #1 and #2 stay recorded as measured.
+    - *PR #95, disposition.* The first implementation of decision B (`fix/25a-06-b7-arithmetic-ownership`, head
+      `5c93ca4`, CI green) added a prose-figure validator to the shared protocol (`unsupportedFigures`, about 160 lines
+      of numeric reading enforced by `validateAssistantResultV2` on the server and the device) and then eighteen
+      follow-up commits of numeric-reading fixes, each for a rarer prose shape (a sign before a figure, exponent
+      notation, every Unicode dash, a currency code inside a label, …). The owner stopped that loop on 2026-10-09: the
+      goal is a reliable natural-language financial assistant, not a general validator able to interpret every
+      mathematical expression generated prose can hold. **PR #95 stays open and unmerged**; its three remaining Codex
+      threads (a verified amount relabelled as a count, «2 × 10^6» split into day-sized integers, a category named
+      «USD» refused as a currency mark) are left for the owner, and each is the class such a validator cannot settle
+      without reading the prose. This PR carries only the generalizable part of that work; the validator is **not
+      ported**. What PR #95 found, kept here: (a) on the capture path (`parse`) the validator checks a draft's amount
+      bounds and currency, never their agreement with the person's words (probed offline: «Gasté 1,99 dólares» with 200
+      or 1 990 minor units is accepted); the review sheet, where the amount is visible and editable, and the person's
+      confirmation are the guarantee today, and a deterministic capture validation with the domain's own amount reader
+      is a separate slice, not started; (b) a heuristic over prose cannot verify what the prose claims about a figure
+      (label, period, direction, role), a figure in words, a computed count of 31 or less or space-grouped thousands;
+      (c) if prose figures ever need to be verified by construction, the robust design is a result-shape change for
+      protocol v3 (typed figure references rendered by the device from fact ids, no digits in the model's text), its own
+      slice, not forced now; (d) the owner's decision D (currency inference, nine rules) is written in full on that
+      branch (roadmap B7 and production-plan.md §5.8 there) and is carried, with its implementation, by its own PR.
+    - *The rule, in the v2 instructions* (`server/mobile/assistant-prompt.js`, one edited line): «Las cuentas las hace
+      FinanzApp, nunca vos: no calcules ni estimes importes (ni diferencias entre períodos, ni porcentajes, ni totales,
+      ni saldos, ni deuda de tarjeta, ni uso de presupuesto, ni cuotas, ni conversiones de moneda, ni flujo neto, ni
+      redondeos) … Los únicos importes y cantidades que podés escribir son los de los facts que citás, tal cual, con
+      sus centavos. Podés explicar y comparar con naturalidad lo que muestran: para comparar dos períodos, nombrá los
+      dos importes y decí cuál es mayor, sin restar; la app muestra los números verificados y la diferencia exacta.»
+      The 25A-05 allowance («o la diferencia del mismo dato entre este período y el anterior») is removed; the
+      cross-currency question, the causal rule and the insufficient-facts rule stay. Natural language and explanation
+      are the model's; the figures are the ledger's. The device is unchanged: `answerContent` keeps drawing the signed
+      difference row from a cited current/previous pair, so the person keeps the exact number (VoiceOver reads it too).
+    - *Evaluator* (`server/mobile/evals/harness.js`): the scorer's `underivedNumbers` keeps its existing reader (digit
+      groups by shape or by the case's convention, the «mil»/«k»/«lucas»/«millones» suffixes, the ≤ 31 bare-integer
+      rule) and changes what it accepts: a figure must equal a cited fact's amount in exact minor units, a cited count
+      or a year of the request's dates; a monetary token (a currency mark beside it, or a multiplier) only a cited
+      amount, never a count or a year («$14» with a count of 14 is invented), and a figure finer than the currency's two
+      decimals («1,994») is no fact's amount, never rounded to one (both from the Codex review of this PR); the
+      difference of a current/previous pair, any percentage and the 1 % tolerance
+      (which let «unos 184 mil» and «US$ 842» pass for 842,50) are gone. The golden fixture names both amounts and
+      compares in words («Más que …», «Menos que …», «Lo mismo que …») instead of a «Diferencia» line; the device's
+      scripted fixture answer (`fixtures.ts`, a development view) names both verified amounts of the total and of the
+      Restaurantes pair instead of a computed difference (the other two cited pairs appear only as evidence rows).
+    - *Effect on scores, explicitly.* Corpus expectations: none changed. Fixture evaluation: every threshold passes
+      (not a model result). A live answer that states a correct difference, which the 25A-05 scorer accepted, now costs
+      `groundedEvidenceAccuracy` and `hallucinatedFactRate`; so does a rounded or cents-dropped amount: the bar is
+      stricter, never lower. Re-scored under the new rule, run #2's `causal.es` is still `underived_number:22.800` (its
+      recorded result stays as measured); how many of the other nine answers stated a correct difference and would now
+      be flagged is unknown (their prose was not retained): a next live run measures it. Changed tests, each
+      deliberate: the scorer test that accepted «32.200 más», «unos 184 mil» and «un 21% más» now expects them flagged;
+      the run #2 pin test expects «21.800» flagged too and the comparison in words accepted; a new test pins the exact
+      minor units (1,99 against 2, 1,98 and 1,994; 842,50 against 842 and 843) and the money-only binding («$14»,
+      «US$ 2026», «12 mil» against a count of 14 or 12 and the year); the instruction wording is pinned.
+    - *Limitation, stated honestly.* **The prose is instructed and measured, not deterministically verified.** The
+      shared validator still checks the result's shape, the cited ids, the navigation intent and the safety of the text
+      (no link, code or hidden character); it does not read figures out of prose. A model that computes a figure anyway
+      passes the validator and its words reach the person; the evaluation measures how often (the two rates above) and
+      the thresholds gate adoption, which is where that decision belongs. The figures a person can rely on are the
+      evidence rows the device computes from its own ledger, never the prose. A person who reads the text alone gets
+      both amounts and «más» or «menos»; the row gives the difference. This PR does not claim that arbitrary model
+      prose is mathematically verified.
+    - *Worst case, recomputed with the committed `worstCaseMicroUsd`:* **169 803 µUSD for `gpt-6-luna`** (166 834 at
+      PR #94; the instructions grew from 5 168 to 5 399 bytes) and **370 455 µUSD for `gpt-5.6-luna`** (364 519). Any
+      further live run needs a new written owner approval of at least the figure the script computes at that commit.
+    - *Not in this PR:* currency inference (decision D, its own PR), the over-long-name marker (decision A), the
+      transfer sentence (C), the approval's shape (E), the deterministic capture validation, any protocol v3 work. No
+      paid call, no staging configuration, no B8, no EAS build, no merge; both live runs remain **FAILED**; B8 **BLOCKED**.
 - **Owner refinements before accepting the runbook (2026-10-05, in this PR).**
   - **Staging region:** Vercel Functions `gru1` (São Paulo) and the staging Supabase project in the specific region
     `sa-east-1` (São Paulo), replacing `iad1` / us-east-1. The reasons: Argentina-first, the API compute next to its

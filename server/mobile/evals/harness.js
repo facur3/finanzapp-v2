@@ -29,11 +29,13 @@ const COPY = {
   es: { proposal: 'Revisá el movimiento antes de guardarlo.', out_of_scope: 'Solo puedo ayudarte a registrar gastos e ingresos y a consultar tus movimientos en FinanzApp.',
     clarification: { kind: '¿Es un gasto o un ingreso?', amount: '¿Cuál fue el monto?', currency: '¿En qué moneda?', date: '¿Qué día fue?', merchant: '¿Dónde fue?',
       category: '¿En qué categoría lo anoto?', destination: '¿Con qué cuenta o tarjeta?', period: '¿Sobre qué período querés saber?' },
-    current: 'este mes', previous: 'el mismo período del mes anterior', difference: 'Diferencia', movements: 'movimientos' },
+    current: 'este mes', previous: 'el mismo período del mes anterior', more: 'Más que en el mismo período del mes anterior.', less: 'Menos que en el mismo período del mes anterior.',
+    same: 'Lo mismo que en el mismo período del mes anterior.', movements: 'movimientos' },
   en: { proposal: 'Review the movement before saving it.', out_of_scope: 'I can only help you record expenses and income and look at your movements in FinanzApp.',
     clarification: { kind: 'Is it an expense or income?', amount: 'What was the amount?', currency: 'Which currency?', date: 'Which day was it?', merchant: 'Where was it?',
       category: 'Which category should I use?', destination: 'Which account or card?', period: 'Which period do you mean?' },
-    current: 'this month', previous: 'the same days last month', difference: 'Difference', movements: 'movements' },
+    current: 'this month', previous: 'the same days last month', more: 'More than the same days last month.', less: 'Less than the same days last month.',
+    same: 'The same as the same days last month.', movements: 'movements' },
 };
 
 // ponytail: two number conventions (lang en or region US: dot decimal; otherwise comma decimal), enough for the corpus
@@ -46,8 +48,9 @@ function money(minor, currency, testCase) {
   return (currency === 'USD' && testCase.lang === 'es' ? 'US$ ' : '$') + whole + cents;
 }
 
-/** The ideal v2 result for a case: what a perfect provider returns. Answers cite exactly the required facts and use
- * only their amounts (and, for two facts of the same label, their difference). */
+/** The ideal v2 result for a case: what a perfect provider returns. Answers cite exactly the required facts and restate
+ * only their amounts and counts; two facts of the same label are compared in words, never subtracted (owner decision B,
+ * 2026-10-08: the device draws the verified difference row from the cited pair, production-plan.md §5.2). */
 export function goldenOutput(testCase) {
   const copy = COPY[testCase.lang];
   const { expect } = testCase;
@@ -64,7 +67,7 @@ export function goldenOutput(testCase) {
       const parts = cited.map(item => `${item.label} (${item.id.startsWith('previous.') ? copy.previous : copy.current}): `
         + `${money(item.amountMinor, testCase.request.currency, testCase)}, ${item.count} ${copy.movements}.`);
       if (cited.length === 2 && cited[0].label === cited[1].label) {
-        parts.push(`${copy.difference}: ${money(Math.abs(cited[0].amountMinor - cited[1].amountMinor), testCase.request.currency, testCase)}.`);
+        parts.push(cited[0].amountMinor > cited[1].amountMinor ? copy.more : cited[0].amountMinor < cited[1].amountMinor ? copy.less : copy.same);
       }
       return { ...base, message: parts.join(' '), evidenceIds: [...expect.evidence.required] };
     }
@@ -103,20 +106,17 @@ function sameField(field, expected, actual) {
 }
 
 const CAUSAL = /\b(?:porque|debido a|a causa de|ya que|because|due to|caused by)\b/i;
-/** Amounts in an answer's prose that no cited fact supports. Heuristic: every digit group (with . and , separators, read
- * by their shape or, where only a convention decides, in the case's; times «mil»/«k»/«lucas» or «millones» when one
- * follows) must be within 1 % of a cited fact's amount in major units, of the difference of two cited amounts, of a cited count, of a year of the request's dates, or
- * (followed by %) within 1 point of that change; differences only between current.X and previous.X. Integers ≤ 31 (days,
- * small counts) are ignored unless they are money: after a currency sign or code, or before a currency word. */
+/** Figures in an answer's prose that no cited fact holds exactly. Heuristic: every digit group (with . and , separators,
+ * read by their shape or, where only a convention decides, in the case's; times «mil»/«k»/«lucas» or «millones» when one
+ * follows) must equal a cited fact's amount in minor units (1,99 is 199, never 200: no tolerance, no rounding), a cited
+ * count or a year of the request's dates. Since owner decision B (2026-10-08) nothing computed is derivable: not the
+ * difference between the two periods, not a percentage (never derivable), not a rounded amount; the device draws the
+ * verified difference. Integers ≤ 31 (days, small counts) are ignored unless they are money: after a currency sign or
+ * code, or before a currency word. A heuristic over prose for the report and the rates, not a verification of it. */
 export function underivedNumbers(message, cited, testCase) {
-  const amounts = cited.map(item => item.amountMinor / 100);
-  // Only the same subject across the two periods (current.X against previous.X) may be compared: income minus expenses
-  // or expenses minus refunds is a net figure the domain computes, never the model.
-  const pairs = cited.filter(item => item.id.startsWith('current.')).flatMap(now => cited.filter(before => before.id === 'previous.' + now.id.slice('current.'.length))
-    .map(before => [now.amountMinor / 100, before.amountMinor / 100]));
-  const derived = [...amounts, ...pairs.map(([a, b]) => Math.abs(a - b)), ...cited.map(item => item.count),
-    ...[testCase.request.facts.flatMap(item => [item.startISO, item.endISO]), EVAL_TODAY].flat().map(iso => Number(iso.slice(0, 4)))];
-  const percents = pairs.filter(([, b]) => b > 0).map(([a, b]) => 100 * (a - b) / b);
+  const amounts = new Set(cited.map(item => item.amountMinor));
+  const plain = new Set([...cited.map(item => item.count),
+    ...[testCase.request.facts.flatMap(item => [item.startISO, item.endISO]), EVAL_TODAY].flat().map(iso => Number(iso.slice(0, 4)))]);
   const decimal = dotDecimal(testCase) ? '.' : ',';
   const found = [];
   const isMoney = match => /(?:\$|\b(?:USD|ARS))\s*$/i.test(message.slice(0, match.index))
@@ -130,10 +130,16 @@ export function underivedNumbers(message, cited, testCase) {
     const mark = new Set(separators).size === 2 || (separators.length === 1 && token.length - last - 1 !== 3) ? token[last] : decimal;
     let value = Number(token.split(mark === '.' ? ',' : '.').join('').replace(mark, '.'));
     const suffix = (match[2] ?? '').trim().toLowerCase();
-    if (suffix === '%') { if (!percents.some(p => Math.abs(Math.abs(p) - value) <= 1)) found.push(match[0]); continue; }
+    if (suffix === '%') { found.push(match[0]); continue; }
+    // A monetary token (a currency mark beside it, or a multiplier) is supported only by a cited amount, never by a
+    // count or a year («$14» with a count of 14 is invented); a bare integer may be either (Codex review of PR #96).
+    const money = Boolean(suffix) || isMoney(match);
     if (suffix === 'millones') value *= 1e6; else if (suffix) value *= 1000;
-    if (!Number.isFinite(value) || (Number.isInteger(value) && value <= 31 && !suffix && !isMoney(match))) continue;
-    if (!derived.some(d => Math.abs(d - value) <= Math.max(0.005, Math.abs(d) * 0.01))) found.push(match[0]);
+    if (!Number.isFinite(value) || (Number.isInteger(value) && value <= 31 && !money)) continue;
+    // Exact minor units: a figure finer than the currency's two decimals («1,994») is no fact's amount, never rounded to one.
+    const minor = Math.round(value * 100);
+    const amount = Math.abs(value * 100 - minor) < 1e-6 && amounts.has(minor);
+    if (!amount && (money || !plain.has(value))) found.push(match[0]);
   }
   return found;
 }
