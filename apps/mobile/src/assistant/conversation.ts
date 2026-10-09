@@ -52,18 +52,27 @@ export type ResolvedDraft = {
   /** 25A-04: the account the model named («con la Visa»), kept while a clarification about something else is open, so the
    * next turn still matches it (and it still counts as stated). Conversation data only, never captured. */
   paymentMethodRef?: string | null;
+  /** 25A-06 (owner decision D): the model stated no currency and the device resolved it by a rule: the destination the
+   * person named or chose lends its own, every destination the domain offers for the kind shares one currency, or the
+   * person chose it in a clarification. Captured as the draft's currency (`reviewDraftFromAssistant`), visible and
+   * editable in the review. Absent or false with `currencyStated` false: the currency is only the screen's, for the
+   * conversation, never captured. */
+  currencyInferred?: boolean;
 };
 
-export type DraftField = 'kind' | 'amount' | 'paymentMethod' | 'category';
+export type DraftField = 'kind' | 'amount' | 'currency' | 'paymentMethod' | 'category';
 /** A chip under a clarification. `label` is user data shown as is (an account
  * name); `labelKey` is the app's own word (Gasto/Ingreso), translated at
  * render; `category` marks a stored category name of that kind, shown with its
  * localized built-in name when it has one (an income preset is only found as
- * income). Exactly one of `label` and `labelKey` is set. */
-export type ClarificationOption = { id: string; label?: string; labelKey?: MessageKey; category?: EntryKind };
+ * income); `currency` is a currency to choose, shown by its name in the
+ * interface language. Exactly one of `label`, `labelKey` and `currency` is set. */
+export type ClarificationOption = { id: string; label?: string; labelKey?: MessageKey; category?: EntryKind; currency?: Currency };
 
-/** The words a chip shows (and that are repeated as the user's message once chosen). */
-export function optionText(option: ClarificationOption, t: Translate = translator('es')): string {
+/** The words a chip shows (and that are repeated as the user's message once chosen). A currency chip shows the
+ * currency's name in the interface language when the caller can name it, its code otherwise. */
+export function optionText(option: ClarificationOption, t: Translate = translator('es'), currencyName?: (currency: Currency) => string): string {
+  if (option.currency) return currencyName ? currencyName(option.currency) : option.currency;
   return option.labelKey ? t(option.labelKey) : option.label ?? '';
 }
 
@@ -251,36 +260,90 @@ export function categoryOptions(entries: Entry[], kind: EntryKind, limit = 4): C
     .map(item => ({ id: item.label, label: item.label, category: kind }));
 }
 
-/** Turn a draft (a protocol v2 proposal, or a parked draft re-read; every field nullable) into either a
- * confirmable draft or the one clarification that blocks it, in this order:
- * kind, amount, account, category. `accounts` are the ones that may carry a
- * posting in the draft's currency. A named payment method matches an account
- * whose name holds all its words, in order (accent- and case-insensitive:
- * "Visa" is "Visa Galicia", never account "a", and "Visa a crédito" is not "a"
- * either); one that matches none or several is asked, never replaced by the
- * only eligible account. Only with nothing named is exactly one eligible
- * account implied; otherwise the user is asked, with the accounts as the options. */
+/** Turn a draft (a protocol proposal, or a parked draft re-read; every field nullable) into either a confirmable draft
+ * or the one clarification that blocks it, in this order: kind, amount, then currency and destination together, then
+ * category. `accounts` are the destinations the domain offers an expense; `incomeAccounts` an income (cash only, 24B6).
+ *
+ * Currency, by the owner's decision D (25A-06), on the device and never by the model, which knows no account:
+ * 1. a currency the person stated (the model's draft) takes precedence;
+ * 2. with none stated, a named destination that matches exactly one account or card lends its currency;
+ * 3. otherwise, when every destination the domain offers for the kind shares one currency, that currency is inferred;
+ * 4. when several currencies are possible and nothing was named, the person is asked which currency, with those as chips;
+ * 5. a currency never implies an account: among several destinations of that currency the person is asked;
+ * 6. a named destination that matches none or several is asked about, never replaced by the only eligible account;
+ * 7. a stated currency that contradicts the only account(s) the name matches is asked about, never converted;
+ * 8. with no destination at all, the currency stays unknown (the screen's stands in for the conversation only) and the
+ *    person is asked, with no chips;
+ * 9. only a destination in a currency the protocol carries (ARS, USD: the model's amount is in its minor units) can lend
+ *    its currency, be inferred or be offered; an account in another currency (JPY, MXN) never lends one, and a ledger
+ *    that holds one next to ARS or USD asks instead of inferring, so «pesos» is never silently another currency (Codex
+ *    review of PR #98); a name is ambiguous when it matches several destinations of any currency, carried or not, and
+ *    the carried match is then asked about, never picked for being the only one the protocol can carry.
+ * A named payment method matches an account whose name holds all its words, in order (accent- and case-insensitive:
+ * "Visa" is "Visa Galicia", never account "a", and "Visa a crédito" is not "a" either). */
 export function resolveDraft(draft: CaptureDraft, accounts: Account[], entries: Entry[], currency: Currency, todayISO: string, incomeAccounts: Account[] = accounts):
   { kind: 'draft'; draft: ResolvedDraft } | { kind: 'clarification'; field: DraftField; question: MessageKey; options: ClarificationOption[]; partial: Partial<ResolvedDraft> } {
-  const resolvedCurrency = draft.currency ?? currency;
   const stated = { currencyStated: draft.currency !== null, dateStated: draft.dateISO !== null, paymentMethodRef: draft.paymentMethodRef };
-  const partial: Partial<ResolvedDraft> = { currency: resolvedCurrency, merchant: draft.merchant ?? '', category: draft.category ?? '',
-    dateISO: draft.dateISO ?? todayISO, ...stated, ...(draft.kind ? { kind: draft.kind } : {}), ...(draft.amountMinor ? { amountMinor: draft.amountMinor } : {}) };
+  const base: Partial<ResolvedDraft> = { merchant: draft.merchant ?? '', category: draft.category ?? '', dateISO: draft.dateISO ?? todayISO, ...stated,
+    ...(draft.kind ? { kind: draft.kind } : {}), ...(draft.amountMinor ? { amountMinor: draft.amountMinor } : {}) };
+  // Until the kind is known the destinations are unknown too: the screen's currency stands in, for the conversation only.
+  const partial: Partial<ResolvedDraft> = { currency: draft.currency ?? currency, currencyInferred: false, ...base };
   if (!draft.kind) return { kind: 'clarification', field: 'kind', question: 'assistant.clarify.kind',
     options: [{ id: 'expense', labelKey: 'movement.expense' }, { id: 'income', labelKey: 'movement.income' }], partial };
   if (!draft.amountMinor) return { kind: 'clarification', field: 'amount', question: 'assistant.clarify.amount', options: [], partial };
-  // An income goes to a cash account (24B6): a card is never offered or implied for it.
-  const eligible = (draft.kind === 'income' ? incomeAccounts : accounts).filter(account => account.currency === resolvedCurrency);
+  // An income goes to a cash account (24B6): a card is never offered or implied for it. Only a destination in a currency
+  // the protocol carries can hold the draft (rule 9); the whole pool still decides whether the currency is ambiguous.
+  const pool = draft.kind === 'income' ? incomeAccounts : accounts;
+  const carried = pool.filter(account => isLegacyCurrency(account.currency));
   // Named but without a letter or digit ("💳") still names something: it matches nothing and is asked.
   const ref = draft.paymentMethodRef?.trim() ? reference(draft.paymentMethodRef) : null;
-  const named = ref ? eligible.filter(account => ` ${words(account.name)} `.includes(` ${ref} `)) : [];
+  const matches = (list: Account[]) => ref ? list.filter(account => ` ${words(account.name)} `.includes(` ${ref} `)) : [];
+  const chips = (list: Account[]): ClarificationOption[] => list.map(account => ({ id: account.id, label: account.name }));
+  const paidWith: MessageKey = draft.kind === 'expense' ? 'assistant.clarify.paidWith' : 'assistant.clarify.receivedIn';
+  const ask = (field: DraftField, question: MessageKey, options: ClarificationOption[], resolved: Partial<ResolvedDraft>) =>
+    ({ kind: 'clarification' as const, field, question, options, partial: { ...base, ...resolved, accountId: null } });
+  let resolvedCurrency: Currency = draft.currency ?? currency;
+  let currencyInferred = false;
+  if (draft.currency) {
+    // Rule 7: the name matches only account(s) in another currency: asked, with the destinations of the stated currency.
+    if (ref && matches(pool.filter(account => account.currency === draft.currency)).length === 0 && matches(pool).length >= 1) {
+      return ask('paymentMethod', 'assistant.clarify.currencyConflict', chips(carried.filter(account => account.currency === draft.currency)), { currency: draft.currency });
+    }
+  } else if (ref) {
+    // Whether a name is ambiguous is decided against every destination offered for the kind, carried or not: «Galicia»
+    // with a «Galicia» in pesos and a «Galicia MXN» matches two, and the carried one is never picked for being the only
+    // one the protocol can carry (rule 6; an independent review of PR #98).
+    const namedAll = matches(pool);
+    const named = matches(carried);
+    if (namedAll.length === 1 && named.length === 1) { resolvedCurrency = named[0].currency; currencyInferred = true; } // rule 2
+    else {
+      // Several matches, or only one the protocol cannot carry, or none: asked for the destination among the carried
+      // matches, or among every carried destination, never replaced by one of them (25A-04); the choice settles the
+      // currency, known already when every destination offered shares one carried currency.
+      const currencies = [...new Set(pool.map(account => account.currency))];
+      const shared = currencies.length === 1 && isLegacyCurrency(currencies[0]) ? currencies[0] : null;
+      return ask('paymentMethod', paidWith, chips(named.length ? named : carried), shared ? { currency: shared, currencyInferred: true } : { currency, currencyInferred: false });
+    }
+  } else {
+    // The currencies in play: every destination's, those the protocol cannot carry included.
+    const currencies = [...new Set(pool.map(account => account.currency))];
+    if (currencies.length === 1 && isLegacyCurrency(currencies[0])) { resolvedCurrency = currencies[0]; currencyInferred = true; } // rule 3
+    else if (currencies.length > 1) {
+      // Several currencies possible: the currency is asked, never guessed from the screen (rule 4), with the currencies
+      // the protocol carries as chips; none in play (another currency only) is asked for the destination, with no chips.
+      const offered = [...new Set(carried.map(account => account.currency))];
+      if (offered.length) return ask('currency', 'assistant.clarify.currency', offered.map(code => ({ id: code, currency: code })), { currency, currencyInferred: false });
+    }
+  }
+  const eligible = carried.filter(account => account.currency === resolvedCurrency);
+  const named = matches(eligible);
   const accountId = ref !== null ? (named.length === 1 ? named[0].id : null) : eligible.length === 1 ? eligible[0].id : null;
   const destinationStated = named.length === 1;
-  if (!accountId) return { kind: 'clarification', field: 'paymentMethod', question: draft.kind === 'expense' ? 'assistant.clarify.paidWith' : 'assistant.clarify.receivedIn',
-    options: eligible.map(account => ({ id: account.id, label: account.name })), partial: { ...partial, accountId: null } };
-  if (!draft.category) return { kind: 'clarification', field: 'category', question: 'assistant.clarify.category', options: categoryOptions(entries, draft.kind), partial: { ...partial, accountId, destinationStated } };
+  const resolved: Partial<ResolvedDraft> = { currency: resolvedCurrency, currencyInferred };
+  if (!accountId) return ask('paymentMethod', paidWith, chips(eligible), resolved);
+  if (!draft.category) return { kind: 'clarification', field: 'category', question: 'assistant.clarify.category', options: categoryOptions(entries, draft.kind), partial: { ...base, ...resolved, accountId, destinationStated } };
   return { kind: 'draft', draft: { kind: draft.kind, amountMinor: draft.amountMinor, currency: resolvedCurrency, merchant: draft.merchant ?? '',
-    category: draft.category, dateISO: draft.dateISO ?? todayISO, accountId, ...stated, destinationStated } };
+    category: draft.category, dateISO: draft.dateISO ?? todayISO, accountId, ...stated, currencyInferred, destinationStated } };
 }
 
 /** Apply a chosen option to a parked draft. Returns the next turn: another clarification (still parked) or the draft. */
@@ -290,24 +353,29 @@ export function completeDraft(pending: { draft: Partial<ResolvedDraft>; field: D
   if (pending.field === 'kind') draft.kind = optionId === 'income' ? 'income' : 'expense';
   else if (pending.field === 'paymentMethod') draft.accountId = optionId;
   else if (pending.field === 'category') draft.category = optionId;
-  // Protocol v2 only ever parks ARS or USD drafts; the ARS default for a draft without a currency is stage 7's to remove.
-  const currency: LegacyCurrency = isLegacyCurrency(draft.currency) ? draft.currency : 'ARS';
+  // A currency the person chose is theirs: resolved by the device's rule, captured, never a guess of the screen's.
+  else if (pending.field === 'currency' && isLegacyCurrency(optionId)) { draft.currency = optionId; draft.currencyInferred = true; }
+  // The currency is passed on only when it is known (stated by the model, chosen or inferred); otherwise the
+  // re-resolution infers it again from the destinations left, or asks. The screen's currency stands in for display only.
+  const known = (draft.currencyStated ?? true) || (draft.currencyInferred ?? false);
+  const fallback: LegacyCurrency = isLegacyCurrency(draft.currency) ? draft.currency : 'ARS';
   // A named account is matched again (it was asked about something else first); a chosen one is already fixed below.
-  const capture: CaptureDraft = { kind: draft.kind ?? null, amountMinor: draft.amountMinor ?? null, currency, merchant: draft.merchant || null,
+  const capture: CaptureDraft = { kind: draft.kind ?? null, amountMinor: draft.amountMinor ?? null, currency: known ? fallback : null, merchant: draft.merchant || null,
     category: draft.category || null, dateISO: draft.dateISO ?? null, paymentMethodRef: draft.accountId ? null : draft.paymentMethodRef ?? null };
   const chosen = (pool: Account[]) => draft.accountId ? pool.filter(account => account.id === draft.accountId) : pool;
-  const next = resolveDraft(capture, chosen(accounts), entries, currency, todayISO, chosen(incomeAccounts));
-  // What the model stated is carried from the first turn: the re-resolution above always passes a currency and a date.
+  const next = resolveDraft(capture, chosen(accounts), entries, fallback, todayISO, chosen(incomeAccounts));
+  // What the model stated is carried from the first turn: the re-resolution above passes a date, and a currency when known.
   // An account chosen now, or named or chosen in an earlier turn, is a stated destination; the one account left by the
-  // filter above is not.
+  // filter above is not. A currency inferred or chosen in any turn stays inferred.
   const named = (resolved: { destinationStated?: boolean }) => resolved.destinationStated ?? false;
+  const inferred = (resolved: { currencyInferred?: boolean }) => (draft.currencyInferred ?? false) || (resolved.currencyInferred ?? false);
   const stated = { currencyStated: pending.draft.currencyStated ?? true, dateStated: pending.draft.dateStated ?? true,
     paymentMethodRef: pending.draft.paymentMethodRef ?? null };
   const destinationStated = pending.field === 'paymentMethod' || (pending.draft.destinationStated ?? false);
   if (next.kind === 'draft') return { textKey: 'assistant.clarify.reviewDraft', pending: null,
-    content: { kind: 'draft', draft: { ...next.draft, accountId: draft.accountId ?? next.draft.accountId, ...stated, destinationStated: destinationStated || named(next.draft) } } };
+    content: { kind: 'draft', draft: { ...next.draft, accountId: draft.accountId ?? next.draft.accountId, ...stated, currencyInferred: inferred(next.draft), destinationStated: destinationStated || named(next.draft) } } };
   return { textKey: next.question, content: { kind: 'clarification', field: next.field, options: next.options, chosen: null },
-    pending: { draft: { ...next.partial, accountId: draft.accountId ?? next.partial.accountId ?? null, ...stated, destinationStated: destinationStated || named(next.partial) }, field: next.field } };
+    pending: { draft: { ...next.partial, accountId: draft.accountId ?? next.partial.accountId ?? null, ...stated, currencyInferred: inferred(next.partial), destinationStated: destinationStated || named(next.partial) }, field: next.field } };
 }
 
 /** What a fact is about, decided by its id; only a category's stored name is read from the label (see `factCategory`). */

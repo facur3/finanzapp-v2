@@ -73,7 +73,11 @@ function deviceFailures(subset: EvalCase[]) {
     const proposal = result.proposals[0];
     // The model's draft has no destination field at all: only the person's words.
     assert.deepEqual(Object.keys(proposal).sort(), ['amountMinor', 'category', 'currency', 'dateISO', 'kind', 'merchant', 'paymentMethodRef'], testCase.id);
-    const compatible = (proposal.kind === 'income' ? incomeAccounts : accounts).filter(account => account.currency === (proposal.currency ?? testCase.request.currency));
+    // The destinations compatible with the currency the device resolved: the model's when stated, the device's inference
+    // otherwise (decision D, 25A-06; every device block is single-currency, so it equals the request's currency).
+    const resolvedCurrency = resolved.content?.kind === 'draft' ? resolved.content.draft.currency : resolved.pending?.draft.currency ?? proposal.currency ?? testCase.request.currency;
+    assert.equal(resolvedCurrency, proposal.currency ?? testCase.request.currency, testCase.id + ': the device never resolves a currency the accounts do not hold');
+    const compatible = (proposal.kind === 'income' ? incomeAccounts : accounts).filter(account => account.currency === resolvedCurrency);
     const expected = testCase.device!.destination;
     const actual = destination(run);
     if (expected === 'ask') {

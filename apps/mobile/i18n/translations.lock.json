@@ -85,6 +85,8 @@
     "amount.unavailable": "9bf66e172af6",
     "assistant.clarify.amount": "32068a9e6182",
     "assistant.clarify.category": "6f825f4b56ee",
+    "assistant.clarify.currency": "96be267b3013",
+    "assistant.clarify.currencyConflict": "3851b927dd26",
     "assistant.clarify.kind": "69bbae4cc8cf",
     "assistant.clarify.paidWith": "7461c621c22f",
     "assistant.clarify.receivedIn": "7151b13a3efe",

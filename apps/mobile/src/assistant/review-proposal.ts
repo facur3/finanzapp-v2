@@ -11,9 +11,10 @@ import type { AssistantCapture, ProposalContent, ResolvedDraft } from './convers
  *   (owner decision, 2026-10-04): an Assistant command that asks to record a movement happens today, the device's local
  *   calendar day at capture (`todayISO`). A deterministic product rule, not a guess: the model never supplies another
  *   date, and the review draft always stores an explicit day. Wallet and other producers keep their own rules;
- * - the currency the model stated; with none stated, the currency of a destination the person named or chose (an
- *   explicit destination carries its own currency); otherwise unknown, a gap the person completes (the screen's display
- *   currency only chooses which accounts the conversation offers, and is never captured as a fact);
+ * - the currency the model stated; with none stated, the one the device resolved by the owner's decision D (25A-06,
+ *   `currencyInferred`: a destination the person named or chose lends its own, every destination the domain offers for
+ *   the kind shares one currency, or the person chose it in a clarification), visible and editable in the review;
+ *   otherwise unknown, a gap the person completes (the screen's display currency is never captured as a fact);
  * - the destination only when the person named it or it was the one account that fits; a card gets the domain's own
  *   choice, «Una vez» (`withDestination`), never cuotas; a destination the domain does not offer for the kind (an income
  *   on a card) is left unchosen, a gap;
@@ -33,7 +34,7 @@ export function reviewDraftFromAssistant(draft: ResolvedDraft, archive: ReviewAr
   const base: ReviewDraft = {
     ...template,
     amountMinor: accepted('amountMinor', draft.amountMinor, template),
-    currency: draft.currencyStated !== false ? draft.currency
+    currency: draft.currencyStated !== false || draft.currencyInferred ? draft.currency
       : draft.destinationStated && draft.accountId ? archive.accounts.find(account => account.id === draft.accountId)?.currency ?? null : null,
     merchant: accepted('merchant', draft.merchant.trim() || null, template),
     category: accepted('category', draft.category.trim() || null, template),

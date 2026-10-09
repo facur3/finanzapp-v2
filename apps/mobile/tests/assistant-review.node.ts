@@ -38,12 +38,20 @@ test('nothing is invented: an unstated currency, an unchosen account and an empt
   const draft = reviewDraftFromAssistant(resolved({ currencyStated: false, accountId: null, merchant: '  ', category: '' }), archive, at, day);
   assert.deepEqual([draft.currency, draft.destinationId, draft.merchant, draft.category, draft.purchase], [null, null, null, null, null]);
   assert.deepEqual(domain.reviewGaps(draft, archive, day), ['currency', 'destination', 'merchant', 'category']);
-  // What the model said and the screen only completed for the conversation: resolveDraft marks it unstated.
-  const fromModel = resolveDraft({ ...FIXTURE_DRAFT.proposals[0], currency: null, dateISO: null, paymentMethodRef: null }, [cash], [], 'ARS', '2026-09-20');
+  // What the model said and the device completed: resolveDraft marks the currency unstated but inferred (decision D, 25A-06:
+  // every destination offered for the kind is in ARS), so it is captured, visible and editable; the destination is implied.
+  const fromModel = resolveDraft({ ...FIXTURE_DRAFT.proposals[0], currency: null, dateISO: null, paymentMethodRef: null }, [cash], [], 'USD', '2026-09-20');
   assert.equal(fromModel.kind, 'draft');
+  assert.deepEqual([fromModel.kind === 'draft' && fromModel.draft.currencyStated, fromModel.kind === 'draft' && fromModel.draft.currencyInferred], [false, true]);
   const mapped = reviewDraftFromAssistant(fromModel.kind === 'draft' ? fromModel.draft : null!, archive, at, day);
-  assert.deepEqual([mapped.currency, mapped.destinationId], [null, 'cash'],
-    'the one account that fits is kept, but implied, so it lends no currency; the screen\'s ARS is never captured');
+  assert.deepEqual([mapped.currency, mapped.destinationId], ['ARS', 'cash'],
+    'the one currency the accounts hold is inferred and captured; the screen\'s USD is never captured');
+  // With accounts in two currencies and nothing named, nothing is inferred: the currency is asked, and a draft parked
+  // behind that question captures no currency.
+  const usd: Account = { id: 'usd', name: 'Dólares', currency: 'USD', openingMinor: 0, createdAt };
+  const asked = resolveDraft({ ...FIXTURE_DRAFT.proposals[0], currency: null, dateISO: null, paymentMethodRef: null }, [cash, usd], [], 'ARS', '2026-09-20');
+  assert.equal(asked.kind === 'clarification' && asked.field, 'currency');
+  assert.equal(asked.kind === 'clarification' && asked.partial.currencyInferred, false);
   // A value a review draft cannot hold is missing, never cut: a merchant over 120 characters, a hidden character.
   assert.equal(reviewDraftFromAssistant(resolved({ merchant: 'x'.repeat(121) }), archive, at, day).merchant, null);
   assert.equal(reviewDraftFromAssistant(resolved({ category: 'Super​mercado' }), archive, at, day).category, null);
@@ -81,10 +89,14 @@ test('currency: a stated currency is kept; with none stated, a destination the p
   const chosen = completeDraft(asked.kind === 'clarification' ? { draft: asked.partial, field: asked.field } : null!, 'cash', [cash, cardAccount], [], day);
   assert.equal(chosen.content.kind === 'draft' && chosen.content.draft.destinationStated, true);
   assert.equal(reviewDraftFromAssistant(chosen.content.kind === 'draft' ? chosen.content.draft : null!, archive, at, day).currency, 'ARS');
-  // Implied (the only account of the screen's currency): no currency, a gap the person completes.
+  // Implied destination (the only account): since decision D (25A-06) its currency is the one every destination shares,
+  // inferred and captured; the destination itself stays implied, not stated.
   const implied = resolveDraft({ ...FIXTURE_DRAFT.proposals[0], currency: null, paymentMethodRef: null }, [cash], [], 'ARS', day);
   assert.equal(implied.kind === 'draft' && implied.draft.destinationStated, false);
-  assert.equal(reviewDraftFromAssistant(implied.kind === 'draft' ? implied.draft : null!, archive, at, day).currency, null);
+  assert.equal(implied.kind === 'draft' && implied.draft.currencyInferred, true);
+  assert.equal(reviewDraftFromAssistant(implied.kind === 'draft' ? implied.draft : null!, archive, at, day).currency, 'ARS');
+  // A draft the conversation never resolved a currency for (no destination at all) captures none: a gap the person completes.
+  assert.equal(reviewDraftFromAssistant(resolved({ currencyStated: false, currencyInferred: false, accountId: null }), archive, at, day).currency, null);
   // Stated USD is kept even when the account chosen is in ARS: the mismatch is the domain's gap, never a conversion.
   const mismatch = reviewDraftFromAssistant(resolved({ currency: 'USD', accountId: cash.id }), withUsd, at, day);
   assert.equal(mismatch.currency, 'USD');

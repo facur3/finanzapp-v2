@@ -40,6 +40,8 @@ export const assistant: Pick<Messages, 'assistant'> = {
       amount: 'How much was it? Type the amount.',
       paidWith: 'What did you pay with?',
       receivedIn: 'Which account did it go into?',
+      currency: 'Which currency was it in?',
+      currencyConflict: 'That account isn’t in the currency you mentioned. Which account or card was it?',
       category: 'Which category should I use?',
       reviewDraft: 'Review the proposal before recording it.',
     },
