@@ -2,7 +2,7 @@
 
 Updated: 2026-10-09 (25A-06 B7, **owner decision A applied: an over-long merchant or category no longer loses the
 draft**, on `fix/25a-06-b7-overlong-names`, owner decision of the same day: the server's one recovery of a refused output
-keeps a proposal whose only fault is an optional name longer than its bound, with that name null and listed in the reply
+keeps a proposal whose only fault is an optional name the person wrote, longer than its bound, with that name null and listed in the reply
 (`dropped`), never cut, cleaned or replaced, so the kind, the exact amount, the currency, the date and the payment
 reference reach the person; every other refusal stays 502; the device validates the list, keeps the person's words in
 the thread, says under the reply which name was left blank and why, and the review asks for it before any confirmation;
@@ -5537,14 +5537,15 @@ nothing of it is on a screen yet.
       so a model can never set the marker (`exact()` still refuses any extra key). Two pure additions.
       `recoverAssistantResultV2(value, request)` is the server's one recovery of a refused output: when the output is a
       proposal with exactly one draft and its only fault is that `merchant` or `category` (`DROPPABLE_FIELDS`) is longer
-      than its bound (measured on the string as returned, as the strict check measures it) and otherwise what
-      `modelText` accepts (no hidden or invisible character, no address, not blank, and at most as long as the person's
-      whole text, 2 000 characters: a longer one cannot be their words copied verbatim, and that bound also keeps the
-      safety checks cheap), that name is set to null and the whole result is validated again, strictly; the validated
-      result comes back with `dropped` naming the fields. Any other refusal (a hidden character in that very name, an
-      address, another bound overrun, a reference over 80, a message over 1 200, two proposals, an extra key, a
-      malformed shape, the wrong type for the action) is thrown exactly as before, and a valid output comes back
-      unchanged with `dropped` empty.
+      than its bound (measured on the string as returned, as the strict check measures it), occurs verbatim in the
+      person's text (`request.text`: a name the model invented, however long or short, is not their words and stays
+      refused; the Codex review of this PR) and is otherwise what `modelText` accepts (no hidden or invisible
+      character, no address, not blank; the person's text is bounded at 2 000 characters, which also keeps the safety
+      checks cheap), that name is set to null and the whole result is validated again, strictly; the validated result
+      comes back with `dropped` naming the fields, each name grounded on its own. Any other refusal (an invented or
+      altered name, a hidden character in that very name, an address, another bound overrun, a reference over 80, a
+      message over 1 200, two proposals, an extra key, a malformed shape, the wrong type for the action) is thrown
+      exactly as before, and a valid output comes back unchanged with `dropped` empty.
       `validateDroppedFields(value, result)` is the device's check of the list the server sends beside the result:
       droppable names only, no repetition, each null in the one proposal, only on a proposal; absent is none, so a reply
       from the server as deployed today, which sends no list, still validates. The name is never cut to the bound,
@@ -5582,27 +5583,33 @@ nothing of it is on a screen yet.
       `schemaValidRate` as run #2 did and nothing else; the golden fixture recovers nothing. So a further live run of
       Luna still fails `schemaValidRate` while it copies long names verbatim (the run #2 projection under A(iii) stands,
       a property of the model, the corpus and the bound); what changes is the person's outcome, not the bar.
-    - *Tests.* Protocol: the recovery of each name and of both, exactly at the bound kept against one over dropped, a
-      name as long as the person's whole text recovered against one character more refused, a valid output of another
-      type unchanged, the strict validator still refusing, twenty outputs that must not be recovered (a hidden or a tag
-      character in the over-long name, an address, a fault beside it, the reference and the message bounds, two
-      proposals, an extra key, the marker as a model key, a blank over-long name, a name longer than the person's text,
-      no proposal, no object), and the device's list validator with its refusals. Server: the over-long merchant kept
-      with every other field exact and `dropped: ['merchant']`, both names, the normal path with its unchanged key set
-      (no `dropped`) and no telemetry count, the name never in the reply's JSON nor in the log; the refusal list keeps an
-      over-long name as a refusal where another fault rides along (a hidden character, a zero amount) and gains the
-      over-long reference. Evaluator: the two over-long cases copied verbatim (the raw verdict kept with no field score,
-      the recovery beside it, `schemaValidRate` 101/103 and its failure as in run #2, nothing else failing; the recovery
-      and the count in a live report's imperfect list) and four faults that recover nothing. Device: the remote client
+    - *Tests.* Protocol: the recovery of each name and of both as the person wrote them (the corpus's two names in one
+      request), exactly at the bound kept against one over dropped, a name as long as the person's whole text copied and
+      recovered against one character more refused, a valid output of another type unchanged, the strict validator still
+      refusing, eight invented or altered names refused (invented against a short text, invented and shorter than the
+      text, one word changed, one character appended, the case changed, a copied name beside an invented one either way,
+      a copy of another text), nineteen outputs that must not be recovered (a zero-width space or an address copied from
+      the person's own text, a tag character, a fault beside the copied name, the reference and the message bounds, two
+      proposals, an extra key, the marker as a model key, a blank over-long name, no proposal, no object), and the
+      device's list validator with its refusals. Server: the over-long merchant the person wrote kept with every other
+      field exact and `dropped: ['merchant']`, the same name invented against another text refused as 502 and billed
+      once, both names, the normal path with its unchanged key set (no `dropped`) and no telemetry count, the name never
+      in the reply's JSON nor in the log; the refusal list keeps an over-long name as a refusal when invented or when
+      another fault rides along (a hidden character, a zero amount) and gains the over-long reference. Evaluator: the two
+      over-long cases copied verbatim (the raw verdict kept with no field score, the recovery beside it,
+      `schemaValidRate` 101/103 and its failure as in run #2, nothing else failing; the recovery and the count in a live
+      report's imperfect list), four faults beside the written name and a second proposal recovering nothing, and two
+      invented names on every proposal case recovering nothing (only the raw misses move). Device: the remote client
       with and without the list, six contradicted lists refused, the fixture in both languages; the screen on real SQLite
       (the person's words kept, the note under the reply with no Reintentar, the capture with the exact amount and the
       merchant missing, the review gap, the sheet presented, nothing written); the screen on the in-memory harness with
       both names dropped behind a currency question (the notes in the server's order, the chip still completing the
       parked draft) and with the real fixture (the preview card with the merchant missing and the note under the reply;
       with several peso destinations the account question first, the note under it, the card after the chip); the
-      corpus's two cases through the recovery, the resolver, the category question and the review adapter (the merchant
-      a gap, every other field exact). Changed tests, each deliberate: the handler's refusal list (an over-long merchant
-      alone is now kept) and the fixture list.
+      corpus's two cases through the recovery (an invented name of the same length refused), the resolver, the category
+      question and the review adapter (the merchant a gap, every other field exact). Changed tests, each deliberate: the
+      handler's refusal list (an over-long merchant the person wrote is now kept; an invented one still refused) and the
+      fixture list.
     - *Effect on scores and thresholds.* Fixture evaluation: every threshold passes, 0 imperfect cases,
       `recoveredProposalCount` 0 (not a model result). Runs #1 and #2 stay recorded as measured. No threshold, corpus
       expectation, prompt or result-shape change; the worst case is unchanged, **176 364 µUSD for `gpt-6-luna`** and

@@ -127,6 +127,8 @@ test('25A-06 (decision A): an over-long merchant or category copied verbatim rea
     const verbatim = { ...golden, proposals: [{ ...golden.proposals[0], [field]: written }] };
     const request = buildRequest(testCase) as AssistantRequest;
     assert.throws(() => validateAssistantResultV2(verbatim, request), id + ': refused as returned, as the evaluation scores it');
+    // The same length invented (Codex review of PR #99): not the person's words, refused, never recovered.
+    assert.throws(() => recoverAssistantResultV2({ ...golden, proposals: [{ ...golden.proposals[0], [field]: 'x'.repeat(written.length) }] }, request), id + ': an invented name is refused');
     const { result, dropped } = recoverAssistantResultV2(verbatim, request);
     assert.deepEqual(dropped, [field]);
     assert.deepEqual(result, validateAssistantResultV2(golden, request), id + ': what the device receives is the committed golden draft, the name null');

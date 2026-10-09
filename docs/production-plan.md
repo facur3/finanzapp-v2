@@ -834,10 +834,11 @@ destination, period, at most 8 candidate ids from the request).
 
 **Double validation.** The server validates the provider's output with `validateAssistantResultV2` (502 on failure),
 with one recovery since 25A-06 (owner decision A, 2026-10-09; `recoverAssistantResultV2`): a proposal whose only fault is
-a merchant or category longer than its bound, otherwise safe text, is kept with that name null, and that reply, and
-only such a reply, lists it in `dropped` beside `evidence` (never a key of the result, so a model cannot set it, and
-the normal path's wire shape is unchanged; the name is never cut, cleaned or replaced; anything else, a hidden character
-in that very name included, stays a 502 and nothing is saved). The app
+a merchant or category longer than its bound, copied verbatim from the person's text and otherwise safe, is kept with
+that name null, and that reply, and only such a reply, lists it in `dropped` beside `evidence` (never a key of the
+result, so a model cannot set it, and the normal path's wire shape is unchanged; the name is never cut, cleaned or
+replaced; anything else, an invented name however long or a hidden character in that very name included, stays a 502
+and nothing is saved). The app
 validates the server's reply again against the request it sent (`apps/mobile/src/integrations/client.ts`), and the
 `dropped` list against that result (`validateDroppedFields`: droppable names only, each null in the one proposal; absent
 is none), before anything becomes content, then the device's own `resolveDraft`, `reviewDraftFromAssistant` and

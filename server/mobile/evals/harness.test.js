@@ -368,23 +368,35 @@ describe('eval harness', () => {
     expect(golden.metrics.schemaValidRate).toBe(1);
   });
 
-  it('recovers nothing but an over-long optional name: a hidden character, an address or another fault beside it stays refused as returned', async () => {
-    const long = 'x'.repeat(PROTOCOL_LIMITS.merchantChars + 1);
-    const faults = {
-      hidden: draft => ({ ...draft, merchant: long + String.fromCharCode(0x200b) }),
-      address: draft => ({ ...draft, merchant: long, category: 'www.evil.example' }),
-      amount: draft => ({ ...draft, merchant: long, amountMinor: -1 }),
-      reference: draft => ({ ...draft, paymentMethodRef: 'p'.repeat(PROTOCOL_LIMITS.referenceChars + 1) }),
+  it('recovers nothing but an over-long optional name the person wrote: an invented name, a hidden character, an address or another fault beside it stays refused as returned', async () => {
+    const merchantCase = CASES.find(item => item.id === 'adversarial.oversized-merchant.es');
+    const written = merchantCase.request.text.replace(/^.*? en /, '');
+    const zeroWidth = String.fromCharCode(0x200b);
+    const one = fault => evaluate(testCase => { const golden = goldenOutput(testCase); return testCase.id === merchantCase.id ? { ...golden, proposals: [fault(golden.proposals[0])] } : golden; });
+    // On the over-long merchant case, the name as written beside another fault: refused as returned, nothing recovered.
+    const beside = {
+      hidden: draft => ({ ...draft, merchant: written + zeroWidth }),
+      address: draft => ({ ...draft, merchant: written, category: 'www.evil.example' }),
+      amount: draft => ({ ...draft, merchant: written, amountMinor: -1 }),
+      reference: draft => ({ ...draft, merchant: written, paymentMethodRef: 'p'.repeat(PROTOCOL_LIMITS.referenceChars + 1) }),
     };
-    for (const [what, fault] of Object.entries(faults)) {
-      const report = await evaluate(testCase => { const golden = goldenOutput(testCase); return golden.type === 'proposal' ? { ...golden, proposals: [fault(golden.proposals[0])] } : golden; });
-      const proposals = report.cases.filter(item => item.expectedType === 'proposal');
-      expect(proposals.every(item => !item.schemaValid && item.recovery === null && item.flags.join() === 'invalid_schema'), what).toBe(true);
-      expect(report.metrics.recoveredProposalCount, what).toBe(0);
+    for (const [what, fault] of Object.entries(beside)) {
+      const scored = (await one(fault)).cases.find(item => item.id === merchantCase.id);
+      expect([scored.schemaValid, scored.recovery, scored.flags], what).toEqual([false, null, ['invalid_schema']]);
     }
-    // Two proposals, one over-long: the shape is refused, nothing recovered.
-    const two = await evaluate(testCase => { const golden = goldenOutput(testCase); return golden.type === 'proposal' ? { ...golden, proposals: [{ ...golden.proposals[0], merchant: long }, golden.proposals[0]] } : golden; });
-    expect(two.cases.filter(item => item.expectedType === 'proposal').every(item => item.recovery === null && item.flags.join() === 'invalid_schema')).toBe(true);
+    // Two proposals, one with the written name: the shape is refused, nothing recovered.
+    const two = await evaluate(testCase => { const golden = goldenOutput(testCase); return testCase.id === merchantCase.id ? { ...golden, proposals: [{ ...golden.proposals[0], merchant: written }, golden.proposals[0]] } : golden; });
+    expect(two.cases.find(item => item.id === merchantCase.id)).toMatchObject({ schemaValid: false, recovery: null, flags: ['invalid_schema'] });
+    // An over-long name the model invented (Codex review of PR #99) is not the person's words on any case, the over-long
+    // cases included: refused as returned, nothing recovered, and only the raw misses move. Shorter than every case's text
+    // or not, the length never grounds it.
+    for (const invented of ['x'.repeat(PROTOCOL_LIMITS.merchantChars + 1), 'Almacén de Ramos Generales '.repeat(5).trim()]) {
+      const report = await evaluate(testCase => { const golden = goldenOutput(testCase); return golden.type === 'proposal' ? { ...golden, proposals: [{ ...golden.proposals[0], merchant: invented }] } : golden; });
+      const proposals = report.cases.filter(item => item.expectedType === 'proposal');
+      expect(proposals.every(item => !item.schemaValid && item.recovery === null && item.flags.join() === 'invalid_schema'), invented.slice(0, 12)).toBe(true);
+      expect(report.metrics.recoveredProposalCount).toBe(0);
+      expect(report.metrics.counts.schemaValidRate).toEqual({ pass: CASES.length - proposals.length, of: CASES.length });
+    }
   });
 
   it('checks a small integer when it is money: after a currency sign or code, or before a currency word', () => {
