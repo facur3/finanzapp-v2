@@ -1196,7 +1196,11 @@ region (two letters) and a `requestId`; **protocol v3** (25A-06) adds the interf
 `language` the reply is written in, beside the region, and the server accepts both versions.
 Like v1 they know ARS and USD only, and the client does not send anything else (24B1). The
 region lets a regional word («pesos», a bare «$») resolve only when it is unambiguous (AR →
-ARS, US → USD); an explicit currency wins; anything else stays null or is asked. The currency
+ARS, US → USD); an explicit currency wins; anything else stays null from the model, and the
+device then resolves it from the person's own destinations (decision D, 25A-06: a named
+destination lends its currency, the one currency every offered destination shares is inferred,
+several possible currencies are asked with the currencies as chips), never from the region or
+from the word «pesos». The currency
 part of this design is therefore still ahead (docs/i18n.md §11, stage 7 of §7.5), with the
 same server-first rollout: it validates currencies against a generated superset independent of
 the client gate, states the scale instead of "centavos", and returns draft amounts as canonical
@@ -1212,7 +1216,8 @@ reply language; no paid AI is enabled.
    the person's word). The app converts the string with `majorStringToMinor` and refuses a
    draft beyond the currency's digits.
 2. **The paying account is the app's question, never the model's guess.** With exactly one
-   account (cash or card) in USD, the draft names it. With several, the app asks **one**
+   account (cash or card) in USD and nothing named, the draft names it (a named account that
+   matches none or several is asked, never replaced by the only eligible one, 25A-04). With several, the app asks **one**
    contextual question with quick options (the USD accounts, each with its kind and recorded
    balance, as the form's account sheet describes them). With none, the app offers the
    accounts in other currencies as a *foreign-currency purchase* (§9): "USD 30 pagado con …",

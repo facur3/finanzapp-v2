@@ -719,6 +719,62 @@ test('25A-04: the Assistant screen has no ledger write path left', () => {
   }
 });
 
+test('25A-06 (decision D): no currency said with accounts in two currencies: the device asks the currency with the currencies as chips, then the account among that currency\'s; the chosen currency is captured', async () => {
+  const unsaid = { ...FIXTURE_DRAFT_NO_ACCOUNT, proposals: [{ ...FIXTURE_DRAFT_NO_ACCOUNT.proposals[0], currency: null }] };
+  const scripted = scriptedClient();
+  const view = harness({ client: scripted.client });
+  view.render().empty.props.onPick('Gasté 18 mil en el súper');
+  await tick();
+  scripted.reply([{ type: 'result', result: unsaid, facts: [] }]);
+  await settle();
+  let screen = view.render();
+  assert.equal(find([screen.items[1]], 'AssistantText')[0].props.text, '¿En qué moneda fue?');
+  assert.equal(find([screen.items[1]], 'AssistantText')[0].props.ownWords, true, 'the app\'s own question, in the interface language');
+  const currencies = find([screen.items[1]], 'ClarificationChoices')[0];
+  assert.deepEqual(currencies.props.options, [{ id: 'ARS', currency: 'ARS' }, { id: 'USD', currency: 'USD' }]);
+  assert.equal(view.review.captures.length, 0, 'nothing captured while a question is open');
+  currencies.props.onChoose(currencies.props.options[0], 'Pesos argentinos');
+  screen = view.render();
+  assert.equal(find([screen.items[2]], 'UserMessage')[0].props.text, 'Pesos argentinos', 'the chip\'s words become the user\'s');
+  assert.equal(find([screen.items[3]], 'AssistantText')[0].props.text, '¿Con qué lo pagaste?');
+  const accounts = find([screen.items[3]], 'ClarificationChoices')[0];
+  assert.deepEqual(accounts.props.options.map((option: any) => option.id), ['visa', 'cash'], 'the destinations in the chosen currency only');
+  accounts.props.onChoose(accounts.props.options[1], 'Efectivo');
+  await settle();
+  const card = find([view.render().items[5]], 'ProposalCard')[0];
+  assert.deepEqual([card.props.content.capture.draft.currency, card.props.content.capture.draft.destinationId, card.props.content.capture.draft.amountMinor], ['ARS', 'cash', 1800000],
+    'the chosen currency is captured, visible in the review, with the amount exactly as said');
+  assert.equal(card.props.content.status, 'captured');
+  assert.equal(view.review.captures.length, 1);
+  assert.equal(scripted.asks.length, 1, 'both clarifications are local: no second request, nothing about the accounts to the model');
+  // Dollars chosen instead: the one USD account is implied, so no second question.
+  const dollars = scriptedClient();
+  const view2 = harness({ client: dollars.client });
+  view2.render().empty.props.onPick('Gasté 18 mil en el súper');
+  await tick();
+  dollars.reply([{ type: 'result', result: unsaid, facts: [] }]);
+  await settle();
+  const choice = find([view2.render().items[1]], 'ClarificationChoices')[0];
+  choice.props.onChoose(choice.props.options[1], 'Dólares estadounidenses');
+  await settle();
+  const card2 = find([view2.render().items[3]], 'ProposalCard')[0];
+  assert.deepEqual([card2.props.content.capture.draft.currency, card2.props.content.capture.draft.destinationId], ['USD', 'usd']);
+  // Only ARS destinations on the device: nothing is asked about the currency; it is inferred and captured.
+  const pesos = scriptedClient();
+  const view3 = harness({ client: pesos.client, accounts: [visa, cash] });
+  view3.render().empty.props.onPick('Gasté 18 mil en el súper');
+  await tick();
+  pesos.reply([{ type: 'result', result: unsaid, facts: [] }]);
+  await settle();
+  const only = view3.render();
+  assert.equal(find([only.items[1]], 'AssistantText')[0].props.text, '¿Con qué lo pagaste?', 'straight to the account, between the two peso destinations');
+  const pick = find([only.items[1]], 'ClarificationChoices')[0];
+  pick.props.onChoose(pick.props.options[0], 'Visa Galicia');
+  await settle();
+  const card3 = find([view3.render().items[3]], 'ProposalCard')[0];
+  assert.deepEqual([card3.props.content.capture.draft.currency, card3.props.content.capture.draft.destinationId], ['ARS', 'visa']);
+});
+
 test('a draft without a payment method asks with the accounts of that currency; the choice becomes the user\'s words and completes the draft', async () => {
   const scripted = scriptedClient();
   const view = harness({ client: scripted.client });

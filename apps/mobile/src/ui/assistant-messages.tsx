@@ -124,13 +124,14 @@ function Chip({ label, onPress, selected = false, disabled = false }: { label: s
  * looked up with the chip's own kind (Sueldo is only a built-in income
  * category); an account or custom category name is the user's own. */
 export function ClarificationChoices({ options, chosen, onChoose }: { options: ClarificationOption[]; chosen: string | null; onChoose: (option: ClarificationOption, shown: string) => void }) {
-  const { t } = useI18n();
+  const { t, currencyName } = useI18n();
   const expenseLook = useCategoryLookOf('expense');
   const incomeLook = useCategoryLookOf('income');
   if (!options.length || chosen) return null;
   return <Reflow fade style={[styles.chips, styles.assistantRow]}>
     {options.map(option => {
-      const shown = option.category && option.label ? (option.category === 'income' ? incomeLook : expenseLook)(option.label).label : optionText(option, t);
+      // A currency to choose (25A-06) is named in the interface language («Pesos argentinos», "US dollars").
+      const shown = option.category && option.label ? (option.category === 'income' ? incomeLook : expenseLook)(option.label).label : optionText(option, t, currencyName);
       return <Chip key={option.id} label={shown} onPress={() => { selectionHaptic(); onChoose(option, shown); }} />;
     })}
   </Reflow>;

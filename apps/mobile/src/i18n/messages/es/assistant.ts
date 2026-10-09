@@ -51,6 +51,10 @@ export const assistant = {
       amount: '¿De cuánto fue? Escribilo con el importe.',
       paidWith: '¿Con qué lo pagaste?',
       receivedIn: '¿En qué cuenta ingresó?',
+      /** 25A-06 (decision D): asked only when the accounts hold several currencies and none was said; the chips are the currencies. */
+      currency: '¿En qué moneda fue?',
+      /** The currency said does not match the account named: the chips are the destinations in the currency said. */
+      currencyConflict: 'Esa cuenta no está en la moneda que dijiste. ¿Con qué cuenta o tarjeta fue?',
       category: '¿En qué categoría lo anoto?',
       /** After the last clarification, above the completed draft card. */
       reviewDraft: 'Revisá la propuesta antes de registrarla.',

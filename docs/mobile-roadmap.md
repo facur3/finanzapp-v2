@@ -1,7 +1,17 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-09 (25A-06, **the reply language, protocol v3: the smallest slice toward a multilingual, region-aware
-Luna**, on `feat/25a-06-assistant-reply-language`, owner direction of the same day: the request gains `language`, the
+Updated: 2026-10-09 (25A-06, **owner decision D applied: device-side currency inference, ARS and USD**, on
+`feat/25a-06-assistant-currency-inference`, owner direction of the same day, so Luna stops asking a currency the app
+already knows: the model keeps `null` for a currency the person did not say and `resolveDraft` resolves it with the
+destination, in the owner's order (an explicit currency first; a named, uniquely matched account or card lends its own;
+one currency shared by every destination offered for the kind is inferred; several possible currencies ask, with the
+currencies as chips; a currency never implies an account; a stated currency that contradicts the named account asks,
+never converts; the income pool stays cash only); the inferred currency is captured (`currencyInferred`), visible and
+editable in the review, exact minor units kept; the screen's display currency is never captured; no prompt, corpus,
+threshold or protocol change, nothing about the accounts to the model; thirteen regression scenarios on the resolver,
+the adapter, the screen and real SQLite; the nine-rule decision D record carried onto master; MXN/COP recorded as
+future coverage; §2, §3, «Producto 25A-06»). Earlier the same day (25A-06, **the reply language, protocol v3: the smallest slice toward a multilingual, region-aware
+Luna**, PR #97, owner direction of the same day: the request gains `language`, the
 interface language the reply is written in, beside the existing `region` (version 3; the shared validator accepts v2
 unchanged and v3, the server-first rollout of docs/i18n.md §11, so nothing rides on v2); the instructions stop forcing
 rioplatense Spanish: the reply follows `language`, a request without it follows the person's own language, the region
@@ -67,7 +77,8 @@ applied or evaluated against a real model; the version line read «FinanzApp 0.1
 merged as PR #85, merge commit d493c83: Assistant → review sheet. The Assistant no longer writes the
 ledger: its direct path (`entryFromDraft` → `validateEntry` → `addEntry`) is gone; every resolved Assistant draft is
 adapted to the canonical review draft (`reviewDraftFromAssistant`: an unstated date is today by the capture rule, an
-unstated currency comes only from a stated destination, a card gets «Una vez», an income never a card) and durably
+unstated currency came only from a stated destination until the device inference of decision D in 25A-06, a card gets
+«Una vez», an income never a card) and durably
 captured with an item id and a write id fixed once; only then a native review sheet is presented over the Assistant,
 where it is confirmed (the review store's one dispatcher), edited or explicitly discarded; closing the sheet leaves it
 pending, and «Para revisar» is the durable inbox, not a required step; New chat never touches it; the fixture view
@@ -1077,8 +1088,8 @@ before it passes (the runbook's §0.2):
 3. **Phase B activates staging** (B7 runs #1 and #2 completed 2026-10-08 UTC: **Luna FAILED adoption** both times; both
    one-run approvals, 2026-10-07 and 2026-10-08, are consumed; the local fixes are merged (PR #94), decision B is
    applied as an instruction plus the scorer (PR #96; PR #95 closed unmerged), and the reply language is protocol v3
-   (the reply-language PR, owner direction 2026-10-09); next: currency inference on the device (decision D, its own
-   PR), the owner's decisions A, C and E, then a new owner spend approval before any further live run; B8 blocked): the **real Luna evaluation** with an owner-approved spend (B7); AI enabled on staging,
+   (PR #97, owner direction 2026-10-09) and the device infers the currency (decision D, the currency-inference PR);
+   next: the owner's decisions A, C and E, then a new owner spend approval before any further live run; B8 blocked): the **real Luna evaluation** with an owner-approved spend (B7); AI enabled on staging,
    the failure drills and the race (B8); the **cost reconciliation** against the provider (B9).
 4. A focused **`/security_audit`**, then **`/security_review`** (B10); results recorded and 25A-06 marked done (B11).
 5. **Only then 25A-07 — Real Assistant product contract and polish** («Producto 25A», «Slices»), with the session slice
@@ -4482,7 +4493,11 @@ nothing of it is on a screen yet.
     producers keep their own date semantics.
   - **Currency.** The currency the model stated is kept; with none stated, a destination the person named («con la Visa»)
     or chose in a clarification lends its own (`destinationStated`); an implied destination (the one account of the
-    screen's currency) lends none and the currency is a gap, completed in Editar. The display currency is never captured.
+    screen's currency) lent none and the currency was a gap, completed in Editar, until 25A-06: since the owner's decision
+    D the device also infers it (`currencyInferred`: a named destination matched exactly once lends its own across the
+    whole pool, one currency shared by every destination offered for the kind is inferred, and several possible
+    currencies with nothing named are asked, with the currencies as chips), captured, visible and editable in the review
+    («Producto 25A-06», decision D). The display currency is never captured.
 - **Currency language for the later real-AI contract (documentation only).** An explicit ISO code or currency name → that
   currency; a regional, ambiguous word such as «pesos» may resolve through the person's configured product region only
   when that mapping is unambiguous (Argentina → ARS); an explicit destination carries its own currency; anything else is
@@ -5395,7 +5410,8 @@ nothing of it is on a screen yet.
       µUSD for `gpt-6-luna`** (169 803 at PR #96; the instructions grew from 5 399 to 5 892 bytes and each request
       carries its language) and **383 574 µUSD for `gpt-5.6-luna`** (370 455). Any further live run needs a new written
       owner approval of at least the figure the script computes at that commit.
-    - *Still ahead, in order, each its own PR.* (1) **Currency inference on the device** (decision D, within ARS/USD):
+    - *Still ahead, in order, each its own PR.* (1) **Currency inference on the device** (decision D, within ARS/USD;
+      delivered right after, the currency-inference PR below):
       `resolveDraft` lends a uniquely matched account's currency to a draft without one, prefills the single currency
       every eligible account shares, asks when several remain, never picks an account because its currency matches,
       never converts; the model keeps `null` for an unstated currency; every inferred value visible and editable in the
@@ -5405,6 +5421,77 @@ nothing of it is on a screen yet.
       exact cents; the structured-output schema's currency enum grows with it. (3) **Language-neutral facts**
       (`subject`, `name`) so an English reply does not read Spanish labels, and the category-name match for English
       drafts. Not in this PR: any of them, a live call, B8, a service change, an EAS build, a merge.
+  - **Decision D applied: device-side currency inference, ARS and USD (owner, decision 2026-10-08, direction
+    2026-10-09; branch `feat/25a-06-assistant-currency-inference`, this PR; no provider call, no prompt change).** Luna
+    should feel intelligent and natural: no currency question when the app already knows enough to resolve it safely;
+    the model understands the language, the device keeps accounts and currency consistent.
+    - *The owner's rule, carried onto master from PR #95's branch (closed unmerged), in this order of precedence:*
+      1. an explicit currency named by the person takes precedence;
+      2. a named, unambiguously matched account or card supplies its currency when none was named;
+      3. otherwise, if every eligible active account uses one supported currency, the device may prefill that currency;
+      4. if several currencies are eligible, the currency stays unresolved and a clarification is requested;
+      5. a destination account is never invented merely because the currency is known;
+      6. an explicit currency that conflicts with the selected account asks, never converts silently;
+      7. in the Argentine region, explicit colloquial pesos / lucas / mangos mean ARS; outside AR, ARS is never assumed
+         silently;
+      8. no account data beyond the minimum necessary is sent to the AI provider;
+      9. every inferred value stays visible and editable in the review.
+      It settles the production-plan.md §5.8 «Ambiguous currencies» row against the corpus: the device, not the model,
+      infers from accounts (rules 2–3); the model keeps `null` for an unstated or unresolvable currency and asks only for
+      two named currencies or an unsupported one. The corpus cases `pesos-non-ar`, `currency-missing` and `k-suffix`
+      stay as committed (`null`, which the device now resolves). Rules 1, 7 and 8 were already true (the instructions'
+      «Moneda» line is unchanged: a regional word resolves only in its region, «k»/«mil» name no currency, another
+      currency is asked; nothing about the accounts travels); this PR applies rules 2–6 and 9.
+    - *What was there (inspected read-only first).* `resolveDraft` filtered the destinations by `draft.currency ??
+      currency`, the screen's display currency, before matching a name, so a uniquely named USD account was not even
+      eligible while Inicio showed pesos; the review adapter captured a currency only when the model stated it or a
+      named or chosen destination lent it; an implied single destination lent none and the currency was a gap the person
+      completed in Editar; `completeDraft` defaulted a parked draft's missing currency to a literal `'ARS'`; the screen's
+      `currency` was the capture hub's display currency, never the person's choice for the movement; the review sheet
+      withholds Confirmar on a currency or destination gap and shows «Sin monto» without a currency; Editar prefills the
+      exact minor units when the currency is known.
+    - *The resolver* (`apps/mobile/src/assistant/conversation.ts`). After kind and amount, the currency and the
+      destination are resolved together from the pool the domain offers for the kind (`postingAccountsFor`: cash and
+      active cards for an expense, cash only for an income): a stated currency stands; otherwise a name matched exactly
+      once in any currency lends its own (rule 2); otherwise one currency shared by every destination is inferred
+      (rule 3); a name matching several destinations across currencies asks among those (the choice settles both);
+      several possible currencies with nothing named ask the currency, with the currencies as chips (rule 4, a new
+      `DraftField` «currency» and a new question «¿En qué moneda fue?»); then the destination as before: one eligible
+      implied when nothing was named, several asked, a name matched by whole words, a name that matches none or several
+      asked and never replaced by the only eligible account (25A-04, unchanged, rules 5–6); a stated currency whose name
+      matches only accounts in another currency asks with the destinations of the stated currency («Esa cuenta no está en
+      la moneda que dijiste. ¿Con qué cuenta o tarjeta fue?», rule 6), never converting. The result carries
+      `currencyInferred`; `completeDraft` passes a currency on only when it is known (stated, inferred or chosen), so a
+      chosen account lends its own and a chosen currency chip is the person's; the literal `'ARS'` default is gone from
+      the capture path (it remains only as the display stand-in when nothing is known). No destination at all: nothing
+      inferred, asked with no chips, the review keeps currency and destination as gaps.
+    - *The adapter* (`review-proposal.ts`): an inferred currency is captured like a stated one (`currencyStated !== false
+      || currencyInferred`), so it is shown in the review sheet with the exact amount and editable in Editar; the
+      display currency is still never captured. Chips name a currency in the interface language («Pesos argentinos»,
+      "US dollars": `optionText` with `currencyName`).
+    - *Tests* (`tests/assistant-currency.node.ts`, new; `assistant-routes.node.ts`, `assistant-review.node.ts`,
+      `assistant-evals.node.ts`). The thirteen scenarios the owner listed: one ARS account (inferred, implied, captured,
+      no gap); several ARS accounts (currency inferred, account asked, never picked); one ARS and one USD (currency asked
+      with named chips, then the account among that currency's, or the one USD account implied); explicit USD with both
+      (the USD account); a uniquely named USD account while the screen shows ARS (its currency); two similarly named
+      accounts in different currencies (asked among the two; with a stated currency, the match in it); explicit ARS
+      against a named USD account (the conflict question, chips in ARS, never converted; a name matching nothing stays
+      the 25A-04 question); no eligible destination (asked with no chips; currency and destination gaps); an income with
+      a card present (cash pool only, the card never offered nor lending); several turns kind → currency → account →
+      category with the context kept and the inferred currency never lost; exact amounts (199 USD, 1 000 000 ARS); on
+      real SQLite capture, edit (currency and amount kept), discard and one confirmation under the frozen write id, nothing
+      written before it; and future coverage: MXN or COP accounts infer their own currency, never ARS for «pesos», and
+      the protocol cannot carry them yet (the device gate refuses before any call). The route test drives the chips on
+      the screen with the default ARS+USD ledger. Two adapter assertions changed by decision (an implied single
+      destination's currency is now inferred and captured, with the screen's currency shown never to be); the device
+      lane of the corpus reads the resolved currency (every device block is single-currency, so nothing moves).
+    - *Unchanged, deliberately.* The instructions, the corpus, every expectation and every threshold (no worst-case
+      change: the instructions are the same bytes); protocol v3 (ARS and USD only: MXN, COP and other currencies are
+      the next protocol slice, recorded as future coverage, never pretended supported); the write boundary (nothing is
+      written before Confirmar in the review sheet; the frozen write id, the no-duplicate rules); the review store and
+      the editing paths. Nothing about the accounts is sent to the model to infer a currency.
+    - *Device checklist* (`docs/mobile-device-checklist.md`, Producto 25A-04 section): a release-gate item for the
+      inferred currency shown and editable in the review sheet, with a connected Assistant.
 - **Owner refinements before accepting the runbook (2026-10-05, in this PR).**
   - **Staging region:** Vercel Functions `gru1` (São Paulo) and the staging Supabase project in the specific region
     `sa-east-1` (São Paulo), replacing `iad1` / us-east-1. The reasons: Argentina-first, the API compute next to its

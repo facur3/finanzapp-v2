@@ -57,6 +57,12 @@ SQLite where persistence matters). Synthetic proposals are never written to the 
   with no action and **no review sheet**, and Más → Para revisar stays empty («Nada pendiente», no badge) afterwards;
   Movimientos unchanged.
 - [ ] **Disconnected build:** a typed message still returns to the composer with its note; nothing appears in Para revisar.
+- [ ] **Currency inference (25A-06, owner decision D; in the release gate, with a connected Assistant):** with only peso
+  accounts and cards, «Gasté 18 mil en el súper» (no currency said) never asks the currency: the proposal, or the
+  account question, comes in pesos; with a peso and a dollar account it asks «¿En qué moneda fue?» with «Pesos
+  argentinos» and «Dólares estadounidenses» as chips, then the account among that currency's; «Gasté 1,99 en Dólares»
+  (an account named «Dólares») goes straight to that account in dollars with 1,99 exactly; the review sheet shows the inferred currency with
+  the amount, and Editar lets both be changed; nothing is written before Confirmar.
 - [ ] **When the Assistant connects (25A-06 on staging, 25A-07 for the product flow), in the release gate:**
   - the review sheet appears by itself right after the proposal is saved, as a native form sheet fitted to its content
     with a grabber, over the Assistant, safe areas respected, light and dark; at the largest text sizes and on an
