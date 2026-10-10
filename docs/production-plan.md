@@ -1787,7 +1787,7 @@ method (runbook §5). This reconciles the roadmap's 25A "mobile sign-in" with 25
 ## 13. Roadmap mapping
 
 Every production item belongs to an existing phase of [mobile-roadmap.md](mobile-roadmap.md). The binding order there
-is unchanged: 25A → 25A2 → 25C → 25C2 → 25D → 25E → 25F → 26. Section references with "launch" point to
+is unchanged: 25A → 25A2 → 25C → 25C2 → 25D → 25E → 25F → 26. *(Proposed exception, 2026-10-10, pending the owner's written approval: a free-core 1.0 brings Producto 26 forward for the core that exists today, and the phases from 25A on follow it as updates in the same order; roadmap §4 «Release plan to 2026-10-31», choice 12.)* Section references with "launch" point to
 [app-store-launch.md](app-store-launch.md).
 
 | Phase | Production items | Where |

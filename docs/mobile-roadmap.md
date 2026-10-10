@@ -6192,8 +6192,13 @@ evaluation failed, the failure drills and cost reconciliation never ran, and no 
 - **Minimum public App Store candidate (free core).** The above, plus: the cleared public name; privacy policy and
   support URLs live on the owner's domain; «Ayuda y comentarios» in Más; App Privacy answers (data not collected,
   except what the Frankfurter rate download implies), age rating, export compliance, category Finance; listing text and
-  6.9-inch screenshots with fictional data in es and en; the physical-device release gate (the deferred 24T3 pass, the
-  review flows, backup/restore across versions, accessibility) passed on a TestFlight build; the whole-app security and
+  6.9-inch screenshots with fictional data in es and en; the physical-device release gate passed on a TestFlight build,
+  **limited to the flows the 1.0 binary can execute** (the deferred 24T3 pass, cards and instalments, transfers,
+  refunds, budgets, recurring, debts, reports and currencies, backup/restore across versions, migrations, accessibility);
+  the Assistant-produced cases (25A-03 review flows fed by the Assistant, 25A-04 and every later 25A device item) cannot
+  run in a build without the Assistant and are **deferred to the AI release by the owner's explicit decision** (choice
+  11 below), never silently dropped; the data-protection evaluation (production-plan.md §14: the iOS data-protection
+  class on device, SQLCipher and key recovery) done and its decision recorded; the whole-app security and
   privacy audit with no open High or Medium; the owner's submission.
 - **Only if AI/Pro launches on day one (not credible by the 31st).** B7 passing after decisions C and E and a new
   approval; B8–B11; the session slice (Sign in with Apple, account deletion with token revocation); the AI consent
@@ -6213,17 +6218,19 @@ evaluation failed, the failure drills and cost reconciliation never ran, and no 
 | 10-13 → 10-15 | **Release-candidate shell PR:** `production` variant with the decided id, Assistant not exposed in it, encryption key, icon slot, version line (below) | Claude |
 | by 10-14 | **Public name** after the brand-brief workflow's App Store, web, domain, handle and trademark screening (steps A–H; a lawyer if the screening warrants) | OWNER (Claude runs the searches it can) |
 | 10-14 → 10-16 | Buy the domain; create the App Store Connect record; approve the icon | OWNER |
-| 10-15 → 10-17 | Drafts: privacy policy, support page, terms choice (standard EULA recommended), App Privacy answers, listing text es/en; «Ayuda y comentarios» PR with the support alias | Claude drafts; OWNER publishes and reviews (legal review if wanted) |
-| 10-17 → 10-18 | First EAS production build and internal TestFlight | OWNER authorises the build and upload |
-| 10-18 → 10-24 | Physical-device release gate on the TestFlight build (checklist «Release gate»: 24T3, 25A-03, money and ledger flows, migrations from an older install, backup/restore, VoiceOver, large text, Reduce Motion/Transparency, cold start, memory) | OWNER on the iPhone; Claude fixes in hotfix PRs |
-| 10-20 → 10-23 | Whole-app security and privacy audit (production-plan.md §14.1) and fixes | Claude |
+| 10-15 → 10-17 | Drafts: privacy policy (naming Frankfurter), support page, terms choice (standard EULA recommended), App Privacy answers, listing text es/en; «Ayuda y comentarios» PR with the support alias | Claude drafts; OWNER publishes the privacy policy **before the upload** and reviews (legal review if wanted) |
+| 10-15 → 10-17 | The **first-TestFlight prerequisites** of app-store-launch.md §11.8 on the installed development build: the region-family sheet (docs/region-families.md) and the 24C1, 24M and 24R2B device checks | OWNER on the iPhone; Claude fixes |
+| 10-18 | First EAS production build and internal TestFlight, only once the privacy policy is live and the §11.8 checks pass | OWNER authorises the build and upload |
+| 10-18 → 10-24 | Physical-device release gate on the TestFlight build, limited to what the 1.0 binary executes (checklist «Release gate»: 24T3, money and ledger flows, migrations from an older install, backup/restore, VoiceOver, large text, Reduce Motion/Transparency, cold start, memory) | OWNER on the iPhone; Claude fixes in hotfix PRs |
+| 10-20 → 10-23 | Whole-app security and privacy audit (production-plan.md §14.1) and fixes; the data-protection evaluation (production-plan.md §14: protection class verified on device, SQLCipher and key recovery assessed) | Claude; OWNER provides the device evidence and records the decision |
 | 10-24 → 10-26 | Screenshots, final metadata, final release-candidate build | Claude prepares; OWNER approves and builds |
 | 10-27 | Go/no-go, then submission for review (manual release) | OWNER |
 | 10-28 → 10-31 | Review buffer; answer App Review; release on approval | OWNER |
 
 **Go/no-go checks (all must hold on 10-27).** Root and mobile suites, `check:repo`, catalogue and i18n gates and
-`export:ios` green on the candidate commit (Claude); the release gate on the TestFlight build passed with no open
-money, data-loss or crash defect (OWNER); security audit with no open High or Medium (Claude, OWNER accepts); privacy
+`export:ios` green on the candidate commit (Claude); the release gate on the TestFlight build passed, limited to the flows the binary executes, with no open
+money, data-loss or crash defect, and the Assistant-produced cases deferred in writing (OWNER); security audit with no open High or Medium (Claude, OWNER accepts); the data-protection evaluation done and its decision
+recorded (OWNER, Claude evaluates); privacy
 and support URLs reachable and matching what the app does (OWNER); the store name cleared and the icon final (OWNER);
 the Assistant absent from the production variant, no paywall, no purchase, no network call besides the rate download
 (Claude verifies in the exported bundle); App Privacy, age rating and export compliance answered (OWNER, Claude drafts);
@@ -6232,8 +6239,8 @@ backup made from the previous build restores in the candidate (OWNER on device).
 **After launch.** Monitor App Store Connect crashes and TestFlight feedback, the support inbox and ratings daily for
 two weeks; triage: data loss or a wrong amount is a stop-ship hotfix the same day, a crash within 48 hours, the rest into
 the roadmap; hotfixes are new builds (no `expo-updates`): 1.0.1, 1.0.2 with short release notes in es/en; versions follow
-app-store-launch.md §11.4. **Then 1.1:** the AI track (B7 → B11, session, consent, 25A-07, production backend) and
-25F (StoreKit, Pro, paywall) in that order; the dock comparison; the landing page and ASO iteration
+app-store-launch.md §11.4. **Then updates, in the roadmap's phase order (choice 12):** 25A first, the AI track (B7 → B11, session,
+consent, 25A-07, production backend, the deferred Assistant device cases), and later 25F (StoreKit, Pro, paywall); the dock comparison; the landing page and ASO iteration
 (go-to-market.md).
 
 **Landing page, domain, ASO, marketing.** For 1.0 only what submission needs: the domain, `/privacy` and `/support`
@@ -6244,13 +6251,19 @@ owner decision if wanted earlier.
 **The owner's choices for October.** (1) Free-core-first 1.0 (recommended) or wait for AI/Pro. (2) Bundle id now. (3)
 Public name. (4) Seller type (Individual is the fastest) and EU trader status, storefronts. (5) Domain and hosting of the
 two pages. (6) Icon. (7) The Assistant hidden in 1.0 (recommended) rather than a «próximamente» tile. (8) Authorising
-the production builds, the TestFlight upload and the submission. (9) A device-QA block 10-18 → 10-24. (10) For the AI
-track, not the 31st: decisions C and E and a new spend approval.
+the production builds, the TestFlight upload and the submission. (9) A device-QA block 10-15 → 10-24. (10) For the AI
+track, not the 31st: decisions C and E and a new spend approval. (11) The written deferral of the Assistant-produced
+device cases to the AI release. (12) **The phase-order exception:** the roadmap's binding order (… 25A → 25A2 → 25C →
+25C2 → 25D → 25E → 25F → 26; production-plan.md §13) puts publication last; a free-core 1.0 brings Producto 26 forward
+for the core that exists today, and 25A (AI), 25A2, 25C, 25C2, 25D, 25E and 25F follow it as updates, in the same order.
+This plan is a proposal until the owner records that exception; without it, 26 stays last and there is no October
+release.
 
 **The next implementation PR: the release-candidate shell.** A `production` variant in `app.config.ts` and an EAS
 `production` profile with the bundle id the owner records (AGENTS rule 3: never before that decision), the store
 name, the icon assets slot, `ITSAppUsesNonExemptEncryption: false` once the owner confirms exempt encryption; the
-Assistant's hub tile and route absent from the production variant (development and preview unchanged); the Más version
+Assistant's hub tile and route absent from the production variant (development and preview unchanged), and «Para
+revisar» shown only when an item exists (no producer feeds it in 1.0); the Más version
 line; tests that pin each. No EAS build, no submission.
 
 ### Producto 26 — TestFlight, the definitive identity and publication
