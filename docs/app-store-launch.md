@@ -4,9 +4,12 @@
 subscription, no paywall, no StoreKit code, no purchase or analytics SDK, no production identity, no TestFlight build and
 no store listing. No account was created, no agreement signed, no build made and no charge incurred to write it.
 Updated 2026-10-05 with the owner's support identity, in-app help and seller identity gate (§12, §13.1, §14).
-Updated 2026-10-10: the owner targets an App Store release on **2026-10-31**; the dated plan, the minimum TestFlight and
-public candidates (a free-core-first 1.0, AI/Pro in a later release) and the go/no-go checks are in the roadmap, §4
-«Release plan to 2026-10-31». This document stays the detail; nothing here was implemented by that update.
+Updated 2026-10-10: 2026-10-31 is the owner's **target**, not a mandatory public deadline; the preferred near-term
+milestone is an internal TestFlight candidate by the end of October; a public free-core release is a valid option pending
+the owner's approval; public AI/Pro comes later, with AI work continuing in parallel. The dated plan and the go/no-go
+checks are in the roadmap, §4 «Release plan to 2026-10-31». A public privacy-policy URL is required to submit; a custom
+domain is not a prerequisite to prepare. The visible App Store name can change before submission; the bundle identifier
+cannot change once a build is uploaded. This document stays the detail; nothing here was implemented by that update.
 
 - **External facts** (Apple, Expo, RevenueCat) were read from the vendors' own pages on **2026-10-02** and are listed
   in §16. Prices, limits and guideline wording change: re-read the source before any decision that depends on one. A

@@ -1817,7 +1817,8 @@ Reconciliation notes:
 
 ## 14. Readiness
 
-**Release target (owner, 2026-10-10):** 2026-10-31 for a free-core-first 1.0, AI and Pro in a later release; the
+**Release target (owner, 2026-10-10; a target, not a mandatory deadline):** an internal TestFlight candidate by the end
+of October; a public free-core release is an option pending the owner's approval; AI and Pro later, AI work in parallel; the
 dated critical path and go/no-go checks are the roadmap's §4 «Release plan to 2026-10-31». The rows below stay the
 detail of each gate.
 
