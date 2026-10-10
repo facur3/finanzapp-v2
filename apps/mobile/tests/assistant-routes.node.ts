@@ -1289,3 +1289,35 @@ test('VoiceOver: the test banner speaks the interface language when it differs f
   assert.equal(banner('en', 'es-AR').props.accessibilityLanguage, 'es');
   assert.equal(banner('es', 'es-AR').props.accessibilityLanguage, undefined, 'device and app agree: the voice chosen in iOS Settings');
 });
+
+// 25A-06, ledger currencies: protocol v4 carries every currency of the domain's creation gate. A person whose accounts are
+// all in MXN records in MXN (the screen's currency is sent, the device infers MXN and scales the decimal by its exponent);
+// a question waits while the screen's currency has no cents (JPY), because a question's facts are read as cents until they
+// state their exponent; recording in yen works.
+test('25A-06: an MXN-only ledger records «10 mil pesos» as MXN 10 000 exactly; a JPY screen records but does not ask questions yet', async () => {
+  const mxn: domain.Account = { id: 'mxn', name: 'Cuenta Banorte', currency: 'MXN', openingMinor: 0, createdAt };
+  const pesos = { ...FIXTURE_DRAFT_NO_ACCOUNT, proposals: [{ ...FIXTURE_DRAFT_NO_ACCOUNT.proposals[0], amount: '10000', currency: null, paymentMethodRef: null, category: 'Supermercado' }] };
+  const scripted = scriptedClient();
+  const view = harness({ client: scripted.client, accounts: [mxn] });
+  view.render().empty.props.onPick('Gasté 10 mil pesos en el súper');
+  await tick();
+  assert.equal(scripted.asks[0].currency, 'MXN', 'the screen\'s currency travels as MXN, never refused as before');
+  scripted.reply([{ type: 'result', result: pesos, facts: [] }]);
+  await settle();
+  const card = find(view.render().items, 'ProposalCard')[0];
+  assert.deepEqual([card.props.content.capture.draft.currency, card.props.content.capture.draft.destinationId, card.props.content.capture.draft.amountMinor], ['MXN', 'mxn', 1000000]);
+  // A JPY screen: a question is declined locally (no request), a recording is sent.
+  const jpy: domain.Account = { id: 'jpy', name: 'Yenes', currency: 'JPY', openingMinor: 0, createdAt };
+  const asked = scriptedClient();
+  const yen = harness({ client: asked.client, accounts: [jpy] });
+  yen.render().empty.props.onPick('¿Cuánto gasté este mes?');
+  await tick();
+  assert.equal(asked.asks.length, 0, 'no question is sent while facts would be read as cents');
+  assert.equal(yen.render().messages.at(-1)?.role === 'system' && (yen.render().messages.at(-1) as any).reason, 'unavailable');
+  const recorded = scriptedClient();
+  const yen2 = harness({ client: recorded.client, accounts: [jpy] });
+  yen2.render().empty.props.onPick('Gasté 100 yenes en el súper');
+  await tick();
+  assert.equal(recorded.asks.length, 1);
+  assert.equal(recorded.asks[0].currency, 'JPY');
+});

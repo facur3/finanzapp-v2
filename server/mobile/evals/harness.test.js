@@ -288,7 +288,12 @@ describe('eval harness', () => {
     expect(ASSISTANT_INSTRUCTIONS).toContain('("15 mil" = "15000"; "1,99" en AR = "1.99"');
     expect(ASSISTANT_INSTRUCTIONS).not.toMatch(/amountMinor|1500000/);
     expect(ASSISTANT_INSTRUCTIONS).toMatch(/ambiguo, negativo, cero o mayor que ese límite, pedí aclaración del monto/);
-    expect(ASSISTANT_INSTRUCTIONS).toMatch(/nombre coloquial como "lucas" o "mangos"\) vale ARS solo si region es AR/);
+    // 25A-06, ledger currencies: a regional word names the currency of the person's region only when it names one there
+    // («pesos» is never ARS everywhere); anything else stays null for the device; no table of countries or slang.
+    expect(ASSISTANT_INSTRUCTIONS).toMatch(/una palabra o un nombre coloquial que en su region nombra una sola moneda/);
+    expect(ASSISTANT_INSTRUCTIONS).toMatch(/Si en su region la palabra puede nombrar más de una moneda, null/);
+    expect(ASSISTANT_INSTRUCTIONS).toMatch(/Sin moneda dicha, null: la app la resuelve con las cuentas de la persona/);
+    expect(ASSISTANT_INSTRUCTIONS).not.toMatch(/vale ARS solo si region es AR|Otra moneda \(euros, reales\)/);
     expect(ASSISTANT_INSTRUCTIONS).toMatch(/"k" y "mil" solos no nombran ninguna moneda/);
     expect(ASSISTANT_INSTRUCTIONS).toMatch(/otra moneda que la de los facts, no hay tipo de cambio: pedí aclaración de moneda/);
     expect(ASSISTANT_INSTRUCTIONS).toMatch(/Un pedido de que FinanzApp pague, transfiera o envíe dinero es out_of_scope/);

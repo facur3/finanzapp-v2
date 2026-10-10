@@ -1,4 +1,4 @@
-import { isLegacyCurrency, majorStringToMinor, type Account, type Currency, type Entry, type EntryKind, type LegacyCurrency, type ReviewDraft } from '@finanzapp/domain';
+import { isLedgerCurrency, majorStringToMinor, type Account, type Currency, type Entry, type EntryKind, type ReviewDraft } from '@finanzapp/domain';
 import type { AssistantFact } from '../../../../packages/integrations/contracts.js';
 import type { AssistantResultV2, ClarificationField, DroppableField, NavigationIntent, ProposalDraft } from '../../../../packages/integrations/assistant-protocol.js';
 import { factCategory } from '../integrations/evidence.ts';
@@ -291,11 +291,13 @@ function minorIn(amount: string, currency: Currency): number | null {
  * 7. a stated currency that contradicts the only account(s) the name matches is asked about, never converted;
  * 8. with no destination at all, the currency stays unknown (the screen's stands in for the conversation only) and the
  *    person is asked, with no chips;
- * 9. only a destination in a currency the protocol carries (ARS, USD: the model's amount is in its minor units) can lend
- *    its currency, be inferred or be offered; an account in another currency (JPY, MXN) never lends one, and a ledger
- *    that holds one next to ARS or USD asks instead of inferring, so «pesos» is never silently another currency (Codex
- *    review of PR #98); a name is ambiguous when it matches several destinations of any currency, carried or not, and
- *    the carried match is then asked about, never picked for being the only one the protocol can carry.
+ * 9. only a destination in a currency the protocol carries can lend its currency, be inferred or be offered: since
+ *    25A-06 that is every currency of the domain's creation gate (`isLedgerCurrency`: MXN, COP, EUR, JPY and the rest,
+ *    the amount scaled by each one's exponent, above), so a MXN-only ledger infers MXN; an account in a held currency
+ *    (a three-decimal one a restored backup may hold) never lends one, and a ledger that holds one next to a carried
+ *    currency asks instead of inferring (Codex review of PR #98); a name is ambiguous when it matches several
+ *    destinations of any currency, carried or not, and the carried match is then asked about, never picked for being
+ *    the only one the protocol can carry.
  * A named payment method matches an account whose name holds all its words, in order (accent- and case-insensitive:
  * "Visa" is "Visa Galicia", never account "a", and "Visa a crédito" is not "a" either). */
 export function resolveDraft(draft: DraftInput, accounts: Account[], entries: Entry[], currency: Currency, todayISO: string, incomeAccounts: Account[] = accounts):
@@ -311,7 +313,7 @@ export function resolveDraft(draft: DraftInput, accounts: Account[], entries: En
   // An income goes to a cash account (24B6): a card is never offered or implied for it. Only a destination in a currency
   // the protocol carries can hold the draft (rule 9); the whole pool still decides whether the currency is ambiguous.
   const pool = draft.kind === 'income' ? incomeAccounts : accounts;
-  const carried = pool.filter(account => isLegacyCurrency(account.currency));
+  const carried = pool.filter(account => isLedgerCurrency(account.currency));
   // Named but without a letter or digit ("💳") still names something: it matches nothing and is asked.
   const ref = draft.paymentMethodRef?.trim() ? reference(draft.paymentMethodRef) : null;
   const matches = (list: Account[]) => ref ? list.filter(account => ` ${words(account.name)} `.includes(` ${ref} `)) : [];
@@ -338,13 +340,13 @@ export function resolveDraft(draft: DraftInput, accounts: Account[], entries: En
       // matches, or among every carried destination, never replaced by one of them (25A-04); the choice settles the
       // currency, known already when every destination offered shares one carried currency.
       const currencies = [...new Set(pool.map(account => account.currency))];
-      const shared = currencies.length === 1 && isLegacyCurrency(currencies[0]) ? currencies[0] : null;
+      const shared = currencies.length === 1 && isLedgerCurrency(currencies[0]) ? currencies[0] : null;
       return ask('paymentMethod', paidWith, chips(named.length ? named : carried), shared ? { currency: shared, currencyInferred: true } : { currency, currencyInferred: false });
     }
   } else {
     // The currencies in play: every destination's, those the protocol cannot carry included.
     const currencies = [...new Set(pool.map(account => account.currency))];
-    if (currencies.length === 1 && isLegacyCurrency(currencies[0])) { resolvedCurrency = currencies[0]; currencyInferred = true; } // rule 3
+    if (currencies.length === 1 && isLedgerCurrency(currencies[0])) { resolvedCurrency = currencies[0]; currencyInferred = true; } // rule 3
     else if (currencies.length > 1) {
       // Several currencies possible: the currency is asked, never guessed from the screen (rule 4), with the currencies
       // the protocol carries as chips; none in play (another currency only) is asked for the destination, with no chips.
@@ -378,11 +380,11 @@ export function completeDraft(pending: { draft: Partial<ResolvedDraft>; field: D
   else if (pending.field === 'paymentMethod') draft.accountId = optionId;
   else if (pending.field === 'category') draft.category = optionId;
   // A currency the person chose is theirs: resolved by the device's rule, captured, never a guess of the screen's.
-  else if (pending.field === 'currency' && isLegacyCurrency(optionId)) { draft.currency = optionId; draft.currencyInferred = true; }
+  else if (pending.field === 'currency' && isLedgerCurrency(optionId)) { draft.currency = optionId; draft.currencyInferred = true; }
   // The currency is passed on only when it is known (stated by the model, chosen or inferred); otherwise the
   // re-resolution infers it again from the destinations left, or asks. The screen's currency stands in for display only.
   const known = (draft.currencyStated ?? true) || (draft.currencyInferred ?? false);
-  const fallback: LegacyCurrency = isLegacyCurrency(draft.currency) ? draft.currency : 'ARS';
+  const fallback: Currency = isLedgerCurrency(draft.currency) ? draft.currency : 'ARS';
   // A named account is matched again (it was asked about something else first); a chosen one is already fixed below.
   const capture: DraftInput = { kind: draft.kind ?? null, amount: draft.amount ?? null, currency: known ? fallback : null, merchant: draft.merchant || null,
     category: draft.category || null, dateISO: draft.dateISO ?? null, paymentMethodRef: draft.accountId ? null : draft.paymentMethodRef ?? null };

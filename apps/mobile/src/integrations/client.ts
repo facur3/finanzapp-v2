@@ -1,9 +1,9 @@
 import { validateCapture, type CaptureRequest } from '../../../../packages/integrations/contracts.js';
-import { ASSISTANT_PROTOCOL_VERSION, validateAssistantRequest, validateAssistantResultV2, validateDroppedFields, type AssistantRequestV3 } from '../../../../packages/integrations/assistant-protocol.js';
+import { ASSISTANT_PROTOCOL_VERSION, validateAssistantRequest, validateAssistantResultV2, validateDroppedFields, type AssistantRequestV4 } from '../../../../packages/integrations/assistant-protocol.js';
 
 /** What a caller asks (protocol v3: the interface `language` the reply is written in travels with the region); the
  * client adds the protocol version and a fresh request id. */
-export type AssistantQuery = Omit<AssistantRequestV3, 'version' | 'requestId'>;
+export type AssistantQuery = Omit<AssistantRequestV4, 'version' | 'requestId'>;
 
 /** Call only after explicit cloud consent. No API key and no financial data in URLs.
  * Its own failures are thrown as catalogue keys (`assistant.integration.*`):

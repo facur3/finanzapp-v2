@@ -1,7 +1,16 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-09 (25A-06, **protocol v4: the proposal's amount is an exact decimal in major units, scaled on the
-device after the currency is resolved**, on `feat/25a-06-assistant-decimal-amount`, the preparation slice of the owner
+Updated: 2026-10-10 (25A-06, **the Assistant records in every currency the domain lets a person create an account in**,
+on `feat/25a-06-assistant-ledger-currencies`: protocol v4's currencies are the domain's creation gate itself
+(`LEDGER_CURRENCIES`, 146 codes, now in `packages/domain/ledger-currencies.js` so the server's protocol reads the same
+list; the seven three-decimal currencies stay held); the instructions name a currency by its name, code or symbol, or by
+a regional word only where that region gives it one currency («pesos» is never ARS everywhere), otherwise null for the
+device; decision D's rule 9 widened from ARS/USD to the creation gate (an MXN-only ledger infers MXN, «100» yen are 100);
+v2/v3 stay ARS/USD and a proposal in another currency is refused for them; questions wait for facts with an exponent when
+the screen's currency has no cents; one corpus expectation changed deliberately (`adversarial.euros.es`); the owner's
+long-term Luna vision and a dock-audit note recorded; worst case 193 077 / 416 999 µUSD; §2, §3, «Producto 25A»,
+«Producto 25A-06», «UX backlog»). Earlier (2026-10-09; 25A-06, **protocol v4: the proposal's amount is an exact decimal
+in major units, scaled on the device after the currency is resolved**, PR #100, the preparation slice of the owner
 direction of the same day (Luna with the currencies FinanzApp supports, without a regional dictionary): the model writes
 the number the person meant («15000», «1.99») and never cents, because before the currency is known no scale is right
 for every currency (100 yen are 100 minor units, 100 pesos 10 000); `resolveDraft` scales it with `majorStringToMinor`
@@ -854,7 +863,11 @@ it was checked in). Metro from `master` (or a delivery's branch) on the installe
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
-- **25A-06 — protocol v4, the decimal amount (branch `feat/25a-06-assistant-decimal-amount`; no EAS build; nothing
+- **25A-06 — ledger currencies (branch `feat/25a-06-assistant-ledger-currencies`; no EAS build; nothing
+  device-verified):** every build stays disconnected; the fixture view is unchanged. With a connected build (25A-07), a
+  ledger in MXN, COP, EUR or JPY records through the Assistant (the currency chips name any ledger currency in the
+  interface language), and a question with a JPY (zero-decimal) screen shows the unavailable note: release-gate items.
+- **25A-06 — protocol v4, the decimal amount (PR #100; no EAS build; nothing
   device-verified):** every build stays disconnected; in the fixture view the scripted proposals show the same amounts
   as before (18 500, 18 000 and 3 000 pesos), now stated as decimals and scaled on the device. Nothing else is visible.
 - **25A-06 B7 — over-long names, decision A (PR #99; no EAS build; nothing
@@ -1119,7 +1132,7 @@ before it passes (the runbook's §0.2):
    applied as an instruction plus the scorer (PR #96; PR #95 closed unmerged), and the reply language is protocol v3
    (PR #97, owner direction 2026-10-09), the device infers the currency (decision D, PR #98) and an over-long optional
    name no longer loses the draft (decision A, owner decision 2026-10-09, PR #99) and the proposal's amount is an exact
-   decimal scaled on the device (protocol v4, the decimal-amount PR; the currency widening is the next slice); next: the owner's
+   decimal scaled on the device (protocol v4, PR #100) and every ledger currency is carried (the ledger-currencies PR); next: the owner's
    decisions C and E, then a new owner spend approval before any further live run; B8 blocked): the **real Luna evaluation** with an owner-approved spend (B7); AI enabled on staging,
    the failure drills and the race (B8); the **cost reconciliation** against the provider (B9).
 4. A focused **`/security_audit`**, then **`/security_review`** (B10); results recorded and 25A-06 marked done (B11).
@@ -1827,6 +1840,25 @@ the owner authorises it; no EAS build or store submission without the owner.
 
 Production detail (25OPS1): [production-plan.md](production-plan.md) §2–§6 (environments, hosting, Supabase, the
 Assistant's capability boundary and model evaluation, monetary safety).
+
+**Owner's long-term vision for Luna (recorded 2026-10-10; product goals, not implemented, not scheduled by this note).**
+Luna becomes a natural-language copilot for the whole of FinanzApp, not only an expense parser. Over time it should
+understand and work with: every currency available for account creation (done for recording since the ledger-currencies
+slice, 25A-06); the configured region and every supported language (Spanish, English and, once localized, others such as
+Japanese); accounts, movements, transfers and categories; arbitrary date ranges and historical reports («How much did I
+spend during the last six months?», «Why did my Galicia balance decrease?»); credit cards, statement cycles and
+instalment plans («How many installments remain on my purchase at Rever?», «Compré un buzo en tres cuotas sin
+interés.»); budgets, recurring transactions, debts and refunds; the financial calendar (25C2); app functionality and
+contextual guidance («How do I record a purchase in installments?»); and filtered deep links that open exactly the
+movements asked for («Show me last month's supermarket expenses on my Visa.»). The binding rules stay: the model
+interprets language freely within the financial scope, without hard-coded merchants, slang or sentences; the app supplies
+verified data only through explicitly scoped, safe read capabilities (never model SQL, ledger writes or bank operations);
+every financial proposal is reviewed and confirmed by the person; arithmetic and ledger data stay deterministic.
+Conversation continuity: navigating away from Luna keeps the current conversation (the app session already holds it,
+25A-04); an optional **local** chat history is planned separately, and no remote chat persistence by default. Each
+capability arrives as its own slice with its evidence contract, scorer coverage and device QA: historical/date-range
+queries and filtered navigation (25A-07), cards and instalments, budgets/recurring/debts/refunds facts, calendar
+(25C2), feature guidance, local history.
 
 - **Goal.** The Assistant becomes the central capability, not a decorative page: it proposes
   movements and edits as drafts, asks the minimum, answers analytical questions with verifiable
@@ -5692,6 +5724,62 @@ nothing of it is on a screen yet.
       no threshold change. (3) Language-neutral facts with an explicit exponent (docs/currency.md §11).
     - *Not in this PR:* the currency widening, any corpus case, decisions C and E, a live call, B8, a service change, an
       EAS build, a merge. Both live runs remain **FAILED**; B8 **BLOCKED**.
+  - **Ledger currencies — the Assistant carries every currency the domain lets a person create an account in (owner
+    direction 2026-10-10; branch `feat/25a-06-assistant-ledger-currencies`, this PR; no provider call).**
+    - *One list.* `LEDGER_CURRENCIES` moved, unchanged, from `currency.ts` to `packages/domain/ledger-currencies.js`
+      (plain data, imports nothing, a `.d.ts` beside it); `currency.ts` re-exports it, so every domain caller and test is
+      unchanged, and the server's protocol (plain JavaScript, which cannot load the generated catalogue) imports the same
+      file: `PROTOCOL_CURRENCIES` **is** `LEDGER_CURRENCIES` (pinned by identity). No second list. The domain boundary
+      test admits a sibling `.js` module only when it imports nothing. Held currencies (BHD, IQD, JOD, KWD, LYD, OMR, TND:
+      the unverified VoiceOver reading of three decimals) are not in the gate, so not in the protocol, the schema enum or
+      the device's inference.
+    - *Protocol.* A v4 request's `currency` and any proposal's `currency` may be any of the 146; the structured-output
+      enum lists them. v2 and v3 keep ARS/USD for the request (`LEGACY_WIRE_CURRENCIES`, their frozen wire contract), and
+      `wireResult` refuses (502) a proposal in another currency for them instead of nulling it (a null would let an old
+      client infer a peso account for «100 euros»). Nothing else in the validator changed.
+    - *Instructions* (the currency sentence only). «currency es el código ISO 4217 de la moneda que la persona nombró por su
+      nombre, código o símbolo (euros, yenes, USD, €), o con una palabra o un nombre coloquial que en su region nombra una
+      sola moneda ("pesos", "$", "lucas" o "mangos": en AR, ARS; "pesos" en MX, MXN; "$" en US, USD). Si en su region la
+      palabra puede nombrar más de una moneda, null. … Sin moneda dicha, null: la app la resuelve con las cuentas de la
+      persona. Una moneda que el esquema no admite: pedí aclaración de moneda.» Three examples, not a table: the model's
+      knowledge of the region decides, and anything it cannot decide is the device's.
+    - *Device.* Rule 9 of decision D now reads the creation gate (`isLedgerCurrency`) instead of ARS/USD: a destination in
+      any ledger currency lends its currency, is inferred or is offered as a chip, and the decimal is scaled by that
+      currency's exponent (PR #100), so an MXN-only ledger's «10 mil pesos» is MXN 10 000.00 and a JPY account's «100» is
+      100 yen. A held-currency account never lends, and beside a carried one the currency is asked. The other eight rules
+      are unchanged (explicit first; a named destination lends; a currency never implies an account; a conflict asks and
+      never converts; an explicit currency with no destination in it asks with no chips, never a peso account). The screen
+      sends any ledger currency; a **question** (`explain`) waits (the unavailable note) while the screen's currency has an
+      exponent other than 2, because its facts are minor units the instructions read as cents (zero-decimal JPY, CLP, KRW,
+      PYG, VND…); recording works in all 146.
+    - *Corpus (deliberate golden change, recorded).* `adversarial.euros.es` («Gasté 50 euros en el museo») expected a
+      currency question because EUR was not a protocol currency; it now expects `expense('50', 'EUR')`. No threshold and
+      no other expectation changed; runs #1 and #2 stay recorded as measured. MXN, COP and JPY corpus cases, a mixed ledger
+      and «pesos» outside AR are the separate corpus-expansion slice.
+    - *Tests.* Protocol: identity with the domain gate, 146 codes, the schema enum, for every code a v4 request and a
+      proposal accepted, «100» and «1.99» scaled by its exponent, v3 refusing it and `wireResult` refusing it for v2/v3;
+      held, incomplete and excluded codes refused. Device (catalogue-driven, every ledger code): inferred from a lone
+      account, lent by a named one, stated, offered as a chip beside ARS, the chosen chip scaling «1.99» (exact at exponent
+      2, asked again at exponent 0), captured exactly with no review gap, named in Spanish and English; held codes never
+      inferred or offered. The owner's scenarios (MXN «10 mil pesos» stated or not, COP «20 lucas», JPY «100 yenes», 1.99
+      and 0.50 euros, ARS+MXN asked, an MXN screen not deciding, MXN+COP chosen COP, an explicit USD conflict with chips, an
+      explicit EUR with peso accounts only, the decimal and currency surviving a kind question, chips in both languages).
+      Screen: an MXN-only ledger sends MXN and captures MXN 10 000; a JPY screen declines a question locally and sends a
+      recording. Changed tests, each deliberate: the PR #98 rule-9 tests (JPY/MXN now carried; the held KWD takes their
+      place) and the PR #100 unresolved-currency test (a held account instead of JPY).
+    - *Effect on cost.* Instructions 6 154 → 6 337 bytes and the schema enum grows by 144 codes: **193 077 µUSD for
+      `gpt-6-luna`** (179 588) and **416 999 for `gpt-5.6-luna`** (390 025). Any further live run needs a new written owner
+      approval of at least that figure.
+    - *Remaining gaps (recorded, not in this PR).* (1) Questions in a zero-decimal screen currency: facts with an explicit
+      exponent (the language-neutral facts slice, docs/currency.md §11). (2) The corpus expansion above. (3)
+      Internationalization: the interface and the Assistant's own copy exist in Spanish and English only; the model is
+      told to reply in `language`, but only `es` and `en` are released interface languages (docs/i18n.md), so «Japanese
+      and other languages» are understood as input but not yet a released reply language; 23 native-digit regions still
+      write Argentine formats (24R3); region-specific number reading in the instructions names AR and US only. Each is its
+      own slice. (4) Held three-decimal currencies open only after their iPhone VoiceOver check (24M).
+    - *Not in this PR:* navigation, chat history, filtered deep links, calendar, instalments, Apple integrations, the dock
+      redesign, decisions C and E, a live call, B8, a service change, an EAS build, a merge. Both live runs remain
+      **FAILED**; B8 **BLOCKED**.
 - **Owner refinements before accepting the runbook (2026-10-05, in this PR).**
   - **Staging region:** Vercel Functions `gru1` (São Paulo) and the staging Supabase project in the specific region
     `sa-east-1` (São Paulo), replacing `iad1` / us-east-1. The reasons: Argentina-first, the API compute next to its
@@ -5721,6 +5809,14 @@ nothing of it is on a screen yet.
   cap); 15 planted faults in the new guards were each caught by a test. `node server/mobile/evals/run.js` (fixture mode)
   passes every threshold, including `estimateExceededCount` = 0 (not a model result). No EAS build, no remote SQL, no
   provider call, no service configured, no iPhone run by the agent.
+
+### UX backlog: nonblocking design notes
+
+- **Dock audit on a real iPhone (owner, 2026-10-10).** Audit the floating four-tab dock and separate capture action on a
+  real iPhone. Compare current graphite material with a slightly elevated graphite in dark mode; do not automatically
+  replace it with a white dock. Evaluate icon discoverability, contrast, touch targets, Reduce Transparency, VoiceOver,
+  keyboard/safe-area behavior, interruption-safe motion and the Assistant's discoverability. Preserve the existing layout
+  until device comparison.
 
 ### Later notes recorded in 24UX6A (future; document only, not scheduled)
 
