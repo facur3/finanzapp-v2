@@ -4,6 +4,12 @@
 subscription, no paywall, no StoreKit code, no purchase or analytics SDK, no production identity, no TestFlight build and
 no store listing. No account was created, no agreement signed, no build made and no charge incurred to write it.
 Updated 2026-10-05 with the owner's support identity, in-app help and seller identity gate (§12, §13.1, §14).
+Updated 2026-10-10: 2026-10-31 is the owner's **target**, not a mandatory public deadline; the preferred near-term
+milestone is an internal TestFlight candidate by the end of October; a public free-core release is a valid option pending
+the owner's approval; public AI/Pro comes later, with AI work continuing in parallel. The dated plan and the go/no-go
+checks are in the roadmap, §4 «Release plan to 2026-10-31». A public privacy-policy URL is required to submit; a custom
+domain is not a prerequisite to prepare. The visible App Store name can change before submission; the bundle identifier
+cannot change once a build is uploaded. This document stays the detail; nothing here was implemented by that update.
 
 - **External facts** (Apple, Expo, RevenueCat) were read from the vendors' own pages on **2026-10-02** and are listed
   in §16. Prices, limits and guideline wording change: re-read the source before any decision that depends on one. A
@@ -194,6 +200,9 @@ there.
   capability (the Assistant or voice without Pro, a theme pack, the advanced export), or tapped the «FinanzApp Pro» row
   in Más. It is always the result of the person's own action. There is no permanent free AI allowance or message
   counter to run out (owner decision, 2026-10-04); a Pro subscriber is warned only near a real fair-use limit.
+- **The capture action is never a paywall trigger (owner, 2026-10-10).** Touching the floating «+» opens the capture
+  hub; Gasto, Ingreso and Transferencia stay free; the Assistant tile may be highlighted there, and once entitlements
+  exist it states its premium state plainly; the paywall opens only when a free person chooses the Assistant itself.
 - **One permanent, quiet entry:** a «FinanzApp Pro» row in Más, which shows the plans to a free user and the status to
   a subscriber.
 - **Never:** on first launch, on a timer, between tabs, over a form in progress, as a full-screen interruption of manual
@@ -712,9 +721,10 @@ The design workflow, in this order:
 - **B.** Compare them on one small representative set: Home, Reports, Cards, Settings/More, the Wallet / Live Activity
   capture presentation, and the landing-page hero.
 - **C.** The owner selects one.
-- **D.** Only then decide whether the current Forest palette (decision 005) needs a broad change.
+- **D.** Only then decide whether the current palette (Electric Lime since 25VIS1, 2026-10-03; Forest before it,
+  decision 005) needs a broad change.
 
-Rules: the Forest palette is **not** changed merely because another finance app uses green; the goal is an
+Rules: the palette is **not** changed merely because another finance app uses green; the goal is an
 independently recognizable brand, not arbitrary difference; and no cosmetic churn is made in the app before step C.
 Sequencing: the gate sits in 26 before the public metadata (§9, §10), the landing page (§14) and the marketing assets,
 and must be passed before TestFlight builds carry a public name; it changes no earlier phase. The release marker, the
@@ -959,7 +969,7 @@ approval (roadmap, «Producto 26»).
 | Encryption / export compliance | `ITSAppUsesNonExemptEncryption` set explicitly; `false` only if the app and its libraries use just exempt encryption (HTTPS, the system's). SQLCipher, if ever adopted, would need this re-answered (*unverified* classification; production-plan.md §11) | **NOT IMPLEMENTED**; roadmap «Native config cleanup» | The next native config change, at the latest before the first TestFlight; owner confirms |
 | Third-party AI disclosure and permission | 5.1.2(i): "clearly disclose where personal data will be shared with third parties, including with third-party AI, and obtain explicit permission before doing so" | **NOT IMPLEMENTED**; the Assistant is disconnected | 25A (the consent screen naming the provider and what travels; production-plan.md §5) |
 | Sign in with Apple / login services | 4.8 applies only if a third-party or social login is offered; then an equivalent privacy-preserving option is required. 5.1.1(v): "let people use it without a login" when account features are not significant | No account exists; nothing required | 25A's session / 25E, only if a third-party login is added (production-plan.md §12) |
-| Account deletion | 5.1.1(v): "If your app supports account creation, you must also offer account deletion within the app"; with Sign in with Apple, revoke its tokens | Not applicable: no accounts | The first build with accounts (25A session or 25E) |
+| Account deletion | 5.1.1(v): "If your app supports account creation, you must also offer account deletion within the app"; with Sign in with Apple, revoke its tokens | Not applicable to a 1.0 without accounts; required with the session slice (decision 006, Sign in with Apple) | The first build with accounts (25A session or 25E) |
 | Subscription metadata | Products, subscription group, localized display names and descriptions, prices per storefront, review screenshot; multiseat and Family Sharing settings | **NOT IMPLEMENTED** | 25F; needs the Paid Apps Agreement (§6) |
 | Restore purchases | 3.1.1: "a restore mechanism for any restorable in-app purchases" | **NOT IMPLEMENTED** | 25F |
 | Subscription review | 2.1(b): purchases "complete, up-to-date, visible to the reviewer and functional"; the paywall meets §3.2 | **NOT IMPLEMENTED** | 25F; sandbox on the iPhone first |
@@ -1019,8 +1029,8 @@ and promises no compliance.
 | Frankfurter (`api.frankfurter.dev`) | Only when a consolidated view needs a month's reference rates it does not have | A date window and currency codes, and the device's IP address as with any request; no key, no amount, no account | **EXISTS TODAY**: "the only network call without the owner's backend" (`apps/mobile/README.md`). To be named in the privacy policy before TestFlight (`docs/currency.md` §8.2) |
 | Apple | Always, as the platform | Downloads, purchases, opt-in diagnostics: Apple's own collection, which the developer does not declare | — |
 | Expo (EAS) | Build time | Source and credentials to build and sign; nothing from users. EAS Update, if ever added, would see update requests from installs | Build service only |
-| Vercel (mobile API host) | Only once the owner configures the backend and the person uses a cloud capability | Requests to `api/mobile/*` | **NOT IMPLEMENTED** as a live service: unconfigured and failing closed |
-| Supabase (identity, database) | Same | Session, quota rows, capture inbox rows; later entitlement and optional sync data | **NOT IMPLEMENTED** |
+| Vercel (mobile API host) | Only once the owner configures the backend and the person uses a cloud capability | Requests to `api/mobile/*` | Staging only since 2026-10-07 (B6), AI off; no production project; no build points at it |
+| Supabase (identity, database) | Same | Session, quota rows, capture inbox rows; later entitlement and optional sync data | Staging project only since 2026-10-07 (B3); no production project |
 | AI provider (the adapter in code targets OpenAI; the choice is open, production-plan.md §5) | Only with the person's consent, per request | The person's message (which may itself name a merchant or an amount); for analytical questions aggregated facts with category names; never the ledger's merchants, account names, balances or movements | **NOT IMPLEMENTED**: no key, no live call |
 | RevenueCat | Only if chosen in 25F | Purchase history and an app user ID | **NOT IMPLEMENTED**; DPA and sub-processors to read first (§2) |
 | An analytics vendor | Only if chosen (§7) | Events without financial content | **NOT IMPLEMENTED** |

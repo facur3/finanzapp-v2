@@ -1,7 +1,13 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-10 (25A-06, **the Assistant records in every currency the domain lets a person create an account in**,
-on `feat/25a-06-assistant-ledger-currencies`: protocol v4's currencies are the domain's creation gate itself
+Updated: 2026-10-10 (**release readiness audit and the plan toward an App Store release targeted for 2026-10-31**,
+docs only, on `docs/release-readiness-oct31`: the verified state (code, not older prose), three milestones (an internal
+TestFlight candidate by the end of October, the preferred near-term target; a public free-core release, a valid option
+pending the owner's approval; a public AI/Pro release later, with AI work continuing in parallel), the dated critical path, the go/no-go checks, the owner's choices, the model-independent
+copilot vision locked as staged milestones, the model-adoption procedure (production-plan.md §5.5b) and the dock and
+Free/Pro navigation direction; §3 «Recommended next», «Producto 25A», «UX backlog», §4 «Release plan to 2026-10-31»).
+Earlier the same day (25A-06, **the Assistant records in every currency the domain lets a person create an account in**,
+PR #101: protocol v4's currencies are the domain's creation gate itself
 (`LEDGER_CURRENCIES`, 146 codes, now in `packages/domain/ledger-currencies.js` so the server's protocol reads the same
 list; the seven three-decimal currencies stay held); the instructions name a currency by its name, code or symbol, or by
 a regional word only where that region gives it one currency («pesos» is never ARS everywhere), otherwise null for the
@@ -863,7 +869,7 @@ it was checked in). Metro from `master` (or a delivery's branch) on the installe
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
-- **25A-06 — ledger currencies (branch `feat/25a-06-assistant-ledger-currencies`; no EAS build; nothing
+- **25A-06 — ledger currencies (PR #101; no EAS build; nothing
   device-verified):** every build stays disconnected; the fixture view is unchanged. With a connected build (25A-07), a
   ledger in MXN, COP, EUR or JPY records through the Assistant (the currency chips name any ledger currency in the
   interface language), and a question with a JPY (zero-decimal) screen shows the unavailable note: release-gate items.
@@ -1113,7 +1119,16 @@ item unless a section says a new native build is needed. The checklist sections 
 
 ## 3. Next deliveries
 
-**Recommended next (2026-10-05):** **25A-05 merged as PR #86** (merge commit bd133a3): AI security, the closed
+**Recommended next (2026-10-10, corrected after the owner's review): the release plan.** 2026-10-31 is a **target, not a
+mandatory public release deadline**. The verified state and the dated plan are §4 «Release plan to 2026-10-31», with three
+milestones: (1) an **internal TestFlight candidate by the end of October**, the preferred near-term milestone, subject to
+the identity, privacy and device prerequisites; (2) a **public free-core release** (the manual ledger, cards,
+instalments, reports, budgets, recurring, debts, backup; the Assistant not exposed), a valid option **not yet approved**;
+(3) a **public AI/Pro release**, later. The Assistant stays a major differentiator: the AI work below continues **in
+parallel**, never paused until after publication. The release-candidate shell (§4) starts only after the owner chooses
+the production identifier and authorises native build-related changes. The activation order below stays binding for AI.
+
+**AI activation order (recorded 2026-10-05; statuses current to 2026-10-10):** **25A-05 merged as PR #86** (merge commit bd133a3): AI security, the closed
 protocol v2, the provider port with a disabled adapter, money-based reservations and ceilings with a database kill
 switch, the evaluation corpus, harness and thresholds. **25A-06 Phase A** (the repository preflight of the staging
 activation: environment identity, key kinds, the database's environment binding, `vercel.json`, the owner's staging
@@ -1841,24 +1856,30 @@ the owner authorises it; no EAS build or store submission without the owner.
 Production detail (25OPS1): [production-plan.md](production-plan.md) §2–§6 (environments, hosting, Supabase, the
 Assistant's capability boundary and model evaluation, monetary safety).
 
-**Owner's long-term vision for Luna (recorded 2026-10-10; product goals, not implemented, not scheduled by this note).**
-Luna becomes a natural-language copilot for the whole of FinanzApp, not only an expense parser. Over time it should
-understand and work with: every currency available for account creation (done for recording since the ledger-currencies
-slice, 25A-06); the configured region and every supported language (Spanish, English and, once localized, others such as
-Japanese); accounts, movements, transfers and categories; arbitrary date ranges and historical reports («How much did I
-spend during the last six months?», «Why did my Galicia balance decrease?»); credit cards, statement cycles and
-instalment plans («How many installments remain on my purchase at Rever?», «Compré un buzo en tres cuotas sin
-interés.»); budgets, recurring transactions, debts and refunds; the financial calendar (25C2); app functionality and
-contextual guidance («How do I record a purchase in installments?»); and filtered deep links that open exactly the
-movements asked for («Show me last month's supermarket expenses on my Visa.»). The binding rules stay: the model
-interprets language freely within the financial scope, without hard-coded merchants, slang or sentences; the app supplies
-verified data only through explicitly scoped, safe read capabilities (never model SQL, ledger writes or bank operations);
-every financial proposal is reviewed and confirmed by the person; arithmetic and ledger data stay deterministic.
-Conversation continuity: navigating away from Luna keeps the current conversation (the app session already holds it,
-25A-04); an optional **local** chat history is planned separately, and no remote chat persistence by default. Each
-capability arrives as its own slice with its evidence contract, scorer coverage and device QA: historical/date-range
-queries and filtered navigation (25A-07), cards and instalments, budgets/recurring/debts/refunds facts, calendar
-(25C2), feature guidance, local history.
+**Product vision, locked (owner, 2026-10-10): a model-independent financial copilot.** The Assistant is FinanzApp's
+financial copilot, not an expense-only chatbot and not tied to one model (Luna is today's staging candidate, never a
+name in a product contract). Staged milestones, not promises of what ships in October, each its own slice with its
+evidence contract, scorer coverage and device QA:
+1. **Reviewed creation:** expenses and income (today, in fixtures), then transfers, card purchases and instalment plans,
+   always through the review draft and the accounting invariants of decision 003; nothing written without Confirmar.
+2. **Read-only financial questions over any period:** accounts and balances, movement details, transfers, cards and
+   statement cycles, instalments («¿Cuántas cuotas me quedan de Rever?»), budgets, recurring items, debts, refunds,
+   reports and the calendar (25C2); account-specific explanations of a balance change («¿Por qué bajó Galicia?»).
+   Answers come from deterministic, bounded, read-only capabilities on the device that compute the evidence and send
+   only what the question needs; the model never receives SQLite, SQL, the whole ledger, or any autonomous bank or
+   payment capability (production-plan.md §5.1–§5.3).
+3. **Navigation and help:** correct filtered deep links into movements, accounts, cards and reports («los gastos de
+   súper del mes pasado con la Visa»), app-feature help and guided navigation («¿Cómo registro una compra en cuotas?»).
+4. **Conversation:** genuine multi-turn context (the conversation already survives leaving the screen, in memory,
+   25A-04); an optional **persistent local** chat history only after explicit privacy, retention, deletion and backup
+   decisions; no remote chat persistence by default.
+5. **Currencies, regions, languages:** every enabled ledger currency with its decimal scale (recording since PR #101;
+   questions in zero-decimal currencies need facts with an exponent); every released region; replies eventually
+   independent of the interface language (Japanese and others once each is localized, evaluated and released).
+6. **Voice input**, last, only with a verified implementation (no microphone icon before it exists).
+Binding throughout: the model interprets language freely within the financial scope, with no hard-coded merchants,
+slang or sentences; financial arithmetic and ledger data stay deterministic; every proposal is reviewed and confirmed;
+model choice is server configuration under the adoption procedure (production-plan.md §5.5b).
 
 - **Goal.** The Assistant becomes the central capability, not a decorative page: it proposes
   movements and edits as drafts, asks the minimum, answers analytical questions with verifiable
@@ -1933,7 +1954,8 @@ queries and filtered navigation (25A-07), cards and instalments, budgets/recurri
       `gru1`, 60 s), the owner's staging scripts (`verify.sql`, `usage-report.sql`, `probe.js`, `reconcile.js`), the
       live-evaluation gates (staging identity, price freshness, an approved worst case, `estimateExceededCount` = 0),
       the runbook and decision 006.
-    - **Phase B — owner-led activation** (not started; after Phase A merges; the runbook's checkpoints B1–B11): the
+    - **Phase B — owner-led activation** (B1–B6 passed 2026-10-07, B7 failed twice 2026-10-08, B8 blocked, B9–B11 not
+      started: «Producto 25A-06», «Phase B record»; the runbook's checkpoints B1–B11): the
       owner records the existing remote resources (B1); the owner creates a dedicated AI provider project with its own
       key and a small prepaid amount or hard spend limit, the server's ceilings set below it (B2); the owner creates the
       Supabase staging project (B3); the owner sets the secrets (`MOBILE_SUPABASE_SECRET_KEY`, `MOBILE_AI_API_KEY` and
@@ -5337,7 +5359,7 @@ nothing of it is on a screen yet.
       B8, no EAS build.
   - **B7 — decision B taken (owner, 2026-10-08) and applied the simple way (owner direction, 2026-10-09): financial
     calculations belong to FinanzApp's deterministic code, never to the model (branch
-    `fix/25a-06-b7-no-model-arithmetic`, this PR; no provider call).** The model interprets the question, chooses the
+    PR #96; no provider call).** The model interprets the question, chooses the
     facts and explains; it never derives a financial figure. The product rule as the owner set it: the Assistant
     produces editable, explicitly confirmed drafts before any ledger write; monetary amounts are exact integer minor
     units (1,99 stays 1,99); the model understands ordinary language, colloquial amounts included; financial
@@ -5411,7 +5433,7 @@ nothing of it is on a screen yet.
       transfer sentence (C), the approval's shape (E), the deterministic capture validation, any protocol v3 work. No
       paid call, no staging configuration, no B8, no EAS build, no merge; both live runs remain **FAILED**; B8 **BLOCKED**.
   - **Protocol v3, the reply language (owner direction, 2026-10-09: the quality and usability of Luna as a multilingual,
-    region-aware assistant; branch `feat/25a-06-assistant-reply-language`, this PR; no provider call).** The first and
+    region-aware assistant; PR #97; no provider call).** The first and
     smallest slice of the v3 contract, chosen because it is the user-visible problem: with English chosen in Más the
     model still answered in Spanish, by instruction, because protocol v2 carried no language (docs/i18n.md §11: «the
     reply language arrives with v3»). The inspection before it (seven read-only reviews of i18n, currencies and
@@ -5663,7 +5685,7 @@ nothing of it is on a screen yet.
       Both live runs remain **FAILED**; B8 **BLOCKED**.
   - **Protocol v4 — the proposal's amount as an exact decimal in major units (owner direction 2026-10-09: Luna with the
     currencies FinanzApp already supports, without a regional dictionary; branch `feat/25a-06-assistant-decimal-amount`,
-    this PR; the preparation slice; no provider call).**
+    PR #100; the preparation slice; no provider call).**
     - *The problem.* The domain opens 146 ledger currencies with ISO exponents 0 and 2 (three-decimal ones held), but
       the v2/v3 proposal carried `amountMinor`, cents the model computed («15 mil ARS = 1500000»). A model that emits
       minor units before the currency is known cannot be right for every currency: «Gasté 100 yenes» is 100 minor units,
@@ -5725,7 +5747,7 @@ nothing of it is on a screen yet.
     - *Not in this PR:* the currency widening, any corpus case, decisions C and E, a live call, B8, a service change, an
       EAS build, a merge. Both live runs remain **FAILED**; B8 **BLOCKED**.
   - **Ledger currencies — the Assistant carries every currency the domain lets a person create an account in (owner
-    direction 2026-10-10; branch `feat/25a-06-assistant-ledger-currencies`, this PR; no provider call).**
+    direction 2026-10-10; PR #101; no provider call).**
     - *One list.* `LEDGER_CURRENCIES` moved, unchanged, from `currency.ts` to `packages/domain/ledger-currencies.js`
       (plain data, imports nothing, a `.d.ts` beside it); `currency.ts` re-exports it, so every domain caller and test is
       unchanged, and the server's protocol (plain JavaScript, which cannot load the generated catalogue) imports the same
@@ -5817,6 +5839,16 @@ nothing of it is on a screen yet.
   replace it with a white dock. Evaluate icon discoverability, contrast, touch targets, Reduce Transparency, VoiceOver,
   keyboard/safe-area behavior, interruption-safe motion and the Assistant's discoverability. Preserve the existing layout
   until device comparison.
+- **Dock and Free/Pro navigation, working direction (owner-approved, 2026-10-10; nothing changed in code).** Four
+  primary destinations stay: Inicio, Movimientos, Reportes, Más. The floating capture action stays separate, and its hub
+  keeps Assistant, Gasto, Ingreso and Transferencia. The manual core is always available to Free users: touching «+»
+  never forces a subscription paywall; the Assistant may be highlighted inside the hub, with clear premium-state
+  messaging once entitlements exist (app-store-launch.md §3.1). No microphone as the general Assistant icon until real
+  voice input exists (today `sparkles`). Compare the current graphite dock with a slightly elevated graphite in dark
+  mode on real iPhone captures, and test icon discoverability and possible labels, not only colours. Preserve the
+  safe-area, keyboard, scrolling, VoiceOver and Reduce Transparency behaviour and the mounted-tab black-screen
+  mitigation (`src/ui/navigation.ts`: `detachInactiveScreens: false`, `lazy: false`, `freezeOnBlur: false`). Not an
+  October blocker; done after the 1.0 device pass unless the pass finds a usability failure.
 
 ### Later notes recorded in 24UX6A (future; document only, not scheduled)
 
@@ -6127,6 +6159,132 @@ unlimited (production-plan.md §6.6).
     (app-store-launch.md §3.1).
 
 ## 4. Launch
+
+### Release plan to 2026-10-31 (owner target; recorded 2026-10-10, corrected after the owner's review)
+
+**2026-10-31 is a target, not a mandatory public release deadline.** The preferred near-term milestone is an internally
+testable TestFlight candidate by the end of October; a public free-core release is a valid option the owner has **not
+yet approved**; a public AI/Pro release comes later, and AI work continues in parallel with all of it. This plan
+sequences what exists; the detail stays in [app-store-launch.md](app-store-launch.md) (store, StoreKit, review
+checklist, support, legal) and [production-plan.md](production-plan.md) §14 (readiness). Honestly: a public release by
+the 31st is reachable only for the free core, only if the owner approves that option and the phase-order exception
+(choice 12), and only if the identity decisions land by 2026-10-14; the internal TestFlight candidate is reachable with
+the identifier, the privacy-policy URL and the first-TestFlight device prerequisites alone.
+
+**Verified state (code and records, 2026-10-10).**
+
+| Area | State |
+| --- | --- |
+| Manual ledger: accounts, movements, transfers, categories, cards and cycles, instalments, refunds, early payoff, budgets, recurring, debts, reports, 146 currencies with FX views, regions, es/en | Implemented and tested (root 694, mobile 1 365 tests); **device-verified only through 24T2 (2026-09-29)** and partial passes on 2026-10-02/03; 24T3 onward is unverified on an iPhone |
+| Storage | SQLite schema 14, migrations v1–v14, backup format v1–v14 restore, export re-validated before sharing; review and rates databases v1 |
+| First opening, Más, backup/restore, undo | Implemented (25B, 24UX5); no «Ayuda y comentarios», no privacy link, no delete-all-data yet |
+| Navigation | Four tabs + floating «+» hub (Asistente, Gasto, Ingreso, Transferencia); Reduce Transparency fallback; mounted-tab mitigation |
+| Assistant on device | Every build **disconnected** (no API origin, no session); fixtures in development only; the screen tells a person it is not connected yet |
+| Assistant server | Staging only, fail-closed configuration; protocol v4 (decimal amounts, 146 currencies) |
+| AI activation | B1–B6 passed (2026-10-07); **B7 failed twice** (2026-10-08, both approvals consumed); **B8 blocked**; B9–B11 not started; decisions C and E and a new spend approval pending |
+| Sign in with Apple, AI consent screen, account deletion | Not implemented (decision 006 accepted) |
+| Subscriptions | Nothing: no StoreKit or RevenueCat, no entitlements, no paywall, no Paid Apps Agreement |
+| Production backend | None: production is refused by configuration; no production Supabase, Vercel or provider project |
+| Identity | Working name only («FinanzApp» is used by another App Store app); bundle ids `com.facur3.finanzapp.dev`/`.preview` only; no production variant, no icon, no App Store Connect record, no TestFlight build ever; seller type undecided; Apple Developer membership exists |
+| Privacy, support, legal | No privacy policy, no support URL, no domain, App Privacy answers not prepared |
+| Go-to-market | Nothing public exists (no domain, handle, listing, screenshots or landing page) |
+
+**Not ready for public AI.** Fixtures and a passing fixture evaluation prove the contract, not the model: the live
+evaluation failed, the failure drills and cost reconciliation never ran, and no build can reach the server.
+
+**Milestones.**
+- **1. Internal TestFlight candidate (preferred by the end of October).** A `production` app variant with the owner's
+  bundle id and a store name (a working name is acceptable on internal TestFlight; the visible App Store name can change
+  until submission, but the **bundle identifier cannot change once a build is uploaded**, so it is chosen carefully
+  first), an app icon, `ITSAppUsesNonExemptEncryption`
+  answered, the Assistant not exposed (hub tile and route absent in that variant), the version line, and an EAS
+  production build the owner authorises, uploaded to an App Store Connect record the owner created.
+- **2. Public free-core release (a valid option, pending the owner's approval; not decided).** The above, plus: the
+  cleared public name; privacy policy and support pages at public, stable URLs (a public privacy-policy URL is required;
+  a purchased custom domain is preferred once the name is chosen but is not a prerequisite to start preparing the
+  product or the pages); «Ayuda y comentarios» in Más; App Privacy answers (data not collected,
+  except what the Frankfurter rate download implies), age rating, export compliance, category Finance; listing text and
+  6.9-inch screenshots with fictional data in es and en; the physical-device release gate passed on a TestFlight build,
+  **limited to the flows the 1.0 binary can execute** (the deferred 24T3 pass, cards and instalments, transfers,
+  refunds, budgets, recurring, debts, reports and currencies, backup/restore across versions, migrations, accessibility);
+  the Assistant-produced cases (25A-03 review flows fed by the Assistant, 25A-04 and every later 25A device item) cannot
+  run in a build without the Assistant and are **deferred to the AI release by the owner's explicit decision** (choice
+  11 below), never silently dropped; the data-protection evaluation (production-plan.md §14: the iOS data-protection
+  class on device, SQLCipher and key recovery) done and its decision recorded; the whole-app security and
+  privacy audit with no open High or Medium; the owner's submission.
+- **3. Public AI/Pro release (later; not credible by the 31st).** What it needs: B7 passing after decisions C and E and a new
+  approval; B8–B11; the session slice (Sign in with Apple, account deletion with token revocation); the AI consent
+  screen; a production backend (paid Vercel/Supabase plans, a production provider project with limits); 25A-07; StoreKit
+  or RevenueCat behind the entitlement port, the Paid Apps Agreement, tax and banking, prices, paywall, restore, server
+  notifications; the privacy label re-answered for AI and purchases. Each item is weeks of work or an external
+  dependency, so AI/Pro reaches the public in a release after the first one, whichever that is. **The AI track continues
+  in parallel now**, in bounded slices that never block the milestones above: facts with an explicit exponent
+  (questions in zero-decimal currencies such as JPY), evaluation preparation (the MXN/COP/JPY corpus expansion, decisions
+  C and E), then a B7 rerun once the owner approves new spend, B8–B11 and the session and consent slices.
+- **If the public free-core option is not approved,** milestone 1 still proceeds and serves as the internal test bed;
+  if the identity gates slip, each day of slip moves the candidate one day (Apple's review, for a later public
+  submission, usually takes one to two days but is not promised).
+
+**Critical path and dates (owner actions marked OWNER; everything else Claude's, in focused PRs).**
+
+| Date | Step | Who |
+| --- | --- | --- |
+| 10-10 | This audit and plan (docs) | Claude |
+| by 10-13 | Decide the **bundle id** carefully (it cannot change after the first upload; brand-neutral is fine and unblocks the record while naming continues) and authorise native build-related changes; seller type; storefronts and languages (es/en). Whether to pursue the public free-core release can wait | OWNER |
+| after that decision | **Release-candidate shell PR:** `production` variant with the decided id, Assistant not exposed in it, encryption key, icon slot, version line (below) | Claude |
+| by 10-14 for a public release; later for TestFlight | **Public name** after the brand-brief workflow's App Store, web, domain, handle and trademark screening (steps A–H; a lawyer if the screening warrants); the visible name can change until submission | OWNER (Claude runs the searches it can) |
+| 10-14 → 10-16 | Choose where the privacy and support pages are published (a custom domain is optional at this stage); create the App Store Connect record; approve the icon | OWNER |
+| 10-15 → 10-17 | Drafts: privacy policy (naming Frankfurter), support page, terms choice (standard EULA recommended), App Privacy answers, listing text es/en; «Ayuda y comentarios» PR with the support alias | Claude drafts; OWNER publishes the privacy policy **before the upload** and reviews (legal review if wanted) |
+| 10-15 → 10-17 | The **first-TestFlight prerequisites** of app-store-launch.md §11.8 on the installed development build: the region-family sheet (docs/region-families.md) and the 24C1, 24M and 24R2B device checks | OWNER on the iPhone; Claude fixes |
+| 10-18 | First EAS production build and internal TestFlight, only once the privacy policy is live and the §11.8 checks pass | OWNER authorises the build and upload |
+| 10-18 → 10-24 | Physical-device release gate on the TestFlight build, limited to what the 1.0 binary executes (checklist «Release gate»: 24T3, money and ledger flows, migrations from an older install, backup/restore, VoiceOver, large text, Reduce Motion/Transparency, cold start, memory) | OWNER on the iPhone; Claude fixes in hotfix PRs |
+| 10-20 → 10-23 | Whole-app security and privacy audit (production-plan.md §14.1) and fixes; the data-protection evaluation (production-plan.md §14: protection class verified on device, SQLCipher and key recovery assessed) | Claude; OWNER provides the device evidence and records the decision |
+| 10-24 → 10-26 | *Only if the public free-core release is approved:* screenshots, final metadata, final release-candidate build | Claude prepares; OWNER approves and builds |
+| 10-27 | *Only if approved:* go/no-go, then submission for review (manual release) | OWNER |
+| 10-28 → 10-31 | *Only if approved:* review buffer; answer App Review; release on approval. Otherwise: internal TestFlight iterations | OWNER |
+
+**Go/no-go checks for a public submission (all must hold; 10-27 if the free-core release is approved).** The internal
+TestFlight needs the identifier, the shell, the privacy-policy URL and the §11.8 prerequisites only. Root and mobile suites, `check:repo`, catalogue and i18n gates and
+`export:ios` green on the candidate commit (Claude); the release gate on the TestFlight build passed, limited to the flows the binary executes, with no open
+money, data-loss or crash defect, and the Assistant-produced cases deferred in writing (OWNER); security audit with no open High or Medium (Claude, OWNER accepts); the data-protection evaluation done and its decision
+recorded (OWNER, Claude evaluates); privacy
+and support URLs reachable and matching what the app does (OWNER); the store name cleared and the icon final (OWNER);
+the Assistant absent from the production variant, no paywall, no purchase, no network call besides the rate download
+(Claude verifies in the exported bundle); App Privacy, age rating and export compliance answered (OWNER, Claude drafts);
+backup made from the previous build restores in the candidate (OWNER on device).
+
+**After launch.** Monitor App Store Connect crashes and TestFlight feedback, the support inbox and ratings daily for
+two weeks; triage: data loss or a wrong amount is a stop-ship hotfix the same day, a crash within 48 hours, the rest into
+the roadmap; hotfixes are new builds (no `expo-updates`): 1.0.1, 1.0.2 with short release notes in es/en; versions follow
+app-store-launch.md §11.4. **Then updates, in the roadmap's phase order (choice 12, if approved):** 25A first, the AI track (B7 → B11, session,
+consent, 25A-07, production backend, the deferred Assistant device cases), and later 25F (StoreKit, Pro, paywall); the dock comparison; the landing page and ASO iteration
+(go-to-market.md).
+
+**Landing page, domain, ASO, marketing.** For a first public release only what submission needs: public URLs for
+`/privacy` and `/support` (static; the owner's own domain once the name is chosen, not required to prepare them); listing name, subtitle, keywords, description and screenshots (app-store-launch.md §9).
+A full landing page, social handles and content wait for the name and for the period after launch (go-to-market.md), an
+owner decision if wanted earlier.
+
+**The owner's choices for October.** (1) Whether to pursue a public free-core release (a valid option, not yet
+approved) or keep October to the internal TestFlight while AI matures. (2) Bundle id now. (3)
+Public name. (4) Seller type (Individual is the fastest) and EU trader status, storefronts. (5) Where the two pages are published (a
+custom domain optional until the name is chosen). (6) Icon. (7) The Assistant hidden in 1.0 (recommended) rather than a «próximamente» tile. (8) Authorising
+the production builds, the TestFlight upload and the submission. (9) A device-QA block 10-15 → 10-24. (10) For the AI
+track, not the 31st: decisions C and E and a new spend approval. (11) The written deferral of the Assistant-produced
+device cases to the AI release. (12) **The phase-order exception (pending the owner's approval; not approved):** the roadmap's binding order (… 25A → 25A2 → 25C →
+25C2 → 25D → 25E → 25F → 26; production-plan.md §13) puts publication last; a free-core 1.0 brings Producto 26 forward
+for the core that exists today, and 25A (AI), 25A2, 25C, 25C2, 25D, 25E and 25F follow it as updates, in the same order.
+Until the owner records that exception, 26 stays last and there is no public release before the phases ahead of it; the
+internal TestFlight candidate does not need the exception.
+
+**The next implementation PR: the release-candidate shell, only after the owner chooses the production identifier
+and authorises native build-related changes.** Meanwhile the AI track continues with bounded work (facts with an
+explicit exponent for zero-decimal currencies, evaluation preparation). The shell: a `production` variant in `app.config.ts` and an EAS
+`production` profile with the bundle id the owner records (AGENTS rule 3: never before that decision), the store
+name, the icon assets slot, `ITSAppUsesNonExemptEncryption: false` once the owner confirms exempt encryption; the
+Assistant's hub tile and route absent from the production variant (development and preview unchanged), and «Para
+revisar» shown only when an item exists (no producer feeds it in 1.0); the Más version
+line; tests that pin each. No EAS build, no submission.
 
 ### Producto 26 — TestFlight, the definitive identity and publication
 
