@@ -6,7 +6,10 @@ export declare const ASSISTANT_PROTOCOL_VERSION: 4;
 export declare const ASSISTANT_PROTOCOL_VERSIONS: readonly [2, 3, 4];
 export type ResultType = 'answer' | 'proposal' | 'clarification' | 'out_of_scope';
 export type ProposalKind = 'expense' | 'income';
-/** A currency of the domain's creation gate (`LEDGER_CURRENCIES`); v2 and v3 carry ARS and USD only. */
+/** A currency of the domain's creation gate (`LEDGER_CURRENCIES`); v2 and v3 carry ARS and USD only. Statically the
+ * domain's own currency type, as the domain types its gate (`isLedgerCurrency(value): value is IsoCurrencyCode`): the
+ * gate is a runtime list, and a literal union of its 146 codes here would be a second list to keep in step. The
+ * validators enforce the gate. */
 export type ProtocolCurrency = IsoCurrencyCode;
 export type LegacyWireCurrency = 'ARS' | 'USD';
 export type ClarificationField = 'kind' | 'amount' | 'currency' | 'date' | 'merchant' | 'category' | 'destination' | 'period';
@@ -45,7 +48,7 @@ export interface ProposalDraft {
   dateISO: string | null; paymentMethodRef: string | null;
 }
 /** A proposal as a v2 or v3 client reads it: the amount in cents. */
-export interface LegacyProposalDraft extends Omit<ProposalDraft, 'amount'> { amountMinor: number | null }
+export interface LegacyProposalDraft extends Omit<ProposalDraft, 'amount' | 'currency'> { amountMinor: number | null; currency: LegacyWireCurrency | null }
 export interface NavigationIntent { target: NavigationTarget; factId: string }
 export interface Clarification { field: ClarificationField; candidateIds: string[] }
 export interface AssistantResultV2 {
