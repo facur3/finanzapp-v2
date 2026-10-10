@@ -1,16 +1,20 @@
 import type { AssistantFact } from './contracts.js';
+import type { IsoCurrencyCode } from '../domain/currency-data.ts';
 /** The version a client sends today (v4: v3's request; a proposal states `amount`, an exact decimal in major units);
  * the server accepts every version listed. */
 export declare const ASSISTANT_PROTOCOL_VERSION: 4;
 export declare const ASSISTANT_PROTOCOL_VERSIONS: readonly [2, 3, 4];
 export type ResultType = 'answer' | 'proposal' | 'clarification' | 'out_of_scope';
 export type ProposalKind = 'expense' | 'income';
-export type ProtocolCurrency = 'ARS' | 'USD';
+/** A currency of the domain's creation gate (`LEDGER_CURRENCIES`); v2 and v3 carry ARS and USD only. */
+export type ProtocolCurrency = IsoCurrencyCode;
+export type LegacyWireCurrency = 'ARS' | 'USD';
 export type ClarificationField = 'kind' | 'amount' | 'currency' | 'date' | 'merchant' | 'category' | 'destination' | 'period';
 export type NavigationTarget = 'movements' | 'category' | 'budget';
 export declare const RESULT_TYPES: readonly ResultType[];
 export declare const PROPOSAL_KINDS: readonly ProposalKind[];
 export declare const PROTOCOL_CURRENCIES: readonly ProtocolCurrency[];
+export declare const LEGACY_WIRE_CURRENCIES: readonly LegacyWireCurrency[];
 export declare const CLARIFICATION_FIELDS: readonly ClarificationField[];
 export declare const NAVIGATION_TARGETS: readonly NavigationTarget[];
 export declare const PROTOCOL_LIMITS: Readonly<{
@@ -19,7 +23,7 @@ export declare const PROTOCOL_LIMITS: Readonly<{
   amountWholeDigits: number; amountFractionDigits: number;
 }>;
 export interface AssistantRequestV2 {
-  version: 2; requestId: string; action: 'parse' | 'explain'; text: string; todayISO: string; currency: ProtocolCurrency; region: string; facts: AssistantFact[];
+  version: 2; requestId: string; action: 'parse' | 'explain'; text: string; todayISO: string; currency: LegacyWireCurrency; region: string; facts: AssistantFact[];
 }
 /** v2 plus `language`: the interface language the reply is written in (ISO 639-1, two lowercase letters). The region
  * stays what it was, a regional currency word's only key; it never decides the reply's language. */
@@ -27,8 +31,10 @@ export interface AssistantRequestV3 extends Omit<AssistantRequestV2, 'version'> 
   version: 3; language: string;
 }
 /** v3's request; its reply states a proposal's amount as an exact decimal in major units (`ProposalDraft.amount`). */
-export interface AssistantRequestV4 extends Omit<AssistantRequestV3, 'version'> {
+export interface AssistantRequestV4 extends Omit<AssistantRequestV3, 'version' | 'currency'> {
   version: 4;
+  /** Any currency of the domain's creation gate (the screen's: the facts' currency for a question). */
+  currency: ProtocolCurrency;
 }
 export type AssistantRequest = AssistantRequestV2 | AssistantRequestV3 | AssistantRequestV4;
 /** Financial facts only; every unknown is null. No account or card id: `paymentMethodRef` is the person's words.

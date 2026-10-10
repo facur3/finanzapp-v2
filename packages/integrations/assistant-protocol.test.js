@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { ASSISTANT_PROTOCOL_VERSION, ASSISTANT_PROTOCOL_VERSIONS, ASSISTANT_RESULT_SCHEMA, DROPPABLE_FIELDS, PROTOCOL_LIMITS, PROTOCOL_CURRENCIES, PROPOSAL_KINDS, modelInput, validateAssistantResultV2,
+import { ASSISTANT_PROTOCOL_VERSION, ASSISTANT_PROTOCOL_VERSIONS, ASSISTANT_RESULT_SCHEMA, DROPPABLE_FIELDS, LEGACY_WIRE_CURRENCIES, PROTOCOL_LIMITS, PROTOCOL_CURRENCIES, PROPOSAL_KINDS, modelInput, validateAssistantResultV2,
   validateAssistantRequest, isSafeModelText, isSafeInputText, isProtocolAmount, recoverAssistantResultV2, validateDroppedFields, wireResult } from './assistant-protocol.js';
 import { MAX_AMOUNT_DIGITS, MAX_ENTRY_MINOR, majorStringToMinor } from '../domain/money.ts';
-import { LEDGER_CURRENCIES, MAX_UNIT_EXPONENT, minorUnitExponent } from '../domain/currency.ts';
+import { HELD_CURRENCIES, LEDGER_CURRENCIES, MAX_UNIT_EXPONENT, currenciesWithStatus, minorUnitExponent } from '../domain/currency.ts';
 import { REVIEW_KINDS, parseReviewDraft } from '../domain/review-drafts.ts';
 
 const request = validateAssistantRequest({ version: 2, requestId: 'fixture-request-0001', action: 'parse', text: 'Gasté 15 mil', todayISO: '2026-09-19', currency: 'ARS', region: 'AR', facts: [] });
@@ -113,7 +113,7 @@ describe('protocol v2 stays inside what a review draft can hold', () => {
     const copied = fields => proposal({ merchant: LONG_MERCHANT, ...fields });
     for (const [bad, asked_] of [
       [proposal({ merchant: LONG_MERCHANT + zeroWidth }), unsafe], [proposal({ category: LONG_CATEGORY + ' www.evil.example' }), unsafe], [proposal({ merchant: LONG_MERCHANT + '\u{E0041}' }), asked],
-      [copied({ amount: '0' }), asked], [copied({ currency: 'EUR' }), asked], [copied({ dateISO: '2026-09-20' }), asked], [copied({ category: 'Kiosco' + zeroWidth }), asked],
+      [copied({ amount: '0' }), asked], [copied({ currency: 'KWD' }), asked], [copied({ dateISO: '2026-09-20' }), asked], [copied({ category: 'Kiosco' + zeroWidth }), asked],
       [proposal({ paymentMethodRef: 'p'.repeat(PROTOCOL_LIMITS.referenceChars + 1) }), asked], [{ ...copied({}), message: 'x'.repeat(PROTOCOL_LIMITS.messageChars + 1) }, asked],
       [{ ...copied({}), extra: true }, asked], [{ ...copied({}), dropped: ['merchant'] }, asked], [{ ...copied({}), proposals: [copied({}).proposals[0], proposal({}).proposals[0]] }, asked],
       [{ ...copied({}), proposals: [{ ...copied({}).proposals[0], accountId: 'acct-1' }] }, asked], [{ ...copied({}), type: 'answer' }, asked],
@@ -172,6 +172,38 @@ describe('protocol v2 stays inside what a review draft can hold', () => {
       const scope = { type: 'out_of_scope', message: 'No.', evidenceIds: [], navigation: null, proposals: [], clarification: null };
       expect(wireResult(scope, legacy)).toEqual(scope);
     }
+  });
+
+  // 25A-06: v4 carries every currency the domain lets a person create an account in, read from the domain's own gate
+  // (ledger-currencies.js), never a list of the protocol's; the three-decimal currencies stay held; v2 and v3 clients
+  // keep ARS and USD, and a proposal in another currency is refused for them, never nulled.
+  it('v4 currencies are the domain\'s creation gate, every one of them; held currencies never; v2 and v3 stay ARS and USD', () => {
+    expect(PROTOCOL_CURRENCIES).toBe(LEDGER_CURRENCIES);
+    expect(PROTOCOL_CURRENCIES).toHaveLength(146);
+    expect([...LEGACY_WIRE_CURRENCIES]).toEqual(['ARS', 'USD']);
+    expect(ASSISTANT_RESULT_SCHEMA.properties.proposals.items.properties.currency.enum).toEqual([...LEDGER_CURRENCIES, null]);
+    const held = Object.keys(HELD_CURRENCIES);
+    expect(held.length).toBe(7);
+    const v3 = { version: 3, requestId: 'fixture-request-0001', action: 'parse', text: 'Gasté 100', todayISO: '2026-09-19', currency: 'ARS', region: 'AR', language: 'es', facts: [] };
+    const v4 = validateAssistantRequest({ ...v3, version: 4 });
+    for (const currency of LEDGER_CURRENCIES) {
+      expect([0, 2], currency).toContain(minorUnitExponent(currency));
+      expect(validateAssistantRequest({ ...v3, version: 4, currency }).currency, currency).toBe(currency);
+      const result = validateAssistantResultV2(proposal({ amount: '100', currency }), v4);
+      expect(result.proposals[0].currency, currency).toBe(currency);
+      // One decimal, one exact amount per exponent: «100» is 100 yen or 10 000 cents, «1.99» exact or asked, never rounded.
+      expect(majorStringToMinor('100', currency), currency).toEqual({ ok: true, minor: 100 * 10 ** minorUnitExponent(currency) });
+      expect(majorStringToMinor('1.99', currency), currency).toEqual(minorUnitExponent(currency) === 2 ? { ok: true, minor: 199 } : { ok: false, reason: 'precision' });
+      if (!LEGACY_WIRE_CURRENCIES.includes(currency)) {
+        expect(() => validateAssistantRequest({ ...v3, currency }), currency).toThrow();
+        expect(() => wireResult(result, validateAssistantRequest(v3)), currency).toThrow();
+      }
+    }
+    for (const currency of [...held, ...currenciesWithStatus('incomplete', 'excluded'), 'XXX', 'ars', 'EURO', '', null]) {
+      expect(() => validateAssistantRequest({ ...v3, version: 4, currency }), String(currency)).toThrow();
+      if (currency !== null) expect(() => validateAssistantResultV2(proposal({ currency }), v4), String(currency)).toThrow();
+    }
+    for (const currency of ['ARS', 'USD', null]) expect(wireResult(validateAssistantResultV2(proposal({ currency }), v4), validateAssistantRequest(v3)).proposals[0].currency).toBe(currency);
   });
 
   it('allows emoji joiners in the person\'s text but refuses direction overrides and controls', () => {

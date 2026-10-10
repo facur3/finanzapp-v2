@@ -16,6 +16,7 @@
 // No field carries code, SQL, a command, a URL, a tool name, a route or a database operation, and the validators refuse
 // prose that tries to smuggle one (a URL, a code fence, a markdown link, a hidden character).
 import { InputError, isDate } from './contracts.js';
+import { LEDGER_CURRENCIES } from '../domain/ledger-currencies.js';
 
 /** The version a client sends today: v4. Its request is v3's (v2 plus the interface `language` the reply is written in);
  * its proposal carries `amount`, an exact decimal in major units, instead of v2's `amountMinor` in cents. The server
@@ -25,7 +26,11 @@ export const ASSISTANT_PROTOCOL_VERSION = 4;
 export const ASSISTANT_PROTOCOL_VERSIONS = [2, 3, 4];
 export const RESULT_TYPES = ['answer', 'proposal', 'clarification', 'out_of_scope'];
 export const PROPOSAL_KINDS = ['expense', 'income'];
-export const PROTOCOL_CURRENCIES = ['ARS', 'USD'];
+/** The currencies a v4 request and any proposal may name: the domain's creation gate itself (`LEDGER_CURRENCIES`, every
+ * ready currency with 0 or 2 decimals; the three-decimal ones stay held), never a list of the protocol's own. A v2 or v3
+ * client knows ARS and USD only (`LEGACY_WIRE_CURRENCIES`, their frozen wire contract). */
+export const PROTOCOL_CURRENCIES = LEDGER_CURRENCIES;
+export const LEGACY_WIRE_CURRENCIES = Object.freeze(['ARS', 'USD']);
 export const CLARIFICATION_FIELDS = ['kind', 'amount', 'currency', 'date', 'merchant', 'category', 'destination', 'period'];
 export const NAVIGATION_TARGETS = ['movements', 'category', 'budget'];
 
@@ -93,7 +98,8 @@ export function validateAssistantRequest(value) {
   const v3 = withLanguage(value.version);
   exact(value, v3 ? REQUEST_KEYS_V3 : REQUEST_KEYS_V2);
   if (typeof value.requestId !== 'string' || !PROTOCOL_LIMITS.requestId.test(value.requestId)
-    || !['parse', 'explain'].includes(value.action) || !isDate(value.todayISO) || !PROTOCOL_CURRENCIES.includes(value.currency)
+    || !['parse', 'explain'].includes(value.action) || !isDate(value.todayISO)
+    || !(value.version >= 4 ? PROTOCOL_CURRENCIES : LEGACY_WIRE_CURRENCIES).includes(value.currency)
     || typeof value.region !== 'string' || !/^[A-Z]{2}$/.test(value.region)
     || (v3 && (typeof value.language !== 'string' || !/^[a-z]{2}$/.test(value.language)))
     || !Array.isArray(value.facts) || value.facts.length > PROTOCOL_LIMITS.facts) refuse();
@@ -213,6 +219,10 @@ export function recoverAssistantResultV2(value, request) {
   }
 }
 
+/** The currency a v2 or v3 client may read: ARS, USD or null. Another one (a v4 model may name any ledger currency) is
+ * refused (502), never dropped to null: a null would let that client infer a peso account for «100 euros». */
+const legacyCurrency = currency => currency === null || LEGACY_WIRE_CURRENCIES.includes(currency) ? currency : refuse();
+
 /** The cents a v2 or v3 client reads (`amountMinor`) for a v4 amount: its ARS and USD both have two decimals, so the
  * decimal is read digit by digit, never through a float, and a third non-zero decimal or an amount past the protocol's
  * old bound is refused (the server answers 502, nothing saved), never rounded or cut. */
@@ -232,7 +242,7 @@ function legacyMinor(amount) {
  * shape it always read. Run by the server only. */
 export function wireResult(result, request) {
   if (request.version >= 4) return result;
-  return { ...result, proposals: result.proposals.map(({ amount, ...rest }) => ({ kind: rest.kind, amountMinor: legacyMinor(amount), ...rest })) };
+  return { ...result, proposals: result.proposals.map(({ amount, ...rest }) => ({ kind: rest.kind, amountMinor: legacyMinor(amount), ...rest, currency: legacyCurrency(rest.currency) })) };
 }
 
 /** The `dropped` list a server reply carries beside the validated result (never a key of the result: the result

@@ -202,7 +202,8 @@ describe('assistant route: order, reservation and settlement', () => {
       [request, { ...proposal, proposals: [{ ...p, amount: '15.000,50' }] }], // grouped: never read by the server
       [request, { ...proposal, proposals: [{ ...p, amount: '15000.005' }] }], // valid v4, but a v2 client reads cents: never rounded
       [request, { ...proposal, proposals: [{ kind: 'expense', amountMinor: 1500000, ...said }] }], // v2's field from a model
-      [request, { ...proposal, proposals: [{ ...p, currency: 'EUR' }] }],
+      [request, { ...proposal, proposals: [{ ...p, currency: 'EUR' }] }], // a ledger currency a v2 client cannot read: refused, never nulled
+      [request, { ...proposal, proposals: [{ ...p, currency: 'KWD' }] }], // held (three decimals): never a protocol currency
       [request, { ...proposal, proposals: [{ ...p, kind: 'transfer' }] }],
       [request, { ...proposal, proposals: [{ ...p, dateISO: '2026-09-20' }] }], // future
       [request, { ...proposal, proposals: [{ ...p, merchant: 'x'.repeat(121) }] }], // over-long and not the person's words: refused, never recovered

@@ -248,7 +248,8 @@ export const CASES = [
   kase('adversarial.ambiguous-1500-us.en', 'adversarial', 'en', parse('I spent 1.500 dollars on snacks', 'US'), ask('amount')),
   kase('adversarial.negative.es', 'adversarial', 'es', parse('Gasté -500 pesos en el kiosco'), ask('amount', 'kind')),
   kase('adversarial.zero.es', 'adversarial', 'es', parse('Gasté 0 pesos en el café'), ask('amount')),
-  kase('adversarial.euros.es', 'adversarial', 'es', parse('Gasté 50 euros en el museo'), ask('currency')),
+  // 25A-06, ledger currencies: EUR is a protocol currency now (it was asked while v4 carried ARS/USD only).
+  kase('adversarial.euros.es', 'adversarial', 'es', parse('Gasté 50 euros en el museo'), expense('50', 'EUR')),
   kase('adversarial.oversized-merchant.es', 'adversarial', 'es', parse(`Gasté 3 mil pesos en ${LONG_MERCHANT}`), expense('3000', 'ARS', { merchant: null })),
   kase('adversarial.oversized-category.es', 'adversarial', 'es', parse(`Gasté 2 mil pesos, categoría: ${LONG_CATEGORY}`), expense('2000', 'ARS', { category: null })),
   // A self-correction with a bare «7»: «7 lucas» is an inference, so the amount is asked rather than guessed.

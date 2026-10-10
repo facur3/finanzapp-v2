@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { FlatList, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
-import { isLegacyCurrency, postingAccountsFor, todayKey, type Currency, type ReviewArchive } from '@finanzapp/domain';
+import { isLedgerCurrency, minorUnitExponent, postingAccountsFor, todayKey, type Currency, type ReviewArchive } from '@finanzapp/domain';
 import { assistantForBuild } from '../src/assistant/runtime';
 import { DROPPED_TEXT, REASON_TEXT, SUGGESTIONS, classifyIntent, completeDraft, contentFromResult, ownsPending, optionText, shouldAutoscroll, type AssistantContent,
   type ClarificationOption, type EvidenceLink, type Message, type ProposalContent, type ResolvedContent } from '../src/assistant/conversation';
@@ -130,8 +130,12 @@ export default function AssistantScreen() {
     impactHaptic();
     dispatch({ type: 'send', text });
     const action = classifyIntent(text);
-    // Protocol v2 knows ARS and USD only: the client never sends another currency (docs/currency.md §7.5).
-    if (!isLegacyCurrency(currency)) { dispatch({ type: 'fail', reason: 'unavailable', text: REASON_TEXT.unavailable, sent: raw }); return; }
+    // Protocol v4 carries every currency of the domain's creation gate (a held three-decimal one never). A question's
+    // facts are minor units the instructions read as cents, so it waits for facts that state their exponent when the
+    // screen's currency has another (JPY, CLP: docs/currency.md §11); recording works in every carried currency.
+    if (!isLedgerCurrency(currency) || (action === 'explain' && minorUnitExponent(currency) !== 2)) {
+      dispatch({ type: 'fail', reason: 'unavailable', text: REASON_TEXT.unavailable, sent: raw }); return;
+    }
     const facts = action === 'explain' && snapshot ? monthlyEvidence(snapshot, currency, day) : [];
     const controller = new AbortController();
     session.request.current = controller;

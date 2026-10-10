@@ -820,7 +820,7 @@ Rules for every stage:
    - v9 without a unit, v9 with a wrong unit, and a v1–v8 file naming JPY are refused
    - a scale-only difference is a conflict
    - a failed import changes nothing
-7. **Assistant contract, server first.** *(Partly done, 25A-06: protocol v4 carries the draft amount as a canonical major-unit string, scaled on the device after the currency is resolved, and the instructions no longer say "centavos"; facts with an explicit exponent, the currency superset and the `locale` object are still ahead.)* One version carries both docs/i18n.md §11's `locale` and the currency change, and §11 is updated in the same commit. Its sentence "`amountMinor` is integer minor units of the stated currency" becomes: facts keep `amountMinor` at the request's explicit `minorUnitExponent`, and a draft amount is a canonical major-unit string. Protocol v2 (25A-05: the closed result, the region and a request id) shipped first with neither, so this change is v3, with the same rollout.
+7. **Assistant contract, server first.** *(Partly done, 25A-06: protocol v4 carries the draft amount as a canonical major-unit string, scaled on the device after the currency is resolved, the instructions no longer say "centavos", and v4 carries every creation-gate currency from the domain's own list (no generated superset: the gate itself); facts with an explicit exponent and the `locale` object are still ahead.)* One version carries both docs/i18n.md §11's `locale` and the currency change, and §11 is updated in the same commit. Its sentence "`amountMinor` is integer minor units of the stated currency" becomes: facts keep `amountMinor` at the request's explicit `minorUnitExponent`, and a draft amount is a canonical major-unit string. Protocol v2 (25A-05: the closed result, the region and a request id) shipped first with neither, so this change is v3, with the same rollout.
    - The server validates the currency against a fixed superset that does not depend on the client gate: every catalogue code whose data status is `ready` (or `historical`). `generate.mjs` emits this list as a JS module that `contracts.js` and the enum at `openai.js:6` import.
    - The parse prompt (`openai.js:20`) and the explain prompt (`:24`) drop "centavos" and state the scale.
    - Staging payloads record their version (`schema.sql:9`). `schema.test.sql:19`–`:36` gains a fixture in which a payload without a version reads as v1. This is a reviewed staging migration only.
@@ -1198,18 +1198,23 @@ currency step) keeps v3's request and states a proposal's amount as an exact dec
 units (`amount`: «15000», «1.99», «0.50»), which the device scales to minor units with
 `majorStringToMinor` only once it has resolved the currency, asking again for an amount the
 currency cannot hold (a third decimal in pesos), never rounding. The server accepts the three
-versions and answers v2 and v3 in exact cents. Like v1 they know ARS and USD only, and the
-client does not send anything else (24B1). The
+versions and answers v2 and v3 in exact cents. **Since the ledger-currencies slice (25A-06)
+v4 carries every currency of the creation gate** (`LEDGER_CURRENCIES`, read by the protocol from
+`packages/domain/ledger-currencies.js`, the same list; the three-decimal currencies stay held),
+while v2 and v3 keep ARS and USD and a proposal in another currency is refused for them. A
+question (`explain`) still needs a screen currency with two decimals, because its facts are minor
+units read as cents until they state their exponent. The
 region lets a regional word («pesos», a bare «$») resolve only when it is unambiguous (AR →
 ARS, US → USD); an explicit currency wins; anything else stays null from the model, and the
 device then resolves it from the person's own destinations (decision D, 25A-06: a named
 destination lends its currency, the one currency every offered destination shares is inferred,
-several possible currencies are asked with the currencies as chips), never from the region or
-from the word «pesos». The currency
-part of this design is therefore still ahead (docs/i18n.md §11, stage 7 of §7.5), with the
-same server-first rollout: it validates currencies against a generated superset independent of
-the client gate and lifts the device's ARS/USD-only destination rule; the draft amount as a
-canonical major-unit string that the client converts and checks is done (v4). Nothing below is active beyond the
+several possible currencies are asked with the currencies as chips; any ledger currency since
+the ledger-currencies slice), never from the screen's currency or from the word «pesos» alone: the
+model names a regional word's currency only where that region gives it one. What remains of
+this design is facts with an explicit exponent (questions in JPY and other zero-decimal
+currencies) and the `locale` object (docs/i18n.md §11, stage 7 of §7.5). The protocol validates
+against the creation gate itself, not a wider superset: a currency opens for the Assistant
+when it opens for accounts. Nothing below is active beyond the
 reply language; no paid AI is enabled.
 
 ### 11.1 "Gasté 30 dólares en Steam."
