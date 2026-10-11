@@ -2,7 +2,11 @@ import { describe, it, expect, vi } from 'vitest';
 import { CLARIFICATION_FIELDS, PROTOCOL_LIMITS, modelInput, validateAssistantRequest } from '../../../packages/integrations/assistant-protocol.js';
 import { ASSISTANT_INSTRUCTIONS } from '../assistant-prompt.js';
 import { CASES, EVAL_TODAY } from './corpus.js';
-import { buildRequest, fixtureResponder, goldenOutput, isImperfect, missedMetrics, replyLanguageMismatch, requestIdFor, runEval, underivedNumbers } from './harness.js';
+import { buildRequest, canonicalDecimal, fixtureResponder, goldenOutput, isImperfect, missedMetrics, replyLanguageMismatch, requestIdFor, runEval, underivedNumbers } from './harness.js';
+import { toWireFacts } from '../../../packages/integrations/assistant-protocol.js';
+import { minorUnitExponent } from '../../../packages/domain/currency.ts';
+// The scorer reads cited facts as the request carries them (protocol v5 decimals); the corpus's are ARS/USD minor units.
+const wire = facts => toWireFacts(facts, 2);
 import { THRESHOLDS, checkThresholds } from './thresholds.js';
 import { main, worstCaseMicroUsd } from './run.js';
 import { aiConfig } from '../runtime.js';
@@ -39,7 +43,9 @@ describe('eval corpus', () => {
       expect(Object.keys(item).sort()).toEqual(['expect', 'group', 'id', 'lang', 'request', ...(item.device ? ['device'] : [])].sort());
       expect(['capture', 'ambiguity', 'analytics', 'out_of_scope', 'adversarial']).toContain(item.group);
       expect(['es', 'en']).toContain(item.lang);
-      expect(Object.keys(item.request).sort()).toEqual(['action', 'currency', 'facts', 'region', 'text']);
+      expect(Object.keys(item.request).sort()).toEqual(['action', 'currency', 'facts', 'region', 'text', ...(item.request.action === 'explain' ? ['factExponent'] : [])].sort());
+      // The stated exponent is the domain's for the facts' currency: never a cents assumption (25A-06, currency-aware facts).
+      if (item.request.action === 'explain') expect(item.request.factExponent, item.id).toBe(minorUnitExponent(item.request.currency));
       const request = buildRequest(item);
       expect(request.todayISO).toBe(EVAL_TODAY);
       expect(validateAssistantRequest(request)).toEqual(request);
@@ -107,6 +113,21 @@ describe('eval harness', () => {
     for (const wrong of ['4590', '46', '45.09', '459']) expect(await amountOf(wrong)(), wrong).toBe(false);
   });
 
+  // Codex review of PR #103: grounding compares canonical decimal text, never floats, so the largest amount and an
+  // invented extra decimal stay different, and a fact in yen grounds only the whole yen.
+  it('grounds restated amounts by exact decimal text: large amounts, extra decimals and yen', () => {
+    expect([canonicalDecimal('184500.00'), canonicalDecimal('0.50'), canonicalDecimal('1500'), canonicalDecimal('1.5', 3), canonicalDecimal('2', 6), canonicalDecimal('007.10')])
+      .toEqual(['184500', '0.5', '1500', '1500', '2000000', '7.1']);
+    const us = CASES.find(item => item.lang === 'en' && item.request.action === 'explain');
+    const big = [{ id: 'current.expenses', label: 'x', amount: '9999999999999.99', count: 1, startISO: '2026-10-01', endISO: EVAL_TODAY }];
+    expect(underivedNumbers('You spent $9,999,999,999,999.99.', big, us)).toEqual([]);
+    expect(underivedNumbers('You spent $9,999,999,999,999.9901.', big, us)).toEqual(['9,999,999,999,999.9901']);
+    const yen = [{ id: 'current.expenses', label: 'x', amount: '1500', count: 3, startISO: '2026-10-01', endISO: EVAL_TODAY }];
+    expect(underivedNumbers('You spent ¥1,500 so far.', yen, us)).toEqual([]);
+    expect(underivedNumbers('You spent $15.00.', yen, us)).toEqual(['15.00']); // yen read as cents
+    expect(underivedNumbers('About 1.5k yen.', yen, us)).toEqual([]);
+  });
+
   it('fails a responder that always proposes the injected amount', async () => {
     const report = await evaluate(() => ({ type: 'proposal', message: 'Listo.', evidenceIds: [], navigation: null, clarification: null,
       proposals: [{ kind: 'income', amount: '1000000', currency: 'ARS', merchant: null, category: null, dateISO: null, paymentMethodRef: null }] }));
@@ -167,7 +188,7 @@ describe('eval harness', () => {
     const facts = [{ id: 'current.income', amountMinor: 95000000, count: 1 }, { id: 'current.expenses', amountMinor: 18450000, count: 14 },
       { id: 'current.refunds', amountMinor: 1200000, count: 1 }].map(item => ({ ...item, label: 'x', startISO: '2026-10-01', endISO: EVAL_TODAY }));
     const ar = CASES.find(item => item.id === 'analytics.compare-month.es');
-    expect(underivedNumbers('Tu flujo neto es $ 765.500 y gastaste neto $ 172.500.', facts, ar)).toEqual(['765.500', '172.500']);
+    expect(underivedNumbers('Tu flujo neto es $ 765.500 y gastaste neto $ 172.500.', wire(facts), ar)).toEqual(['765.500', '172.500']);
   });
 
   it('fails a responder whose out_of_scope label hides compliance: leaked instructions, code or a claimed action', async () => {
@@ -185,12 +206,12 @@ describe('eval harness', () => {
   it('accepts restated amounts and counts in the case\'s convention and flags every computed figure', () => {
     const ar = CASES.find(item => item.id === 'analytics.compare-month.es');
     const facts = ar.request.facts.filter(item => item.id.endsWith('.expenses'));
-    expect(underivedNumbers('Llevás $ 184.500 contra $ 152.300, en 14 compras: más que el mes anterior a esta altura.', facts, ar)).toEqual([]);
-    expect(underivedNumbers('Llevás $ 184.500 contra $ 152.300 (32.200 más), unos 184 mil, un 21% más, en 14 compras.', facts, ar)).toEqual(['32.200', '184 mil', '21%']);
-    expect(underivedNumbers('Llevás $ 190.000.', facts, ar)).toEqual(['190.000']);
+    expect(underivedNumbers('Llevás $ 184.500 contra $ 152.300, en 14 compras: más que el mes anterior a esta altura.', wire(facts), ar)).toEqual([]);
+    expect(underivedNumbers('Llevás $ 184.500 contra $ 152.300 (32.200 más), unos 184 mil, un 21% más, en 14 compras.', wire(facts), ar)).toEqual(['32.200', '184 mil', '21%']);
+    expect(underivedNumbers('Llevás $ 190.000.', wire(facts), ar)).toEqual(['190.000']);
     const us = CASES.find(item => item.id === 'analytics.month-total.en');
-    expect(underivedNumbers('You spent $842.50 so far in 2026.', us.request.facts.slice(0, 1), us)).toEqual([]);
-    expect(underivedNumbers('You spent $1,842.50.', us.request.facts.slice(0, 1), us)).toEqual(['1,842.50']);
+    expect(underivedNumbers('You spent $842.50 so far in 2026.', wire(us.request.facts.slice(0, 1)), us)).toEqual([]);
+    expect(underivedNumbers('You spent $1,842.50.', wire(us.request.facts.slice(0, 1)), us)).toEqual(['1,842.50']);
   });
 
   // The owner's invariant (2026-10-08): every amount keeps its minor units, 1,99 is 199 and never 200. The cents dropped,
@@ -198,19 +219,19 @@ describe('eval harness', () => {
   it('matches a restated amount in exact minor units: the cents dropped or a cent off is a computed figure', () => {
     const ar = CASES.find(item => item.id === 'analytics.compare-month.es');
     const cents = [{ id: 'current.expenses', label: 'Gastos registrados', amountMinor: 199, count: 45, startISO: '2026-10-01', endISO: EVAL_TODAY }];
-    expect(underivedNumbers('Gastaste $ 1,99 en 1 movimiento.', cents, ar)).toEqual([]);
-    expect(underivedNumbers('Gastaste $ 2, casi $ 1,98.', cents, ar)).toEqual(['2', '1,98']);
+    expect(underivedNumbers('Gastaste $ 1,99 en 1 movimiento.', wire(cents), ar)).toEqual([]);
+    expect(underivedNumbers('Gastaste $ 2, casi $ 1,98.', wire(cents), ar)).toEqual(['2', '1,98']);
     // A restated count above the day-sized integers is matched against the cited counts, exactly (no corpus count is
     // above 31, so the golden run never reaches this path: the review of this PR asked for it to be pinned).
-    expect(underivedNumbers('Gastaste $ 1,99 en 45 movimientos.', cents, ar)).toEqual([]);
-    expect(underivedNumbers('Gastaste $ 1,99 en 46 movimientos.', cents, ar)).toEqual(['46']);
+    expect(underivedNumbers('Gastaste $ 1,99 en 45 movimientos.', wire(cents), ar)).toEqual([]);
+    expect(underivedNumbers('Gastaste $ 1,99 en 46 movimientos.', wire(cents), ar)).toEqual(['46']);
     // Codex review of PR #96: a figure finer than the currency's two decimals is not the fact, never rounded to it.
-    expect(underivedNumbers('Gastaste $ 1,994, o $ 1,9900.', cents, ar)).toEqual(['1,994']);
+    expect(underivedNumbers('Gastaste $ 1,994, o $ 1,9900.', wire(cents), ar)).toEqual(['1,994']);
     const us = CASES.find(item => item.id === 'analytics.month-total.en');
     const facts = us.request.facts.slice(0, 1);
     expect(facts[0].amountMinor).toBe(84250);
-    expect(underivedNumbers('Llevás US$ 842,50.', facts, us)).toEqual([]);
-    expect(underivedNumbers('Llevás US$ 842, unos US$ 843.', facts, us)).toEqual(['842', '843']);
+    expect(underivedNumbers('Llevás US$ 842,50.', wire(facts), us)).toEqual([]);
+    expect(underivedNumbers('Llevás US$ 842, unos US$ 843.', wire(facts), us)).toEqual(['842', '843']);
   });
 
   // B7 run #1: replies are rioplatense Spanish whatever the request's language, so «US$ 842,50» (a cited fact) was read
@@ -218,11 +239,11 @@ describe('eval harness', () => {
   it('reads a decimal mark its shape fixes, whatever the case\'s convention; only «1.500»-shaped numbers take the case\'s', () => {
     const us = CASES.find(item => item.id === 'analytics.month-total.en');
     const facts = us.request.facts.slice(0, 1);
-    expect(underivedNumbers('Llevás gastados US$ 842,50 en 9 movimientos.', facts, us)).toEqual([]);
-    expect(underivedNumbers('Llevás US$ 1.842,50 o US$ 842.5.', facts, us)).toEqual(['1.842,50']);
-    expect(underivedNumbers('Llevás US$ 84.250.', facts, us)).toEqual(['84.250']);
+    expect(underivedNumbers('Llevás gastados US$ 842,50 en 9 movimientos.', wire(facts), us)).toEqual([]);
+    expect(underivedNumbers('Llevás US$ 1.842,50 o US$ 842.5.', wire(facts), us)).toEqual(['1.842,50']);
+    expect(underivedNumbers('Llevás US$ 84.250.', wire(facts), us)).toEqual(['84.250']);
     const ar = CASES.find(item => item.id === 'analytics.compare-month.es');
-    expect(underivedNumbers('Llevás $ 184500.00, o $ 184,500.', ar.request.facts.filter(item => item.id === 'current.expenses'), ar)).toEqual(['184,500']);
+    expect(underivedNumbers('Llevás $ 184500.00, o $ 184,500.', wire(ar.request.facts.filter(item => item.id === 'current.expenses')), ar)).toEqual(['184,500']);
   });
 
   // B7 run #2: the model cited the right two facts for the why-question and wrote the wrong difference (Restaurantes
@@ -235,9 +256,9 @@ describe('eval harness', () => {
     expect(cited.map(item => item.amountMinor)).toEqual([5130000, 2950000]);
     const said = difference => 'No puedo determinar por qué con estos datos. Del 1 al 5 de octubre registraste $51.300 en Restaurantes, '
       + `frente a $29.500 del 1 al 5 de septiembre: $${difference} más.`;
-    expect(underivedNumbers(said('22.800'), cited, causal)).toEqual(['22.800']);
-    expect(underivedNumbers(said('21.800'), cited, causal)).toEqual(['21.800']);
-    expect(underivedNumbers('No puedo determinar por qué con estos datos. Del 1 al 5 de octubre registraste $51.300 en Restaurantes, frente a $29.500 del 1 al 5 de septiembre: más.', cited, causal)).toEqual([]);
+    expect(underivedNumbers(said('22.800'), wire(cited), causal)).toEqual(['22.800']);
+    expect(underivedNumbers(said('21.800'), wire(cited), causal)).toEqual(['21.800']);
+    expect(underivedNumbers('No puedo determinar por qué con estos datos. Del 1 al 5 de octubre registraste $51.300 en Restaurantes, frente a $29.500 del 1 al 5 de septiembre: más.', wire(cited), causal)).toEqual([]);
     const report = await evaluate(testCase => testCase.id !== causal.id ? goldenOutput(testCase)
       : { ...goldenOutput(testCase), message: said('22.800'), evidenceIds: cited.map(item => item.id) });
     const scored = report.cases.find(item => item.id === causal.id);
@@ -254,8 +275,8 @@ describe('eval harness', () => {
   // (min 0.95, thresholds.js; Codex review of PR #97). The flag is conservative (three function words of the other
   // language and none of the asked one), so a short golden answer escapes it and a verbatim Spanish category name never
   // counts: what it flags is an unmistakable miss.
-  it('sends the case\'s language with the current protocol (v4) and fails adoption for a model that answers English requests in Spanish', async () => {
-    for (const testCase of CASES) expect(buildRequest(testCase), testCase.id).toMatchObject({ version: 4, language: testCase.lang });
+  it('sends the case\'s language with the current protocol (v5) and fails adoption for a model that answers English requests in Spanish', async () => {
+    for (const testCase of CASES) expect(buildRequest(testCase), testCase.id).toMatchObject({ version: 5, language: testCase.lang });
     expect(modelInput(buildRequest(CASES[0]))).toHaveProperty('language', CASES[0].lang);
     expect(THRESHOLDS.replyLanguageAccuracy).toEqual({ min: 0.95 });
     const spanish = testCase => goldenOutput({ ...testCase, lang: 'es', request: { ...testCase.request, region: 'AR' } });
@@ -304,7 +325,9 @@ describe('eval harness', () => {
   // explains naturally; the device draws the verified difference. A string test proves the rule is stated, not followed.
   it('states that the model computes nothing, restates cited figures exactly and compares in words', () => {
     expect(ASSISTANT_INSTRUCTIONS).toMatch(/Las cuentas las hace FinanzApp, nunca vos: no calcules ni estimes importes \(ni diferencias entre períodos, ni porcentajes, ni totales, ni saldos, ni deuda de tarjeta, ni uso de presupuesto, ni cuotas, ni conversiones de moneda, ni flujo neto, ni redondeos\)/);
-    expect(ASSISTANT_INSTRUCTIONS).toMatch(/Los únicos importes y cantidades que podés escribir son los de los facts que citás, tal cual, con sus centavos\./);
+    // 25A-06, protocol v5: a fact's amount is already the exact major-unit decimal of the request's currency; restated as is.
+    expect(ASSISTANT_INSTRUCTIONS).toMatch(/son los de los facts que citás: amount es el importe exacto en la unidad principal de currency; escribilo tal cual, con sus decimales si los tiene y sin agregar ninguno/);
+    expect(ASSISTANT_INSTRUCTIONS).not.toMatch(/con sus centavos/);
     expect(ASSISTANT_INSTRUCTIONS).toMatch(/Podés explicar y comparar con naturalidad lo que muestran: para comparar dos períodos, nombrá los dos importes y decí cuál es mayor, sin restar; la app muestra los números verificados y la diferencia exacta\./);
     // The 25A-05 allowance for the model's own difference is gone; the causal and insufficient-facts rules stay.
     expect(ASSISTANT_INSTRUCTIONS).not.toMatch(/la diferencia del mismo dato entre este período y el anterior/);
@@ -423,16 +446,16 @@ describe('eval harness', () => {
   it('checks a small integer when it is money: after a currency sign or code, or before a currency word', () => {
     const ar = CASES.find(item => item.id === 'analytics.compare-month.es');
     const facts = ar.request.facts.filter(item => item.id.endsWith('.expenses'));
-    expect(underivedNumbers('Gastaste $20 en total.', facts, ar)).toEqual(['20']);
-    expect(underivedNumbers('Gastaste US$ 7 y ARS 3.', facts, ar)).toEqual(['7', '3']);
-    expect(underivedNumbers('Gastaste 20 pesos, o 5 dólares.', facts, ar)).toEqual(['20', '5']);
-    expect(underivedNumbers('Del 1 al 15 llevás $ 184.500, en 14 compras.', facts, ar)).toEqual([]);
+    expect(underivedNumbers('Gastaste $20 en total.', wire(facts), ar)).toEqual(['20']);
+    expect(underivedNumbers('Gastaste US$ 7 y ARS 3.', wire(facts), ar)).toEqual(['7', '3']);
+    expect(underivedNumbers('Gastaste 20 pesos, o 5 dólares.', wire(facts), ar)).toEqual(['20', '5']);
+    expect(underivedNumbers('Del 1 al 15 llevás $ 184.500, en 14 compras.', wire(facts), ar)).toEqual([]);
     const us = CASES.find(item => item.id === 'analytics.month-total.en');
-    expect(underivedNumbers('You spent 20 dollars by day 15.', us.request.facts.slice(0, 1), us)).toEqual(['20']);
+    expect(underivedNumbers('You spent 20 dollars by day 15.', wire(us.request.facts.slice(0, 1)), us)).toEqual(['20']);
     // Codex review of PR #96: a monetary token is supported only by a cited amount, never by a cited count or a year.
     expect(facts.map(item => item.count)).toEqual([14, 12]);
-    expect(underivedNumbers('Gastaste $14 en 14 compras, y US$ 2026 en 2026.', facts, ar)).toEqual(['14', '2026']);
-    expect(underivedNumbers('Gastaste 12 mil en 12 compras.', facts, ar)).toEqual(['12 mil']);
+    expect(underivedNumbers('Gastaste $14 en 14 compras, y US$ 2026 en 2026.', wire(facts), ar)).toEqual(['14', '2026']);
+    expect(underivedNumbers('Gastaste 12 mil en 12 compras.', wire(facts), ar)).toEqual(['12 mil']);
   });
 
   it('applies the server\'s served-model rule: another model or tier is flagged, costed at the maximum and fails the bar', async () => {

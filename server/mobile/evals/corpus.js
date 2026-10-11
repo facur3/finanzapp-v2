@@ -4,7 +4,7 @@
 // against a staging model.
 //
 // Shape (the device lane consumes `device`; keep it stable):
-//   { id, group, lang, request: { action, text, currency, region, facts }, expect, device? }
+//   { id, group, lang, request: { action, text, currency, region, facts, factExponent? }, expect, device? }
 //   expect: { type, proposal?: { kind, amount, currency, dateISO, paymentMethodRef, merchant?, category? },
 //             clarification?: { fields }, evidence?: { required, allowed } }
 //   Every listed proposal field is scored; `null` means the model must leave it null (not invent it). merchant, category
@@ -23,7 +23,9 @@
 export const EVAL_TODAY = '2026-10-05';
 
 const parse = (text, region = 'AR', currency = region === 'AR' ? 'ARS' : 'USD') => ({ action: 'parse', text, currency, region, facts: [] });
-const explain = (text, facts, region = 'AR', currency = 'ARS') => ({ action: 'explain', text, currency, region, facts });
+// `factExponent` is the facts' currency's ISO minor unit, stated (never assumed): the harness writes each fact's
+// `amountMinor` as protocol v5's exact decimal with it (`toWireFacts`); harness.test.js pins it against the domain.
+const explain = (text, facts, region = 'AR', currency = 'ARS', factExponent = 2) => ({ action: 'explain', text, currency, region, facts, factExponent });
 // `amount` is protocol v4's: the exact decimal in major units the person meant ('15000', '12.34'), whatever the currency.
 const draft = kind => (amount, currency, extra = {}) => ({ type: 'proposal',
   proposal: { kind, amount, currency, dateISO: null, paymentMethodRef: null, ...extra } });

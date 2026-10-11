@@ -727,7 +727,7 @@ Today nothing is sent, because the client is disconnected. When connected, a pro
 
 | Action | Sent | Not sent |
 | --- | --- | --- |
-| `parse` (record something) | The person's text (up to 2 000 characters), today's local date, the screen's currency (any creation-gate currency on v4; a question needs one with two decimals until facts state their exponent), the configured region and the interface language (two letters each, read from the interface when the ask is sent; the language since protocol v3, 25A-06), and a fresh `requestId`. **No facts.** | Any ledger data: no account or card name, no merchant history, no balance. |
+| `parse` (record something) | The person's text (up to 2 000 characters), today's local date, the screen's currency (any creation-gate currency on v4 and v5; since v5 a question's facts state exact major-unit decimals, so every ledger currency works), the configured region and the interface language (two letters each, read from the interface when the ask is sent; the language since protocol v3, 25A-06), and a fresh `requestId`. **No facts.** | Any ledger data: no account or card name, no merchant history, no balance. |
 | `explain` (an analytical question) | The same, plus at most 60 aggregated facts: month-to-date and the comparable previous period, as totals and counts of expenses, income and refunds, and, for each of the two periods, up to 26 category totals labelled with the person's category names. | Merchants, account names, balances, individual movements, cards, debts, budgets, any identifier other than the fact ids. |
 
 The `requestId` is the reservation's idempotency key (§6.3), never shown to the model: the model reads the request
@@ -826,7 +826,9 @@ per ask (the app uses expo-crypto's `randomUUID`); `action` is `parse` or `expla
 with control characters and bidirectional overrides refused (emoji joiners allowed); `currency` is ARS or USD on v2 and
 v3 and, on v4, any currency of the domain's creation gate (`LEDGER_CURRENCIES`, the same list the app creates accounts
 in, read from `packages/domain/ledger-currencies.js`; held three-decimal currencies excluded); `region`
-is two capital letters; `facts` at most 60, none on `parse`. Unknown keys are refused, so no account, card or locale
+is two capital letters; `facts` at most 60, none on `parse`; each fact `{ id, label, amountMinor, count, startISO,
+endISO }` on v2–v4 and, on **v5** (2026-10-11), `amount` instead of `amountMinor`: the exact decimal in major units of the
+request's currency with that currency's minor digits («1500» yen, «184500.00» pesos), the same digit count on every fact. Unknown keys are refused, so no account, card or locale
 object can ride along, and a language never rides on v2. The shared validator (`validateAssistantRequest`) accepts the
 three versions and returns the wire shape it received, the server-first rollout of [i18n.md](i18n.md) §11; the app sends
 v4; the model reads the language only when it was sent. The model always writes the v4 result; the server hands a v2 or

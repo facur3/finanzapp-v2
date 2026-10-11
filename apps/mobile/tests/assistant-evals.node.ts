@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { majorStringToMinor, postingAccountsFor, reviewGaps, validateAccount, validateLiabilityProfiles, type Account, type CreditCardProfile, type Currency } from '@finanzapp/domain';
 import { recoverAssistantResultV2, validateAssistantResultV2, validateDroppedFields, type AssistantRequest, type AssistantResultV2 } from '../../../packages/integrations/assistant-protocol.js';
+import type { AssistantFact } from '../../../packages/integrations/contracts.js';
 import { CASES } from '../../../server/mobile/evals/corpus.js';
 import { buildRequest, goldenOutput } from '../../../server/mobile/evals/harness.js';
 import { completeDraft, contentFromResult } from '../src/assistant/conversation.ts';
@@ -13,7 +14,7 @@ const minorFromDecimal = (amount: string, currency: Currency) => { const reading
 // (contentFromResult over the domain's posting accounts, exactly as app/assistant.tsx builds them). The model only ever
 // says words for the means of payment; which account they name is decided here, or asked.
 type DeviceAccount = { id: string; name: string; currency: Currency; kind: 'cash' | 'card' };
-type EvalCase = { id: string; group: string; request: { currency: Currency; text: string }; expect: { type: string }; device?: { accounts: DeviceAccount[]; destination: string } };
+type EvalCase = { id: string; group: string; request: { currency: Currency; text: string; facts: AssistantFact[] }; expect: { type: string }; device?: { accounts: DeviceAccount[]; destination: string } };
 
 const createdAt = '2026-09-01T12:00:00.000Z';
 const cases = CASES as EvalCase[];
@@ -33,7 +34,8 @@ function onDevice(testCase: EvalCase, output: unknown = goldenOutput(testCase)) 
   const request = buildRequest(testCase) as AssistantRequest;
   const result = validateAssistantResultV2(output, request) as AssistantResultV2;
   const { accounts, incomeAccounts } = testCase.device ? ledger(testCase.device) : { accounts: [], incomeAccounts: [] };
-  const resolved = contentFromResult(result, request.facts, accounts, [], request.currency, request.todayISO, incomeAccounts);
+  // The device's own facts (integer minor units), as the screen keeps them; the request carried their v5 decimals.
+  const resolved = contentFromResult(result, testCase.request.facts, accounts, [], request.currency, request.todayISO, incomeAccounts);
   return { request, result, accounts, incomeAccounts, resolved };
 }
 
@@ -136,7 +138,7 @@ test('25A-06 (decision A): an over-long merchant or category copied verbatim rea
     assert.deepEqual(validateDroppedFields(dropped, result), [field], id + ': the device accepts the list against the result');
     // On the device: the one peso account is implied, the missing category is asked (as for any draft without one), the
     // chosen category completes the draft, and the review draft keeps the exact amount with the merchant a gap.
-    const resolved = contentFromResult(result, request.facts, [account], [], 'ARS', request.todayISO, [account]);
+    const resolved = contentFromResult(result, testCase.request.facts, [account], [], 'ARS', request.todayISO, [account]);
     assert.equal(resolved.content?.kind === 'clarification' && resolved.content.field, 'category', id);
     const next = completeDraft(resolved.pending!, 'Varios', [account], [], request.todayISO, [account]);
     assert.equal(next.content.kind, 'draft', id);

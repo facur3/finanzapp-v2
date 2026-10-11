@@ -1,7 +1,13 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-10 (**release readiness audit and the plan toward an App Store release targeted for 2026-10-31**,
-docs only, on `docs/release-readiness-oct31`: the verified state (code, not older prose), three milestones (an internal
+Updated: 2026-10-11 (**protocol v5: currency-aware question facts**, on `feat/25a-06-currency-aware-facts`: a question's
+facts state their amount as the exact decimal in major units of the request's currency («1500» yen, «184500.00» pesos),
+written by the device from its integer minor units with one shared helper pinned against the domain for all 146
+currencies, so questions work in every ledger currency (JPY, CLP, KRW included) and no model reads yen as cents; the
+evidence rows stay the device's integers; v2–v4 keep minor units; corpus values unchanged (explain requests state
+their exponent, pinned to the domain); fixture rates identical; worst case 194 848 / 420 538 µUSD; «Producto 25A-06»).
+Earlier (2026-10-10; **release readiness audit and the plan toward an App Store release targeted for 2026-10-31**,
+docs only, PR #102: the verified state (code, not older prose), three milestones (an internal
 TestFlight candidate by the end of October, the preferred near-term target; a public free-core release, a valid option
 pending the owner's approval; a public AI/Pro release later, with AI work continuing in parallel), the dated critical path, the go/no-go checks, the owner's choices, the model-independent
 copilot vision locked as staged milestones, the model-adoption procedure (production-plan.md §5.5b) and the dock and
@@ -1874,7 +1880,7 @@ evidence contract, scorer coverage and device QA:
    25A-04); an optional **persistent local** chat history only after explicit privacy, retention, deletion and backup
    decisions; no remote chat persistence by default.
 5. **Currencies, regions, languages:** every enabled ledger currency with its decimal scale (recording since PR #101;
-   questions in zero-decimal currencies need facts with an exponent); every released region; replies eventually
+   questions in every ledger currency since protocol v5's decimal facts); every released region; replies eventually
    independent of the interface language (Japanese and others once each is localized, evaluated and released).
 6. **Voice input**, last, only with a verified implementation (no microphone icon before it exists).
 Binding throughout: the model interprets language freely within the financial scope, with no hard-coded merchants,
@@ -5792,7 +5798,7 @@ nothing of it is on a screen yet.
     - *Effect on cost.* Instructions 6 154 → 6 337 bytes and the schema enum grows by 144 codes: **193 077 µUSD for
       `gpt-6-luna`** (179 588) and **416 999 for `gpt-5.6-luna`** (390 025). Any further live run needs a new written owner
       approval of at least that figure.
-    - *Remaining gaps (recorded, not in this PR).* (1) Questions in a zero-decimal screen currency: facts with an explicit
+    - *Remaining gaps (recorded, not in this PR).* (1) [Closed by protocol v5, 2026-10-11.] Questions in a zero-decimal screen currency: facts with an explicit
       exponent (the language-neutral facts slice, docs/currency.md §11). (2) The corpus expansion above. (3)
       Internationalization: the interface and the Assistant's own copy exist in Spanish and English only; the model is
       told to reply in `language`, but only `es` and `en` are released interface languages (docs/i18n.md), so «Japanese
@@ -5802,6 +5808,47 @@ nothing of it is on a screen yet.
     - *Not in this PR:* navigation, chat history, filtered deep links, calendar, instalments, Apple integrations, the dock
       redesign, decisions C and E, a live call, B8, a service change, an EAS build, a merge. Both live runs remain
       **FAILED**; B8 **BLOCKED**.
+  - **Protocol v5 — currency-aware question facts (owner direction 2026-10-11; branch
+    `feat/25a-06-currency-aware-facts`, this PR; no provider call).**
+    - *The problem.* PR #101 opened recording in all 146 ledger currencies, but a question's facts carried `amountMinor`
+      and the instructions read them as cents, so the screen declined questions while its currency had no cents (JPY,
+      CLP, KRW…): 1 500 yen would have been read as «15,00».
+    - *The contract.* v5 = v4 whose facts carry `amount` instead of `amountMinor`: the exact decimal in major units of
+      the request's currency, with exactly that currency's minor digits («1500» yen, «184500.00» pesos, «0.00»),
+      ≤ 15 whole digits and ≤ 4 decimals, zero allowed; one request, one currency, so every fact has the same number of
+      decimals (refused otherwise). The currency is the request's; the exponent is in the digits. v2–v4 keep
+      `amountMinor` facts; the result is v4's. The server accepts v2–v5; the client sends v5. Chosen over a request-level
+      exponent the model would apply (decision B: the app owns arithmetic, the model copies exact figures) and mirrors
+      PR #100's proposal decimals.
+    - *One conversion.* `toWireFacts(facts, exponent)` in the shared protocol writes each integer digit by digit (no
+      float); the device passes `minorUnitExponent(currency)`; a test pins it against the domain's
+      `minorToMajorString` (and back through `majorStringToMinor`) for every ledger currency and six amounts, the
+      largest entry amount included.
+    - *Device.* `integrations/client.ts` sends wire facts and keeps returning the device's own minor-unit facts as the
+      evidence (never the server's copy, never the wire decimals), so the evidence rows, the verified difference and the
+      links are unchanged. The screen no longer declines questions in a non-two-decimal currency (held currencies are
+      still refused before any call).
+    - *Instructions* (one sentence). «… son los de los facts que citás: amount es el importe exacto en la unidad
+      principal de currency; escribilo tal cual, con sus decimales si los tiene y sin agregar ninguno, con los
+      separadores de region.» («con sus centavos» is gone.)
+    - *Evaluator.* Corpus facts stay the device-side integers; each explain request now states its `factExponent`
+      (2 for ARS/USD), pinned by a test to the domain's exponent; the harness writes the v5 decimals with
+      `toWireFacts`; the grounding scorer compares a restated figure to the cited fact's exact decimal (1,99 is «1.99»,
+      1 500 yen «1500»; compared as canonical decimal text, never floats, so a 13-digit amount and an invented extra
+      decimal stay different: Codex review of this PR; still no tolerance, no rounding). No expectation, threshold or case changed; the fixture
+      evaluation's quality rates are identical to master's (only token and cost figures moved). Runs #1 and #2 stay as
+      measured (they ran v3).
+    - *Tests.* Protocol: the conversion for every ledger currency and amount, v5 requests accepted in every currency,
+      nine refused fact shapes (minor units on v5, a decimal on v4, a sign, grouping, a comma, five decimals, a number, a
+      leading zero, mixed digits), zero allowed. Server: a v5 question in yen reaches the model as «1500», refused shapes
+      are 400 before any reservation, v4 keeps minor units. Device: yen sent as «1500», pesos as «184500.00», the
+      evidence the device's integers, an answer's rows in yen, a held currency refused before the call; the screen sends
+      a JPY question. Changed tests, deliberately: the client's version pins (5), the JPY screen test (a question is now
+      sent), the scorer's unit tests (wire facts), the corpus shape test (`factExponent`).
+    - *Effect on cost.* Instructions 6 337 → 6 478 bytes, facts a few bytes longer: **194 848 µUSD for `gpt-6-luna`**
+      (193 077) and **420 538 for `gpt-5.6-luna`** (416 999).
+    - *Not in this PR:* corpus cases in JPY/MXN/COP (the corpus-expansion slice), language-neutral fact labels, more
+      languages, the calendar, subscriptions, the dock, a live call, B8, a service change, an EAS build, a merge.
 - **Owner refinements before accepting the runbook (2026-10-05, in this PR).**
   - **Staging region:** Vercel Functions `gru1` (São Paulo) and the staging Supabase project in the specific region
     `sa-east-1` (São Paulo), replacing `iad1` / us-east-1. The reasons: Argentina-first, the API compute next to its
@@ -6180,7 +6227,7 @@ the identifier, the privacy-policy URL and the first-TestFlight device prerequis
 | First opening, Más, backup/restore, undo | Implemented (25B, 24UX5); no «Ayuda y comentarios», no privacy link, no delete-all-data yet |
 | Navigation | Four tabs + floating «+» hub (Asistente, Gasto, Ingreso, Transferencia); Reduce Transparency fallback; mounted-tab mitigation |
 | Assistant on device | Every build **disconnected** (no API origin, no session); fixtures in development only; the screen tells a person it is not connected yet |
-| Assistant server | Staging only, fail-closed configuration; protocol v4 (decimal amounts, 146 currencies) |
+| Assistant server | Staging only, fail-closed configuration; protocol v5 (decimal amounts and decimal question facts, 146 currencies; 2026-10-11) |
 | AI activation | B1–B6 passed (2026-10-07); **B7 failed twice** (2026-10-08, both approvals consumed); **B8 blocked**; B9–B11 not started; decisions C and E and a new spend approval pending |
 | Sign in with Apple, AI consent screen, account deletion | Not implemented (decision 006 accepted) |
 | Subscriptions | Nothing: no StoreKit or RevenueCat, no entitlements, no paywall, no Paid Apps Agreement |
@@ -6218,8 +6265,8 @@ evaluation failed, the failure drills and cost reconciliation never ran, and no 
   or RevenueCat behind the entitlement port, the Paid Apps Agreement, tax and banking, prices, paywall, restore, server
   notifications; the privacy label re-answered for AI and purchases. Each item is weeks of work or an external
   dependency, so AI/Pro reaches the public in a release after the first one, whichever that is. **The AI track continues
-  in parallel now**, in bounded slices that never block the milestones above: facts with an explicit exponent
-  (questions in zero-decimal currencies such as JPY), evaluation preparation (the MXN/COP/JPY corpus expansion, decisions
+  in parallel now**, in bounded slices that never block the milestones above: currency-aware question facts (protocol v5,
+  done 2026-10-11), evaluation preparation (the MXN/COP/JPY corpus expansion, decisions
   C and E), then a B7 rerun once the owner approves new spend, B8–B11 and the session and consent slices.
 - **If the public free-core option is not approved,** milestone 1 still proceeds and serves as the internal test bed;
   if the identity gates slip, each day of slip moves the candidate one day (Apple's review, for a later public

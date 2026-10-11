@@ -1,9 +1,10 @@
-import { validateCapture, type CaptureRequest } from '../../../../packages/integrations/contracts.js';
-import { ASSISTANT_PROTOCOL_VERSION, validateAssistantRequest, validateAssistantResultV2, validateDroppedFields, type AssistantRequestV4 } from '../../../../packages/integrations/assistant-protocol.js';
+import { minorUnitExponent } from '@finanzapp/domain';
+import { validateCapture, type AssistantFact, type CaptureRequest } from '../../../../packages/integrations/contracts.js';
+import { ASSISTANT_PROTOCOL_VERSION, toWireFacts, validateAssistantRequest, validateAssistantResultV2, validateDroppedFields, type AssistantRequestV5 } from '../../../../packages/integrations/assistant-protocol.js';
 
-/** What a caller asks (protocol v3: the interface `language` the reply is written in travels with the region); the
- * client adds the protocol version and a fresh request id. */
-export type AssistantQuery = Omit<AssistantRequestV4, 'version' | 'requestId'>;
+/** What a caller asks: the device's own facts in integer minor units of `currency`; the client adds the protocol version
+ * and a fresh request id and writes each fact's amount as protocol v5's exact decimal with that currency's exponent. */
+export type AssistantQuery = Omit<AssistantRequestV5, 'version' | 'requestId' | 'facts'> & { facts: AssistantFact[] };
 
 /** Call only after explicit cloud consent. No API key and no financial data in URLs.
  * Its own failures are thrown as catalogue keys (`assistant.integration.*`):
@@ -43,7 +44,8 @@ export function integrationClient(baseURL: string, getAccessToken: () => Promise
       return { id: receipt.id as string, status: 'needs_review' as const, duplicate: receipt.duplicate as boolean };
     },
     async assistant({ action, text, todayISO, currency, region, language, facts }: AssistantQuery) {
-      const request = validateAssistantRequest({ version: ASSISTANT_PROTOCOL_VERSION, requestId: newId(), action, text, todayISO, currency, region, language, facts });
+      const wire = facts.length ? toWireFacts(facts, minorUnitExponent(currency)) : [];
+      const request = validateAssistantRequest({ version: ASSISTANT_PROTOCOL_VERSION, requestId: newId(), action, text, todayISO, currency, region, language, facts: wire });
       // The server's reply is validated again here, against the request this device sent; its copy of the evidence is
       // dropped: the evidence is this device's own facts, the ones the validated result cites or offers as candidates.
       // `dropped` (25A-06, decision A) names the optional names the server boundary left null because the model copied
@@ -52,7 +54,8 @@ export function integrationClient(baseURL: string, getAccessToken: () => Promise
       const result = validateAssistantResultV2(reply, request);
       const dropped = validateDroppedFields(served, result);
       const named = new Set([...result.evidenceIds, ...(result.clarification?.candidateIds ?? [])]);
-      return { ...result, evidence: request.facts.filter(f => named.has(f.id)), dropped };
+      // The local minor-unit facts, never the wire decimals: the device draws its evidence rows from its own integers.
+      return { ...result, evidence: facts.filter(f => named.has(f.id)), dropped };
     },
   };
 }

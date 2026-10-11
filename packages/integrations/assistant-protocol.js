@@ -18,12 +18,15 @@
 import { InputError, isDate } from './contracts.js';
 import { LEDGER_CURRENCIES } from '../domain/ledger-currencies.js';
 
-/** The version a client sends today: v4. Its request is v3's (v2 plus the interface `language` the reply is written in);
+/** v5 (25A-06, currency-aware facts) is v4 whose facts state their amount like a proposal does: `amount`, the exact
+ * decimal in major units of the request's currency («1500» yen, «184500.00» pesos), never minor units a model must
+ * scale; the result is v4's. v4 below is the version before it. */
+/** The version before v5: v4. Its request is v3's (v2 plus the interface `language` the reply is written in);
  * its proposal carries `amount`, an exact decimal in major units, instead of v2's `amountMinor` in cents. The server
  * accepts v2, v3 and v4 (the server-first rollout of docs/i18n.md §11): a v2 request carries no language, and the
  * instructions then follow the language the person wrote in; a v2 or v3 reply keeps `amountMinor` (`wireResult`). */
-export const ASSISTANT_PROTOCOL_VERSION = 4;
-export const ASSISTANT_PROTOCOL_VERSIONS = [2, 3, 4];
+export const ASSISTANT_PROTOCOL_VERSION = 5;
+export const ASSISTANT_PROTOCOL_VERSIONS = [2, 3, 4, 5];
 export const RESULT_TYPES = ['answer', 'proposal', 'clarification', 'out_of_scope'];
 export const PROPOSAL_KINDS = ['expense', 'income'];
 /** The currencies a v4 request and any proposal may name: the domain's creation gate itself (`LEDGER_CURRENCIES`, every
@@ -74,14 +77,35 @@ export function isSafeInputText(value, max) {
 }
 const inputText = (value, max) => isSafeInputText(value, max) ? value.trim() : refuse();
 
-function fact(value, todayISO) {
-  exact(value, ['id', 'label', 'amountMinor', 'count', 'startISO', 'endISO']);
+/** A v5 fact's amount: the exact decimal in major units of the request's currency, with exactly that currency's minor
+ * digits as the device writes them («1500» yen, «184500.00» pesos, «0.00»); zero allowed (a period with nothing). */
+const FACT_AMOUNT = new RegExp(`^(?:0|[1-9]\\d{0,${PROTOCOL_LIMITS.amountWholeDigits - 1}})(?:\\.\\d{1,${PROTOCOL_LIMITS.amountFractionDigits}})?$`);
+const fractionDigits = amount => amount.includes('.') ? amount.length - amount.indexOf('.') - 1 : 0;
+
+function fact(value, todayISO, decimal) {
+  exact(value, ['id', 'label', decimal ? 'amount' : 'amountMinor', 'count', 'startISO', 'endISO']);
   const id = inputText(value.id, PROTOCOL_LIMITS.factIdChars);
-  if (!/^[A-Za-z0-9_.-]+$/.test(id) || !Number.isSafeInteger(value.amountMinor) || value.amountMinor < 0
+  const amountOk = decimal ? typeof value.amount === 'string' && FACT_AMOUNT.test(value.amount)
+    : Number.isSafeInteger(value.amountMinor) && value.amountMinor >= 0;
+  if (!/^[A-Za-z0-9_.-]+$/.test(id) || !amountOk
     || !Number.isSafeInteger(value.count) || value.count < 0 || !isDate(value.startISO) || !isDate(value.endISO)
     || value.startISO > value.endISO || value.endISO > todayISO) refuse();
-  return { id, label: inputText(value.label, PROTOCOL_LIMITS.factLabelChars), amountMinor: value.amountMinor, count: value.count,
-    startISO: value.startISO, endISO: value.endISO };
+  return { id, label: inputText(value.label, PROTOCOL_LIMITS.factLabelChars), ...(decimal ? { amount: value.amount } : { amountMinor: value.amountMinor }),
+    count: value.count, startISO: value.startISO, endISO: value.endISO };
+}
+
+/** The device's local facts (integer minor units, `AssistantFact`) as v5 wire facts: each `amountMinor` written as the
+ * exact decimal with `exponent` minor digits, digit by digit, never through a float (1500 at exponent 0 is «1500»,
+ * 18450000 at 2 is «184500.00»). The device passes its currency's ISO exponent (`minorUnitExponent`); a test pins this
+ * against the domain's `minorToMajorString` for every ledger currency. */
+export function toWireFacts(facts, exponent) {
+  if (!Number.isInteger(exponent) || exponent < 0 || exponent > PROTOCOL_LIMITS.amountFractionDigits) refuse();
+  return facts.map(({ amountMinor, ...rest }) => {
+    if (!Number.isSafeInteger(amountMinor) || amountMinor < 0) refuse();
+    const digits = String(amountMinor).padStart(exponent + 1, '0');
+    const whole = digits.slice(0, digits.length - exponent), fraction = digits.slice(digits.length - exponent);
+    return { id: rest.id, label: rest.label, amount: whole + (fraction ? '.' + fraction : ''), count: rest.count, startISO: rest.startISO, endISO: rest.endISO };
+  });
 }
 
 const REQUEST_KEYS_V2 = ['version', 'requestId', 'action', 'text', 'todayISO', 'currency', 'region', 'facts'];
@@ -103,8 +127,11 @@ export function validateAssistantRequest(value) {
     || typeof value.region !== 'string' || !/^[A-Z]{2}$/.test(value.region)
     || (v3 && (typeof value.language !== 'string' || !/^[a-z]{2}$/.test(value.language)))
     || !Array.isArray(value.facts) || value.facts.length > PROTOCOL_LIMITS.facts) refuse();
-  const facts = value.facts.map(item => fact(item, value.todayISO));
+  const decimal = value.version >= 5;
+  const facts = value.facts.map(item => fact(item, value.todayISO, decimal));
   if (new Set(facts.map(item => item.id)).size !== facts.length || (value.action === 'parse' && facts.length)) refuse();
+  // One request, one currency: every v5 fact carries the same number of minor digits (that currency's exponent).
+  if (decimal && new Set(facts.map(item => fractionDigits(item.amount))).size > 1) refuse();
   return { version: value.version, requestId: value.requestId, action: value.action, text: inputText(value.text, PROTOCOL_LIMITS.textChars),
     todayISO: value.todayISO, currency: value.currency, region: value.region, ...(v3 ? { language: value.language } : {}), facts };
 }

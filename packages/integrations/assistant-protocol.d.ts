@@ -2,8 +2,8 @@ import type { AssistantFact } from './contracts.js';
 import type { IsoCurrencyCode } from '../domain/currency-data.ts';
 /** The version a client sends today (v4: v3's request; a proposal states `amount`, an exact decimal in major units);
  * the server accepts every version listed. */
-export declare const ASSISTANT_PROTOCOL_VERSION: 4;
-export declare const ASSISTANT_PROTOCOL_VERSIONS: readonly [2, 3, 4];
+export declare const ASSISTANT_PROTOCOL_VERSION: 5;
+export declare const ASSISTANT_PROTOCOL_VERSIONS: readonly [2, 3, 4, 5];
 export type ResultType = 'answer' | 'proposal' | 'clarification' | 'out_of_scope';
 export type ProposalKind = 'expense' | 'income';
 /** A currency of the domain's creation gate (`LEDGER_CURRENCIES`); v2 and v3 carry ARS and USD only. Statically the
@@ -39,7 +39,16 @@ export interface AssistantRequestV4 extends Omit<AssistantRequestV3, 'version' |
   /** Any currency of the domain's creation gate (the screen's: the facts' currency for a question). */
   currency: ProtocolCurrency;
 }
-export type AssistantRequest = AssistantRequestV2 | AssistantRequestV3 | AssistantRequestV4;
+/** A v5 fact: the device's fact with its amount as the exact decimal in major units of the request's currency. */
+export interface AssistantWireFact { id: string; label: string; amount: string; count: number; startISO: string; endISO: string }
+/** v4 whose facts state `amount` (exact major-unit decimal) instead of `amountMinor`; the result is v4's. */
+export interface AssistantRequestV5 extends Omit<AssistantRequestV4, 'version' | 'facts'> {
+  version: 5;
+  facts: AssistantWireFact[];
+}
+export type AssistantRequest = AssistantRequestV2 | AssistantRequestV3 | AssistantRequestV4 | AssistantRequestV5;
+/** The device's local facts as v5 wire facts, `amountMinor` written with `exponent` minor digits, exactly. */
+export declare function toWireFacts(facts: readonly AssistantFact[], exponent: number): AssistantWireFact[];
 /** Financial facts only; every unknown is null. No account or card id: `paymentMethodRef` is the person's words.
  * `amount` (v4) is the number the person meant, in major units, as a canonical decimal («15000», «1.99»); the device
  * scales it to minor units once the currency is resolved. */
@@ -58,7 +67,7 @@ export declare function isSafeInputText(value: unknown, max: number): boolean;
 export declare function isSafeModelText(value: unknown, max: number, prose?: boolean): boolean;
 /** Accepts v2, v3 and v4 and returns the wire shape of the version received. */
 export declare function validateAssistantRequest(value: unknown): AssistantRequest;
-export declare function modelInput(request: AssistantRequest): Omit<AssistantRequestV2, 'version' | 'requestId'> & { language?: string };
+export declare function modelInput(request: AssistantRequest): Omit<AssistantRequestV2, 'version' | 'requestId' | 'currency' | 'facts'> & { currency: ProtocolCurrency; facts: (AssistantFact | AssistantWireFact)[]; language?: string };
 /** A canonical decimal amount a v4 proposal may state: digits, one optional dot and up to four decimals, above zero. */
 export declare function isProtocolAmount(value: unknown): value is string;
 /** Validates the v4 result (what a model writes) against the request it answers, whatever the request's version. */
