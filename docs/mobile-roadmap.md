@@ -5834,7 +5834,8 @@ nothing of it is on a screen yet.
     - *Evaluator.* Corpus facts stay the device-side integers; each explain request now states its `factExponent`
       (2 for ARS/USD), pinned by a test to the domain's exponent; the harness writes the v5 decimals with
       `toWireFacts`; the grounding scorer compares a restated figure to the cited fact's exact decimal (1,99 is «1.99»,
-      1 500 yen «1500»; still no tolerance, no rounding). No expectation, threshold or case changed; the fixture
+      1 500 yen «1500»; compared as canonical decimal text, never floats, so a 13-digit amount and an invented extra
+      decimal stay different: Codex review of this PR; still no tolerance, no rounding). No expectation, threshold or case changed; the fixture
       evaluation's quality rates are identical to master's (only token and cost figures moved). Runs #1 and #2 stay as
       measured (they ran v3).
     - *Tests.* Protocol: the conversion for every ledger currency and amount, v5 requests accepted in every currency,

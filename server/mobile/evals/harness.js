@@ -119,9 +119,21 @@ const CAUSAL = /\b(?:porque|debido a|a causa de|ya que|because|due to|caused by)
  * difference between the two periods, not a percentage (never derivable), not a rounded amount; the device draws the
  * verified difference. Integers ≤ 31 (days, small counts) are ignored unless they are money: after a currency sign or
  * code, or before a currency word. A heuristic over prose for the report and the rates, not a verification of it. */
+/** A decimal as canonical text, scaled by 10^shift (a «mil» or «millones» multiplier), without a float: no leading
+ * zeros, no trailing decimal zeros («184500.00» → «184500», «1,5 mil» → «1500», «0.50» → «0.5»). */
+export function canonicalDecimal(text, shift = 0) {
+  const [whole, fraction = ''] = String(text).split('.');
+  const digits = whole + fraction.padEnd(fraction.length + shift, '0');
+  const point = whole.length + shift;
+  const integer = digits.slice(0, point).replace(/^0+(?=\d)/, '') || '0';
+  const decimals = digits.slice(point).replace(/0+$/, '');
+  return decimals ? `${integer}.${decimals}` : integer;
+}
+
 export function underivedNumbers(message, cited, testCase) {
-  // The cited facts as the request carried them (v5 decimals): the same digits parsed the same way, so equality is exact.
-  const amounts = new Set(cited.map(item => Number(item.amount)));
+  // The cited facts as the request carried them (v5 decimals), compared as canonical decimal text, never as floats: a
+  // 13-digit amount and an invented extra decimal must not collapse into one IEEE-754 value (Codex review of PR #103).
+  const amounts = new Set(cited.map(item => canonicalDecimal(item.amount)));
   const plain = new Set([...cited.map(item => item.count),
     ...[testCase.request.facts.flatMap(item => [item.startISO, item.endISO]), EVAL_TODAY].flat().map(iso => Number(iso.slice(0, 4)))]);
   const decimal = dotDecimal(testCase) ? '.' : ',';
@@ -135,7 +147,8 @@ export function underivedNumbers(message, cited, testCase) {
     // («1.500») or a repeated one is read in the case's convention.
     const token = match[1], separators = token.match(/[.,]/g) ?? [], last = Math.max(token.lastIndexOf('.'), token.lastIndexOf(','));
     const mark = new Set(separators).size === 2 || (separators.length === 1 && token.length - last - 1 !== 3) ? token[last] : decimal;
-    let value = Number(token.split(mark === '.' ? ',' : '.').join('').replace(mark, '.'));
+    const text = token.split(mark === '.' ? ',' : '.').join('').replace(mark, '.');
+    let value = Number(text);
     const suffix = (match[2] ?? '').trim().toLowerCase();
     if (suffix === '%') { found.push(match[0]); continue; }
     // A monetary token (a currency mark beside it, or a multiplier) is supported only by a cited amount, never by a
@@ -144,7 +157,7 @@ export function underivedNumbers(message, cited, testCase) {
     if (suffix === 'millones') value *= 1e6; else if (suffix) value *= 1000;
     if (!Number.isFinite(value) || (Number.isInteger(value) && value <= 31 && !money)) continue;
     // Exact: a figure finer than the fact's own digits («1,994» against «1.99») is no fact's amount, never rounded to one.
-    const amount = amounts.has(value);
+    const amount = amounts.has(canonicalDecimal(text, suffix === 'millones' ? 6 : suffix ? 3 : 0));
     if (!amount && (money || !plain.has(value))) found.push(match[0]);
   }
   return found;

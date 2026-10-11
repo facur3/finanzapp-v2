@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { CLARIFICATION_FIELDS, PROTOCOL_LIMITS, modelInput, validateAssistantRequest } from '../../../packages/integrations/assistant-protocol.js';
 import { ASSISTANT_INSTRUCTIONS } from '../assistant-prompt.js';
 import { CASES, EVAL_TODAY } from './corpus.js';
-import { buildRequest, fixtureResponder, goldenOutput, isImperfect, missedMetrics, replyLanguageMismatch, requestIdFor, runEval, underivedNumbers } from './harness.js';
+import { buildRequest, canonicalDecimal, fixtureResponder, goldenOutput, isImperfect, missedMetrics, replyLanguageMismatch, requestIdFor, runEval, underivedNumbers } from './harness.js';
 import { toWireFacts } from '../../../packages/integrations/assistant-protocol.js';
 import { minorUnitExponent } from '../../../packages/domain/currency.ts';
 // The scorer reads cited facts as the request carries them (protocol v5 decimals); the corpus's are ARS/USD minor units.
@@ -111,6 +111,21 @@ describe('eval harness', () => {
     expect(await amountOf('45.9')()).toBe(true);
     expect(await amountOf('45.900')()).toBe(true);
     for (const wrong of ['4590', '46', '45.09', '459']) expect(await amountOf(wrong)(), wrong).toBe(false);
+  });
+
+  // Codex review of PR #103: grounding compares canonical decimal text, never floats, so the largest amount and an
+  // invented extra decimal stay different, and a fact in yen grounds only the whole yen.
+  it('grounds restated amounts by exact decimal text: large amounts, extra decimals and yen', () => {
+    expect([canonicalDecimal('184500.00'), canonicalDecimal('0.50'), canonicalDecimal('1500'), canonicalDecimal('1.5', 3), canonicalDecimal('2', 6), canonicalDecimal('007.10')])
+      .toEqual(['184500', '0.5', '1500', '1500', '2000000', '7.1']);
+    const us = CASES.find(item => item.lang === 'en' && item.request.action === 'explain');
+    const big = [{ id: 'current.expenses', label: 'x', amount: '9999999999999.99', count: 1, startISO: '2026-10-01', endISO: EVAL_TODAY }];
+    expect(underivedNumbers('You spent $9,999,999,999,999.99.', big, us)).toEqual([]);
+    expect(underivedNumbers('You spent $9,999,999,999,999.9901.', big, us)).toEqual(['9,999,999,999,999.9901']);
+    const yen = [{ id: 'current.expenses', label: 'x', amount: '1500', count: 3, startISO: '2026-10-01', endISO: EVAL_TODAY }];
+    expect(underivedNumbers('You spent ¥1,500 so far.', yen, us)).toEqual([]);
+    expect(underivedNumbers('You spent $15.00.', yen, us)).toEqual(['15.00']); // yen read as cents
+    expect(underivedNumbers('About 1.5k yen.', yen, us)).toEqual([]);
   });
 
   it('fails a responder that always proposes the injected amount', async () => {
