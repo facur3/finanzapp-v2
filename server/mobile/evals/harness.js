@@ -2,7 +2,7 @@
 // protocol validator, then the provider-neutral request of assistant-prompt.js), asks a responder, validates the output
 // with the protocol and scores it against the corpus. The responder is the fixture below in every test and in CI; a
 // real provider is reached only through run.js --live behind its two gates. No network here.
-import { ASSISTANT_PROTOCOL_VERSION, validateAssistantRequest, validateAssistantResultV2, modelInput, recoverAssistantResultV2 } from '../../../packages/integrations/assistant-protocol.js';
+import { ASSISTANT_PROTOCOL_VERSION, validateAssistantRequest, validateAssistantResultV2, modelInput, recoverAssistantResultV2, toWireFacts } from '../../../packages/integrations/assistant-protocol.js';
 import { providerRequest, inputTokenBound, ASSISTANT_INSTRUCTIONS } from '../assistant-prompt.js';
 import { actualCostMicroUsd, maxCostMicroUsd, usageOrNull } from '../cost.js';
 import { servedAsConfigured } from '../handlers.js';
@@ -17,11 +17,13 @@ export const FIXTURE_SERVED = Object.freeze({ model: 'fixture', serviceTier: 'de
 /** Deterministic and injective for corpus ids (kebab with dots, no '_'), and inside the protocol's requestId bound. */
 export const requestIdFor = id => ('eval-' + id.replace(/\./g, '_').replace(/[^A-Za-z0-9_-]/g, '-')).padEnd(16, '-').slice(0, 100);
 
-/** The validated request, as the handler holds it after validateAssistantRequest: the current protocol (v4), the case's `lang` as the
- * interface language the reply is written in (what the device sends from `useI18n()`). */
+/** The validated request, as the handler holds it after validateAssistantRequest: the current protocol (v5), the case's
+ * `lang` as the interface language the reply is written in (what the device sends from `useI18n()`), and the corpus's
+ * minor-unit facts written as exact decimals with the case's stated exponent, as the device writes them. */
 export function buildRequest(testCase) {
-  const { action, text, currency, region, facts } = testCase.request;
-  return validateAssistantRequest({ version: ASSISTANT_PROTOCOL_VERSION, requestId: requestIdFor(testCase.id), action, text, todayISO: EVAL_TODAY, currency, region, language: testCase.lang, facts });
+  const { action, text, currency, region, facts, factExponent } = testCase.request;
+  return validateAssistantRequest({ version: ASSISTANT_PROTOCOL_VERSION, requestId: requestIdFor(testCase.id), action, text, todayISO: EVAL_TODAY, currency, region,
+    language: testCase.lang, facts: facts.length ? toWireFacts(facts, factExponent) : [] });
 }
 
 // ── The fixture provider ─────────────────────────────────────────────────────────────────────────────────────────
@@ -111,13 +113,15 @@ function sameField(field, expected, actual) {
 const CAUSAL = /\b(?:porque|debido a|a causa de|ya que|because|due to|caused by)\b/i;
 /** Figures in an answer's prose that no cited fact holds exactly. Heuristic: every digit group (with . and , separators,
  * read by their shape or, where only a convention decides, in the case's; times «mil»/«k»/«lucas» or «millones» when one
- * follows) must equal a cited fact's amount in minor units (1,99 is 199, never 200: no tolerance, no rounding), a cited
+ * follows) must equal a cited fact's exact amount (protocol v5's decimal in the request's currency: 1,99 is «1.99», never 2;
+ * 1500 yen is «1500»; no tolerance, no rounding), a cited
  * count or a year of the request's dates. Since owner decision B (2026-10-08) nothing computed is derivable: not the
  * difference between the two periods, not a percentage (never derivable), not a rounded amount; the device draws the
  * verified difference. Integers ≤ 31 (days, small counts) are ignored unless they are money: after a currency sign or
  * code, or before a currency word. A heuristic over prose for the report and the rates, not a verification of it. */
 export function underivedNumbers(message, cited, testCase) {
-  const amounts = new Set(cited.map(item => item.amountMinor));
+  // The cited facts as the request carried them (v5 decimals): the same digits parsed the same way, so equality is exact.
+  const amounts = new Set(cited.map(item => Number(item.amount)));
   const plain = new Set([...cited.map(item => item.count),
     ...[testCase.request.facts.flatMap(item => [item.startISO, item.endISO]), EVAL_TODAY].flat().map(iso => Number(iso.slice(0, 4)))]);
   const decimal = dotDecimal(testCase) ? '.' : ',';
@@ -139,9 +143,8 @@ export function underivedNumbers(message, cited, testCase) {
     const money = Boolean(suffix) || isMoney(match);
     if (suffix === 'millones') value *= 1e6; else if (suffix) value *= 1000;
     if (!Number.isFinite(value) || (Number.isInteger(value) && value <= 31 && !money)) continue;
-    // Exact minor units: a figure finer than the currency's two decimals («1,994») is no fact's amount, never rounded to one.
-    const minor = Math.round(value * 100);
-    const amount = Math.abs(value * 100 - minor) < 1e-6 && amounts.has(minor);
+    // Exact: a figure finer than the fact's own digits («1,994» against «1.99») is no fact's amount, never rounded to one.
+    const amount = amounts.has(value);
     if (!amount && (money || !plain.has(value))) found.push(match[0]);
   }
   return found;

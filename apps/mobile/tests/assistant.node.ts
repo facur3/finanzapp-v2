@@ -261,7 +261,9 @@ test('the remote client wraps the existing endpoint contract and maps failures t
   assert.equal(calls.length, 1);
   assert.equal(calls[0].url, 'https://finanzapp.example/api/mobile/assistant');
   assert.equal(calls[0].auth, 'Bearer jwt');
-  assert.equal(calls[0].body.version, 4, 'protocol v4');
+  assert.equal(calls[0].body.version, 5, 'protocol v5');
+  assert.deepEqual(calls[0].body.facts.map((fact: any) => fact.amount), facts.map(fact => (fact.amountMinor / 100).toFixed(2)), 'ARS facts travel as exact decimals');
+  assert.ok(calls[0].body.facts.every((fact: any) => !('amountMinor' in fact)));
   assert.match(calls[0].body.requestId, /^[A-Za-z0-9_-]{16,100}$/);
   assert.equal(calls[0].body.region, 'AR');
   assert.equal(events.length, 1);
@@ -385,16 +387,16 @@ test('a failure carries only the integration client\'s own keys: a contract reje
   assert.deepEqual('result' in groceries && groceries.result.navigation, FIXTURE_CATEGORY_ANSWER.navigation);
 });
 
-test('25A-06: the client posts the current protocol (v4): version 4, a fresh request id per ask (injectable), the configured region and the interface language', async () => {
+test('25A-06: the client posts the current protocol (v5): version 5, a fresh request id per ask (injectable), the configured region and the interface language', async () => {
   const bodies: any[] = [];
   const fetcher = (async (_url: string, init: any) => { bodies.push(JSON.parse(init.body)); return { ok: true, status: 200, json: async () => FIXTURE_CLARIFICATION }; }) as unknown as typeof fetch;
   const ask = { action: 'parse' as const, text: 'Spent 12 at Target', todayISO: today, currency: 'ARS' as const, region: 'US', language: 'en', facts: [] };
   const client = integrationClient('https://finanzapp.example', async () => 'jwt', fetcher);
   await client.assistant(ask);
   await client.assistant(ask);
-  // Even a caller that still names version 2 posts version 4: the client sets it.
+  // Even a caller that still names version 2 posts version 5: the client sets it.
   await client.assistant({ ...ask, version: 2 } as unknown as typeof ask);
-  assert.deepEqual(bodies.map(body => body.version), [4, 4, 4], 'never an older version from this client');
+  assert.deepEqual(bodies.map(body => body.version), [5, 5, 5], 'never an older version from this client');
   assert.ok(bodies.every(body => /^[A-Za-z0-9_-]{16,100}$/.test(body.requestId)));
   assert.equal(new Set(bodies.map(body => body.requestId)).size, 3, 'every ask has its own request id');
   assert.ok(bodies.every(body => body.region === 'US' && body.language === 'en'), 'the region and the language asked with');
@@ -684,4 +686,28 @@ test('25A-05: a stored category name the protocol refuses is left out of the evi
   assert.ok(facts.some(fact => fact.label === 'Categoría de gasto: Supermercado'));
   assert.ok(!facts.some(fact => fact.label.includes('\u2068')));
   assert.doesNotThrow(() => validateAssistantRequest({ version: 2, requestId: 'fixture-request-0001', action: 'explain', text: '¿Cuánto gasté?', todayISO: today, currency: 'ARS', region: 'AR', facts }));
+});
+
+// 25A-06, protocol v5 (currency-aware facts): a question in a zero-decimal currency sends its facts as exact yen, never
+// cents; ARS keeps its two decimals; the evidence the device shows stays its own integer minor units, never the server's
+// copy and never the wire decimals; an answer's evidence rows read them in the screen's currency.
+test('25A-06: facts travel as exact major-unit decimals in the request currency (JPY «1500», ARS «184500.00»); the evidence stays the device\'s integers', async () => {
+  const bodies: any[] = [];
+  const reply = { type: 'answer', message: 'Llevás ¥1.500 este mes.', evidenceIds: ['current.expenses'], navigation: null, proposals: [], clarification: null };
+  const fetcher = (async (_url: string, init: any) => { bodies.push(JSON.parse(init.body)); return { ok: true, status: 200, json: async () => ({ ...reply, evidence: [{ id: 'current.expenses', amount: '999' }] }) }; }) as unknown as typeof fetch;
+  const client = integrationClient('https://finanzapp.example', async () => 'jwt', fetcher);
+  const yen = [{ id: 'current.expenses', label: 'Gastos registrados', amountMinor: 1500, count: 3, startISO: '2026-09-01', endISO: today },
+    { id: 'previous.expenses', label: 'Gastos registrados', amountMinor: 900, count: 2, startISO: '2026-08-01', endISO: '2026-08-21' }];
+  const result = await client.assistant({ action: 'explain', text: '¿Cuánto gasté?', todayISO: today, currency: 'JPY', region: 'JP', language: 'es', facts: yen });
+  assert.equal(bodies[0].version, 5);
+  assert.deepEqual(bodies[0].facts.map((fact: any) => fact.amount), ['1500', '900'], 'yen are whole: never «15.00»');
+  assert.deepEqual(result.evidence.map(fact => fact.amountMinor), [1500], 'the device\'s own integers, not the served copy');
+  const content = answerContent(result, result.evidence, 'JPY');
+  assert.deepEqual(content.rows.map(row => [row.amountMinor, row.signed]), [[1500, false]]);
+  await client.assistant({ action: 'explain', text: '¿Cuánto gasté?', todayISO: today, currency: 'ARS', region: 'AR', language: 'es',
+    facts: [{ ...yen[0], amountMinor: 18450000 }, { ...yen[1], amountMinor: 0 }] });
+  assert.deepEqual(bodies[1].facts.map((fact: any) => fact.amount), ['184500.00', '0.00']);
+  // A held currency never reaches the wire: the request is refused before any call.
+  await assert.rejects(client.assistant({ action: 'explain', text: '¿Cuánto gasté?', todayISO: today, currency: 'KWD' as any, region: 'KW', language: 'es', facts: yen }));
+  assert.equal(bodies.length, 2);
 });

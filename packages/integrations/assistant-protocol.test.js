@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { ASSISTANT_PROTOCOL_VERSION, ASSISTANT_PROTOCOL_VERSIONS, ASSISTANT_RESULT_SCHEMA, DROPPABLE_FIELDS, LEGACY_WIRE_CURRENCIES, PROTOCOL_LIMITS, PROTOCOL_CURRENCIES, PROPOSAL_KINDS, modelInput, validateAssistantResultV2,
-  validateAssistantRequest, isSafeModelText, isSafeInputText, isProtocolAmount, recoverAssistantResultV2, validateDroppedFields, wireResult } from './assistant-protocol.js';
-import { MAX_AMOUNT_DIGITS, MAX_ENTRY_MINOR, majorStringToMinor } from '../domain/money.ts';
+  validateAssistantRequest, isSafeModelText, isSafeInputText, isProtocolAmount, recoverAssistantResultV2, validateDroppedFields, wireResult, toWireFacts } from './assistant-protocol.js';
+import { MAX_AMOUNT_DIGITS, MAX_ENTRY_MINOR, majorStringToMinor, minorToMajorString } from '../domain/money.ts';
 import { HELD_CURRENCIES, LEDGER_CURRENCIES, MAX_UNIT_EXPONENT, currenciesWithStatus, minorUnitExponent } from '../domain/currency.ts';
 import { REVIEW_KINDS, parseReviewDraft } from '../domain/review-drafts.ts';
 
@@ -45,13 +45,13 @@ describe('protocol v2 stays inside what a review draft can hold', () => {
   it('accepts protocol v3 next to v2, in the wire shape received, hands the model the language only when sent, and refuses a language on v2', () => {
     const v2 = { version: 2, requestId: 'fixture-request-0001', action: 'parse', text: 'Gasté 15 mil', todayISO: '2026-09-19', currency: 'ARS', region: 'AR', facts: [] };
     const v3 = { ...v2, version: 3, language: 'en' };
-    expect([...ASSISTANT_PROTOCOL_VERSIONS]).toEqual([2, 3, 4]);
+    expect([...ASSISTANT_PROTOCOL_VERSIONS]).toEqual([2, 3, 4, 5]);
     expect(validateAssistantRequest(v3)).toEqual(v3);
     expect(validateAssistantRequest(v2)).toEqual(v2);
     expect(modelInput(validateAssistantRequest(v3))).toEqual({ action: 'parse', text: 'Gasté 15 mil', todayISO: '2026-09-19', currency: 'ARS', region: 'AR', language: 'en', facts: [] });
     expect(modelInput(validateAssistantRequest(v2))).not.toHaveProperty('language');
     for (const bad of [{ ...v2, language: 'en' }, { ...v3, language: undefined }, { ...v3, language: null }, { ...v3, language: 'EN' }, { ...v3, language: 'spa' }, { ...v3, language: '' },
-      { ...v3, locale: { language: 'en' } }, { ...v3, version: 5 }, { ...v3, version: 1 }, { ...v3, version: '3' }, { ...v2, version: 4 }, null, 'v3']) {
+      { ...v3, locale: { language: 'en' } }, { ...v3, version: 6 }, { ...v3, version: 1 }, { ...v3, version: '3' }, { ...v2, version: 4 }, null, 'v3']) {
       expect(() => validateAssistantRequest(bad), JSON.stringify(bad)).toThrow();
     }
     // The result shape is the same in both versions: a reply validates the same against either request.
@@ -142,7 +142,7 @@ describe('protocol v2 stays inside what a review draft can hold', () => {
   it('v4: the request is v3\'s, a proposal states an exact decimal amount, and v2 and v3 replies keep exact cents', () => {
     const v3 = { version: 3, requestId: 'fixture-request-0001', action: 'parse', text: 'Gasté 15 mil', todayISO: '2026-09-19', currency: 'ARS', region: 'AR', language: 'es', facts: [] };
     const v4 = { ...v3, version: 4 };
-    expect(ASSISTANT_PROTOCOL_VERSION).toBe(4);
+    expect(ASSISTANT_PROTOCOL_VERSIONS).toContain(4);
     expect(validateAssistantRequest(v4)).toEqual(v4);
     expect(modelInput(validateAssistantRequest(v4))).toEqual(modelInput(validateAssistantRequest(v3)));
     expect(ASSISTANT_RESULT_SCHEMA.properties.proposals.items.required).toContain('amount');
@@ -204,6 +204,41 @@ describe('protocol v2 stays inside what a review draft can hold', () => {
       if (currency !== null) expect(() => validateAssistantResultV2(proposal({ currency }), v4), String(currency)).toThrow();
     }
     for (const currency of ['ARS', 'USD', null]) expect(wireResult(validateAssistantResultV2(proposal({ currency }), v4), validateAssistantRequest(v3)).proposals[0].currency).toBe(currency);
+  });
+
+  // 25A-06, protocol v5: a question's facts state their amount as the exact decimal in major units of the request's
+  // currency, written by the device from its integer minor units (`toWireFacts` with the currency's exponent), so no
+  // model ever reads yen as cents. v2–v4 keep `amountMinor`; one request carries one currency's digits.
+  it('v5: facts state an exact major-unit decimal for every ledger currency; the conversion is the domain\'s, digit for digit', () => {
+    expect(ASSISTANT_PROTOCOL_VERSION).toBe(5);
+    const local = (id, amountMinor) => ({ id, label: 'Gastos registrados', amountMinor, count: 3, startISO: '2026-09-01', endISO: '2026-09-19' });
+    const base = { version: 5, requestId: 'fixture-request-0001', action: 'explain', text: '¿Cuánto gasté?', todayISO: '2026-09-19', region: 'AR', language: 'es' };
+    for (const currency of LEDGER_CURRENCIES) {
+      const exponent = minorUnitExponent(currency);
+      for (const minor of [0, 1, 199, 1500, 18450000, MAX_ENTRY_MINOR]) {
+        const [wire] = toWireFacts([local('current.expenses', minor)], exponent);
+        expect(wire.amount, `${minor} ${currency}`).toBe(minorToMajorString(minor, currency));
+        expect(majorStringToMinor(wire.amount, currency), `${minor} ${currency}`).toEqual({ ok: true, minor });
+      }
+      const facts = toWireFacts([local('current.expenses', 1500), local('previous.expenses', 1200)], exponent);
+      const request = validateAssistantRequest({ ...base, currency, facts });
+      expect(request.facts, currency).toEqual(facts);
+      expect(modelInput(request).facts, currency).toEqual(facts);
+    }
+    // 1500 yen are «1500», never «15.00»; 18 450 000 centavos are «184500.00».
+    expect(toWireFacts([local('a', 1500)], minorUnitExponent('JPY'))[0].amount).toBe('1500');
+    expect(toWireFacts([local('a', 18450000)], minorUnitExponent('ARS'))[0].amount).toBe('184500.00');
+    expect(Object.keys(toWireFacts([local('a', 1)], 2)[0])).toEqual(['id', 'label', 'amount', 'count', 'startISO', 'endISO']);
+    for (const [facts, exponent] of [[[local('a', -1)], 2], [[local('a', 1.5)], 2], [[local('a', 1)], -1], [[local('a', 1)], 5], [[local('a', 1)], 1.5]])
+      expect(() => toWireFacts(facts, exponent)).toThrow();
+    // Refused: minor units on v5, a decimal on v4, a sign, grouping, a comma, more than 4 decimals, a number, mixed digits.
+    const ars = amount => ({ id: 'current.expenses', label: 'Gastos registrados', amount, count: 1, startISO: '2026-09-01', endISO: '2026-09-19' });
+    for (const facts of [[local('current.expenses', 100)], [ars('-1.00')], [ars('1.234,00')], [ars('1,00')], [ars('1.00000')], [ars(100)], [ars('01.00')], [ars('')],
+      [ars('1.00'), { ...ars('1500'), id: 'previous.expenses' }]])
+      expect(() => validateAssistantRequest({ ...base, currency: 'ARS', facts }), JSON.stringify(facts)).toThrow();
+    expect(() => validateAssistantRequest({ ...base, version: 4, currency: 'ARS', facts: [ars('1.00')] })).toThrow();
+    expect(validateAssistantRequest({ ...base, version: 4, currency: 'ARS', facts: [local('current.expenses', 100)] }).facts[0].amountMinor).toBe(100);
+    expect(validateAssistantRequest({ ...base, currency: 'ARS', facts: [ars('0.00')] }).facts[0].amount).toBe('0.00');
   });
 
   it('allows emoji joiners in the person\'s text but refuses direction overrides and controls', () => {

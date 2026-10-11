@@ -161,6 +161,27 @@ describe('assistant route: order, reservation and settlement', () => {
       for (const unrepresentable of ['1.999', '10000000000000']) expect(await reply(legacy, unrepresentable), unrepresentable).toBe(502);
     }
   });
+  // 25A-06, protocol v5: a question's facts arrive as exact major-unit decimals of the request's currency; the model reads
+  // them as sent («1500» yen), and a v4 question keeps its minor units.
+  it('takes a v5 question in yen with decimal facts and hands the model the exact amounts; v4 keeps minor units', async () => {
+    const facts = [{ id: 'current.expenses', label: 'Gastos registrados', amount: '1500', count: 3, startISO: '2026-09-01', endISO: '2026-09-19' }];
+    const v5 = { ...request, version: 5, language: 'es', action: 'explain', currency: 'JPY', text: '¿Cuánto gasté?', facts };
+    const answer = { type: 'answer', message: 'Llevás ¥1.500.', evidenceIds: ['current.expenses'], navigation: null, proposals: [], clarification: null };
+    const deps = ports(); deps.provider.respond.mockResolvedValue({ output: answer, usage, model: 'gpt-6-luna', tier: 'default' });
+    const res = await call('assistant', v5, deps);
+    expect(res.code).toBe(200);
+    expect(JSON.parse(deps.provider.respond.mock.calls[0][0].input).facts).toEqual(facts);
+    expect(res.body.evidence).toEqual(facts);
+    for (const bad of [{ ...v5, facts: [{ ...facts[0], amount: 1500 }] }, { ...v5, facts: [{ ...facts[0], amount: '15,00' }] }, { ...v5, version: 4 }]) {
+      const refused = ports();
+      expect((await call('assistant', bad, refused)).code, JSON.stringify(bad.facts)).toBe(400);
+      expect(refused.provider.respond).not.toHaveBeenCalled();
+    }
+    const v4 = { ...v5, version: 4, facts: [{ ...facts[0], amount: undefined, amountMinor: 1500 }].map(({ amount: _a, ...rest }) => rest) };
+    const legacy = ports(); legacy.provider.respond.mockResolvedValue({ output: answer, usage, model: 'gpt-6-luna', tier: 'default' });
+    expect((await call('assistant', v4, legacy)).code).toBe(200);
+    expect(JSON.parse(legacy.provider.respond.mock.calls[0][0].input).facts[0].amountMinor).toBe(1500);
+  });
   it('keeps the reservation at its maximum when the cost is unknown, never releasing it', async () => {
     const cases = [
       [{ category: 'timeout' }, 502], [{ category: 'network' }, 502], [{ category: 'http' }, 502], [{ category: 'spend_limit' }, 503], [{ category: 'refusal' }, 422],

@@ -1294,7 +1294,7 @@ test('VoiceOver: the test banner speaks the interface language when it differs f
 // all in MXN records in MXN (the screen's currency is sent, the device infers MXN and scales the decimal by its exponent);
 // a question waits while the screen's currency has no cents (JPY), because a question's facts are read as cents until they
 // state their exponent; recording in yen works.
-test('25A-06: an MXN-only ledger records «10 mil pesos» as MXN 10 000 exactly; a JPY screen records but does not ask questions yet', async () => {
+test('25A-06: an MXN-only ledger records «10 mil pesos» as MXN 10 000 exactly; a JPY screen records and asks questions (protocol v5 facts)', async () => {
   const mxn: domain.Account = { id: 'mxn', name: 'Cuenta Banorte', currency: 'MXN', openingMinor: 0, createdAt };
   const pesos = { ...FIXTURE_DRAFT_NO_ACCOUNT, proposals: [{ ...FIXTURE_DRAFT_NO_ACCOUNT.proposals[0], amount: '10000', currency: null, paymentMethodRef: null, category: 'Supermercado' }] };
   const scripted = scriptedClient();
@@ -1306,14 +1306,16 @@ test('25A-06: an MXN-only ledger records «10 mil pesos» as MXN 10 000 exactly;
   await settle();
   const card = find(view.render().items, 'ProposalCard')[0];
   assert.deepEqual([card.props.content.capture.draft.currency, card.props.content.capture.draft.destinationId, card.props.content.capture.draft.amountMinor], ['MXN', 'mxn', 1000000]);
-  // A JPY screen: a question is declined locally (no request), a recording is sent.
+  // A JPY screen: a question is sent too (since protocol v5 its facts travel as exact yen decimals); the screen hands the
+  // client its own minor-unit facts, which the integration client writes as v5 decimals (tests/assistant-currency-facts).
   const jpy: domain.Account = { id: 'jpy', name: 'Yenes', currency: 'JPY', openingMinor: 0, createdAt };
   const asked = scriptedClient();
   const yen = harness({ client: asked.client, accounts: [jpy] });
   yen.render().empty.props.onPick('¿Cuánto gasté este mes?');
   await tick();
-  assert.equal(asked.asks.length, 0, 'no question is sent while facts would be read as cents');
-  assert.equal(yen.render().messages.at(-1)?.role === 'system' && (yen.render().messages.at(-1) as any).reason, 'unavailable');
+  assert.equal(asked.asks.length, 1, 'a question in yen is sent');
+  assert.deepEqual([asked.asks[0].action, asked.asks[0].currency], ['explain', 'JPY']);
+  assert.ok(asked.asks[0].facts.every((fact: any) => Number.isSafeInteger(fact.amountMinor)), 'the screen keeps integer minor units; the wire decimals are the client\'s');
   const recorded = scriptedClient();
   const yen2 = harness({ client: recorded.client, accounts: [jpy] });
   yen2.render().empty.props.onPick('Gasté 100 yenes en el súper');
