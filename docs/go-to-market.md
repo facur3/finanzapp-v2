@@ -53,7 +53,7 @@ in order of how strongly the product supports them today:
 
 | Pillar | What it means in the product | Status in the product (2026-10-03) |
 | --- | --- | --- |
-| Calm, premium personal finance | Forest composition, restrained colour, motion that follows the system (mobile-design.md) | IMPLEMENTED |
+| Calm, premium personal finance | Electric Lime composition (Forest before 2026-10-03), restrained colour, motion that follows the system (mobile-design.md) | IMPLEMENTED |
 | Truthful accounting | Cards with statements and cycles, instalments recognised one by one, refunds, transfers never counted twice, original currencies kept (decision 003; currency.md) | IMPLEMENTED |
 | Commitments ahead | Recurring rules, card due dates, instalments, debts | IMPLEMENTED; the calendar is 25C2 |
 | Local-first, offline core, no account | The ledger lives on the iPhone; nothing required to start | IMPLEMENTED |
@@ -238,7 +238,7 @@ variants of the winners → only then test paid distribution of proven creative.
 
 ## 8. Retention and engagement
 
-**DECIDED** (production-plan §8; launch §9.2 «Ratings»): local notifications, each family opt-in and off by default,
+**DECIDED** (production-plan §9; launch §9.2 «Ratings»): local notifications, each family opt-in and off by default,
 permission asked in context, never at first launch; no dark patterns (no guilt copy, no fake urgency, no badge used to
 pull the person back, no streak-loss threats, no notification that hides what it is about).
 

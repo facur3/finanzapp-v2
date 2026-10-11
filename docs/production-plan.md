@@ -788,6 +788,29 @@ server's copy of the evidence is dropped. This proves provenance, not that every
   `additionalProperties: false` everywhere, every key required, nullable objects as `anyOf [null, object]`, no length or
   number bounds; the validators enforce the bounds.
 
+### 5.5b Model portability and the adoption procedure
+
+**EXISTS TODAY (verified in code, 2026-10-10).** The model is server configuration: `MOBILE_AI_PROVIDER` and
+`MOBILE_AI_MODEL` (`server/mobile/runtime.js`), accepted only when the pair has a price in `server/mobile/pricing.js`
+(today `openai:gpt-6-luna` and `openai:gpt-5.6-luna`, read on 2026-10-05) and the reasoning effort is one that model
+allows; anything else closes the route. One provider port (`server/mobile/provider.js`) with one adapter (OpenAI
+Responses, `store: false`). No product contract, protocol, device code or instruction names a model; «Luna» appears only
+in the price table, the evaluation's default price and tests. Known gap: the 30-day price freshness is enforced by the
+live evaluation (`evals/run.js`) but not by the server route; a follow-up adds it or records why not.
+
+**Adopting another model (same provider):** (1) the output protocol: the model must support strict structured output
+for `ASSISTANT_RESULT_SCHEMA` (enum of 146 currencies included) and `store: false`; (2) pricing: one reviewed
+`pricing.js` entry from the vendor's own page (input, cached, cache write, output, allowed efforts, context bound) and a
+recomputed worst case; (3) limits: token caps inside the entry's bounds, the provider project's hard limit and the
+server ceilings set below it; (4) reasoning configuration: the lowest effort that passes; (5) privacy: data retention
+and training terms read and recorded (production-plan §5.4, the consent copy updated if the vendor changes); (6)
+regression evaluation: the full corpus live, under a written owner spend approval, every threshold passing, never a
+threshold lowered to pass; (7) staged rollout: staging first, failure drills (B8) and cost reconciliation (B9), then
+production as a release decision; (8) rollback: setting the previous pair back is a configuration change with no build,
+and the database kill switch stops AI immediately. **Another provider** adds an adapter behind the same port, its key and
+project patterns, its price entries and a check that `servedAsConfigured` matches how it names models and tiers; the
+same eight steps follow. Never dynamic routing to an unpriced or unevaluated model.
+
 ### 5.5a The closed Assistant protocol v2
 
 **EXISTS TODAY (25A-05)** in `packages/integrations/assistant-protocol.js` (pure JavaScript, shared by the server and the
@@ -1764,7 +1787,7 @@ method (runbook §5). This reconciles the roadmap's 25A "mobile sign-in" with 25
 ## 13. Roadmap mapping
 
 Every production item belongs to an existing phase of [mobile-roadmap.md](mobile-roadmap.md). The binding order there
-is unchanged: 25A → 25A2 → 25C → 25C2 → 25D → 25E → 25F → 26. Section references with "launch" point to
+is unchanged: 25A → 25A2 → 25C → 25C2 → 25D → 25E → 25F → 26. *(Proposed exception, 2026-10-10, pending the owner's written approval: a free-core 1.0 brings Producto 26 forward for the core that exists today, and the phases from 25A on follow it as updates in the same order; roadmap §4 «Release plan to 2026-10-31», choice 12.)* Section references with "launch" point to
 [app-store-launch.md](app-store-launch.md).
 
 | Phase | Production items | Where |
@@ -1793,6 +1816,11 @@ Reconciliation notes:
 ---
 
 ## 14. Readiness
+
+**Release target (owner, 2026-10-10; a target, not a mandatory deadline):** an internal TestFlight candidate by the end
+of October; a public free-core release is an option pending the owner's approval; AI and Pro later, AI work in parallel; the
+dated critical path and go/no-go checks are the roadmap's §4 «Release plan to 2026-10-31». The rows below stay the
+detail of each gate.
 
 Nothing below is complete unless it says **EXISTS TODAY**. "Launch §n" is a section of
 [app-store-launch.md](app-store-launch.md).
