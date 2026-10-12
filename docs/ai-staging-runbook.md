@@ -1024,7 +1024,8 @@ Vercel `MOBILE_AI_ENABLED=false`, redeploy. Record the abort and its reason in t
    Ready, from `master`; note its commit `S`. Locally, on an up-to-date clone:
 
    ```
-   git fetch origin && git merge-base --is-ancestor 900ee77 S && git diff --quiet 900ee77 S -- api server packages vercel.json package.json package-lock.json && echo COMPATIBLE
+   S=<the deployment's commit SHA>
+   git fetch origin && git merge-base --is-ancestor 900ee77 "$S" && git diff --quiet 900ee77 "$S" -- api server packages vercel.json package.json package-lock.json && echo COMPATIBLE
    ```
 
    It must print `COMPATIBLE`: the server is the code B7 run #3 passed with (900ee77). Anything else stops B8 before a
