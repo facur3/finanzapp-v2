@@ -879,7 +879,12 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   and `@expo/ui` (SwiftUI views, a dependency of `expo-router`), on top of the 2026-10-07 native fixes in `expo-sqlite`
   and `expo-modules-core`. JS-only QA through Metro on the old build is not evidence for this tree. `expo install --fix`
   also offers the `expo-sharing` config plugin; it is not added: it only configures the opt-in share-into extension
-  (off by default, already present in 57.0.22), and the app uses `expo-sharing` only to share out a backup.
+  (off by default, already present in 57.0.22), and the app uses `expo-sharing` only to share out a backup. Checked on
+  Linux from a clean `npm ci` (Node 24.21, npm 11.19): `npm ls --all`, `expo install --check` («Dependencies are up to
+  date»), typecheck, `currency:verify`, `regions:verify`, `i18n:check -- --strict` (0 errors), the SQLite tests (1366
+  of 1366), `export:ios` and the bundle secret scan, root `npm test` (697 passed, 1 todo) and `check:repo`, all OK;
+  `npm audit` 21 → 21. The `mobile_api` PostgreSQL tests were not run locally (no local PostgreSQL service); they ran in
+  CI on the PR. Blocker: none in the repository; iPhone evidence waits for the new development build.
 
 ## 2. Device QA pending
 
