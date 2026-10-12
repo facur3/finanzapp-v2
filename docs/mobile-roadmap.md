@@ -1,6 +1,8 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-11 (25A-06 B7, **run #3 PASSED: `gpt-6-luna` adopted for staging, not for production**, docs only:
+Updated: 2026-10-12 (25A-06 B8 preparation, docs only: the B8 baseline with an app-wide month of USD 1, proposed by the
+owner and not yet applied; drill restores, race setup and start-state checks corrected in the runbook; nothing remote
+changed; «Producto 25A-06»). Before (2026-10-11, 25A-06 B7, **run #3 PASSED: `gpt-6-luna` adopted for staging, not for production**, docs only:
 owner decisions C(a) and E(a) and a third, separate one-run approval of 200 000 µUSD recorded; the owner ran B7 run #3
 once from `master` 900ee77 (exit 0, every threshold passed, schema validity and hallucination with no margin; 8 158 µUSD;
 the approval is consumed and no further paid run is authorized); four imperfect cases recorded; runs #1 and #2 stay
@@ -5971,6 +5973,22 @@ nothing of it is on a screen yet.
       deployment switch off as well until B8, that is an owner action in Vercel (`false`, redeploy), set back to `true`
       at B8's start. Nothing is enabled until the owner deliberately performs B8 (runbook §12 and §6.6). B9, B10 and B11, the session slice, the consent screen, subscriptions and any production
       activation are not started.
+- **B8 — operational preparation (2026-10-12, docs only; nothing remote changed).** The runbook let a B8 drill restore
+  the app-wide month ceiling to `5000000` µUSD, which equals the provider limit (USD 5, B2) and breaks §7.2's rule (at
+  most 80 %), and its race setup raised both app-wide ceilings to USD 100 while AI was on. Corrected (runbook §6.6, §12):
+  - **The B8 baseline** (runbook §12.1): the schema's placeholders with the app-wide month at **`1000000` µUSD (USD 1)**.
+    It is **the owner's proposed B8 ceiling, not yet applied**; the owner applies it at B8's start and records it here.
+    One restore statement and one read-only check (`baseline_ok`) are used after every limit drill and after the race,
+    and B8 ends with the check `true` and the database switch off. Checked against the schema on a local disposable
+    PostgreSQL (not in CI): the restore and check, the start-state query, and the race setup granting exactly 3 of 8.
+  - **The race** keeps the app-wide ceilings at the baseline (8 reservations of 1 000 µUSD fit inside them); while its
+    setup is in place `max_request_micro_usd = 1000` refuses every real request before the provider.
+  - **The start state** adds the deployed-revision check (`COMPATIBLE`: `master` at or after 900ee77 with the same server
+    tree) and a read-only room check (expected `0` µUSD and no open reservation this month).
+  - **The drills** are ordered: deployment drills with the database switch off and free (`$P api`), then the database
+    drills with it on; each states its before-state, expected result and verified restore, with one abort path. The
+    revoked-key drills end only when the original key is back, a billed or free probe proves it, and the drill key shows
+    revoked. The deployment switch (`MOBILE_AI_ENABLED`) and the database kill switch stay separate.
 - **Owner refinements before accepting the runbook (2026-10-05, in this PR).**
   - **Staging region:** Vercel Functions `gru1` (São Paulo) and the staging Supabase project in the specific region
     `sa-east-1` (São Paulo), replacing `iad1` / us-east-1. The reasons: Argentina-first, the API compute next to its
