@@ -5981,7 +5981,7 @@ nothing of it is on a screen yet.
     One restore statement and one read-only check (`baseline_ok`) are used after every limit drill and after the race,
     and B8 ends with the check `true` and the database switch off. Checked against the schema on a local disposable
     PostgreSQL (not in CI): the restore and check, the start-state query, and the race setup granting exactly 3 of 8.
-  - **The race** keeps the app-wide ceilings at the baseline (8 reservations of 1 000 µUSD fit inside them); while its
+  - **The race** raises no money ceiling (8 reservations of 1 000 µUSD fit inside the baseline); while its
     setup is in place `max_request_micro_usd = 1000` refuses every real request before the provider.
   - **The start state** adds the deployed-revision check (`COMPATIBLE`: `master` at or after 900ee77 with the same server
     tree) and a read-only room check (expected `0` µUSD and no open reservation this month).
