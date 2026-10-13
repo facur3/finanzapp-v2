@@ -2,7 +2,8 @@
 
 Updated: 2026-10-12 (25A-06 B8 preparation, docs only: the B8 baseline with an app-wide month of USD 1, proposed by the
 owner and not yet applied; drill restores, race setup and start-state checks corrected in the runbook; nothing remote
-changed; «Producto 25A-06»). Before (2026-10-11, 25A-06 B7, **run #3 PASSED: `gpt-6-luna` adopted for staging, not for production**, docs only:
+changed; «Producto 25A-06». Earlier the same day: Expo SDK 57 patch alignment for `expo install --check`, six packages,
+a new development build needed before iPhone QA, §1 «Builds and tooling»). Before (2026-10-11, 25A-06 B7, **run #3 PASSED: `gpt-6-luna` adopted for staging, not for production**, docs only:
 owner decisions C(a) and E(a) and a third, separate one-run approval of 200 000 µUSD recorded; the owner ran B7 run #3
 once from `master` 900ee77 (exit 0, every threshold passed, schema validity and hallucination with no margin; 8 158 µUSD;
 the approval is consumed and no further paid run is authorized); four imperfect cases recorded; runs #1 and #2 stay
@@ -871,10 +872,21 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   owner's iPhone (FinanzApp Dev, `com.facur3.finanzapp.dev`); Metro from the branch for QA. CI:
   root tests/build/hygiene, mobile `npm ls`, `expo install --check`, typecheck, currency and
   region catalogue verification, strict localization check, the SQLite tests, the iOS export;
-  the mobile API's PostgreSQL tests. Expo SDK 57 patch releases last aligned 2026-10-07 for `expo install --check`
-  (`expo` 57.0.27, `expo-constants` 57.0.21, `expo-linking` 57.0.12, `expo-router` 57.0.25, `expo-sqlite` 57.0.4; React
-  Native stays 0.86.3); the native fixes in `expo-sqlite` and `expo-modules-core` reach the iPhone with the next
-  development build.
+  the mobile API's PostgreSQL tests. Expo SDK 57 patch releases last aligned 2026-10-12 for `expo install --check`
+  (`expo` 57.0.28, `expo-crypto` 57.0.4, `expo-dev-client` 57.0.20, `expo-router` 57.0.26, `expo-sharing` 57.0.23,
+  `expo-splash-screen` 57.0.10; before, 2026-10-07: `expo-constants` 57.0.21, `expo-linking` 57.0.12, `expo-sqlite`
+  57.0.4; React Native stays 0.86.3). **The installed development build predates native changes**, so physical iPhone
+  verification needs a new EAS development build first (an owner action, not made here): the 2026-10-12 alignment
+  changes autolinked iOS code in `expo-modules-core` (Fabric view headers), `expo-modules-jsi` (the JS runtime bridge)
+  and `@expo/ui` (SwiftUI views, a dependency of `expo-router`), on top of the 2026-10-07 native fixes in `expo-sqlite`
+  and `expo-modules-core`. JS-only QA through Metro on the old build is not evidence for this tree. `expo install --fix`
+  also offers the `expo-sharing` config plugin; it is not added: it only configures the opt-in share-into extension
+  (off by default, already present in 57.0.22), and the app uses `expo-sharing` only to share out a backup. Checked on
+  Linux from a clean `npm ci` (Node 24.21, npm 11.19): `npm ls --all`, `expo install --check` («Dependencies are up to
+  date»), typecheck, `currency:verify`, `regions:verify`, `i18n:check -- --strict` (0 errors), the SQLite tests (1366
+  of 1366), `export:ios` and the bundle secret scan, root `npm test` (697 passed, 1 todo) and `check:repo`, all OK;
+  `npm audit` 21 → 21. The `mobile_api` PostgreSQL tests were not run locally (no local PostgreSQL service); they ran in
+  CI on the PR. Blocker: none in the repository; iPhone evidence waits for the new development build.
 
 ## 2. Device QA pending
 
