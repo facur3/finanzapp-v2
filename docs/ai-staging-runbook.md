@@ -1013,7 +1013,9 @@ this runbook, before it is applied.
 **Abort, at any moment of B8:** `update public.mobile_ai_control set enabled = false;`. It takes effect on the next
 request with no redeploy; a request in flight completes and settles. Then run the baseline restore and the baseline
 check (`enabled = false`), put back any Vercel variable the drill changed (from the password manager for a secret),
-redeploy, and confirm with `$P api` all PASS. If the database cannot be reached, the deployment switch instead:
+redeploy, and confirm with `$P api` all PASS. **Revoke every temporary key created so far** (drill 4's Supabase secret,
+drill 15's OpenAI key), even if the drill had not reached its own revoke step, and confirm each is gone from the
+provider's key list; the abort is not complete until then. If the database cannot be reached, the deployment switch instead:
 Vercel `MOBILE_AI_ENABLED=false`, redeploy. Record the abort and its reason in the roadmap.
 
 ### 12.2 Start state (each checked, in order)
@@ -1095,12 +1097,12 @@ first run).
 | --- | --- | --- | --- | --- |
 | 6 | Smoke and duplicate request id | `$P api --ai-enabled` | 200 with a protocol result; the repeated id 409 `duplicate`; telemetry `settlement` settled | nothing changed |
 | 7 | AI disabled (database) | `update public.mobile_ai_control set enabled = false;` then `$P api` | 503 `disabled`; no provider call; `$P api` all PASS | `set enabled = true;` baseline check `enabled = true` |
-| 8 | Kill switch during active testing | Run `$P api --ai-enabled`; flip the database switch off between two runs | the next request 503 `disabled`; an in-flight one completes and settles; no new reservation | `set enabled = true;` baseline check |
+| 8 | Kill switch with a request in flight (database only, no provider) | SQL Editor, in order: (1) `select public.mobile_ai_reserve((select id from auth.users where email = '<test person A e-mail>'), 'stagingprobe-kill-0001', 'm', 1000, 1, 1, 'staging');` (2) `update public.mobile_ai_control set enabled = false;` (3) `select public.mobile_ai_settle((select id from auth.users where email = '<test person A e-mail>'), (select id from public.mobile_ai_reservations where request_id = 'stagingprobe-kill-0001'), 'settled', 0, 1, 0, 0, 1, 0);` then `$P api` | (1) an `id`, reserved while on; (3) `true`: the reservation made before the flip still settles; `$P api` all PASS (the next request 503 `disabled`, no new reservation) | `delete from public.mobile_ai_reservations where request_id like 'stagingprobe-kill-%';` then `set enabled = true;` and the baseline check |
 | 9 | User daily money ceiling | `update public.mobile_ai_control set user_day_ceiling_micro_usd = 1;` then `$P api --ai-enabled` | telemetry `429` `user_budget` | baseline restore and check |
 | 10 | User monthly money ceiling | `… set user_month_ceiling_micro_usd = 1;` then `$P api --ai-enabled` | telemetry `429` `user_budget` | baseline restore and check |
 | 11 | Global daily ceiling | `… set global_day_ceiling_micro_usd = 1;` then `$P api --ai-enabled` | telemetry `503` `global_budget` | baseline restore and check |
 | 12 | Global monthly ceiling | `… set global_month_ceiling_micro_usd = 1;` then `$P api --ai-enabled` | telemetry `503` `global_budget` | baseline restore and check: back to **`1000000`**, never `5000000` |
-| 13 | Request rate limit | `… set user_per_minute = 1;` then `$P api --ai-enabled` twice within a minute | the first run billed 200 (its repeat 409 `duplicate`, checked before the rate); the second run telemetry `429` `rate` | baseline restore and check |
+| 13 | Request rate limit | First wait until A has no reservation in the last minute: `select count(*) from public.mobile_ai_reservations where user_id = (select id from auth.users where email = '<test person A e-mail>') and created_at > now() - interval '1 minute';` prints 0. Then `… set user_per_minute = 1;` and `$P api --ai-enabled` twice within a minute | the first run billed 200 (its repeat 409 `duplicate`, checked before the rate); the second run telemetry `429` `rate` | baseline restore and check |
 | 14 | Concurrency limit | `… set user_concurrency = 0;` then `$P api --ai-enabled` | telemetry `429` `busy` | baseline restore and check. True concurrency: drill 16 |
 | 15 | Bad provider key, unknown usage | Create a third key in `finanzapp-staging`, set it as `MOBILE_AI_API_KEY`, redeploy, **revoke it** in OpenAI; `$P api --ai-enabled`; then `select state, count(*) from public.mobile_ai_reservations group by state;` | telemetry `502` `provider_http`; the reservation `unsettled` at its maximum, counted, never freed | set the **`finanzapp-staging-api`** key back from the password manager, redeploy; `$P api --ai-enabled` 200; OpenAI's project keys show the drill key revoked and only the two named service accounts active |
 | 16 | Concurrency race | §6.6 | PASS: exactly 3 of 8 granted | §6.6 step 3: race rows deleted, baseline restore and check |
@@ -1122,7 +1124,7 @@ No drill writes a ledger. The API has no ledger. An AI reply is a draft until th
 2. [ ] The baseline check: `enabled = false`, `baseline_ok = true`. A temporary drill or race limit can never be the
    state B8 ends in.
 3. [ ] `select state, count(*) from public.mobile_ai_reservations group by state;`: the settled drill requests, the one
-   `unsettled` row of drill 15, no `reserved` row, and no `stagingprobe-race-%` row.
+   `unsettled` row of drill 15, no `reserved` row, and no `stagingprobe-race-%` or `stagingprobe-kill-%` row.
 4. [ ] `$P api` all PASS: the deployment is open, in `staging`, with the right Supabase secret, and the database holds AI
    off. Vercel's variables are those of §4.4; OpenAI and Supabase list no drill key still active.
 5. [ ] Record in the roadmap: the date, `S`, each drill's result, the race line, the baseline check output, the final
