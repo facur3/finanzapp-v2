@@ -55,7 +55,7 @@ Each checkpoint must pass before the next one starts. Do not skip ahead.
 | B5 | Boundary probe (§6.5) | Owner runs a script | **Passed** 2026-10-07. Every line PASS |
 | B6 | Vercel staging project deployed, AI off in the database (§4) | Owner | **Passed** 2026-10-07. `probe.js api` all PASS |
 | B7 | Real Luna evaluation (§11) | Owner approves the spend and runs it | Every threshold passes, or the run is recorded as a failure, never re-graded. **RUN #1 completed 2026-10-08 UTC: FAILED** (exit 1; `schemaValidRate`, `intentAccuracy`, `clarificationAccuracy`, `groundedEvidenceAccuracy`, `hallucinatedFactRate`; 7 818 µUSD). **RUN #2 completed 2026-10-08 UTC from merged PR #92: FAILED** (exit 1; `schemaValidRate` 0.9806, `intentAccuracy` 0.9417, `clarificationAccuracy` 0.8696, `groundedEvidenceAccuracy` 0.9; 7 836 µUSD). Two one-run approvals, 2026-10-07 (consumed by run #1) and 2026-10-08 (consumed by run #2), each 200 000 µUSD; neither authorizes a further run. A third, separate one-run approval (2026-10-11, 200 000 µUSD, `gpt-6-luna` only, after decisions C(a) and E(a); worst case 194 848 µUSD at 900ee77). **RUN #3 completed 2026-10-11 UTC from 900ee77: PASSED** (exit 0, `failures: []`; `schemaValidRate` 0.9903 and `hallucinatedFactRate` 0.0194 with no margin; 8 158 µUSD); the third approval consumed; `gpt-6-luna` adopted for staging only; any further run needs its own written approval |
-| B8 | AI enabled on staging, failure drills (§12), race (§6.6) | Owner | Every drill as expected; race PASS; kill switch tested. **Ready for controlled owner-led execution** (B7 passed 2026-10-11); not started; the database switch stays off until the owner performs it |
+| B8 | AI enabled on staging, failure drills (§12), race (§6.6) | Owner | The deployed revision `COMPATIBLE` (§12.2); every drill as expected; race PASS; kill switch tested; B8 ends with the database switch off and the B8 baseline checked (§12.1, §12.5). **Ready for controlled owner-led execution** (B7 passed 2026-10-11); not started; the database switch stays off until the owner performs it. B8 baseline proposed by the owner 2026-10-12 (app-wide month `1000000` µUSD), not yet applied |
 | B9 | Cost reconciliation (§9.3) | Owner runs a script | No day `investigate`; `estimate_exceeded` = 0 |
 | B10 | Focused `/security_audit`, then `/security_review` (§14) | Claude, on the owner's request | No open High or Medium; findings fixed or recorded |
 | B11 | Results recorded; 25A-06 marked done | Claude, owner confirms | Roadmap and production-plan.md updated |
@@ -633,15 +633,19 @@ Every line must be PASS (exit 0). The probe capture may stay; to remove it:
 ### 6.6 Concurrency race on staging (OWNER, at B8, after AI was enabled once)
 
 CI proves the race with two real connections (`schema.test.sql` (m)). This repeats it through the real PostgREST. No
-provider is called.
+provider is called. It is the last database drill of B8 (§12.4, drill 16).
 
-1. [ ] SQL Editor, the race setup: AI stays enabled, every limit is raised for the race, and test person A's month is
-   sized to 3 requests of 1 000 µUSD. The ceiling for A is relative to what A already holds this month.
+- **Before:** the database switch on; the B8 baseline in place (§12.1, `baseline_ok` true); no drill limit left over.
+- **Abort at any point:** `update public.mobile_ai_control set enabled = false;`, then step 3 below.
+
+1. [ ] SQL Editor, the race setup: AI stays enabled, the request counts and concurrency are raised, and test person
+   A's month is sized to 3 requests of 1 000 µUSD, relative to what A already holds this month. **No money ceiling is
+   raised**: the app-wide ceilings and A's day stay at the baseline, which 8 reservations of 1 000 µUSD fit far inside. While this setup is in place, `max_request_micro_usd = 1000` refuses every real Assistant request
+   (`request_too_large`) before any provider call.
 
    ```sql
    update public.mobile_ai_control set user_per_minute = 1000, user_per_hour = 1000, user_per_day = 1000,
      user_per_month = 1000, user_concurrency = 1000, global_concurrency = 1000, max_request_micro_usd = 1000,
-     user_day_ceiling_micro_usd = 100000000, global_day_ceiling_micro_usd = 100000000, global_month_ceiling_micro_usd = 100000000,
      user_month_ceiling_micro_usd = 3000 + (select coalesce(sum(charged_micro_usd), 0) from public.mobile_ai_reservations
        where user_id = (select id from auth.users where email = '<test person A e-mail>')
        and month_key = date_trunc('month', now() at time zone 'UTC')::date);
@@ -649,19 +653,16 @@ provider is called.
 
 2. [ ] `node --env-file=$HOME/.config/finanzapp/staging-db.env server/mobile/staging/probe.js race --max 1000 --ceiling 3000`.
    It sends 8 reservations at once; PASS means exactly 3 were granted.
-3. [ ] Cleanup, the same query tab. The race rows never reached a provider, so deleting them releases no real spend:
+3. [ ] Cleanup and restore, the same query tab, whatever step 2 printed. The race rows never reached a provider, so
+   deleting them releases no real spend:
 
    ```sql
    delete from public.mobile_ai_reservations where request_id like 'stagingprobe-race-%';
    ```
 
-   Then restore the staging values (the placeholders of `schema.sql`, with the global month as set in §7.2):
-
-   ```sql
-   update public.mobile_ai_control set user_month_ceiling_micro_usd = 2000000, user_day_ceiling_micro_usd = 250000,
-     global_day_ceiling_micro_usd = 1000000, global_month_ceiling_micro_usd = <as recorded at B8>, max_request_micro_usd = 10000,
-     user_per_minute = 6, user_per_hour = 60, user_per_day = 200, user_per_month = 2000, user_concurrency = 2, global_concurrency = 10;
-   ```
+   Then run **the baseline restore and the baseline check of §12.1**. The race is done only when the check prints
+   `baseline_ok = true` and `select count(*) from public.mobile_ai_reservations where request_id like 'stagingprobe-race-%';`
+   prints 0.
 
 ## 7. OpenAI staging project
 
@@ -693,8 +694,9 @@ provider is called.
   password manager the moment it is shown.
 - [ ] **Budget / hard limit** for the project: the smallest the console allows that still covers §11 and §12 (for
   example **USD 5 per month**). Record it as `L`. The server must stop first: at B8, before enabling AI, the owner sets
-  `global_month_ceiling_micro_usd` to at most 80 % of `L` (with `L` = USD 5: `4000000`). Lowering a ceiling needs no
-  special approval; raising one does (production-plan.md §6.2).
+  `global_month_ceiling_micro_usd` to at most 80 % of `L` (with `L` = USD 5: `4000000`); the owner's proposed B8
+  value is `1000000`, the B8 baseline of §12.1. Lowering a ceiling needs no special approval; raising one does
+  (production-plan.md §6.2).
 - [ ] **Alerts:** project budget alert e-mails at 50 % and 80 %, to the owner.
 - [ ] **Organization billing:** prepaid balance **small** (for example USD 5–10); **auto-recharge OFF**.
 - [ ] **Data controls:** record the organization's data retention settings. `store: false` is sent on every request;
@@ -716,7 +718,9 @@ independently.
 - the server's ceilings below it.
 
 The staging placeholders in `mobile_ai_control` are the server's ceilings: USD 2 per person per month, USD 0.25 per
-person per day, USD 1 app-wide per day, USD 5 app-wide per month, USD 0.01 per request.
+person per day, USD 1 app-wide per day, USD 5 app-wide per month, USD 0.01 per request. The USD 5 app-wide month equals
+the provider limit, so it is never the active value: B8 lowers it to the B8 baseline (§12.1, USD 1) before AI is
+enabled.
 
 **Production (later, not decided here):**
 - auto-recharge, if enabled, only keeps the service available between deliberate top-ups;
@@ -951,18 +955,6 @@ The eval calls the provider **directly**: they bypass the database reservations.
 
 ## 12. Staging smoke and failure drills (OWNER, at B8)
 
-**Start state:**
-- Vercel staging deployed (§4.4, `MOBILE_AI_ENABLED=true`);
-- the database switch **off**;
-- `probe.js api` all PASS;
-- the global month ceiling below the provider limit (§7.2);
-- the owner's confirmation of the staging billing settings (§7.2: hard budget, auto-recharge OFF, prepaid balance,
-  model access) recorded in the roadmap;
-- then: `update public.mobile_ai_control set enabled = true;`.
-
-The placeholders stay as installed unless a drill says otherwise. After each drill, restore what it changed, and read
-the telemetry line (§4.7).
-
 In 25A-06 no app build calls staging (§13), so the manual local app is untouched by every drill by construction:
 - the ledger lives on the iPhone;
 - the server has no ledger;
@@ -971,33 +963,172 @@ In 25A-06 no app build calls staging (§13), so the manual local app is untouche
 The device-side behavior on failures (an error message, nothing written, manual entry available) is pinned by the app's
 tests. It is checked on the iPhone only when a build connects (25A-07).
 
+The two switches stay separate: the **deployment switch** (`MOBILE_AI_ENABLED`, a Vercel variable, effective only after a
+redeploy) opens the route; the **database switch** (`mobile_ai_control.enabled`, effective on the next request, no
+redeploy) is the kill switch. Since B6 the deployment switch is `true` and the database switch alone holds AI off.
+
+### 12.1 The B8 baseline
+
+The values every drill restores, and the state B8 ends in. The schema's placeholders (§8) with one change: the
+app-wide month is **`1000000` µUSD (USD 1)** instead of `5000000`, which equals the provider limit `L` = USD 5 and so
+breaks §7.2's rule (at most 80 % of `L`). This is **the owner's proposed B8 ceiling (2026-10-12), not yet applied**: the
+owner applies it at the start of B8 (§12.2) and records it in the roadmap. Lowering a ceiling needs no special approval
+(§7.2). The live evaluations bypassed the reservations, so their provider cost (23 812 µUSD for runs #1 to #3 in
+October) is not in the server's count; USD 1 plus that stays far below `L`.
+
+| Column | B8 baseline |
+| --- | --- |
+| `enabled` | `false` outside the drills of §12.4 |
+| `environment` | `staging` (set by the schema, never changed) |
+| `user_month_ceiling_micro_usd` / `user_day_ceiling_micro_usd` | `2000000` / `250000` |
+| `global_day_ceiling_micro_usd` / `global_month_ceiling_micro_usd` | `1000000` / **`1000000`** |
+| `max_request_micro_usd` | `10000` |
+| `max_input_tokens` / `max_output_tokens` | `32000` / `4000` |
+| `user_per_minute` / `user_per_hour` / `user_per_day` / `user_per_month` | `6` / `60` / `200` / `2000` |
+| `user_concurrency` / `global_concurrency` | `2` / `10` |
+| `reservation_ttl_seconds` | `120` |
+
+**Baseline restore** (every limit, never `enabled`; run it after every limit drill and after the race):
+
+```sql
+update public.mobile_ai_control set user_month_ceiling_micro_usd = 2000000, user_day_ceiling_micro_usd = 250000,
+  global_day_ceiling_micro_usd = 1000000, global_month_ceiling_micro_usd = 1000000, max_request_micro_usd = 10000,
+  max_input_tokens = 32000, max_output_tokens = 4000, user_per_minute = 6, user_per_hour = 60, user_per_day = 200,
+  user_per_month = 2000, user_concurrency = 2, global_concurrency = 10, reservation_ttl_seconds = 120;
+```
+
+**Baseline check** (read only; `baseline_ok` must be `true`, and `enabled` what the step says):
+
+```sql
+select enabled, environment, (user_month_ceiling_micro_usd, user_day_ceiling_micro_usd, global_day_ceiling_micro_usd,
+  global_month_ceiling_micro_usd, max_request_micro_usd, max_input_tokens, max_output_tokens, user_per_minute,
+  user_per_hour, user_per_day, user_per_month, user_concurrency, global_concurrency, reservation_ttl_seconds)
+  = (2000000, 250000, 1000000, 1000000, 10000, 32000, 4000, 6, 60, 200, 2000, 2, 10, 120) as baseline_ok
+from public.mobile_ai_control;
+```
+
+If the owner decides another value, it replaces `1000000` in both statements and in the table, in a reviewed change to
+this runbook, before it is applied.
+
+**Abort, at any moment of B8:** `update public.mobile_ai_control set enabled = false;`. It takes effect on the next
+request with no redeploy; a request in flight completes and settles. Then run the baseline restore and the baseline
+check (`enabled = false`), put back any Vercel variable the drill changed (from the password manager for a secret),
+redeploy, and confirm with `$P api` all PASS. **Revoke every temporary key created so far** (drill 4's Supabase secret,
+drill 15's OpenAI key), even if the drill had not reached its own revoke step, and confirm each is gone from the
+provider's key list; the abort is not complete until then. If the database cannot be reached, the deployment switch instead:
+Vercel `MOBILE_AI_ENABLED=false`, redeploy. Record the abort and its reason in the roadmap.
+
+### 12.2 Start state (each checked, in order)
+
+1. [ ] The owner's confirmation of the staging billing settings (§7.2: hard budget, auto-recharge OFF, prepaid balance,
+   model access) recorded in the roadmap.
+2. [ ] **The deployed revision.** Vercel → `finanzapp-api-staging` → Deployments: the current Production deployment is
+   Ready, from `master`; note its commit `S`. Locally, on an up-to-date clone:
+
+   ```
+   S=<the deployment's commit SHA>
+   git fetch origin && git merge-base --is-ancestor 900ee77 "$S" && git diff --quiet 900ee77 "$S" -- api server packages vercel.json package.json package-lock.json && echo COMPATIBLE
+   ```
+
+   It must print `COMPATIBLE`: the server is the code B7 run #3 passed with (900ee77). Anything else stops B8 before a
+   billed request:
+   - **an older deployment** (for example one from before 900ee77): make a **new** Production deployment built from
+     `master`'s current head through the project's Git integration, then note its new `S` and run the check again.
+     Never Redeploy or Promote the existing deployment: both keep its old commit. If pushes to `master` stopped producing
+     Production deployments, find out why and record it before going on;
+   - **a newer one whose server code differs** from 900ee77: a reviewed decision on whether it changes what B7 measured.
+
+   `probe.js api` cannot tell an old server from a current one (its request is protocol v2, which every server since B6
+   accepts), so this check is the only proof of the revision. During the drills, every Redeploy starts from this
+   current Production deployment, so `S` holds through them.
+3. [ ] The deployment variables as §4.4, `MOBILE_AI_ENABLED=true`. If it was set to `false` meanwhile, set `true` and
+   redeploy.
+4. [ ] The database switch off and the environment right: the baseline check prints `enabled = false`,
+   `environment = staging` (`baseline_ok` is still `false` here: the placeholder month is `5000000`).
+5. [ ] **Room for B8.** Read only:
+
+   ```sql
+   select coalesce(sum(charged_micro_usd), 0) as month_micro_usd, count(*) filter (where state <> 'settled') as open_rows
+   from public.mobile_ai_reservations where month_key = date_trunc('month', now() at time zone 'UTC')::date;
+   ```
+
+   Expected `0` and `0`: no AI request has been reserved on staging yet (the probes before B8 are refused `disabled`
+   before any row). B8 is compatible with the baseline when `month_micro_usd` is at most `800000` and `open_rows` is
+   `0`; otherwise stop and record what the rows are.
+6. [ ] The baseline restore, then the baseline check: `enabled = false`, `baseline_ok = true`. Record in the roadmap the
+   date, `S`, and that the B8 baseline is applied.
+7. [ ] `$P api` all PASS.
+
 Base commands:
 - `P=node --env-file=$HOME/.config/finanzapp/staging-db.env server/mobile/staging/probe.js`
-- `$P api --ai-enabled`: two billed requests, about USD 0.001.
+- `$P api`: free; with the database switch off, all PASS proves the deployment is open, in `staging` and holds a working
+  Supabase secret (the 503 must carry the reservation's own words).
+- `$P api --ai-enabled`: one billed request and its duplicate (refused before the provider), about USD 0.0001 to
+  0.0003. B8's billed requests total about USD 0.002.
 
-| Drill | How to cause it | Expect |
-| --- | --- | --- |
-| AI disabled (database) | `update public.mobile_ai_control set enabled = false;` then `$P api` | 503; telemetry `category: disabled`; no provider call |
-| AI disabled (deployment) | Vercel: `MOBILE_AI_ENABLED=false`, redeploy | 503 «La integración todavía no está habilitada.», no telemetry line (no dependencies); restore and redeploy |
-| Kill switch during active testing | Run `$P api --ai-enabled`; flip the database switch off between two runs | the next request 503 `disabled`; an in-flight one completes and settles; no new reservation |
-| Bad or missing API key | (a) Vercel: delete `MOBILE_AI_API_KEY`, redeploy. (b) Create a third key, set it, redeploy, **revoke it** in OpenAI | (a) 503, route closed. (b) 502 `provider_http`; the reservation `unsettled` at its maximum |
-| Bad Supabase secret | Create a third secret key, set it, redeploy, **revoke it** | 503 `database` on reservation («La integración no está disponible…»); nothing reaches the provider. `$P api` fails its 503 check here: it requires the reservation's own words |
-| Invalid user token | `$P api` | 401 on no session, a malformed bearer and a forged token |
-| Anonymous user | Not reproducible while anonymous sign-ins stay off (the boundary probe checks that); the server's refusal is unit-tested | do not enable anonymous sign-ins to test it |
-| User daily money ceiling | `update … set user_day_ceiling_micro_usd = 1;` then `$P api --ai-enabled` | 429 `user_budget`; restore 250000 |
-| User monthly money ceiling | `update … set user_day_ceiling_micro_usd = 250000, user_month_ceiling_micro_usd = 1;` | 429 `user_budget`; restore 2000000 |
-| Global daily ceiling | `update … set global_day_ceiling_micro_usd = 1;` | 503 `global_budget`; restore 1000000 |
-| Global monthly ceiling | `update … set global_month_ceiling_micro_usd = 1;` | 503 `global_budget`; restore 5000000 |
-| Request rate limit | `update … set user_per_minute = 1;` then `$P api --ai-enabled` | the second request in the minute 429 `rate`; restore 6 |
-| Concurrency limit | `update … set user_concurrency = 0;` | 429 `busy`; restore 2. True concurrency: §6.6 |
-| Duplicate request id | `$P api --ai-enabled` | the repeated id 409 `duplicate` |
-| Provider timeout | Not inducible on staging without a fault flag, which production code does not carry. Unit-tested (`provider.test.js`: `timeout`) | recorded as unit evidence only |
-| Invalid provider schema | Not inducible with a strict schema. Unit-tested (`invalid`, `output_invalid`) | unit evidence only |
-| Model or tier mismatch | Not inducible by configuration. Unit-tested; the evaluation's `servedAsConfiguredRate` = 1 | unit and eval evidence |
-| Unknown usage, unsettled reservation | Produced by the revoked-key drill above | `select state, count(*) from public.mobile_ai_reservations group by state;` shows `unsettled` rows counted at their maximum, never freed |
-| Wrong environment | Vercel: `MOBILE_ENVIRONMENT=production`, redeploy | 503, route closed (code refuses production); restore |
+After each drill read its telemetry line (§4.7); Hobby keeps runtime logs for about one hour.
+
+### 12.3 Deployment drills: database switch OFF, no provider call
+
+**Before each:** the database switch off, the baseline check `baseline_ok = true`, `$P api` all PASS. **Done when** the
+restore is followed by `$P api` all PASS.
+
+| # | Drill | How to cause it | Expect | Restore, then verify |
+| --- | --- | --- | --- | --- |
+| 1 | Invalid user token | `$P api` | 401 on no session, a malformed bearer and a forged token | nothing changed |
+| 2 | AI disabled (deployment) | Vercel: `MOBILE_AI_ENABLED=false`, redeploy; `$P api` | 503 «La integración todavía no está habilitada.» before the session is read, no telemetry line (no dependencies). `$P api`: sign-in and 405 PASS; the three 401 checks, the 415 check and the 503 check FAIL (route closed) | `true`, redeploy; `$P api` all PASS |
+| 3 | Missing API key | Vercel: delete `MOBILE_AI_API_KEY`, redeploy; `$P api` | the same as drill 2: route closed, the same five FAILs | add the **`finanzapp-staging-api`** key back from the password manager (Production only, Sensitive), redeploy; `$P api` all PASS. The key's value is proven by drill 6's 200 |
+| 4 | Bad Supabase secret | Create a third secret key, set it as `MOBILE_SUPABASE_SECRET_KEY`, redeploy, **revoke it**; `$P api` | 503 `database` on reservation («La integración no está disponible…»); nothing reaches the provider. `$P api`: only the 503 check FAILs (the session and content-type checks still run) | set the **`mobile-api-staging`** key back from the password manager, redeploy; `$P api` all PASS; Supabase's API keys list no longer shows the drill key |
+| 5 | Wrong environment | Vercel: `MOBILE_ENVIRONMENT=production`, redeploy; `$P api` | route closed (the code refuses production), the same five FAILs as drill 2 | `staging`, redeploy; `$P api` all PASS |
+
+A Vercel secret marked Sensitive cannot be read back, so a restore is proven by behavior, never by looking at it.
+
+### 12.4 Database drills: database switch ON
+
+**Before:** every drill of §12.3 restored and verified. Then, deliberately:
+`update public.mobile_ai_control set enabled = true;` and the baseline check: `enabled = true`, `baseline_ok = true`.
+**Before each drill:** `baseline_ok = true`. **After each limit drill:** the baseline restore, then the baseline check;
+the next drill does not start until it prints `baseline_ok = true`. The probe prints only PASS/FAIL, never a status,
+and `global_budget` carries the same words as `disabled`: in drills 9 to 15 the evidence is **the telemetry line's
+`status` and `category`** (§4.7), never the probe's output, whose 200 check FAILs there by design (except drill 13's
+first run).
+
+| # | Drill | How to cause it | Expect | Restore, then verify |
+| --- | --- | --- | --- | --- |
+| 6 | Smoke and duplicate request id | `$P api --ai-enabled` | 200 with a protocol result; the repeated id 409 `duplicate`; telemetry `settlement` settled | nothing changed |
+| 7 | AI disabled (database) | `update public.mobile_ai_control set enabled = false;` then `$P api` | 503 `disabled`; no provider call; `$P api` all PASS | `set enabled = true;` baseline check `enabled = true` |
+| 8 | Kill switch with a request in flight (database only, no provider) | SQL Editor, in order: (1) `select public.mobile_ai_reserve((select id from auth.users where email = '<test person A e-mail>'), 'stagingprobe-kill-0001', 'm', 1000, 1, 1, 'staging');` (2) `update public.mobile_ai_control set enabled = false;` (3) `select public.mobile_ai_settle((select id from auth.users where email = '<test person A e-mail>'), (select id from public.mobile_ai_reservations where request_id = 'stagingprobe-kill-0001'), 'settled', 0, 1, 0, 0, 1, 0);` then `$P api` | (1) an `id`, reserved while on; (3) `true`: the reservation made before the flip still settles; `$P api` all PASS (the next request 503 `disabled`, no new reservation) | `delete from public.mobile_ai_reservations where request_id like 'stagingprobe-kill-%';` then `set enabled = true;` and the baseline check |
+| 9 | User daily money ceiling | `update public.mobile_ai_control set user_day_ceiling_micro_usd = 1;` then `$P api --ai-enabled` | telemetry `429` `user_budget` | baseline restore and check |
+| 10 | User monthly money ceiling | `… set user_month_ceiling_micro_usd = 1;` then `$P api --ai-enabled` | telemetry `429` `user_budget` | baseline restore and check |
+| 11 | Global daily ceiling | `… set global_day_ceiling_micro_usd = 1;` then `$P api --ai-enabled` | telemetry `503` `global_budget` | baseline restore and check |
+| 12 | Global monthly ceiling | `… set global_month_ceiling_micro_usd = 1;` then `$P api --ai-enabled` | telemetry `503` `global_budget` | baseline restore and check: back to **`1000000`**, never `5000000` |
+| 13 | Request rate limit | First wait until A has no reservation in the last minute: `select count(*) from public.mobile_ai_reservations where user_id = (select id from auth.users where email = '<test person A e-mail>') and created_at > now() - interval '1 minute';` prints 0. Then `… set user_per_minute = 1;` and `$P api --ai-enabled` twice within a minute | the first run billed 200 (its repeat 409 `duplicate`, checked before the rate); the second run telemetry `429` `rate` | baseline restore and check |
+| 14 | Concurrency limit | `… set user_concurrency = 0;` then `$P api --ai-enabled` | telemetry `429` `busy` | baseline restore and check. True concurrency: drill 16 |
+| 15 | Bad provider key, unknown usage | Create a third key in `finanzapp-staging`, set it as `MOBILE_AI_API_KEY`, redeploy, **revoke it** in OpenAI; `$P api --ai-enabled`; then `select state, count(*) from public.mobile_ai_reservations group by state;` | telemetry `502` `provider_http`; the reservation `unsettled` at its maximum, counted, never freed | set the **`finanzapp-staging-api`** key back from the password manager, redeploy; `$P api --ai-enabled` 200; OpenAI's project keys show the drill key revoked and only the two named service accounts active |
+| 16 | Concurrency race | §6.6 | PASS: exactly 3 of 8 granted | §6.6 step 3: race rows deleted, baseline restore and check |
+
+Not inducible on staging, evidence recorded instead:
+- **Anonymous user:** not reproducible while anonymous sign-ins stay off (the boundary probe checks that); the server's
+  refusal is unit-tested. Do not enable anonymous sign-ins to test it.
+- **Provider timeout:** needs a fault flag, which production code does not carry. Unit-tested (`provider.test.js`:
+  `timeout`).
+- **Invalid provider schema:** not inducible with a strict schema. Unit-tested (`invalid`, `output_invalid`).
+- **Model or tier mismatch:** not inducible by configuration. Unit-tested; the evaluation's `servedAsConfiguredRate` = 1.
 
 No drill writes a ledger. The API has no ledger. An AI reply is a draft until the person confirms it on the device.
+
+### 12.5 Closing B8
+
+1. [ ] `update public.mobile_ai_control set enabled = false;`: AI stays off after B8. B9 needs no live request;
+   enabling it again is a separate, recorded owner step.
+2. [ ] The baseline check: `enabled = false`, `baseline_ok = true`. A temporary drill or race limit can never be the
+   state B8 ends in.
+3. [ ] `select state, count(*) from public.mobile_ai_reservations group by state;`: the settled drill requests, the one
+   `unsettled` row of drill 15, no `reserved` row, and no `stagingprobe-race-%` or `stagingprobe-kill-%` row.
+4. [ ] `$P api` all PASS: the deployment is open, in `staging`, with the right Supabase secret, and the database holds AI
+   off. Vercel's variables are those of §4.4; OpenAI and Supabase list no drill key still active.
+5. [ ] Record in the roadmap: the date, `S`, each drill's result, the race line, the baseline check output, the final
+   switch states (deployment `true`, database `false`) and B8's month total (the query of §12.2, step 5).
 
 ## 13. Mobile staging connection (prepared, NOT published)
 
