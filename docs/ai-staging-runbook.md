@@ -1029,10 +1029,16 @@ Vercel `MOBILE_AI_ENABLED=false`, redeploy. Record the abort and its reason in t
    ```
 
    It must print `COMPATIBLE`: the server is the code B7 run #3 passed with (900ee77). Anything else stops B8 before a
-   billed request: for an older deployment, create a new Production deployment of `master`'s head (not a Redeploy,
-   which keeps the old commit) and check again; a newer one whose server code differs needs a
-   reviewed decision on whether it changes what B7 measured. A Vercel Redeploy keeps the commit, so this holds through
-   the drills.
+   billed request:
+   - **an older deployment** (for example one from before 900ee77): make a **new** Production deployment built from
+     `master`'s current head through the project's Git integration, then note its new `S` and run the check again.
+     Never Redeploy or Promote the existing deployment: both keep its old commit. If pushes to `master` stopped producing
+     Production deployments, find out why and record it before going on;
+   - **a newer one whose server code differs** from 900ee77: a reviewed decision on whether it changes what B7 measured.
+
+   `probe.js api` cannot tell an old server from a current one (its request is protocol v2, which every server since B6
+   accepts), so this check is the only proof of the revision. During the drills, every Redeploy starts from this
+   current Production deployment, so `S` holds through them.
 3. [ ] The deployment variables as §4.4, `MOBILE_AI_ENABLED=true`. If it was set to `false` meanwhile, set `true` and
    redeploy.
 4. [ ] The database switch off and the environment right: the baseline check prints `enabled = false`,

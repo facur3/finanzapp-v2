@@ -1,7 +1,8 @@
 # FinanzApp mobile: living roadmap
 
 Updated: 2026-10-12 (25A-06 B8 preparation, docs only: the B8 baseline with an app-wide month of USD 1, proposed by the
-owner and not yet applied; drill restores, race setup and start-state checks corrected in the runbook; nothing remote
+owner and not yet applied; drill restores, race setup and start-state checks corrected in the runbook; the owner's
+first start-state checks recorded, organization billing and a current staging deployment still open; nothing remote
 changed; «Producto 25A-06». Earlier the same day: Expo SDK 57 patch alignment for `expo install --check`, six packages,
 a new development build needed before iPhone QA, §1 «Builds and tooling»). Before (2026-10-11, 25A-06 B7, **run #3 PASSED: `gpt-6-luna` adopted for staging, not for production**, docs only:
 owner decisions C(a) and E(a) and a third, separate one-run approval of 200 000 µUSD recorded; the owner ran B7 run #3
@@ -6001,6 +6002,14 @@ nothing of it is on a screen yet.
     drills with it on; each states its before-state, expected result and verified restore, with one abort path. The
     revoked-key drills end only when the original key is back, a billed or free probe proves it, and the drill key shows
     revoked. The deployment switch (`MOBILE_AI_ENABLED`) and the database kill switch stay separate.
+  - **Start state reported by the owner (2026-10-12), runbook §12.2.** Verified: the Supabase staging environment is
+    right and the database switch is `false` (step 4); `probe.js api` seven of seven PASS, exit 0 (step 7, to repeat after
+    the new deployment); the OpenAI staging project has a USD 5 spend limit with enforcement on, spend alerts, and
+    `gpt-6-luna` as its allowed model (part of step 1). **Still open, not complete:** step 1's organization-level
+    auto-recharge OFF and the credit balance, to be confirmed by the owner; step 2, the deployed revision: Vercel staging's
+    current Production deployment is `3043ca2` (2026-10-05), which is older than 900ee77, so the check does not print
+    `COMPATIBLE` and B8 cannot start until a **new** Production deployment of current `master` exists and passes it
+    (current `master` does). The B8 baseline is not applied; AI stays off.
 - **Owner refinements before accepting the runbook (2026-10-05, in this PR).**
   - **Staging region:** Vercel Functions `gru1` (São Paulo) and the staging Supabase project in the specific region
     `sa-east-1` (São Paulo), replacing `iad1` / us-east-1. The reasons: Argentina-first, the API compute next to its
