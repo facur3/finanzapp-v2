@@ -1106,11 +1106,13 @@ submit (Producto 26); whether the marketing page ships with 1.0 or after it is a
   - Never animated, never on a whole phrase.
 - **Colour.** The concept uses Sapphire + sand, the preferred direction for further comparison
   ([brand-brief.md §4.9](brand-brief.md)). The built page takes whichever identity the owner selects at §9.4 step C.
-- **Structure for an AI-first release** (roadmap §4, «Owner preference, 2026-10-13»):
+- **Structure if the first public build includes the Assistant** (the release order is roadmap §4's; this concept
+  decides no release):
   1. **Hero.** One sentence; a real Inicio screenshot captioned «Datos ficticios»; one call to action by state:
      TestFlight, a consent-based list, or Apple's badge once the app is live.
   2. **The Assistant block.** A sentence becomes a draft to review: Confirmar, Editar, Descartar. It is published only
-     if the Assistant is in the App Store build, and says only what that build does.
+     if the Assistant is in the App Store build, and says only what that build does; without it, the page goes from the
+     hero straight to the everyday capabilities.
   3. **Everyday capabilities.** Cards and cuotas, what is coming, reports and budgets, separate currencies, no account
      for manual entry. A dashed «Más adelante» tile names nothing as available.
   4. **Privacy.** The privacy policy's own words.

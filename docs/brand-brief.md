@@ -257,7 +257,9 @@ name, logo or brand identity: the naming, trademark and confusing-similarity gat
 
 ### 4.9 Sapphire + sand, the preferred direction for further comparison (owner, 2026-10-13)
 
-**Preferred for further comparison. Not selected, not implemented.** Electric Lime stays the product palette
+**Preferred for further comparison. Not selected, not implemented.** *(Later on 2026-10-13 the owner named B the
+preferred main visual direction: it is planned as a separate trial PR on top of PR #107's `onSemantic`, kept unmerged
+until physical iPhone QA and the owner's explicit approval; no logo is selected.)* Electric Lime stays the product palette
 (`apps/mobile/src/ui/palette.ts`, §4.8). No production palette changes until the owner approves one, at step C of
 [app-store-launch.md §9.4](app-store-launch.md#94-brand-naming-and-identity-gate).
 
@@ -278,33 +280,62 @@ name, logo or brand identity: the naming, trademark and confusing-similarity gat
    - `dockActive`: #403E38 light, #43413B dark;
    - `heroControl`: a darker track, #1A3A9E light, #1A3790 dark;
    - dark `elevated`: #34322D.
+
+   A token the sheet left out would keep its Electric Lime value, which is wrong on a dark-blue field: the amount's
+   symbol and cents would sit at 1.03–1.45:1, the status bar would stay dark over the field, the chosen segment's label
+   would be white on white, and switches and swipe actions would stay olive. The sheet below therefore lists every token
+   of `palette.ts`, PR #107's `onSemantic` included. Measured with the WCAG 2 formula `tests/theme.node.ts` uses (light /
+   dark): `heroMoneySymbol` 5.90 / 6.34 and `heroMoneyCents` 4.62 / 4.96 on the field (4.5 required; #C6C6CA would fail
+   at 4.48), symbol to cents 1.28; `heroStatusBar` `light` (field luminance 0.088 / 0.078); `heroThumbInk` on the thumb
+   17.13; the toggle's white knob 7.63 / 4.95 and its track against the off track 5.97 / 3.18; white on the swipe fills
+   at least 5.48; `onSemantic` on the four semantic fills at least 5.31 / 7.11. Two values change from 2026-10-03: dark
+   `tertiary` #A09B90 (with #9C978C, Reportes' idle bar is 2.99:1 against the 3:1 the chart test requires) and dark
+   `primary` #7E9BF7 (item 2).
 2. **The transfer tone (OWNER DECISION).** A warm taupe transfer sits 0–4° from the amber `warning`, and a slate transfer
    would sit about 20° from the sapphire brand. One of the three must move; meaning never rides on colour alone, so the
-   sign and the glyph rules stay.
+   sign and the glyph rules stay. Recommended: keep the owner-approved slate and separate it from the brand by
+   colourfulness instead of hue (Lab chroma about 10–12 against at least 51; colour distance 66 light, 44 dark), which
+   moves dark `primary` from #9DB4FF (1.04:1 and distance 33 from the dark slate, the same lightness) to #7E9BF7.
 3. **One bright object per screen.** In light mode the «+» and the filled Confirmar share the same sapphire. Whether the
-   «+» keeps the brand fill or takes ink with a sapphire glyph is an exploration item.
+   «+» keeps the brand fill or takes ink with a sapphire glyph is an exploration item. Electric Lime's «+» holds 7:1
+   against the graphite dock; a sapphire «+» cannot (2.21 light, 6.21 dark), so that rule becomes «+» against the canvas
+   it floats on, at least 3:1 (6.65 / 7.42). Dark mode also has three brand fills (#3D60D4 buttons and swipe, #4568DA
+   switch, #7E9BF7 «+»); one shared dark fill is an option for the iPhone.
 4. **The theme tests.** About a third of `tests/theme.node.ts` encodes Electric Lime itself (the 68–82° window, a light
    field, ink on the fill). Before any non-lime theme, or a 25F theme pack, the file is split:
    - accessibility assertions that every theme must pass;
-   - identity assertions, one set per theme.
+   - identity assertions, one set per theme. For B these are rewritten, not met: `heroThumbInk` equal to `heroInk`
+     (B's thumb ink is the light text), the amount's luminance order (on a dark field, ink > symbol > cents), the hue
+     window, the neutral-chroma rule for warm sand, transfer at least 90° from the brand (item 2), and the «+» against
+     the dock (item 3). `tests/spending-home.node.ts` and `tests/ui-rows.node.ts` each pin one Lime literal too.
 5. **The icon.** The mark must carry the distinction, and is tested at 29 pt on a real Home Screen in light, dark and
    tinted modes.
 6. **The iPhone.** The owner scores B against A on §4.5 through a local development build that swaps the token file.
    That build is not merged and carries no production change.
 
-**Token sheet B, as proposed** (light / dark; the names of `palette.ts`; not implemented):
+**Token sheet B, as proposed** (light / dark; every token of `palette.ts`; not implemented):
 
 | Token | Light | Dark |
 | --- | --- | --- |
 | background / surface / inset / elevated | #F3EFE6 / #FFFCF6 / #E9E3D6 / #FFFFFF | #0C0B0A / #1B1A18 / #24231F / #34322D |
-| text / secondary / tertiary / line | #19191C / #514E47 / #625E56 / #DDD6C8 | #F3F0E8 / #ADA89C / #9C978C / #2C2A26 |
-| primary = link / primarySoft | #2148C0 / #E4E9F7 | #9DB4FF / #19223F |
+| text / secondary / tertiary / line | #19191C / #514E47 / #625E56 / #DDD6C8 | #F3F0E8 / #ADA89C / #A09B90 / #2C2A26 |
+| primary = link / primarySoft | #2148C0 / #E4E9F7 | #7E9BF7 / #19223F |
 | primaryFill / onPrimary | #2148C0 / #FFFFFF | #3D60D4 / #FFFFFF |
+| thumb / toggle | #FFFFFF / #2148C0 | #3C3A35 / #4568DA |
 | hero / heroInk / heroSecondary / heroControl | #2148C0 / #FFFFFF / #D3DCF6 / #1A3A9E | #2446AE / #FFFFFF / #C9D4F5 / #1A3790 |
-| accent / onAccent | #2148C0 / #FFFFFF | #7E9BF7 / #0C0B0A |
+| heroThumb / heroThumbInk | #FFFCF6 / #19191C | #FFFCF6 / #19191C |
+| heroMoneySymbol / heroMoneyCents | #E2E2E5 / #C9C9CD | #E2E2E5 / #C9C9CD |
+| heroStatusBar | light | light |
+| accent / onAccent | #2148C0 / #FFFFFF | #7E9BF7 / #19191C |
 | dock / dockInk / dockActive / dockActiveInk | #1E1D1B / #A9A498 / #403E38 / #FFFFFF | #201F1C / #A9A498 / #43413B / #FFFFFF |
 | income / expense / warning | #1F7A4F / #B3432E / #9A5B00 | #5CCB93 / #EE8A72 / #E8A94A |
-| transfer | open (item 2) | open (item 2) |
+| transfer | #48606F, the slate kept (item 2) | #A3B5C4 (item 2) |
+| onSemantic (PR #107) | #FFFFFF | #19191C |
+| swipeDestructive / swipeNeutral / swipeAccent | #B3432E / #5E5A52 / #2148C0 | #B8412D / #524F48 / #3D60D4 |
+| shadow | rgba(25, 25, 28, 0.08) | rgba(0, 0, 0, 0) |
+
+The soft semantic tints (`incomeSoft`, `expenseSoft`, `warningSoft`, `transferSoft`) and `scrim` keep their current
+values; they pass on sand (semantic on its soft tint at least 4.55 light, 6.23 dark).
 
 ## 5. What the identity must stay away from
 
