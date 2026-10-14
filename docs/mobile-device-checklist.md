@@ -1,6 +1,40 @@
 # Physical iPhone acceptance checklist
 
-## Fix — «Pagar tarjeta» readable in dark (this PR)
+## Producto 25VIS2 — Sapphire + Sand trial (this PR; **not merged until this check passes and the owner approves**)
+
+Colour tokens only (`apps/mobile/src/ui/palette.ts`): Electric Lime replaced token for token by sheet B of
+[brand-brief.md](brand-brief.md) §4.9. No layout, navigation, copy, financial, schema or backup change; JavaScript only.
+**Needs a new development build from `master` first** (the installed one predates PR #106's native changes; owner
+authorization for the EAS build), then Metro from this branch. The end of Más reads «FinanzApp 0.1.0 (25VIS2)». Each
+item in light **and** dark, and the owner scores B against A (Electric Lime, `master`) on brand-brief.md §4.5.
+
+- [ ] **Inicio's field:** the sapphire field with white units; the currency symbol and the cents a step quieter, still
+  legible; «Hasta hoy» and the month label; the status bar **light** over the field, the scheme's own once scrolled past.
+- [ ] **Gastado | Disponible on the field:** the chosen segment a sand-white thumb with ink text, the other label pale
+  sapphire; the scope chip and the accounts button readable on the darker control fill.
+- [ ] **The dock and «+»:** the graphite pill with warm grey glyphs and the white selected glyph in its capsule; the
+  «+» stands out against the canvas (sapphire in light, periwinkle with ink in dark), with Reduce Transparency **on and
+  off**. Whether one bright object per screen holds when Confirmar is also sapphire (brand-brief.md §4.9, item 3).
+- [ ] **The capture hub:** the Assistant tile (the field's sapphire with a white circle) against the hub surface,
+  especially in dark (the tile is close to the dark sheet: 2.1:1, a shape, not text); its resume line when present.
+- [ ] **Buttons:** a filled Confirmar / Guardar (white on sapphire; dark #3D60D4); a **disabled** filled button still
+  reads as disabled; «Pagar tarjeta» (slate, `onSemantic`) in both; swipe actions on a movement (destructive, neutral,
+  pay/resume).
+- [ ] **Text and links:** «Ver todos», selected choices and checks in sapphire (light) and periwinkle (dark); the
+  currency switch's chosen code on its inset; switches that are on (white knob visible).
+- [ ] **Semantics apart from the brand:** a transfer's slate amount next to a sapphire link reads as a different thing
+  (owner decision on the transfer tone, brand-brief.md §4.9, item 2); income green, expense red, warning amber unchanged.
+- [ ] **Reportes:** the current month's bar and the idle bars (dark tertiary 3:1); the partial-month outline on the
+  selected bar; the donut's chosen category.
+- [ ] **Accounts:** an account using the cobalt preset (#2557D6) next to the sapphire brand in light (close in colour:
+  an owner call whether it reads as a separate identity).
+- [ ] **The quiet zero hero** (an empty month) and the first opening (onboarding) on the sand canvas.
+- [ ] **Accessibility:** VoiceOver order unchanged; the largest Dynamic Type size on Inicio; Increase Contrast (not
+  handled by the app, before or after); Smart Invert.
+- [ ] **Owner choices before approval:** the slate transfer kept or not; one dark brand fill or the three
+  (#3D60D4 buttons and swipes, #4568DA switches, #7E9BF7 «+»); the cobalt account preset.
+
+## Fix — «Pagar tarjeta» readable in dark (PR #107, merged)
 
 Colour only: a filled semantic button's label and glyph take `onSemantic` (white in light, ink in dark). Nothing else moves.
 

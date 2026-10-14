@@ -199,7 +199,7 @@ test('a row names kind, amount, merchant, category, destination, date, source an
   assert.match(emptyRow.props.accessibilityLabel, /^Gasto o ingreso, Sin monto, Sin comercio, Categoría: Falta completar, Dónde se registra: Falta completar, Fecha: Falta completar, Asistente, Faltan 7 datos$/);
 });
 
-test('an incomplete draft reads neutral, never as an error; stale and interrupted ask in amber; only a conflict takes the negative tone; lime is never a state', () => {
+test('an incomplete draft reads neutral, never as an error; stale and interrupted ask in amber; only a conflict takes the negative tone; the brand is never a state', () => {
   const incomplete = itemOf(drafted({ category: null }));
   const stale = itemOf({ ...drafted(), basis: [{ kind: 'account', id: bank.id, revision: 4 }] });
   const interrupted = itemOf(drafted(), { attempt: domain.writeForReviewDraft(drafted(), archive as domain.ReviewArchive, { writeId: 'w-x', createdAt, todayISO: today }) });
@@ -236,7 +236,7 @@ test('the tray has no in-app producer: no development action creates a proposal,
 
 // ---- the detail ---------------------------------------------------------------------------------------------------------
 
-test('a complete, current proposal: what will be recorded, where and when, and Confirmar (the one lime action) calls the store once at the shown revision', async () => {
+test('a complete, current proposal: what will be recorded, where and when, and Confirmar (the one brand-filled action) calls the store once at the shown revision', async () => {
   const item = itemOf(drafted(), { revision: 3 });
   const ledger: Ledger = { review: trayOf([item]), calls: [] };
   const view = harness('review/[id].tsx', ledger, { id: item.id });
@@ -247,7 +247,7 @@ test('a complete, current proposal: what will be recorded, where and when, and C
     Fecha: i18nFormat.formatDate(today, 'dayYear', 'es-AR'), Origen: 'Asistente' });
   const confirm = button(root, 'Confirmar')!;
   assert.deepEqual([confirm.props.label, confirm.props.spokenLabel, confirm.props.disabled, confirm.props.secondary], ['Confirmar · $ 15.000,00', 'Confirmar, 15000,00 pesos', false, undefined],
-    'the primary (lime) fill; Editar and Descartar are secondary');
+    'the primary (brand) fill; Editar and Descartar are secondary');
   assert.deepEqual(['Editar', 'Descartar'].map(label => button(root, label)!.props.secondary), [true, true]);
   confirm.props.onPress();
   confirm.props.onPress(); // A second tap while the first is in flight does nothing.
@@ -642,7 +642,7 @@ test('25A-04 (Codex review of #85): a capture that committed while the tray coul
 
 // ---- 25A-04: the review sheet ------------------------------------------------------------------------------------------
 
-test('the review sheet shows the live item compactly, and Confirmar (the one lime action) calls the same dispatcher once, at the shown revision', async () => {
+test('the review sheet shows the live item compactly, and Confirmar (the one brand-filled action) calls the same dispatcher once, at the shown revision', async () => {
   const item = itemOf(drafted({ destinationId: cardAccount.id, purchase: { mode: 'once' } }), { revision: 2 });
   const ledger: Ledger = { review: trayOf([item]), calls: [] };
   const view = harness('review-sheet/[id].tsx', ledger, { id: item.id });

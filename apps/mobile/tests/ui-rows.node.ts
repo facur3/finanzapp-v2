@@ -348,7 +348,7 @@ test('A filled semantic ActionButton paints its label and glyph in onSemantic, r
   }
 });
 
-test('25VIS1 final: Inicio\'s Gastado | Disponible on the field: a white thumb with an ink label, the other label secondary; accessibilityState says which', () => {
+test('25VIS1 final, kept in 25VIS2: Inicio\'s Gastado | Disponible on the field: a light thumb with the light ink label, the other label secondary; accessibilityState says which', () => {
   for (const palette of [lightPalette, darkPalette]) {
     const ui = load('components.tsx', {}, 1, 390, { ...palette, isDark: palette === darkPalette });
     const props = { onField: true, value: 'spent', onChange: () => {}, options: [{ value: 'spent', label: 'Gastado' }, { value: 'available', label: 'Disponible' }] };
@@ -358,7 +358,7 @@ test('25VIS1 final: Inicio\'s Gastado | Disponible on the field: a white thumb w
     assert.equal(flat(control.props.style).backgroundColor, palette.heroControl, 'the track is unchanged');
     const thumb = nodes(control).find(node => node.type === 'Animated.View')!;
     assert.equal(flat(thumb.props.style).backgroundColor, palette.heroThumb);
-    assert.deepEqual([palette.heroThumb, palette.heroThumbInk], [lightPalette.surface, palette.heroInk], 'white thumb, ink label, in both themes');
+    assert.deepEqual([palette.heroThumb, palette.heroThumbInk], [lightPalette.surface, lightPalette.text], 'the light surface\'s thumb and ink, in both themes');
     const labels = nodes(control).filter(node => node.type === 'Animated.Text');
     assert.deepEqual(labels.map(label => flat(label.props.style).color), [palette.heroThumbInk, palette.heroSecondary]);
     assert.deepEqual(labels.map(label => flat(label.props.style).fontWeight), ['600', '500'], 'weight marks the chosen one too, not colour alone');

@@ -1,6 +1,9 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-14 (25A-06 B8 preparation, **automatic Production deployments of `master`**, PR #110:
+Updated: 2026-10-14, latest (**Producto 25VIS2, Sapphire + Sand trial**, on its branch, **unmerged until physical
+iPhone QA and the owner's approval**: brand-brief.md §4.9's sheet B token for token in `palette.ts`, the Lime identity
+tests rewritten and every accessibility assertion kept; no layout, navigation or financial change; JavaScript only, but
+the iPhone check needs a new development build from `master`; «Producto 25VIS2», §2). Before (2026-10-14, 25A-06 B8 preparation, **automatic Production deployments of `master`**, PR #110:
 `vercel.json`'s `git.deploymentEnabled` (`"**": false`, `"master": true`) replaces the `ignoreCommand` that canceled
 every Git-triggered Production build, owner decision to fix it before B8; B8's revision check becomes a tested script
 that denies by default and accepts only that reviewed change; nothing deployed, merged or configured remotely;
@@ -910,6 +913,10 @@ it was checked in). Metro from `master` (or a delivery's branch) on the installe
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
+- **25VIS2 — Sapphire + Sand trial (on its branch, unmerged; a new development build from `master` first):** the
+  checklist's «Producto 25VIS2» in light and dark, then the owner's score against Electric Lime and three choices (the
+  transfer tone, one or three dark brand fills, the cobalt account preset). Not merged until then.
+- **Fix — «Pagar tarjeta» in dark (PR #107, merged; no EAS build):** the checklist's section; nothing device-verified.
 - **25A-06 — ledger currencies (PR #101; no EAS build; nothing
   device-verified):** every build stays disconnected; the fixture view is unchanged. With a connected build (25A-07), a
   ledger in MXN, COP, EUR or JPY records through the Assistant (the currency chips name any ledger currency in the
@@ -4413,6 +4420,24 @@ nothing of it is on a screen yet.
   local, Linux, same results: root `npm test` 590 passed, 1 todo; `check:repo` OK; `typecheck` OK; `test:storage` 1247
   passed, 0 failed; `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0 errors, 0 stale; `check` OK;
   `export:ios` OK. No account, handle, ad account or campaign created.
+
+### Producto 25VIS2 — Sapphire + Sand trial (on its branch; unmerged until iPhone QA and the owner's approval)
+
+- **Scope.** brand-brief.md §4.9's sheet B in `apps/mobile/src/ui/palette.ts`, token for token under the same names
+  (PR #107's `onSemantic` included: white in light, #19191C in dark). Typography stays the system's (SF Pro); the
+  four-tab dock and the separate «+» are unchanged; no layout, navigation, copy, domain, storage, schema (14), backup
+  (v14), API or server change. The splash colour (`app.config.ts`, native) is left out so the trial stays JavaScript.
+- **Tests.** `tests/theme.node.ts`: every accessibility assertion kept, plus primary text on the inset and the field's
+  ink on its control fill; the Lime identity rewritten for sapphire (hue 218–232°, saturated; the amount's order by
+  contrast against the field; warm neutrals; the slate transfer apart by Lab chroma ≤ 15 and ΔE ≥ 40 from every brand
+  token; the «+» at least 3:1 against the canvas). `spending-home.node.ts` reads `heroStatusBar` (light over the
+  field), `ui-rows.node.ts` the light ink on the thumb. The version line reads «FinanzApp 0.1.0 (25VIS2)».
+- **Tight margins for the iPhone:** the cents 4.62:1 on the light field; dark primary on `elevated` 4.83:1; the dark
+  switch track 3.18:1 on the inset; the field's control fill 1.28:1 against the field (a shape, with its text 7:1+).
+- **Owner decisions before approval:** the transfer tone; one dark brand fill or three; the cobalt account preset
+  (#2557D6, close to the light brand).
+- **Gates.** Physical iPhone QA (the checklist's «Producto 25VIS2»), then the owner's explicit approval; only then a
+  merge. Lime's values stay in git history.
 
 ### Producto 25VIS1 — Electric Lime palette, accepted as the current palette (PR #83, merged)
 

@@ -257,7 +257,8 @@ name, logo or brand identity: the naming, trademark and confusing-similarity gat
 
 ### 4.9 Sapphire + sand, the preferred direction for further comparison (owner, 2026-10-13)
 
-**Preferred for further comparison. Not selected, not implemented.** *(Later on 2026-10-13 the owner named B the
+**Preferred for further comparison. Not selected; implemented only as an unmerged trial** (Producto 25VIS2, branch
+`feat/25vis2-sapphire-sand`, 2026-10-14: this sheet token for token, the theme tests split as item 4 says). *(Later on 2026-10-13 the owner named B the
 preferred main visual direction: it is planned as a separate trial PR on top of PR #107's `onSemantic`, kept unmerged
 until physical iPhone QA and the owner's explicit approval; no logo is selected.)* Electric Lime stays the product palette
 (`apps/mobile/src/ui/palette.ts`, §4.8). No production palette changes until the owner approves one, at step C of

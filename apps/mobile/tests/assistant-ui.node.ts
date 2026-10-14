@@ -195,7 +195,7 @@ test('25A-04: a proposal card shows what the review item holds, says what it nee
   assert.equal(all.some(node => node.type === 'AppText' && textOf(node) === 'Pendiente · Gasto'), true);
   assert.ok(all.some(node => node.type === 'AppText' && textOf(node) === 'Lista para confirmar.'));
   assert.deepEqual(all.filter(node => node.type === 'ActionButton').map(node => [node.props.label, node.props.secondary]), [['Revisar', true]],
-    'one way on: the review sheet; no Confirmar, Editar or Descartar in the chat, and no lime');
+    'one way on: the review sheet; no Confirmar, Editar or Descartar in the chat, and no brand fill');
   all.find(node => node.type === 'ActionButton')!.props.onPress();
   assert.deepEqual(calls, ['review:item-1']);
   assert.equal(pending.type, 'Appear');

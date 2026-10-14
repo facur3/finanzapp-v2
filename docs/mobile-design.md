@@ -19,6 +19,9 @@ visual y gestual en iPhone sigue pendiente. [Alcance del producto](decisions/002
 > «Reemplazado por la decisión 005». La parte de navegación de la decisión 003 (cinco pestañas) también queda
 > reemplazada por la 005; sus reglas de tarjetas siguen.
 >
+> **25VIS2 (prueba, sin mergear).** Sapphire + Sand reemplaza a Electric Lime token por token solo si el dueño la
+> aprueba en el iPhone; mientras tanto vale «Producto 25VIS1». Ver «Producto 25VIS2».
+>
 > **Desde 25VIS1 (2026-10-03, aceptada por el dueño en el iPhone).** Los colores de Forest se reemplazan por **Electric Lime** con los mismos
 > nombres de tokens (`src/ui/palette.ts`); la estructura de la decisión 005 no cambia. Lo vigente de color está en
 > «Producto 25VIS1»; donde abajo se lee «pino», «salvia» o un hex de Forest, vale como registro.
@@ -856,6 +859,28 @@ La selección de porciones dentro de la dona (solo visual, dentro del reporte) *
 barras de Día a día y una cabecera fija sólida. Siguen permitidos para una pasada siguiente; no hay ruta de detalle por comercio. El orden
 vinculante del roadmap no cambia: la próxima entrega de producto es 24T3; 24UX6C (Movimientos y Más) y 24UX6D
 (Tarjetas) siguen a 24UX6B en el carril UX, y su lugar frente a 24T3 lo decide el dueño (ver `docs/mobile-roadmap.md`).
+
+## Producto 25VIS2 — Sapphire + Sand, prueba (sin mergear; sin rediseño)
+
+En su rama `feat/25vis2-sapphire-sand` desde master 6611376. **No se mergea hasta la revisión en el iPhone físico y la
+aprobación explícita del dueño**; hasta entonces Electric Lime («Producto 25VIS1») sigue siendo la paleta del producto.
+Implementa la hoja B de [brand-brief.md](brand-brief.md) §4.9 token por token, con los mismos nombres: ninguna
+pantalla, layout, navegación (las cuatro pestañas y el «+» aparte), texto, dominio, almacenamiento, esquema (14) ni
+backup (v14) cambia. La tipografía sigue siendo la del sistema (SF Pro): la app no carga otra fuente. Sin itálicas
+decorativas; ningún logo elegido.
+
+- **Marca.** Un zafiro real (≈225°, ni violeta ni azul marino): #2148C0 como campo de Inicio, botón principal y «+» en
+  claro; en oscuro el campo #2446AE, el botón #3D60D4, el interruptor #4568DA y el texto de marca y el «+» #7E9BF7
+  (periwinkle, con tinta encima). Sobre el campo, blanco; el símbolo y los centavos del monto, grises sólidos
+  (#E2E2E5, #C9C9CD; 5,9 y 4,6:1); la barra de estado clara sobre el campo en los dos temas.
+- **Arena.** Lienzo #F3EFE6, superficies #FFFCF6, tinta #19191C; en oscuro, casi negro cálido #0C0B0A. Todo lo que no
+  es marca es un neutro cálido (30–60°), nunca verde ni azul.
+- **Significados.** Ingreso, gasto y aviso sin cambios. La transferencia sigue pizarra: queda cerca del tono del zafiro
+  y se separa por saturación (croma ≤ 15 contra ≥ 40; ΔE ≥ 40), decisión del dueño pendiente (§4.9, punto 2).
+- **Pruebas.** `tests/theme.node.ts` conserva cada aserción de accesibilidad y reescribe las de identidad de Lime: la
+  ventana de 218–232°, la jerarquía del monto por contraste contra el campo, los neutros cálidos, la transferencia por
+  croma y distancia de color, el «+» contra el lienzo (≥ 3:1) y el texto de marca sobre el inset. Las de Inicio y la
+  fila de Gastado | Disponible leen el token, no el literal de Lime.
 
 ## Producto 25A-06 — activación del staging de la IA, fase A (sin cambios visuales)
 

@@ -109,7 +109,7 @@ export function Surface({ children, style, grouped = false }: { children: ReactN
 }
 
 /** A section heading with an optional text action on the right. `quiet` (Inicio, 24UX3) draws the action at footnote
- * size with a small chevron in the `link` ink (the brand text: olive-lime in light, soft lime in dark since 25VIS1): a visible, 44 pt tappable link
+ * size with a small chevron in the `link` ink (the brand text: sapphire in light, periwinkle in dark since 25VIS2): a visible, 44 pt tappable link
  * that reads as navigation without competing with the financial field. Elsewhere the action is the brand primary. */
 export function SectionTitle({ children, action, onAction, caption, captionLabel, quiet = false }: {
   /** `captionLabel`: what VoiceOver reads for the caption when it holds an amount (its spoken twin). */
@@ -166,9 +166,9 @@ export function PressFeedback({ children, style, containerStyle, feedback = 'sca
   </Pressable></Animated.View>;
 }
 
-/** The one filled call to action on a screen is the brand fill (Electric Lime
- * since 25VIS1) with ink on it. Secondary actions stay ink on the inset fill, so
- * a screen has at most one lime button; a semantic tone (a transfer, an income) still wins.
+/** The one filled call to action on a screen is the brand fill (sapphire since
+ * 25VIS2) with `onPrimary` on it. Secondary actions stay ink on the inset fill, so
+ * a screen has at most one brand-filled button; a semantic tone (a transfer, an income) still wins.
  * `spokenLabel` is the label for VoiceOver when it carries an amount ("Guardar
  * gasto, 1234,50 pesos", built with the spoken formatters); the button shows
  * `label` unchanged. */
@@ -543,7 +543,7 @@ const AMOUNT_COLUMN = '56%';
 export function Money({ minor, currency, large = false, color, signed = false, size, tone = 'neutral', weight, align = 'left', onField = false }: {
   minor: number; currency: Currency; large?: boolean; color?: string; signed?: boolean; size?: number; tone?: Tone; weight?: '500' | '600' | '700';
   align?: 'left' | 'center';
-  /** On Inicio's lime field (25A-03): a hero's symbol and cents take the field's solid graphite tones (`heroMoneySymbol`,
+  /** On Inicio's field (25A-03): a hero's symbol and cents take the field's solid quiet tones (`heroMoneySymbol`,
    * `heroMoneyCents`) instead of the ink at an alpha. The whole units keep `color`. */
   onField?: boolean;
 }) {

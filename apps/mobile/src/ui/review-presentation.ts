@@ -56,7 +56,7 @@ export function reviewFacts(item: ReviewItem, archive: ReviewArchive, context: R
 }
 
 /** The tone of a state's line: neutral while something is merely missing (an incomplete draft is not an error), amber when
- * the person must look again, the negative tone only for a conflict the ledger reports. Never lime: lime is Confirmar. */
+ * the person must look again, the negative tone only for a conflict the ledger reports. Never the brand: the brand fill is Confirmar. */
 export function stateTone(state: ReviewState): 'neutral' | 'warning' | 'expense' {
   return state === 'conflict' ? 'expense' : state === 'stale' || state === 'interrupted' ? 'warning' : 'neutral';
 }
