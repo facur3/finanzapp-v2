@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* B8's deployed-revision check (docs/ai-staging-runbook.md §12.2). No dependencies. On an up-to-date clone:
-   `node scripts/check-deployed-revision.mjs <the Production deployment's commit>` prints COMPATIBLE, or each reason it
-   is not and exits 1.
+   `node scripts/check-deployed-revision.mjs <the Production deployment's full commit SHA>` prints COMPATIBLE and that
+   SHA, or each reason it is not and exits 1.
 
    COMPATIBLE: the commit is on origin/master, at or after the commit B7 run #3 passed with, and everything a Vercel
    deployment can build, bundle or run is that commit's, except the reviewed changes below, each pinned to its exact
@@ -29,11 +29,13 @@ const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8',
 const attempt = (cwd, ...args) => { try { return git(cwd, ...args); } catch { return null; } };
 const exclude = path => path.startsWith(':(') ? ':(top,exclude,' + path.slice(2) : ':(top,exclude)' + path;
 
-/** Why `commit` is not COMPATIBLE; empty when it is. */
+/** Why `commit` (a full SHA: a branch, tag or short id could name another commit) is not COMPATIBLE; empty when it is. */
 export function incompatibilities(commit, { cwd = process.cwd(), base = B7_COMMIT, reviewed = REVIEWED, master = 'origin/master' } = {}) {
+  if (!/^[0-9a-f]{40}$/.test(commit)) return [`${commit} is not a full commit SHA (copy it from the deployment's page)`];
   const sha = attempt(cwd, 'rev-parse', '--verify', '--quiet', commit + '^{commit}');
   if (!sha) return [`${commit} is not a commit in this clone (run git fetch origin first)`];
   const short = base.slice(0, 7);
+  if (!attempt(cwd, 'rev-parse', '--verify', '--quiet', base + '^{commit}')) return [`${short} is not in this clone (a full, unshallow clone is needed)`];
   const reasons = [];
   if (attempt(cwd, 'merge-base', '--is-ancestor', base, sha) === null) reasons.push(`it is not at or after ${short}`);
   if (attempt(cwd, 'merge-base', '--is-ancestor', sha, master) === null) reasons.push(`it is not on ${master}`);
@@ -51,5 +53,5 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   if (!commit) { console.error('usage: node scripts/check-deployed-revision.mjs <deployment commit>'); process.exit(2); }
   const reasons = incompatibilities(commit);
   if (reasons.length) { reasons.forEach(reason => console.error('NOT COMPATIBLE: ' + reason)); process.exit(1); }
-  console.log('COMPATIBLE');
+  console.log('COMPATIBLE ' + commit);
 }

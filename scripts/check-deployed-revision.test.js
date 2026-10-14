@@ -20,8 +20,11 @@ describe('the reviewed changes are the ones in this tree', () => {
 
 describe('check-deployed-revision (a scratch repository)', () => {
   let dir, base;
-  const git = (...args) => execFileSync('git', ['-c', 'user.name=fixture', '-c', 'user.email=fixture@example.test', '-c', 'commit.gpgsign=false',
-    '-c', 'core.hooksPath=/dev/null', ...args], { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  // Isolated from the developer's git: no global or system config (ignore rules, hooks, signing), no inherited GIT_DIR.
+  const env = { ...Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.startsWith('GIT_'))),
+    GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' };
+  const git = (...args) => execFileSync('git', ['-c', 'user.name=fixture', '-c', 'user.email=fixture@example.test', ...args],
+    { cwd: dir, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
   const write = files => { for (const [path, content] of Object.entries(files)) {
     if (content === null) rmSync(join(dir, path)); else { mkdirSync(dirname(join(dir, path)), { recursive: true }); writeFileSync(join(dir, path), content); }
   } };
@@ -70,5 +73,7 @@ describe('check-deployed-revision (a scratch repository)', () => {
     const side = commit({ 'docs/a.md': 'side\n' });
     expect(check(side)).toEqual(['it is not on master']);
     expect(check('0'.repeat(40))[0]).toMatch(/is not a commit in this clone/);
+    for (const name of ['master', 'HEAD', base.slice(0, 12)]) expect(check(name)[0], name).toMatch(/is not a full commit SHA/);
+    expect(incompatibilities(base, { cwd: dir, base: 'f'.repeat(40), reviewed, master: 'master' })[0]).toMatch(/is not in this clone/);
   });
 });

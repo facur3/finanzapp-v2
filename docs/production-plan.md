@@ -179,8 +179,8 @@ No environment is created by this document. The matrix is the target; the "today
 
 **Vercel Preview is not an environment** (runbook §3). A Preview deployment of any branch, in either project, gets **no
 variable** in its scope (never Preview, never Development: an **OWNER ACTION** checked at runbook B1), is **not created
-by a push** (`vercel.json`'s `git.deploymentEnabled` deploys only pushes to `master`, as Production, **EXISTS TODAY**
-since PR #110, replacing the `ignoreCommand` that also canceled `master`'s own deployments, runbook §2.3; a push to an
+by a push** (`vercel.json`'s `git.deploymentEnabled` deploys only pushes to `master`, as Production, in the
+repository since PR #110 and confirmed on `master` by the first deployment after its merge, replacing the `ignoreCommand` that also canceled `master`'s own deployments, runbook §2.3; a push to an
 older branch follows its own `vercel.json` and gets no variable either) and is
 **closed by code** (`VERCEL_ENV` must be `production`). «Preview» is also an app variant and an EAS profile; none of
 the three is a backend environment.

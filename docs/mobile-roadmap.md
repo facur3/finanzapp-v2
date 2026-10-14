@@ -6020,7 +6020,10 @@ nothing of it is on a screen yet.
     built (it is Production today). The project's own Ignored Build Step is Automatic (owner, 2026-10-14);
     `vercel.json`'s `ignoreCommand` overrode it. The fix: `git.deploymentEnabled` `{"**": false, "master": true}`
     replaces `ignoreCommand` (Vercel's Git configuration reference: minimatch on the branch name, a deployment when any
-    matching rule is `true`). The rest of `vercel.json` is unchanged; no server, API, protocol or package file changes.
+    matching rule is `true`). The rest of `vercel.json` is unchanged; no deployed server, API, protocol or package file changes (one test file,
+    `server/mobile/staging/staging.test.js`, does). Observed on this PR: its branch push (a name with a slash) created
+    no Vercel deployment, where #109's was «Canceled by Ignored Build Step»; that a push to `master` deploys is verified
+    only after the merge (runbook §12.2).
     - *Preview and Development.* No push other than `master`'s creates a deployment; none has a variable (owner checks,
       runbook §2.2); the runtime guard is unchanged. New test (`staging.test.js`): the deployed entrypoints
       (`api/mobile/assistant.js`, `captures.js`) with every staging variable present and `VERCEL_ENV` `preview`,

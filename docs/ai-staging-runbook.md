@@ -277,8 +277,8 @@ Old branches are inert unless a deployment builds them with secrets. The protect
 1. No variable in a Preview or Development scope (§0.4, §4.4).
 2. `vercel.json`'s `git.deploymentEnabled` (since PR #110): a push to `master` creates the Production deployment; a push
    to any other branch creates **no deployment**. Vercel matches each rule against the branch name with minimatch and
-   deploys when any matching rule is `true`; `**`, unlike `*`, also matches names with a slash (`feat/x`), so the only
-   branch with a `true` rule is `master`. It holds for every branch created from `master` after PR #110.
+   deploys when any matching rule is `true`; in minimatch `**`, unlike `*`, also matches names with a slash (`feat/x`;
+   PR #110's own branch push created no deployment), so the only branch with a `true` rule is `master`. It holds for every branch created from `master` after PR #110.
 3. A push to an **older** branch still follows that branch's own `vercel.json` and can build a Preview. It gets no
    variable (layer 1) and Vercel Authentication (§4.3), and its code reads no secret that is not there.
 4. The runtime guard (§1): a route runs only with `VERCEL_ENV=production`, so a Preview or Development deployment of
@@ -1045,11 +1045,11 @@ Vercel `MOBILE_AI_ENABLED=false`, redeploy. Record the abort and its reason in t
    this repository on an up-to-date `master` (the check is the script of the checked-out `master`):
 
    ```
-   S=<the deployment's commit SHA>
+   S=<the deployment's full commit SHA, 40 characters>
    git fetch origin && git checkout master && git pull --ff-only && node scripts/check-deployed-revision.mjs "$S"
    ```
 
-   It must print `COMPATIBLE`. The script (`scripts/check-deployed-revision.mjs`, tested on a scratch repository by
+   It must print `COMPATIBLE` and that SHA (a branch name, a tag or a short id is refused). The script (`scripts/check-deployed-revision.mjs`, tested on a scratch repository by
    its `.test.js`) checks that `S` is on `origin/master`, at or after 900ee77, and that everything a deployment can
    build, bundle or run equals 900ee77's, the code B7 run #3 passed with. Deny by default: only `apps/mobile`, `docs`,
    `.github`, `scripts`, `LICENSES`, `.gitignore` and root `*.md` may differ freely. The reviewed changes since 900ee77
