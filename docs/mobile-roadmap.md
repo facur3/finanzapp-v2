@@ -4,7 +4,10 @@ Updated: 2026-10-14 (25A-06 B8 preparation, **automatic Production deployments o
 `vercel.json`'s `git.deploymentEnabled` (`"**": false`, `"master": true`) replaces the `ignoreCommand` that canceled
 every Git-triggered Production build, owner decision to fix it before B8; B8's revision check becomes a tested script
 that denies by default and accepts only that reviewed change; nothing deployed, merged or configured remotely;
-«Producto 25A-06», runbook §2.3, §4.3, §12.2). Before (2026-10-12, 25A-06 B8 preparation, docs only: the B8 baseline with an app-wide month of USD 1, proposed by the
+«Producto 25A-06», runbook §2.3, §4.3, §12.2). Before (2026-10-13, fix: on Tarjetas in dark, «Pagar tarjeta» was white on the light slate transfer tone, 2.1:1; a
+filled semantic button now takes the new `onSemantic` token, white in light and ink in dark, pinned for every semantic fill
+in both themes in `tests/theme.node.ts` and on the rendered button in `tests/ui-rows.node.ts`; no layout, copy or
+financial change; device check in the checklist). Before (2026-10-12, 25A-06 B8 preparation, docs only: the B8 baseline with an app-wide month of USD 1, proposed by the
 owner and not yet applied; drill restores, race setup and start-state checks corrected in the runbook; the owner's
 first start-state checks recorded, organization billing and a current staging deployment still open; nothing remote
 changed; «Producto 25A-06». Earlier the same day: Expo SDK 57 patch alignment for `expo install --check`, six packages,
