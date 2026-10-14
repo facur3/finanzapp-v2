@@ -255,6 +255,57 @@ name, logo or brand identity: the naming, trademark and confusing-similarity gat
   identity; no selector is built now. Every theme multiplies visual and accessibility QA and must pass light, dark,
   accessibility and semantic-colour QA before launch; the launch still needs one recognisable default identity.
 
+### 4.9 Sapphire + sand, the preferred direction for further comparison (owner, 2026-10-13)
+
+**Preferred for further comparison. Not selected, not implemented.** Electric Lime stays the product palette
+(`apps/mobile/src/ui/palette.ts`, §4.8). No production palette changes until the owner approves one, at step C of
+[app-store-launch.md §9.4](app-store-launch.md#94-brand-naming-and-identity-gate).
+
+**What the comparison found** (2026-10-13; research material kept privately, not in the repository, as §4.7 records):
+- **Method.** Three themes on the same five real layouts (Inicio, Movimientos, Asistente, Tarjetas, Reportes), with
+  one fictional dataset, in light and dark: A Electric Lime (shipped), B Sapphire + sand, C Refined Forest. It was HTML
+  in headless Chrome, not an iPhone: a stand-in for SF Pro, opaque dock material instead of glass.
+- **Scores** (1 to 5 per criterion, of 40): A 30, B 27, C 29. The weighting decides: if uniqueness counts double,
+  B and C lead.
+- **B's strengths.** The best screenshots, the most iOS-native feel, and the open territory of §5: warm paper with one
+  saturated accent that is not teal, coral or lime.
+- **B's weaknesses.** The weakest app icon (blue is the commonest colour on a Home Screen), and the generic «bank blue»
+  unless the hue stays a true sapphire (≈225°, never toward violet or navy).
+
+**Before B could be implemented** (each item is work for a later delivery, not a change now):
+1. **Accessibility fixes to its sheet.** Five assertions of `tests/theme.node.ts` fail on the 2026-10-03 values. These
+   proposal values, re-measured when tokens land, fix them:
+   - `dockActive`: #403E38 light, #43413B dark;
+   - `heroControl`: a darker track, #1A3A9E light, #1A3790 dark;
+   - dark `elevated`: #34322D.
+2. **The transfer tone (OWNER DECISION).** A warm taupe transfer sits 0–4° from the amber `warning`, and a slate transfer
+   would sit about 20° from the sapphire brand. One of the three must move; meaning never rides on colour alone, so the
+   sign and the glyph rules stay.
+3. **One bright object per screen.** In light mode the «+» and the filled Confirmar share the same sapphire. Whether the
+   «+» keeps the brand fill or takes ink with a sapphire glyph is an exploration item.
+4. **The theme tests.** About a third of `tests/theme.node.ts` encodes Electric Lime itself (the 68–82° window, a light
+   field, ink on the fill). Before any non-lime theme, or a 25F theme pack, the file is split:
+   - accessibility assertions that every theme must pass;
+   - identity assertions, one set per theme.
+5. **The icon.** The mark must carry the distinction, and is tested at 29 pt on a real Home Screen in light, dark and
+   tinted modes.
+6. **The iPhone.** The owner scores B against A on §4.5 through a local development build that swaps the token file.
+   That build is not merged and carries no production change.
+
+**Token sheet B, as proposed** (light / dark; the names of `palette.ts`; not implemented):
+
+| Token | Light | Dark |
+| --- | --- | --- |
+| background / surface / inset / elevated | #F3EFE6 / #FFFCF6 / #E9E3D6 / #FFFFFF | #0C0B0A / #1B1A18 / #24231F / #34322D |
+| text / secondary / tertiary / line | #19191C / #514E47 / #625E56 / #DDD6C8 | #F3F0E8 / #ADA89C / #9C978C / #2C2A26 |
+| primary = link / primarySoft | #2148C0 / #E4E9F7 | #9DB4FF / #19223F |
+| primaryFill / onPrimary | #2148C0 / #FFFFFF | #3D60D4 / #FFFFFF |
+| hero / heroInk / heroSecondary / heroControl | #2148C0 / #FFFFFF / #D3DCF6 / #1A3A9E | #2446AE / #FFFFFF / #C9D4F5 / #1A3790 |
+| accent / onAccent | #2148C0 / #FFFFFF | #7E9BF7 / #0C0B0A |
+| dock / dockInk / dockActive / dockActiveInk | #1E1D1B / #A9A498 / #403E38 / #FFFFFF | #201F1C / #A9A498 / #43413B / #FFFFFF |
+| income / expense / warning | #1F7A4F / #B3432E / #9A5B00 | #5CCB93 / #EE8A72 / #E8A94A |
+| transfer | open (item 2) | open (item 2) |
+
 ## 5. What the identity must stay away from
 
 The current identities of the products the owner named, described at a high level for differentiation only, from the

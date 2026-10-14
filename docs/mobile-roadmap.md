@@ -1,6 +1,9 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-12 (25A-06 B8 preparation, docs only: the B8 baseline with an app-wide month of USD 1, proposed by the
+Updated: 2026-10-13 (docs only: **Sapphire + sand is the owner's preferred visual direction for further comparison**, not
+selected and not implemented; Electric Lime stays the product palette; what B needs before it could land is in
+brand-brief.md §4.9; the landing concept is reworked with one clean sans-serif face and Electric Lime's restrained
+underline, app-store-launch.md §14). Before (2026-10-12, 25A-06 B8 preparation, docs only: the B8 baseline with an app-wide month of USD 1, proposed by the
 owner and not yet applied; drill restores, race setup and start-state checks corrected in the runbook; the owner's
 first start-state checks recorded, organization billing and a current staging deployment still open; nothing remote
 changed; «Producto 25A-06». Earlier the same day: Expo SDK 57 patch alignment for `expo install --check`, six packages,

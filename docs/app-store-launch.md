@@ -1092,6 +1092,37 @@ submit (Producto 26); whether the marketing page ships with 1.0 or after it is a
 - **The same honesty rules as the listing** (§9.1): real screens with clearly fictional data, no invented testimonials
   or numbers, no bank or Wallet-history claims. Any site analytics follows §7's principles and its own consent rules.
 
+**Landing concept (owner direction, 2026-10-13; a concept, not built).**
+- **Status.** A private mock exists with the brand material, outside the repository, because the page waits for the
+  public name. It uses the placeholder «Nombre» and fictional data.
+- **Type.**
+  - One clean sans-serif family for headlines and text: a free OFL grotesk such as Instrument Sans, with the licence
+    of the exact release checked before use.
+  - SF Pro appears only inside real screenshots.
+  - No decorative italics, no serif display, no all-caps headlines.
+- **The one ornament: Electric Lime's restrained underline.**
+  - A single underline in the brand colour under one key word of a heading, at most once per section (about 0.09 em
+    thick, offset about 0.14 em).
+  - Never animated, never on a whole phrase.
+- **Colour.** The concept uses Sapphire + sand, the preferred direction for further comparison
+  ([brand-brief.md §4.9](brand-brief.md)). The built page takes whichever identity the owner selects at §9.4 step C.
+- **Structure for an AI-first release** (roadmap §4, «Owner preference, 2026-10-13»):
+  1. **Hero.** One sentence; a real Inicio screenshot captioned «Datos ficticios»; one call to action by state:
+     TestFlight, a consent-based list, or Apple's badge once the app is live.
+  2. **The Assistant block.** A sentence becomes a draft to review: Confirmar, Editar, Descartar. It is published only
+     if the Assistant is in the App Store build, and says only what that build does.
+  3. **Everyday capabilities.** Cards and cuotas, what is coming, reports and budgets, separate currencies, no account
+     for manual entry. A dashed «Más adelante» tile names nothing as available.
+  4. **Privacy.** The privacy policy's own words.
+  5. **Preguntas.**
+  6. **Footer.** Ayuda, Privacidad and Términos.
+- **Responsive.**
+  - One column under about 820 px, with a 16 px gutter and no horizontal scroll: headline, text, call to action, then
+    the device.
+  - Two columns above that, with fluid type (`clamp()`).
+  - Light and dark follow the system.
+  - With `prefers-reduced-motion`, nothing moves.
+
 ---
 
 ## 15. Questions this document answers
