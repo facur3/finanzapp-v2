@@ -10,6 +10,10 @@ the owner's approval; public AI/Pro comes later, with AI work continuing in para
 checks are in the roadmap, §4 «Release plan to 2026-10-31». A public privacy-policy URL is required to submit; a custom
 domain is not a prerequisite to prepare. The visible App Store name can change before submission; the bundle identifier
 cannot change once a build is uploaded. This document stays the detail; nothing here was implemented by that update.
+Updated 2026-10-13: the owner prefers an AI-first public release. The free-core public option is withdrawn; the public
+release needs a working Assistant with the narrow v1 scope and its gates (roadmap §4 «Owner preference, 2026-10-13»;
+production-plan.md §6.8, §14). 2026-10-31 stays a target for the internal TestFlight candidate only. Where this document
+says free-core or «AI/Pro later», read it as that record.
 
 - **External facts** (Apple, Expo, RevenueCat) were read from the vendors' own pages on **2026-10-02** and are listed
   in §16. Prices, limits and guideline wording change: re-read the source before any decision that depends on one. A
