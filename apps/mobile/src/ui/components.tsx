@@ -179,7 +179,7 @@ export function ActionButton({ label, spokenLabel, onPress, disabled = false, bu
   const p = usePalette();
   const semantic = tone ? toneColors(p, tone) : null;
   const background = semantic ? (secondary ? semantic.soft : semantic.color) : secondary ? p.inset : p.primaryFill;
-  const color = semantic ? (secondary ? semantic.color : '#FFFFFF') : secondary ? p.text : p.onPrimary;
+  const color = semantic ? (secondary ? semantic.color : p.onSemantic) : secondary ? p.text : p.onPrimary;
   return <PressFeedback accessibilityRole="button" accessibilityLabel={spokenLabel ?? label} containerStyle={containerStyle}
     accessibilityState={{ disabled: disabled || busy, busy }} disabled={disabled || busy}
     onPress={onPress} style={[styles.button, compact && styles.buttonCompact, { backgroundColor: background, opacity: disabled || busy ? 0.5 : 1 }]}>

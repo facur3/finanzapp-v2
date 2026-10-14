@@ -194,8 +194,9 @@ and is not coupled to any API project (launch, brand and go-to-market slices).
 - [x] **Cheap token rejection** (`plausibleAccessToken`). A bearer value that is not a Supabase access token of this
   project, for a signed-in person, unexpired and not anonymous, is refused without a network call. `/auth/v1/user`
   remains the only authority (§10.2).
-- [x] **Vercel configuration** (`vercel.json`): `ignoreCommand` builds only Production deployments, so Previews are
-  skipped; one region `gru1` (São Paulo); `maxDuration` 60 s for `api/mobile/*.js`. Root `package.json` declares `engines.node`
+- [x] **Vercel configuration** (`vercel.json`): `git.deploymentEnabled` (`"**": false`, `"master": true`) deploys
+  only pushes to `master`, as Production; a push to any other branch creates no deployment (since PR #110, replacing
+  `ignoreCommand`, §2.3); one region `gru1` (São Paulo); `maxDuration` 60 s for `api/mobile/*.js`. Root `package.json` declares `engines.node`
   `24.x`.
 - [x] **Evaluation** (`server/mobile/evals/`):
   - `estimateExceededCount` (threshold `max: 0`), `servedModels`, `servedTiers`, token totals, `costTotalMicroUsd`,
@@ -273,14 +274,26 @@ Repository truth:
 ### 2.3 Git branches
 
 Old branches are inert unless a deployment builds them with secrets. The protection is layered:
-1. No variable in a Preview scope (§0.4).
-2. `ignoreCommand` on master skips Preview builds for every branch created from master after this PR.
-3. Previews of older branches can still build with their old `vercel.json`. Setting the project's **Ignored Build Step**
-   to the same command in the dashboard (§4.3) stops those too.
-4. The runtime guard (§1) applies only to code from this PR on.
+1. No variable in a Preview or Development scope (§0.4, §4.4).
+2. `vercel.json`'s `git.deploymentEnabled` (since PR #110): a push to `master` creates the Production deployment; a push
+   to any other branch creates **no deployment**. Vercel matches each rule against the branch name with minimatch and
+   deploys when any matching rule is `true`; in minimatch `**`, unlike `*`, also matches names with a slash (`feat/x`;
+   PR #110's own branch push created no deployment), so the only branch with a `true` rule is `master`. It holds for every branch created from `master` after PR #110.
+3. A push to an **older** branch still follows that branch's own `vercel.json` and can build a Preview. It gets no
+   variable (layer 1) and Vercel Authentication (§4.3), and its code reads no secret that is not there.
+4. The runtime guard (§1): a route runs only with `VERCEL_ENV=production`, so a Preview or Development deployment of
+   this code answers 503 and calls nothing even with every secret in its scope (`staging.test.js` calls the deployed
+   entrypoints that way).
 
-- [ ] **OWNER (optional, recommended):** set the Ignored Build Step on `finanzapp-api-staging` (§4.3). Deleting branches is
-  not part of 25A-06. If the owner wants it later, archive with a tag first.
+**Why not `ignoreCommand` (2026-10-14).** From 25A-06 Phase A until PR #110, `vercel.json` held
+`"ignoreCommand": "[ \"$VERCEL_ENV\" != production ]"` (exit 0 skips the build). On a push to `master` Vercel canceled
+every Production deployment at that step, without a build or a log, while a manual Redeploy of the same commit ran
+the same command and built: on the Git path the check did not see `VERCEL_ENV=production`. Vercel's documentation does
+not say which variables that step sees, so a branch filter that reads none replaces it. `git.deploymentEnabled` decides
+whether a push creates a deployment at all; it does not touch Redeploy, Promote or a CLI deployment, which stay owner
+actions (§12.2).
+
+- [ ] **OWNER (optional):** delete or archive (tag first) stale branches. Not part of 25A-06.
 
 ### 2.4 OpenAI
 
@@ -405,10 +418,14 @@ PR.
 - [ ] Production branch `master`. Node.js version **24.x**: the root `package.json` declares it.
 - [ ] Settings → Environment Variables → "Automatically expose System Environment Variables": **on**. The code
   requires `VERCEL_ENV=production`; without it every route stays closed.
-- [ ] Settings → Git → Ignored Build Step: custom command `[ "$VERCEL_ENV" != production ]`. This also stops Previews of
-  old branches whose `vercel.json` predates it. (`finanzapp-v2` is retired, §0.6.)
-- [ ] Deployment Protection: keep Vercel Authentication on for Previews. Previews are not built anyway. The production
-  domain stays public (§4.1).
+- [ ] The project's **Ignored Build Step** setting: **Automatic**, no custom command. `vercel.json`'s
+  `git.deploymentEnabled` decides which pushes deploy (§2.3); a custom command here would run on every push to `master`
+  and could cancel its Production deployment again. (Until PR #110 this step asked for a custom command; the owner
+  left it Automatic, confirmed 2026-10-14.) (`finanzapp-v2` is retired, §0.6.)
+- [ ] **Git Fork Protection: on** (Deployment Protection; the project field `gitForkProtection`): a pull request from a
+  fork never deploys without the owner's approval. A fork controls the `vercel.json` of its own commits.
+- [ ] Deployment Protection: keep Vercel Authentication on for Previews. No push other than `master`'s creates one. The
+  production domain stays public (§4.1).
 - [ ] Functions: Fluid compute either way. `maxDuration` comes from `vercel.json` (§4.5).
 - [ ] Do **not** add a custom domain, a rewrite, a cron, a firewall rule or a variable outside §4.4 without a reviewed
   change to this runbook.
@@ -1022,20 +1039,34 @@ Vercel `MOBILE_AI_ENABLED=false`, redeploy. Record the abort and its reason in t
 
 1. [ ] The owner's confirmation of the staging billing settings (§7.2: hard budget, auto-recharge OFF, prepaid balance,
    model access) recorded in the roadmap.
-2. [ ] **The deployed revision.** Vercel → `finanzapp-api-staging` → Deployments: the current Production deployment is
-   Ready, from `master`; note its commit `S`. Locally, on an up-to-date clone:
+2. [ ] **The deployed revision.** Vercel → `finanzapp-api-staging` → Deployments, filtered to Production: the deployment
+   marked **Current** is **Ready**, its branch is `master` and it was created by a push to `master` (not a Redeploy or a
+   Promote of another deployment); note its commit `S` (the full SHA from the deployment's page). Locally, in a clone of
+   this repository on an up-to-date `master` (the check is the script of the checked-out `master`):
 
    ```
-   S=<the deployment's commit SHA>
-   git fetch origin && git merge-base --is-ancestor 900ee77 "$S" && git diff --quiet 900ee77 "$S" -- api server packages vercel.json package.json package-lock.json && echo COMPATIBLE
+   S=<the deployment's full commit SHA, 40 characters>
+   git fetch origin && git checkout master && git pull --ff-only && node scripts/check-deployed-revision.mjs "$S"
    ```
 
-   It must print `COMPATIBLE`: the server is the code B7 run #3 passed with (900ee77). Anything else stops B8 before a
-   billed request:
+   It must print `COMPATIBLE` and that SHA (a branch name, a tag or a short id is refused). The script (`scripts/check-deployed-revision.mjs`, tested on a scratch repository by
+   its `.test.js`) checks that `S` is on `origin/master`, at or after 900ee77, and that everything a deployment can
+   build, bundle or run equals 900ee77's, the code B7 run #3 passed with. Deny by default: only `apps/mobile`, `docs`,
+   `.github`, `scripts`, `LICENSES`, `.gitignore` and root `*.md` may differ freely. The reviewed changes since 900ee77
+   are allowed one by one, each pinned to its exact content (git blob id):
+   - `vercel.json`: `git.deploymentEnabled` replaces `ignoreCommand` (PR #110, §2.3); nothing else in the file changed;
+   - `server/mobile/staging/staging.test.js`: that change's tests (a test file; no route imports it).
+
+   `api/`, the rest of `server/`, `packages/`, `package.json` and `package-lock.json` must be byte-identical to
+   900ee77, so the server and protocol are B7's. A new root file Vercel would read (`middleware.js`, `proxy.js`,
+   `vercel.ts`, `.vercelignore`, `.npmrc`, another lockfile) fails the check; the one-line `git diff -- api server
+   packages vercel.json package.json package-lock.json` it replaces let those through. Changing either reviewed file
+   again fails CI until its pinned id here is updated in a reviewed PR. Anything else stops B8 before a billed request:
    - **an older deployment** (for example one from before 900ee77): make a **new** Production deployment built from
      `master`'s current head through the project's Git integration, then note its new `S` and run the check again.
-     Never Redeploy or Promote the existing deployment: both keep its old commit. If pushes to `master` stopped producing
-     Production deployments, find out why and record it before going on;
+     Never Redeploy or Promote the existing deployment: both keep its old commit. If a push to `master` produced no
+     Production deployment, or a Canceled one, find out why and record it before going on (check that `vercel.json` at
+     `S` has `git.deploymentEnabled` and no `ignoreCommand`, and that the Ignored Build Step is Automatic, §4.3);
    - **a newer one whose server code differs** from 900ee77: a reviewed decision on whether it changes what B7 measured.
 
    `probe.js api` cannot tell an old server from a current one (its request is protocol v2, which every server since B6

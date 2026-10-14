@@ -332,6 +332,22 @@ test('24T3 carry-in: Reportes\' prominent switch reads at the subhead size, semi
   assert.equal(plain[0].props.adjustsFontSizeToFit, true);
 });
 
+test('A filled semantic ActionButton paints its label and glyph in onSemantic, readable in light and dark (Tarjetas «Pagar tarjeta»)', () => {
+  for (const palette of [lightPalette, darkPalette]) {
+    const ui = load('components.tsx', {}, 1, 390, { ...palette, isDark: palette === darkPalette });
+    const filled = ui.render('ActionButton', { label: 'Pagar tarjeta', icon: 'arrow-forward-outline', tone: 'transfer', onPress: () => {} });
+    const background = flat(nodes(filled).find(node => is(node, 'PressFeedback'))!.props.style).backgroundColor;
+    assert.equal(background, palette.transfer, 'the fill is still the transfer tone');
+    const label = nodes(filled).find(node => node.type === 'Text' && node.props.children === 'Pagar tarjeta')!;
+    assert.equal(flat(label.props.style).color, palette.onSemantic);
+    assert.equal(nodes(filled).find(node => is(node, 'Ionicons'))!.props.color, palette.onSemantic, 'the glyph matches the label');
+    // Its contrast against every semantic fill, in both themes, is pinned in theme.node.ts.
+    // The secondary form (the card detail's «Pagar tarjeta») keeps the tone as text on its soft tile.
+    const secondary = ui.render('ActionButton', { label: 'Pagar tarjeta', tone: 'transfer', secondary: true, onPress: () => {} });
+    assert.equal(flat(nodes(secondary).find(node => node.type === 'Text')!.props.style).color, palette.transfer);
+  }
+});
+
 test('25VIS1 final: Inicio\'s Gastado | Disponible on the field: a white thumb with an ink label, the other label secondary; accessibilityState says which', () => {
   for (const palette of [lightPalette, darkPalette]) {
     const ui = load('components.tsx', {}, 1, 390, { ...palette, isDark: palette === darkPalette });

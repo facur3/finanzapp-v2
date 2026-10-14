@@ -145,8 +145,9 @@ variables in the Production scope only (runbook §4.4), never Preview or Develop
   renamed or copied into it. The public landing page is not the API backend (launch, brand and go-to-market slices).
 
 The project's static output holds only a plain `404.html` (Vercel refuses an empty output
-directory), so `/` and every other path answer 404 and no web page is served. `vercel.json` builds
-only Production deployments (`ignoreCommand`), so Previews are not built; the code closes them too,
+directory), so `/` and every other path answer 404 and no web page is served. `vercel.json` deploys
+only pushes to `master`, as Production (`git.deploymentEnabled`), so other branches get no deployment; the code closes
+any Preview too,
 because a route runs only with Vercel's own `VERCEL_ENV=production`. One region, `gru1` (São Paulo), next to the
 staging Supabase project in sa-east-1 (runbook §4.2); `maxDuration` 60 s for `api/mobile/*.js`; Node.js `24.x`
 (root `package.json`). Without the owner's configuration (`server/mobile/runtime.js` reads

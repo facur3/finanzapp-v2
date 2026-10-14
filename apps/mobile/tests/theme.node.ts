@@ -38,6 +38,11 @@ for (const [name, p] of [['light', lightPalette], ['dark', darkPalette]] as cons
     assert.ok(contrast(p.text, p.thumb) >= 7, `ink on the compact thumb: ${ratio(p.text, p.thumb)}`);
     if (p === darkPalette) assert.ok(contrast(p.thumb, p.surface) >= 1.4, `the dark thumb separates from its track: ${ratio(p.thumb, p.surface)}`);
   });
+  test(`${name}: a filled semantic button's label holds 4.5:1 on every semantic fill («Pagar tarjeta» in dark was white on slate, 2.1:1)`, () => {
+    for (const [tone, fill] of [['expense', p.expense], ['income', p.income], ['transfer', p.transfer], ['warning', p.warning]] as const) {
+      assert.ok(contrast(p.onSemantic, fill) >= 4.5, `onSemantic on ${tone} ${fill}: ${ratio(p.onSemantic, fill)}`);
+    }
+  });
   test(`${name}: the section link is readable on the canvas and on a surface (24UX5)`, () => {
     // Inicio's «Ver todos» sits on the background; the token also holds on a surface should a link ever sit on a card.
     for (const ground of [p.background, p.surface]) assert.ok(contrast(p.link, ground) >= 4.5, `link on ${ground}: ${ratio(p.link, ground)}`);
