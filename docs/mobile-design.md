@@ -1049,6 +1049,11 @@ pasa a `heroInk` / `hero` con los mismos valores, así que no cambia.
 de la barra de estado al desplazar, el botón lleno sobre una hoja blanca, interruptores, formularios, Reportes, el
 Asistente, VoiceOver, texto grande; docs/mobile-device-checklist.md, «Producto 25VIS1»).
 
+**Corrección (2026-10-13): «Pagar tarjeta» legible en oscuro.** El botón lleno de Tarjetas usa el tono `transfer`, y
+en oscuro ese tono es una pizarra clara (#A3B5C4): el texto blanco quedaba en 2,1:1. Un botón semántico lleno ahora pinta
+su texto y su glifo con `onSemantic`: blanco en claro (5,3:1 o más sobre cada tono) y tinta (#131411) en oscuro (7,5:1 o
+más), como la lima lleva tinta. El botón secundario (texto del tono sobre su tinte suave) no cambia.
+
 ## Producto 25DISC1 — descubrimiento competitivo y brief de marca (sin cambios visuales)
 
 Solo documentación, en su rama `feat/producto-25disc1-competitive-brand-discovery` desde master d0a0be8 (25OPS1
