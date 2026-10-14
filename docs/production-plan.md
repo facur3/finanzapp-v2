@@ -178,9 +178,10 @@ No environment is created by this document. The matrix is the target; the "today
 | Secrets | None in the repository; none in the app | Server environment of the staging deployment only, Production scope of `finanzapp-api-staging` | Server environment of the production deployment only |
 
 **Vercel Preview is not an environment** (runbook §3). A Preview deployment of any branch, in either project, gets **no
-variable** in its scope (never Preview, never Development: an **OWNER ACTION** checked at runbook B1), is **not built**
-(`vercel.json`'s `ignoreCommand` skips every non-production build, **EXISTS TODAY** since 25A-06 Phase A; the same
-command as the project's Ignored Build Step also stops Previews of older branches, an **OWNER ACTION**) and is
+variable** in its scope (never Preview, never Development: an **OWNER ACTION** checked at runbook B1), is **not created
+by a push** (`vercel.json`'s `git.deploymentEnabled` deploys only pushes to `master`, as Production, in the
+repository since PR #110 and confirmed on `master` by the first deployment after its merge, replacing the `ignoreCommand` that also canceled `master`'s own deployments, runbook §2.3; a push to an
+older branch follows its own `vercel.json` and gets no variable either) and is
 **closed by code** (`VERCEL_ENV` must be `production`). «Preview» is also an app variant and an EAS profile; none of
 the three is a backend environment.
 
@@ -1953,7 +1954,7 @@ The release-gate audit covers at least:
 | What will the calendar show? | §10. |
 | What remains a gate rather than a completed capability? | §14. |
 | Where is the staging runbook? | [ai-staging-runbook.md](ai-staging-runbook.md): the activation order (checkpoints A, B1 to B11), the owner's steps, the scripts and the drills; this document keeps the architecture and the gates (§2.4, §4.4, §4.5, §6.7, §14.1). |
-| Can a Preview deployment reach a secret? | §2.2: no variable is ever scoped to Preview or Development, `ignoreCommand` skips Preview builds, and the code refuses any deployment whose `VERCEL_ENV` is not `production`, so a Preview that held a secret by mistake would still answer 503 and call nothing. |
+| Can a Preview deployment reach a secret? | §2.2: no variable is ever scoped to Preview or Development, `git.deploymentEnabled` deploys only pushes to `master`, and the code refuses any deployment whose `VERCEL_ENV` is not `production`, so a Preview that held a secret by mistake would still answer 503 and call nothing. |
 | What is Free vs Pro? StoreKit or RevenueCat? Where is the paywall? How do subscriptions restore? | [app-store-launch.md](app-store-launch.md) §1, §2, §3. |
 | How do we know who has Pro? Do we know a subscriber's Apple email? How can the owner or testers receive access? | [app-store-launch.md](app-store-launch.md) §4, §5. |
 | Where does Apple send the money? What still needs banking or tax setup? | [app-store-launch.md](app-store-launch.md) §6. |
