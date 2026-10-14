@@ -1315,33 +1315,43 @@ AI release ships until this is closed or the owner accepts, in writing, that the
 
 **Proposed design (privacy-compatible; needs a focused security and privacy review before any code):**
 
-- **Key.** At deletion, before the auth user is removed, the server computes
-  `identity_key = HMAC-SHA256(QUOTA_PEPPER, "apple:" + sub)`:
+- **Key.** At deletion, the server first refuses new AI reservations for that user, then, under the AI budget lock
+  `mobile_ai_reserve` already takes (`pg_advisory_xact_lock(91720601, 2)`), computes
+  `identity_key = HMAC-SHA256(QUOTA_PEPPER, "apple:" + sub)`, writes the carryover below, and only then removes the auth
+  user, so no reservation falls between the snapshot and the deletion (a row still `reserved` counts at its maximum, as
+  today):
   - `sub` is Apple's stable, team-scoped identifier, read server-side from the user's verified identity;
   - `QUOTA_PEPPER` is a server-only secret (an environment variable, never in the database or the app), so the
-    database alone cannot reverse or link the key.
-- **Stored.** One `mobile_ai_quota_carryover` row per `identity_key` and UTC period, holding only:
-  - the period (the UTC month, plus the current UTC day for the day ceiling);
+    database alone cannot reverse or link the key;
+  - without `QUOTA_PEPPER` the AI path refuses every request (fails closed) rather than derive another key.
+- **Stored.** One `mobile_ai_quota_carryover` row per (`identity_key`, period kind `day` or `month`, UTC period start),
+  holding only:
+  - that key (a day row and a month row are separate rows, each with its own expiry);
   - the period's settled plus reserved µUSD and request counts;
   - `expires_at` (the end of that period plus a short grace).
   - Not stored: no user id, e-mail, name, content, device data or ledger data.
   - No client role can read or write it.
 - **Applied, never consumed.** At every AI request, the server computes the same key from the user's Apple `sub`. A live
-  carryover row for the period adds to the person's counters, next to that user's own reservations (which, filtered by
-  the current user id as today, never include earlier accounts' spend). Applying the row does not delete it.
+  carryover row whose period start is the current UTC day or month adds to the person's day and month µUSD and request
+  counts, next to that user's own reservations (which, filtered by
+  the current user id as today, never include earlier accounts' spend). Applying the row does not delete it. The minute
+  and hour windows and concurrency are not carried (the day and month counts bound them), and the row never adds to the
+  global sums, which already count the unowned reservations.
 - **Cumulative across every deletion cycle.** At each deletion, the server adds the deleted account's own period usage
-  to the existing row, an upsert that sums, so nothing is counted twice:
+  to the row with the same key (day or month, same period start), an upsert that sums within that key only, so nothing
+  is counted twice:
   - the row already holds the earlier accounts' spend;
   - the account's reservations hold only its own.
 
   After any number of delete → sign-in cycles, the per-person counters equal the identity's whole period usage. The SQL
-  tests must pin two consecutive cycles and a cycle across a day and a month boundary.
+  tests must pin two consecutive cycles, a cycle across a day and a month boundary, and a reservation attempted while
+  the deletion is in progress.
 - **Retention and disclosure.** Rows are deleted only at `expires_at`, never on use. Rotating the pepper at a month
   boundary drops every link; rotating it mid-month would reset the carryover, so the procedure forbids it.
   - The privacy policy says it plainly: «Si borrás tu cuenta, guardamos hasta fin de mes un código irreversible derivado
     de tu identificador de Apple y tu uso del Asistente de ese mes, solo para aplicar el límite mensual».
   - The consent and deletion screens say the same in one line.
-  - Account deletion still removes every personal record (decision 006, guideline 5.1.1(v)).
+  - Account deletion still removes every other personal record (decision 006, guideline 5.1.1(v)).
 - **Legal note.** A peppered hash is still pseudonymous personal data. The legal basis (abuse prevention), the retention
   window and the disclosure need the review; nothing here is legal advice.
 
@@ -1855,7 +1865,9 @@ method (runbook §5). This reconciles the roadmap's 25A "mobile sign-in" with 25
 ## 13. Roadmap mapping
 
 Every production item belongs to an existing phase of [mobile-roadmap.md](mobile-roadmap.md). The binding order there
-is unchanged: 25A → 25A2 → 25C → 25C2 → 25D → 25E → 25F → 26. *(Proposed exception, 2026-10-10, pending the owner's written approval: a free-core 1.0 brings Producto 26 forward for the core that exists today, and the phases from 25A on follow it as updates in the same order; roadmap §4 «Release plan to 2026-10-31», choice 12.)* Section references with "launch" point to
+is unchanged: 25A → 25A2 → 25C → 25C2 → 25D → 25E → 25F → 26. *(Proposed exception, 2026-10-10, pending the owner's written approval: a free-core 1.0 brings Producto 26 forward for the core that exists today, and the phases from 25A on follow it as updates in the same order; roadmap §4 «Release plan to 2026-10-31», choice 12.)* *(Superseded 2026-10-13: no free-core 1.0. An AI-first
+exception, 26 brought forward for 25A's narrow scope with 25A2 … 25F following as updates, is a pending OWNER DECISION,
+roadmap §4 «Owner preference, 2026-10-13».)* Section references with "launch" point to
 [app-store-launch.md](app-store-launch.md).
 
 | Phase | Production items | Where |
@@ -1887,7 +1899,8 @@ Reconciliation notes:
 
 **Release target (owner, 2026-10-10; amended by the owner's preference of 2026-10-13: no public release without a working
 Assistant, roadmap §4 «Owner preference, 2026-10-13»):** an internal TestFlight candidate by the end of October; the public
-release is an AI-first release with the narrow v1 Assistant scope, not credible by the 31st; Pro later; the
+release is an AI-first release with the narrow v1 Assistant scope, not credible by the 31st; Pro at 1.0 or later, an
+OWNER DECISION (roadmap §4: a time-limited launch allowance or StoreKit and Pro first); the
 dated critical path and go/no-go checks are the roadmap's §4 «Release plan to 2026-10-31». The rows below stay the
 detail of each gate.
 
