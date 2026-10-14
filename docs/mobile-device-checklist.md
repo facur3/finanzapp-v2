@@ -1,5 +1,13 @@
 # Physical iPhone acceptance checklist
 
+## Fix — «Pagar tarjeta» readable in dark (this PR)
+
+Colour only: a filled semantic button's label and glyph take `onSemantic` (white in light, ink in dark). Nothing else moves.
+
+- [ ] Más → Tarjetas, dark appearance, a card with a «Saldo pendiente»: «Pagar tarjeta» reads as ink on the slate fill;
+  in light it is still white on the deeper slate. Disabled (nothing pending) stays dimmed in both.
+- [ ] The card detail's secondary «Pagar tarjeta» (slate text on its soft tile) is unchanged in both appearances.
+
 ## Producto 25A-06 — AI staging activation, Phase A (PR #87, merged; no device check required now)
 
 Repository preflight: the server's environment identity (`staging` only), the accepted key kinds, the database's

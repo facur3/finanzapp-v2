@@ -46,6 +46,9 @@ export const lightPalette = {
   /** `transfer`: a neutral slate (≈203°, low saturation), 6.6:1 on white, 5.4:1 on its tile. */
   expense: '#B3432E', income: '#1F7A4F', transfer: '#48606F', warning: '#9A5B00',
   expenseSoft: '#F7E6E1', incomeSoft: '#E2F1E8', transferSoft: '#E4EAEE', warningSoft: '#F7ECDB',
+  /** The label and glyph on a filled semantic button (`ActionButton` with a tone, not secondary): white on every light
+   * fill, 5.3:1 or more. */
+  onSemantic: '#FFFFFF',
   /** Trailing swipe actions (24UX4): solid fills under a white label, each 4.5:1 or more. Destructive is the negative
    * tone, the reversible action a quiet grey, the forward action (pay, resume) the brand's deep olive-lime. */
   swipeDestructive: '#B3432E', swipeNeutral: '#5D6159', swipeAccent: '#4A6100',
@@ -86,6 +89,8 @@ export const darkPalette: typeof lightPalette = {
   toggle: '#5C7A06',
   expense: '#EE8A72', income: '#5CCB93', transfer: '#A3B5C4', warning: '#E8A94A',
   expenseSoft: '#34201A', incomeSoft: '#13291D', transferSoft: '#1C252D', warningSoft: '#2F2413',
+  /** Dark: the semantic tones are light, so white on them fell to 2.0–2.5:1 («Pagar tarjeta» was 2.1:1); ink holds 7.5:1 or more. */
+  onSemantic: '#131411',
   /** Dark: deeper than the text tones so white holds 4.5:1 or more. */
   swipeDestructive: '#B8412D', swipeNeutral: '#50544D', swipeAccent: '#4E6600',
   shadow: 'rgba(0, 0, 0, 0)',

@@ -1,18 +1,24 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { main as probeMain, probeConfig, runProbe, RACE_PREFIX, INBOX_PROBE_ID } from './probe.js';
 import { main as reconcileMain, providerDays, reconcile } from './reconcile.js';
 import { TIMEOUTS_MS, CLIENT_TIMEOUT_MS } from '../runtime.js';
 import { OPENAI_REQUEST_KEYS } from '../openai.js';
+import assistantRoute from '../../../api/mobile/assistant.js';
+import captureRoute from '../../../api/mobile/captures.js';
 
 const root = new URL('../../../', import.meta.url);
 const read = path => readFileSync(new URL(path, root), 'utf8');
 
 describe('deployment configuration (vercel.json)', () => {
   const config = JSON.parse(read('vercel.json'));
-  it('builds only Production deployments, so a Preview never runs the API at all', () => {
-    // Exit 0 skips the build (Vercel's Ignored Build Step): every non-production deployment is skipped.
-    expect(config.ignoreCommand).toBe('[ "$VERCEL_ENV" != production ]');
+  it('deploys a push to master, its Production branch, and no push to any other branch', () => {
+    // git.deploymentEnabled: minimatch on the branch name, deploying when any matching rule is true. `**`, unlike `*`,
+    // also matches names with a slash (feat/x). It replaces ignoreCommand, whose check canceled every Git-triggered
+    // Production build of master (runbook §2.3); nothing else in the file changed (runbook §12.2).
+    expect(config.git).toEqual({ deploymentEnabled: { '**': false, master: true } });
+    expect(config.ignoreCommand).toBeUndefined();
+    expect(Object.keys(config).sort()).toEqual(['$schema', 'buildCommand', 'framework', 'functions', 'git', 'outputDirectory', 'regions']);
   });
   it('holds no variable: secrets live in the project settings, scoped to Production only', () => {
     expect(config.env).toBeUndefined();
@@ -31,6 +37,32 @@ describe('deployment configuration (vercel.json)', () => {
   });
   it('declares the Node major the functions run on', () => {
     expect(JSON.parse(read('package.json')).engines).toEqual({ node: '24.x' });
+  });
+});
+
+describe('a deployment that is not Production runs no route, even with every secret in its scope', () => {
+  // Every staging variable, as if scoped to Preview or Development by mistake (fixture values, never real keys).
+  const SCOPED_BY_MISTAKE = { MOBILE_ENVIRONMENT: 'staging', MOBILE_INTEGRATIONS_ENABLED: 'true', MOBILE_SUPABASE_URL: 'https://example.supabase.co',
+    MOBILE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_fixtureOnlyNotAKey', MOBILE_SUPABASE_SECRET_KEY: 'sb_secret_fixtureOnlyNotAKey',
+    MOBILE_AI_ENABLED: 'true', MOBILE_AI_PROVIDER: 'openai', MOBILE_AI_MODEL: 'gpt-6-luna', MOBILE_AI_API_KEY: 'sk-proj-fixture-only',
+    MOBILE_AI_PROVIDER_PROJECT: 'proj_fixtureOnly01' };
+  afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+  async function call(route, VERCEL_ENV) {
+    for (const [name, value] of Object.entries({ ...SCOPED_BY_MISTAKE, VERCEL_ENV })) vi.stubEnv(name, value);
+    const fetcher = vi.fn(async () => { throw new Error('no network call'); });
+    vi.stubGlobal('fetch', fetcher);
+    vi.spyOn(console, 'log').mockImplementation(() => {}); // the route's own telemetry line
+    const res = { code: 0, status(n) { this.code = n; return this; }, json() { return this; }, setHeader() {} };
+    await route({ method: 'POST', headers: { authorization: 'Bearer ' + 'x'.repeat(32), 'content-type': 'application/json' }, body: {} }, res);
+    return { code: res.code, calls: fetcher.mock.calls.length };
+  }
+  it('answers 503 from the deployed entrypoints before any session check, provider or database call', async () => {
+    for (const route of [assistantRoute, captureRoute]) {
+      for (const env of ['preview', 'development', undefined]) expect(await call(route, env), String(env)).toEqual({ code: 503, calls: 0 });
+      // The same configuration in Production opens the route (an implausible token is then refused, still offline):
+      // the 503 above comes from the environment alone.
+      expect(await call(route, 'production')).toEqual({ code: 401, calls: 0 });
+    }
   });
 });
 

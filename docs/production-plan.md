@@ -178,9 +178,10 @@ No environment is created by this document. The matrix is the target; the "today
 | Secrets | None in the repository; none in the app | Server environment of the staging deployment only, Production scope of `finanzapp-api-staging` | Server environment of the production deployment only |
 
 **Vercel Preview is not an environment** (runbook §3). A Preview deployment of any branch, in either project, gets **no
-variable** in its scope (never Preview, never Development: an **OWNER ACTION** checked at runbook B1), is **not built**
-(`vercel.json`'s `ignoreCommand` skips every non-production build, **EXISTS TODAY** since 25A-06 Phase A; the same
-command as the project's Ignored Build Step also stops Previews of older branches, an **OWNER ACTION**) and is
+variable** in its scope (never Preview, never Development: an **OWNER ACTION** checked at runbook B1), is **not created
+by a push** (`vercel.json`'s `git.deploymentEnabled` deploys only pushes to `master`, as Production, in the
+repository since PR #110 and confirmed on `master` by the first deployment after its merge, replacing the `ignoreCommand` that also canceled `master`'s own deployments, runbook §2.3; a push to an
+older branch follows its own `vercel.json` and gets no variable either) and is
 **closed by code** (`VERCEL_ENV` must be `production`). «Preview» is also an app variant and an EAS profile; none of
 the three is a backend environment.
 
@@ -740,6 +741,19 @@ Using AI does not upload the ledger. A custom category name is the most personal
 The consent screen must say exactly this. New fact kinds (budgets, cards, commitments) are added one at a time, each
 with a reason, each visible in the consent text; "send everything and let the model sort it out" is not an option.
 
+**Balance facts for the AI-first v1 (owner preference, 2026-10-13; NOT IMPLEMENTED).** The narrow v1 scope (roadmap §4,
+«Owner preference, 2026-10-13») answers questions about the person's balances, which the table above does not send. A
+balance fact kind is one of the «new fact kinds added one at a time». The candidates are the balance of each live account
+that is neither a card nor a debt, per currency, and the «Disponible» figure that `availableFigure` computes: the same
+number Inicio shows, never a recomputation. Each one must be bounded, typed and cited like the others. Before any build
+sends one, it needs:
+1. the reason recorded here;
+2. its line in the consent text;
+3. eval corpus cases, and a protocol version if a new fact id needs it (§5.5a);
+4. a paid evaluation only under a new written approval (§5.5b, §5.8).
+
+Account names stay out unless that slice records why one is needed.
+
 **Exact date and date-range questions (DECIDED by the owner, 2026-10-05; IMPLEMENTATION GATE of 25A-07).** A question
 scoped to an exact calendar date or range («¿Qué gasté el 20 de septiembre?») is answered from deterministic local
 evidence, before any visual calendar exists:
@@ -1290,6 +1304,64 @@ ceilings of §6.6 will be sized and reviewed. No amount is set here.
 
 ---
 
+### 6.8 Account deletion and the per-person ceilings (LAUNCH BLOCKER, security; NOT IMPLEMENTED)
+
+**The loophole (recorded 2026-10-13, read from `server/mobile/schema.sql`).** Deleting an account cascades its
+`mobile_api_usage` rows and leaves its `mobile_ai_reservations` unowned (`user_id … on delete set null`), as decision
+006 specifies. Signing in again with the same Apple Account creates a new Supabase user. The per-person rate windows
+and money ceilings are counted from that user's own reservations, so they start again at zero. The global day and month
+ceilings still count the unowned rows, so total spend stays bounded by the app-wide cap. But one person can repeat
+delete → sign in to take far more than the per-person share, at the expense of everyone else's availability. **No public
+AI release ships until this is closed or the owner accepts, in writing, that the per-person ceilings reset on deletion.**
+
+**Proposed design (privacy-compatible; needs a focused security and privacy review before any code):**
+
+- **Key.** At deletion, the server first refuses new AI reservations for that user, then, under the AI budget lock
+  `mobile_ai_reserve` already takes (`pg_advisory_xact_lock(91720601, 2)`), computes
+  `identity_key = HMAC-SHA256(QUOTA_PEPPER, "apple:" + sub)`, writes the carryover below, and only then removes the auth
+  user, so no reservation falls between the snapshot and the deletion (a row still `reserved` counts at its maximum, as
+  today):
+  - `sub` is Apple's stable, team-scoped identifier, read server-side from the user's verified identity;
+  - `QUOTA_PEPPER` is a server-only secret (an environment variable, never in the database or the app), so the
+    database alone cannot reverse or link the key;
+  - without `QUOTA_PEPPER` the AI path refuses every request (fails closed) rather than derive another key.
+- **Stored.** One `mobile_ai_quota_carryover` row per (`identity_key`, period kind `day` or `month`, UTC period start),
+  holding only:
+  - that key (a day row and a month row are separate rows, each with its own expiry);
+  - the period's settled plus reserved µUSD and request counts;
+  - `expires_at` (the end of that period plus a short grace).
+  - Not stored: no user id, e-mail, name, content, device data or ledger data.
+  - No client role can read or write it.
+- **Applied, never consumed.** At every AI request, the server computes the same key from the user's Apple `sub`. A live
+  carryover row whose period start is the current UTC day or month adds to the person's day and month µUSD and request
+  counts, next to that user's own reservations (which, filtered by
+  the current user id as today, never include earlier accounts' spend). Applying the row does not delete it. The minute
+  and hour windows and concurrency are not carried (the day and month counts bound them), and the row never adds to the
+  global sums, which already count the unowned reservations.
+- **Cumulative across every deletion cycle.** At each deletion, the server adds the deleted account's own period usage
+  to the row with the same key (day or month, same period start), an upsert that sums within that key only, so nothing
+  is counted twice:
+  - the row already holds the earlier accounts' spend;
+  - the account's reservations hold only its own.
+
+  After any number of delete → sign-in cycles, the per-person counters equal the identity's whole period usage. The SQL
+  tests must pin two consecutive cycles, a cycle across a day and a month boundary, and a reservation attempted while
+  the deletion is in progress.
+- **Retention and disclosure.** Rows are deleted only at `expires_at`, never on use. Rotating the pepper at a month
+  boundary drops every link; rotating it mid-month would reset the carryover, so the procedure forbids it.
+  - The privacy policy says it plainly: «Si borrás tu cuenta, guardamos hasta fin de mes un código irreversible derivado
+    de tu identificador de Apple y tu uso del Asistente de ese mes, solo para aplicar el límite mensual».
+  - The consent and deletion screens say the same in one line.
+  - Account deletion still removes every other personal record (decision 006, guideline 5.1.1(v)).
+- **Legal note.** A peppered hash is still pseudonymous personal data. The legal basis (abuse prevention), the retention
+  window and the disclosure need the review; nothing here is legal advice.
+
+**Alternatives recorded for the review.**
+- Accept the reset, bounded by the global cap: an owner decision, to be weighed against the availability risk.
+- A cool-down before a deleted identity can use AI again: it needs the same key, so it is no simpler.
+- App Attest per-device keys: not an identity (decision 006). They do not survive a new device and are a later
+  complement only.
+
 ## 7. Wallet and Apple Pay capture (25A2)
 
 Roadmap: [mobile-roadmap.md](mobile-roadmap.md) «Producto 25A2 — Wallet Shortcut Capture». **NOT IMPLEMENTED.** No
@@ -1794,7 +1866,9 @@ method (runbook §5). This reconciles the roadmap's 25A "mobile sign-in" with 25
 ## 13. Roadmap mapping
 
 Every production item belongs to an existing phase of [mobile-roadmap.md](mobile-roadmap.md). The binding order there
-is unchanged: 25A → 25A2 → 25C → 25C2 → 25D → 25E → 25F → 26. *(Proposed exception, 2026-10-10, pending the owner's written approval: a free-core 1.0 brings Producto 26 forward for the core that exists today, and the phases from 25A on follow it as updates in the same order; roadmap §4 «Release plan to 2026-10-31», choice 12.)* Section references with "launch" point to
+is unchanged: 25A → 25A2 → 25C → 25C2 → 25D → 25E → 25F → 26. *(Proposed exception, 2026-10-10, pending the owner's written approval: a free-core 1.0 brings Producto 26 forward for the core that exists today, and the phases from 25A on follow it as updates in the same order; roadmap §4 «Release plan to 2026-10-31», choice 12.)* *(Superseded 2026-10-13: no free-core 1.0. An AI-first
+exception, 26 brought forward for 25A's narrow scope with 25A2 … 25F following as updates, is a pending OWNER DECISION,
+roadmap §4 «Owner preference, 2026-10-13».)* Section references with "launch" point to
 [app-store-launch.md](app-store-launch.md).
 
 | Phase | Production items | Where |
@@ -1824,8 +1898,10 @@ Reconciliation notes:
 
 ## 14. Readiness
 
-**Release target (owner, 2026-10-10; a target, not a mandatory deadline):** an internal TestFlight candidate by the end
-of October; a public free-core release is an option pending the owner's approval; AI and Pro later, AI work in parallel; the
+**Release target (owner, 2026-10-10; amended by the owner's preference of 2026-10-13: no public release without a working
+Assistant, roadmap §4 «Owner preference, 2026-10-13»):** an internal TestFlight candidate by the end of October; the public
+release is an AI-first release with the narrow v1 Assistant scope, not credible by the 31st; Pro at 1.0 or later, an
+OWNER DECISION (roadmap §4: a time-limited launch allowance or StoreKit and Pro first); the
 dated critical path and go/no-go checks are the roadmap's §4 «Release plan to 2026-10-31». The rows below stay the
 detail of each gate.
 
@@ -1853,6 +1929,8 @@ Nothing below is complete unless it says **EXISTS TODAY**. "Launch §n" is a sec
 | Assistant capability boundary (no generic tools) | all | **DECIDED**; **EXISTS TODAY** (no tools; the adapter's request keys are allowlisted and a tool call is refused, 25A-05) | Kept by review of every Assistant change |
 | Closed Assistant protocol v2 and v3, validated on the server and the device | 25A | **EXISTS TODAY** (v2 in 25A-05; v3 in 25A-06: v2 plus the interface `language` the reply is written in, the server accepting both); v1 retired, never deployed | the remaining v3 fields (language-neutral facts, the currency fields of currency.md §11) server first, later |
 | Cloud-AI consent screen | 25A | **NOT IMPLEMENTED**, **LAUNCH BLOCKER** | Built and shown before any send |
+| Balance facts for the v1 Assistant | 25A (AI-first v1) | **NOT IMPLEMENTED**; required by the owner's preference of 2026-10-13 | Its slice (§5.4), consent text, evals and an approved paid evaluation |
+| Per-person ceilings survive account deletion | 25A (session slice) | **NOT IMPLEMENTED**, **LAUNCH BLOCKER** (security) for public AI | §6.8: the reviewed carryover design, or the owner's written acceptance of the reset |
 | Provider port, model as configuration | 25A | **EXISTS TODAY** (25A-05); the OpenAI adapter disabled, nothing configured | — |
 | Model evaluation and choice | 25A | Corpus, harness and thresholds **EXIST TODAY** (25A-05; fixture run only, not model results); `estimateExceededCount` = 0 and the live-run gates added (25A-06 Phase A); B7 runs #1 and #2 (2026-10-08 UTC): **`gpt-6-luna` FAILED adoption** both times (run #1 five thresholds, run #2 four: `schemaValidRate` 0.9806, `intentAccuracy` 0.9417, `clarificationAccuracy` 0.8696, `groundedEvidenceAccuracy` 0.9; thresholds unchanged; both one-run approvals, 2026-10-07 and 2026-10-08, consumed; roadmap «Producto 25A-06», B7); **RESEARCH GATE**, **OWNER ACTION** (paid, approved amount) | The two general instruction rules of the run #2 record are merged (PR #94; string and fixture tests only: not a prediction of a live result); model arithmetic is decided and applied (decision B, 2026-10-08: no model arithmetic, stated in the instructions and measured by the scorer, §5.2; PR #95's prose-figure validator left unmerged by owner direction 2026-10-09); the currency inference is decided and applied on the device (decision D, 2026-10-08; the 25A-06 currency-inference PR, ARS and USD; the instructions' regional-word line unchanged); over-long optional names are decided and applied at the protocol boundary (decision A, 2026-10-09, PR #99); the transfer sentence (decision C(a)) and the approval's shape (decision E(a): one complete passing run against every threshold opens B8–B11) are decided 2026-10-11; **B7 run #3 PASSED** (2026-10-11, one approved run of at most 200 000 µUSD, now consumed; 8 158 µUSD): `gpt-6-luna` adopted for staging, not for production; B8 ready for owner-led execution; any further run needs its own written approval (runbook B7) |
 | Replacement of `gpt-5-mini` before 2026-12-11 | 25A | **DONE in code** (25A-05: removed; no model in code) | The model chosen by 25A-06's evaluation |
@@ -1953,7 +2031,7 @@ The release-gate audit covers at least:
 | What will the calendar show? | §10. |
 | What remains a gate rather than a completed capability? | §14. |
 | Where is the staging runbook? | [ai-staging-runbook.md](ai-staging-runbook.md): the activation order (checkpoints A, B1 to B11), the owner's steps, the scripts and the drills; this document keeps the architecture and the gates (§2.4, §4.4, §4.5, §6.7, §14.1). |
-| Can a Preview deployment reach a secret? | §2.2: no variable is ever scoped to Preview or Development, `ignoreCommand` skips Preview builds, and the code refuses any deployment whose `VERCEL_ENV` is not `production`, so a Preview that held a secret by mistake would still answer 503 and call nothing. |
+| Can a Preview deployment reach a secret? | §2.2: no variable is ever scoped to Preview or Development, `git.deploymentEnabled` deploys only pushes to `master`, and the code refuses any deployment whose `VERCEL_ENV` is not `production`, so a Preview that held a secret by mistake would still answer 503 and call nothing. |
 | What is Free vs Pro? StoreKit or RevenueCat? Where is the paywall? How do subscriptions restore? | [app-store-launch.md](app-store-launch.md) §1, §2, §3. |
 | How do we know who has Pro? Do we know a subscriber's Apple email? How can the owner or testers receive access? | [app-store-launch.md](app-store-launch.md) §4, §5. |
 | Where does Apple send the money? What still needs banking or tax setup? | [app-store-launch.md](app-store-launch.md) §6. |
