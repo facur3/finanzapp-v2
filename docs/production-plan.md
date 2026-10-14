@@ -1320,14 +1320,24 @@ AI release ships until this is closed or the owner accepts, in writing, that the
   - `sub` is Apple's stable, team-scoped identifier, read server-side from the user's verified identity;
   - `QUOTA_PEPPER` is a server-only secret (an environment variable, never in the database or the app), so the
     database alone cannot reverse or link the key.
-- **Stored.** A `mobile_ai_quota_carryover` row with only `identity_key`, the current UTC month, the month's and the
-  day's settled plus reserved µUSD and request counts, and `expires_at` (the end of the current UTC month plus a short
-  grace).
+- **Stored.** One `mobile_ai_quota_carryover` row per `identity_key` and UTC period, holding only:
+  - the period (the UTC month, plus the current UTC day for the day ceiling);
+  - the period's settled plus reserved µUSD and request counts;
+  - `expires_at` (the end of that period plus a short grace).
   - Not stored: no user id, e-mail, name, content, device data or ledger data.
   - No client role can read or write it.
-- **Applied.** At the next AI request of a new user, the server computes the same key from that user's Apple `sub`. A live
-  carryover row adds to the person's counters for its period, and is then deleted, or expires.
-- **Retention and disclosure.** Rows are deleted at `expires_at`; rotating the pepper at a month boundary drops every link.
+- **Applied, never consumed.** At every AI request, the server computes the same key from the user's Apple `sub`. A live
+  carryover row for the period adds to the person's counters, next to that user's own reservations (which, filtered by
+  the current user id as today, never include earlier accounts' spend). Applying the row does not delete it.
+- **Cumulative across every deletion cycle.** At each deletion, the server adds the deleted account's own period usage
+  to the existing row, an upsert that sums, so nothing is counted twice:
+  - the row already holds the earlier accounts' spend;
+  - the account's reservations hold only its own.
+
+  After any number of delete → sign-in cycles, the per-person counters equal the identity's whole period usage. The SQL
+  tests must pin two consecutive cycles and a cycle across a day and a month boundary.
+- **Retention and disclosure.** Rows are deleted only at `expires_at`, never on use. Rotating the pepper at a month
+  boundary drops every link; rotating it mid-month would reset the carryover, so the procedure forbids it.
   - The privacy policy says it plainly: «Si borrás tu cuenta, guardamos hasta fin de mes un código irreversible derivado
     de tu identificador de Apple y tu uso del Asistente de ese mes, solo para aplicar el límite mensual».
   - The consent and deletion screens say the same in one line.

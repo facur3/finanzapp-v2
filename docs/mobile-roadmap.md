@@ -6418,7 +6418,10 @@ this plan:
 - **Dates.** A public AI-first release is not credible by 2026-10-31. The 31st stays a target for the internal TestFlight
   candidate (milestone 1). No public date is recorded until B8 to B11 and the session slice have run.
 
-**2026-10-31 is a target, not a mandatory public release deadline.** The preferred near-term milestone is an internally
+**2026-10-31 is a target, not a mandatory public release deadline.** *(Superseded by «Owner preference, 2026-10-13» above: the free-core public path in the rest of this paragraph and
+in milestone 2, the free-core-only rows of the critical path, the free-core reading of the go/no-go checks and choices
+(1), (7), (11) and (12) no longer describe a public release; they are kept as the record of 2026-10-10. Milestone 1
+and its prerequisites are unchanged.)* The preferred near-term milestone is an internally
 testable TestFlight candidate by the end of October; a public free-core release is a valid option the owner has **not
 yet approved**; a public AI/Pro release comes later, and AI work continues in parallel with all of it. This plan
 sequences what exists; the detail stays in [app-store-launch.md](app-store-launch.md) (store, StoreKit, review
@@ -6456,7 +6459,9 @@ drills and cost reconciliation never ran, and no build can reach the server.
   first), an app icon, `ITSAppUsesNonExemptEncryption`
   answered, the Assistant not exposed (hub tile and route absent in that variant), the version line, and an EAS
   production build the owner authorises, uploaded to an App Store Connect record the owner created.
-- **2. Public free-core release (a valid option, pending the owner's approval; not decided).** The above, plus: the
+- **2. Public free-core release** *(Superseded by «Owner preference, 2026-10-13» above: no longer a public path. Its prerequisites below, except the
+  Assistant's absence and choice 11's deferral, become part of the AI-first public release's gates.)* *(Record of
+  2026-10-10: a valid option, pending the owner's approval; not decided.)* The above, plus: the
   cleared public name; privacy policy and support pages at public, stable URLs (a public privacy-policy URL is required;
   a purchased custom domain is preferred once the name is chosen but is not a prerequisite to start preparing the
   product or the pages); «Ayuda y comentarios» in Más; App Privacy answers (data not collected,
@@ -6478,7 +6483,7 @@ drills and cost reconciliation never ran, and no build can reach the server.
   in parallel now**, in bounded slices that never block the milestones above: currency-aware question facts (protocol v5,
   done 2026-10-11), evaluation preparation (the MXN/COP/JPY corpus expansion; decisions
   C(a) and E(a) recorded 2026-10-11), B7 run #3 (passed 2026-10-11), then B8–B11 and the session and consent slices.
-- **If the public free-core option is not approved,** milestone 1 still proceeds and serves as the internal test bed;
+- *(Record of 2026-10-10; with the 2026-10-13 preference this is the case that holds:)* **If the public free-core option is not approved,** milestone 1 still proceeds and serves as the internal test bed;
   if the identity gates slip, each day of slip moves the candidate one day (Apple's review, for a later public
   submission, usually takes one to two days but is not promised).
 
@@ -6496,11 +6501,13 @@ drills and cost reconciliation never ran, and no build can reach the server.
 | 10-18 | First EAS production build and internal TestFlight, only once the privacy policy is live and the §11.8 checks pass | OWNER authorises the build and upload |
 | 10-18 → 10-24 | Physical-device release gate on the TestFlight build, limited to what the 1.0 binary executes (checklist «Release gate»: 24T3, money and ledger flows, migrations from an older install, backup/restore, VoiceOver, large text, Reduce Motion/Transparency, cold start, memory) | OWNER on the iPhone; Claude fixes in hotfix PRs |
 | 10-20 → 10-23 | Whole-app security and privacy audit (production-plan.md §14.1) and fixes; the data-protection evaluation (production-plan.md §14: protection class verified on device, SQLCipher and key recovery assessed) | Claude; OWNER provides the device evidence and records the decision |
-| 10-24 → 10-26 | *Only if the public free-core release is approved:* screenshots, final metadata, final release-candidate build | Claude prepares; OWNER approves and builds |
-| 10-27 | *Only if approved:* go/no-go, then submission for review (manual release) | OWNER |
-| 10-28 → 10-31 | *Only if approved:* review buffer; answer App Review; release on approval. Otherwise: internal TestFlight iterations | OWNER |
+| 10-24 → 10-26 | *Superseded 2026-10-13 (no free-core public release); kept as record.* *Only if the public free-core release is approved:* screenshots, final metadata, final release-candidate build | Claude prepares; OWNER approves and builds |
+| 10-27 | *Superseded 2026-10-13; record.* *Only if approved:* go/no-go, then submission for review (manual release) | OWNER |
+| 10-28 → 10-31 | Internal TestFlight iterations (the free-core reading, «only if approved: review buffer; answer App Review; release on approval», is superseded 2026-10-13) | OWNER |
 
-**Go/no-go checks for a public submission (all must hold; 10-27 if the free-core release is approved).** The internal
+**Go/no-go checks for a public submission (all must hold; 10-27 if the free-core release is approved).** *(Superseded by «Owner preference, 2026-10-13» above: for the AI-first
+public release these checks still hold, except that the Assistant is **present** in the production variant, connected
+to the production backend, its device cases are not deferred, and the AI release gates listed above are added.)* The internal
 TestFlight needs the identifier, the shell, the privacy-policy URL and the §11.8 prerequisites only. Root and mobile suites, `check:repo`, catalogue and i18n gates and
 `export:ios` green on the candidate commit (Claude); the release gate on the TestFlight build passed, limited to the flows the binary executes, with no open
 money, data-loss or crash defect, and the Assistant-produced cases deferred in writing (OWNER); security audit with no open High or Medium (Claude, OWNER accepts); the data-protection evaluation done and its decision
@@ -6522,7 +6529,9 @@ consent, 25A-07, production backend, the deferred Assistant device cases), and l
 A full landing page, social handles and content wait for the name and for the period after launch (go-to-market.md), an
 owner decision if wanted earlier.
 
-**The owner's choices for October.** (1) Whether to pursue a public free-core release (a valid option, not yet
+**The owner's choices for October.** *(Superseded by «Owner preference, 2026-10-13» above: choice (1) is answered, no free-core public release; (7) applies only to an
+internal build without a production backend; (11) is withdrawn for public builds; (12) no longer applies and an AI-first
+exception is a pending owner decision; the other choices stand.)* (1) Whether to pursue a public free-core release (a valid option, not yet
 approved) or keep October to the internal TestFlight while AI matures. (2) Bundle id now. (3)
 Public name. (4) Seller type (Individual is the fastest) and EU trader status, storefronts. (5) Where the two pages are published (a
 custom domain optional until the name is chosen). (6) Icon. (7) The Assistant hidden in 1.0 (recommended) rather than a «próximamente» tile. (8) Authorising
@@ -6536,7 +6545,9 @@ Until the owner records that exception, 26 stays last and there is no public rel
 internal TestFlight candidate does not need the exception.
 
 **The next implementation PR: the release-candidate shell, only after the owner chooses the production identifier
-and authorises native build-related changes.** Meanwhile the AI track continues with bounded work (facts with an
+and authorises native build-related changes.** *(2026-10-13: still the next implementation PR, for the internal
+TestFlight candidate. Hiding the Assistant in its production variant is right only while no production backend exists;
+the AI-first public release later replaces that gating with the connected Assistant.)* Meanwhile the AI track continues with bounded work (facts with an
 explicit exponent for zero-decimal currencies, evaluation preparation). The shell: a `production` variant in `app.config.ts` and an EAS
 `production` profile with the bundle id the owner records (AGENTS rule 3: never before that decision), the store
 name, the icon assets slot, `ITSAppUsesNonExemptEncryption: false` once the owner confirms exempt encryption; the
