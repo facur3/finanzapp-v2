@@ -984,6 +984,51 @@ The two switches stay separate: the **deployment switch** (`MOBILE_AI_ENABLED`, 
 redeploy) opens the route; the **database switch** (`mobile_ai_control.enabled`, effective on the next request, no
 redeploy) is the kill switch. Since B6 the deployment switch is `true` and the database switch alone holds AI off.
 
+### 12.0 B8 execution sheet (preflight 2026-10-14)
+
+The order of §12.2 to §12.5, drill by drill as §12.3 and §12.4 number them, with each step's kind. **READ** changes
+nothing (a dashboard, a read-only query). **FREE** is `$P api` **with the database switch off**: its request is
+refused before any reservation, so it cannot reach the provider (with the switch on, the same `$P api` sends a real
+parse request and is billed). **WRITE** changes a remote setting (SQL that writes, a Vercel variable or a redeploy, a
+key created or revoked). **PAID** may bill the OpenAI staging project. Every WRITE and PAID step is the owner's, and
+none starts before step 0. An agent may do READ steps through read-only access; it never does a WRITE or PAID step.
+
+**Freeze `master` from step 0 until step 19 is recorded:** every merge creates a new Production deployment and so a new
+`S` (§2.3). A merge needed mid-B8 is an abort (§12.1), then B8 from step 1 again.
+
+| # | Step | Kind | State on 2026-10-14 |
+| --- | --- | --- | --- |
+| 0 | The owner records the go for B8 in the roadmap: AI enabled on staging, the drills, the race, billed requests of about USD 0.002 in all (§12.2), inside the USD 1 baseline and the USD 5 provider limit | Owner decision | **open** |
+| 1 | §12.2 step 1: project hard limit with enforcement, budget alerts, model access `gpt-6-luna` | READ (OpenAI) | verified by the owner 2026-10-12 |
+| 1b | §12.2 step 1: the **organization**'s auto-recharge OFF and a small prepaid balance (§7.2) | READ (OpenAI) | **open, owner** |
+| 2 | §12.2 step 2: Current Production deployment Ready, `master`, created by the push; `check-deployed-revision.mjs` prints `COMPATIBLE` | READ (a WRITE, a new deployment through a push, if it fails) | **passed**: `S` = `66113763ee18d22298775b076a89a868934f008a` (#109's merge; source `git`, alias `finanzapp-api-staging.vercel.app`, `gru1`). Repeat at the start if `master` moved |
+| 3 | §12.2 step 3: the variables of §4.4 | READ (a WRITE and a redeploy if `MOBILE_AI_ENABLED` was changed) | **names and scopes passed**: the 11 of §4.4, Production only, none edited since 2026-10-07; none in Preview or Development; the token caps unset; `MOBILE_AI_EVAL_LIVE` absent. All 11 are Sensitive, stricter than §4.4 asks (only the secrets), so no value can be read back. Step 7 proves the environment, the Supabase variables and the AI variables' shape (`aiConfig` accepts any priced model and any well-formed key); the AI **values** are proven only at step 12 |
+| 4 | §12.2 step 4: the baseline check prints `enabled = false`, `environment = staging` | READ (SQL) | verified 2026-10-12; repeat |
+| 5 | §12.2 step 5: room for B8, `0` / `0` expected (at most `800000` and `0`) | READ (SQL) | open |
+| 6 | §12.2 step 6: the baseline restore (app-wide month `1000000`), then the check `baseline_ok = true`; record the date and `S` | WRITE (lowers a ceiling) | open |
+| 7 | §12.2 step 7: `$P api` all PASS | FREE | 7/7 on 2026-10-12, before the new deployment; repeat |
+| 8 | §12.3 drill 1 | FREE | open |
+| 9 | §12.3 drills 2 and 3: a Vercel variable changed, a redeploy, `$P api`, then the restore and a redeploy | WRITE + FREE | open |
+| 10 | §12.3 drill 4: a third Supabase secret created, set, **revoked**; the original put back | WRITE + FREE | open |
+| 11 | §12.3 drill 5: `MOBILE_ENVIRONMENT=production`, then back to `staging` | WRITE + FREE | open |
+| 12 | §12.4 opening (`enabled = true`, the check `enabled = true`, `baseline_ok = true`), then drill 6: the smoke request and its duplicate. Its 200 and the telemetry's `model` = `gpt-6-luna` prove the AI variables' values | WRITE + **PAID** (about USD 0.0001 to 0.0003) | open |
+| 13 | Drills 7 and 8 (8 is SQL only, no provider; its `stagingprobe-kill-%` row deleted) | WRITE + FREE | open |
+| 14 | Drills 9 to 12: one limit set, `$P api --ai-enabled`, the baseline restore and check after each | WRITE + **PAID request expected to be refused before the provider** (evidence: telemetry) | open |
+| 15 | Drill 13: the rate limit (its first run is billed) | WRITE + **PAID** | open |
+| 16 | Drill 14: concurrency 0, `$P api --ai-enabled`, the baseline restore and check | WRITE + **PAID request expected to be refused before the provider** | open |
+| 17 | Drill 15: a third OpenAI key created, set, **revoked**; the original back; `$P api --ai-enabled` 200 | WRITE + **PAID** | open |
+| 18 | Drill 16, the race (§6.6; no provider): its setup, the probe, the race rows deleted, the baseline restore and check | WRITE + READ | open |
+| 19 | §12.5: `enabled = false`, the baseline check, the state counts (no `reserved`, race or kill row), `$P api` all PASS, the variables as §4.4, every drill key gone, the record | WRITE + READ + FREE | open |
+
+**Recovery** at any step is §12.1's abort, in full: the database switch off, the baseline restore and check, every
+variable a drill changed back, a redeploy, `$P api` all PASS, every temporary key revoked and confirmed gone from the provider's list, any `stagingprobe-race-%`
+or `stagingprobe-kill-%` row deleted, and the abort and its reason recorded in the roadmap. **If the database cannot
+be reached**, the deployment switch is the kill switch instead: `MOBILE_AI_ENABLED=false` and a redeploy, and it
+**stays `false`** (never put back with the drill's variables) until the database can be read, its switch is set
+`false` and the baseline check prints `enabled = false`; only then is it set back to `true` with a redeploy. **The final state** is
+§12.5's: the deployment switch `true`, the database switch `false`, `baseline_ok = true`, no `reserved` row, no drill
+key active.
+
 ### 12.1 The B8 baseline
 
 The values every drill restores, and the state B8 ends in. The schema's placeholders (§8) with one change: the

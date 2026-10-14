@@ -1,6 +1,10 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-14 (25A-06 B8 preparation, **automatic Production deployments of `master`**, PR #110:
+Updated: 2026-10-14, later (25A-06 **B8 preflight**, docs only: PRs #107 to #110 merged by the owner's instruction;
+the Production deployment of `master` 6611376 is Ready, created by the push and `COMPATIBLE`; the variables' names and
+scopes verified read-only; the B8 execution sheet with each step's kind (runbook §12.0); the organization billing,
+the database reads, the baseline, the probe and the owner's go still open; `master` frozen during B8; product
+continuity recorded in §3; nothing remote written, no paid call). Before (2026-10-14, 25A-06 B8 preparation, **automatic Production deployments of `master`**, PR #110:
 `vercel.json`'s `git.deploymentEnabled` (`"**": false`, `"master": true`) replaces the `ignoreCommand` that canceled
 every Git-triggered Production build, owner decision to fix it before B8; B8's revision check becomes a tested script
 that denies by default and accepts only that reviewed change; nothing deployed, merged or configured remotely;
@@ -1198,6 +1202,22 @@ before it passes (the runbook's §0.2):
 4. A focused **`/security_audit`**, then **`/security_review`** (B10); results recorded and 25A-06 marked done (B11).
 5. **Only then 25A-07 — Real Assistant product contract and polish** («Producto 25A», «Slices»), with the session slice
    (Sign in with Apple, decision 006) before any build calls the cloud Assistant.
+
+**Product continuity (recorded 2026-10-14, owner): what is implemented, device-verified or only planned.** The order
+stays B8 → B9 → B10 → B11 → 25A-07, and the AI-first public release preference (§4, 2026-10-13) stands. These stay
+in the roadmap with their state, none started out of order and no redesign begun for them:
+- **Goals:** planned in **25C** (target, date, progress from recorded movements, no simulated returns). Not implemented.
+- **Available for spending:** implemented as Inicio's **Disponible**, cash in normal accounts as of today, never cards,
+  debts or receivables (currency.md), pinned by domain tests; seen on the owner's iPhone at the Electric Lime
+  acceptance (a visual pass, not an accounting check), the full device gate still open (§2). A figure that also subtracts upcoming commitments, card balances or budgets is **not designed**:
+  it needs a domain definition that counts nothing twice (decision 003) before it gets a slice.
+- **Financial calendar:** planned in **25C2** (production-plan.md §10), after 25A-07's date-scoped questions, which
+  do not depend on it. Not implemented; the card's statement calendar (24T2) is a different, implemented thing.
+- **Apple integrations:** none implemented; no notification, Face ID, widget or StoreKit module is installed. Planned:
+  Wallet / Shortcuts capture and the Live Activity gate (**25A2**), Face ID, notifications, App Intents, widgets
+  (**25D**), Sign in with Apple (25A-07's session slice, decision 006), StoreKit (**25F**). Each needs device evidence.
+- **Sapphire + Sand identity:** the preferred direction (brand-brief.md §4.9, PR #109), not implemented; Electric Lime
+  stays the product palette. A trial PR, unmerged until physical iPhone QA and the owner's approval.
 
 **25A2 and production activation are not started.** 25A2 stays a separate decision, allowed in parallel as already
 recorded (its first step is the «Card Network Identity» prerequisite, «Producto 25A2»); production activation is a
@@ -6052,6 +6072,18 @@ nothing of it is on a screen yet.
       from `master`, created by the push, and the check prints `COMPATIBLE` (runbook §12.2).
     - *Owner checks still open:* Git Fork Protection on (runbook §4.3; the read-only API does not show it), the
       Ignored Build Step left Automatic.
+  - **Merged and deployed (2026-10-14).** PR #110 merged as 6fa74f2; its push created Production deployment
+    `dpl_Hmcx97…`, Ready (`source: git`), the first Git-triggered Production build since 2026-10-07: the fix works. PRs
+    #107 (8849eb9), #108 (57737f7) and #109 (6611376) followed, each brought up to date with `master` (the roadmap
+    header only), CI green, no open thread, merged by the owner's instruction; each push deployed Ready.
+  - **B8 preflight (2026-10-14, read-only; runbook §12.0).** Passed: §12.2 step 2, `S` =
+    `66113763ee18d22298775b076a89a868934f008a`, Current (it holds `finanzapp-api-staging.vercel.app`), Ready, `master`,
+    `source: git`, `gru1`, `check-deployed-revision.mjs` prints `COMPATIBLE`; step 3 by name and scope, the 11
+    variables of §4.4 in Production only, all Sensitive (stricter than §4.4), unedited since 2026-10-07, nothing in
+    Preview or Development, the token caps unset, `MOBILE_AI_EVAL_LIVE` absent (values unreadable: `$P api` proves the
+    environment and the Supabase variables; the AI values only drill 6's 200 and its telemetry `model`). Open, the owner's: the go
+    (step 0), the organization's auto-recharge and balance (1b), the switch and room reads (4, 5), the baseline (6),
+    `$P api` (7), Git Fork Protection (§4.3). `master` is frozen from the go until B8 is recorded.
 - **Owner refinements before accepting the runbook (2026-10-05, in this PR).**
   - **Staging region:** Vercel Functions `gru1` (São Paulo) and the staging Supabase project in the specific region
     `sa-east-1` (São Paulo), replacing `iad1` / us-east-1. The reasons: Argentina-first, the API compute next to its
