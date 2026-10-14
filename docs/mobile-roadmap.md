@@ -6079,8 +6079,9 @@ nothing of it is on a screen yet.
   - **B8 preflight (2026-10-14, read-only; runbook §12.0).** Passed: §12.2 step 2, `S` =
     `66113763ee18d22298775b076a89a868934f008a`, Current (it holds `finanzapp-api-staging.vercel.app`), Ready, `master`,
     `source: git`, `gru1`, `check-deployed-revision.mjs` prints `COMPATIBLE`; step 3 by name and scope, the 11
-    variables of §4.4 in Production only, Sensitive, unedited since 2026-10-07, nothing in Preview or Development, the
-    token caps unset, `MOBILE_AI_EVAL_LIVE` absent (values unreadable; step 7 proves them). Open, the owner's: the go
+    variables of §4.4 in Production only, all Sensitive (stricter than §4.4), unedited since 2026-10-07, nothing in
+    Preview or Development, the token caps unset, `MOBILE_AI_EVAL_LIVE` absent (values unreadable: `$P api` proves the
+    environment and the Supabase variables; the AI values only drill 6's 200 and its telemetry `model`). Open, the owner's: the go
     (step 0), the organization's auto-recharge and balance (1b), the switch and room reads (4, 5), the baseline (6),
     `$P api` (7), Git Fork Protection (§4.3). `master` is frozen from the go until B8 is recorded.
 - **Owner refinements before accepting the runbook (2026-10-05, in this PR).**
