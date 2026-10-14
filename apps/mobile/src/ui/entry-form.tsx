@@ -33,12 +33,14 @@ type FormKind = EntryKind | 'transfer';
  * adds the «Pago» section (`InstallmentPurchase`): «En cuotas» saves one plan
  * and no movement. The movement of an instalment is corrected in its merchant
  * and category only; its amount, date and card are the plan's. */
-export function EntryForm({ original, accountId: requestedAccount, currency, kind: requestedKind, onKindChange, onAccountChange, prefill }: {
+export function EntryForm({ original, accountId: requestedAccount, currency, kind: requestedKind, onKindChange, onAccountChange, onLockedChange, prefill }: {
   original?: EntryRecord; accountId?: string; currency?: string; kind?: string; prefill?: EntryPrefill;
   /** When a host owns the Gasto / Ingreso / Transferencia switch it passes `kind` and this callback; the form then renders no switch of its own. */
   onKindChange?: (kind: FormKind) => void;
   /** Lets the host carry the chosen account over when the mode changes. */
   onAccountChange?: (accountId: string) => void;
+  /** 25VIS2: tells the host when a save is in flight or frozen for retry (exactly `busy || pending !== null`), so its switch locks. */
+  onLockedChange?: (locked: boolean) => void;
 }) {
   const { snapshot, archive, addEntry, updateEntry, addInstallmentPlan } = useLedger();
   const { t, moneyText, formatMoneyAmount, spokenMoney, formatDate } = useI18n();
@@ -66,7 +68,12 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
   });
   const [amount, setAmount] = useState(() => before ? stored?.draft ?? '' : prefillDraft(prefill));
   const [merchant, setMerchant] = useState(before?.entry.merchant ?? prefill?.merchant ?? '');
-  const [category, setCategory] = useState(before?.entry.category ?? prefill?.category ?? '');
+  // 25VIS2: one category per kind. Categories belong to a kind, so the one picked for Gasto never rides along into Ingreso
+  // (where it could be saved on an income); switching back to Gasto finds it again.
+  const [categories, setCategories] = useState<Partial<Record<EntryKind, string>>>(() => ({ [before?.entry.kind ?? (requestedKind === 'income' ? 'income' : 'expense')]:
+    before?.entry.category ?? prefill?.category ?? '' }));
+  const category = categories[kind] ?? '';
+  const setCategory = (value: string) => setCategories(current => ({ ...current, [kind]: value }));
   const [date, setDate] = useState(() => before ? new Date(before.entry.dateISO + 'T12:00:00') : prefill?.dateISO ? new Date(prefill.dateISO + 'T12:00:00') : new Date());
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<Submission | null>(null);
@@ -149,6 +156,9 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
     if (saving.current) return;
     saving.current = true;
     setBusy(true);
+    onLockedChange?.(true);
+    // Whether a submission stays frozen once this attempt ends: the host's switch stays locked exactly as long (25VIS2).
+    let frozen = pending !== null;
     setError(null);
     Keyboard.dismiss();
     try {
@@ -190,6 +200,7 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
           }
         }
         setPending(submission);
+        frozen = true;
       }
       if (submission.plan) await addInstallmentPlan(submission.plan);
       else if (submission.change) await updateEntry(submission.change);
@@ -203,10 +214,11 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
       // so the section shows the card's current statements again, and saving builds the plan anew (with the same id). 24T3
       // (A13): the same for every refusal storage decides before writing (a purchase with devoluciones edited below them, a
       // deleted account…): the fields unlock for review. An unknown outcome keeps the submission frozen for an exact retry.
-      if (cause instanceof Error && releasesDraft(cause.message)) setPending(null);
+      if (cause instanceof Error && releasesDraft(cause.message)) { setPending(null); frozen = false; }
     } finally {
       saving.current = false;
       setBusy(false);
+      onLockedChange?.(frozen);
     }
   }
 

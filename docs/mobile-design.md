@@ -271,7 +271,10 @@ siguen montadas, así un revelado al montar no se vería).
 - **Presión.** El control responde al apoyar el dedo, antes de que termine el
   toque. Botones, tarjetas y chips escalan a 0,97; las filas a ancho completo se
   tiñen como una celda de tabla y nunca se achican; los botones de texto o ícono
-  se atenúan al 40 %.
+  se atenúan al 40 %. Con Reduce Motion no hay escala: botones, tarjetas y chips se
+  atenúan al 70 % mientras se presionan (25VIS2; antes no mostraban nada); lo que envuelve
+  vidrio (las píldoras del detalle de una cuenta, mientras son de vidrio) no cambia, porque la opacidad rompe el
+  material; sólidas, se atenúan como un botón.
 - **Control segmentado.** Un solo pulgar se desliza al segmento elegido
   (interrumpible), las etiquetas cambian de color en transición y un háptico de
   selección marca el cambio. Tocar el valor actual no hace nada.
@@ -297,7 +300,10 @@ siguen montadas, así un revelado al montar no se vería).
   de fecha que sube desde el borde: reemplazada por la decisión 005.)* (El lavado animado de
   «En qué gastaste» se retiró con la lista de categorías de Inicio.)
 - **Formularios.** Gasto / Ingreso / Transferencia es un solo control sobre un
-  solo modal: cambiar es estado, no navegación, y el formulario de abajo se funde.
+  solo modal: cambiar es estado, no navegación. Al cruzar a Transferencia o volver de
+  ella el formulario de abajo se funde; Gasto ↔ Ingreso cambia en su lugar y conserva el
+  borrador, con una categoría propia para cada tipo. Mientras un guardado está en curso o
+  congelado para reintentar, el control queda deshabilitado (25VIS2).
 - **Deck de tarjetas (24T2; reemplaza al carrusel horizontal).** Las tarjetas no elegidas
   quedan apiladas arriba en su orden guardado, cada una mostrando solo su franja superior
   (nombre y «•••• 4009», 50 pt como mínimo); la elegida queda al frente, abajo y entera, junto
@@ -882,6 +888,36 @@ decorativas; ningún logo elegido.
   reescribe las de identidad de Lime: la ventana de 218–232° (sin azul marino: luminosidad ≥ 0,40), la jerarquía del monto por contraste contra el campo, los neutros cálidos, la transferencia por
   croma y distancia de color, el «+» contra el lienzo (≥ 3:1) y el texto de marca sobre el inset. Las de Inicio y la
   fila de Gastado | Disponible leen el token, no el literal de Lime.
+
+### Pulido del registro y accesibilidad (misma PR, 2026-10-14)
+
+Lo aprobado por el dueño de la revisión de UX (registro de decisiones privado del 2026-10-14). Se mantiene la pantalla
+única del registro y su control Gasto / Ingreso / Transferencia; no cambian los campos, las reglas de cuentas, las
+cuotas, las monedas ni la precisión, la edición, los borradores del Asistente, la revisión antes de escribir, la
+navegación ni la recuperación de un guardado.
+
+- **El control se bloquea durante un guardado (V1).** Mientras se guarda, y mientras un guardado de resultado incierto
+  queda congelado para reintentar exactamente lo mismo, Gasto / Ingreso / Transferencia está deshabilitado y atenuado:
+  Reintentar no puede mandar un gasto con la pantalla de ingreso, ni pasar a Transferencia tirar el envío congelado. El
+  formulario lo informa desde su guardado (`onLockedChange`), igual que `busy || pending !== null`; un rechazo decidido
+  antes de escribir lo libera, como siempre.
+- **Una categoría por tipo (V2).** La categoría elegida para Gasto no pasa a Ingreso (donde podía guardarse en un
+  ingreso); al volver a Gasto vuelve a estar. Monto, comercio, cuenta y fecha siguen pasando entre los dos.
+- **El monto en Guardar de una transferencia (V3).** «Registrar transferencia · $ 1.234,50», también para un pago de
+  tarjeta, un pago o un cobro de deuda, y VoiceOver lo oye en su forma hablada, como ya pasaba con un gasto o un
+  ingreso. Se lee igual que al guardar; una edición o un reintento conservan sus palabras.
+- **Lo que se paga es un dato, no un botón apagado (V7).** La tarjeta o la deuda de un pago se dibujan enteras, sin
+  chevrón, y VoiceOver las lee como texto (antes: «botón atenuado» al 60 %).
+- **Objetivos de 44 pt sin dibujar nada más grande.** Los segmentos por defecto (32 pt) llegan a 44 con 6 pt de margen
+  táctil vertical; el registro deja 4 pt libres bajo el control para que el formulario no se lleve esos toques. La
+  acción simple de un encabezado de sección suma 4 pt arriba y abajo, como la discreta.
+- **VoiceOver.** El rótulo de un campo ya no es una parada aparte (el campo lo dice una vez); «Listo» del teclado del
+  monto se llama «Listo» (Control por voz); el gesto de escape cierra la hoja de fecha sin cambiarla; un error que
+  aparece se anuncia en iOS (la región viva es solo de Android): lo que Guardar rechazó, no la línea que una devolución
+  muestra mientras se escribe.
+- **El dock oscuro, revisado y sin cambios.** Sin fotos del iPhone no se agrega borde: un solo color de anillo no
+  alcanza en todos los fondos (#4F4D47: 2,33:1 sobre el lienzo, 1,52 sobre filas elevadas, 1,03 sobre el campo zafiro
+  oscuro). El filete actual existe solo sin vidrio. Las fotos que hacen falta están en la lista del iPhone.
 
 ## Producto 25A-06 — activación del staging de la IA, fase A (sin cambios visuales)
 
@@ -3104,6 +3140,10 @@ color propio.
 
 ## Pendiente de revisión en iPhone
 
+- Producto 25VIS2, pulido del registro (misma PR; sin build propia): el control bloqueado durante un guardado, una
+  categoría por tipo, el monto en Registrar de transferencias y pagos, la tarjeta o deuda fija, los objetivos de 44 pt
+  con el mismo dibujo, VoiceOver y Reduce Motion; las fotos del dock oscuro en cada fondo (docs/mobile-device-checklist.md,
+  «Same PR — movement composer and accessibility polish» y «The dark dock»).
 - Producto 25A-06 B7, decisión A (en su rama; sin build de EAS): en la vista de prueba, la nota debajo de la respuesta
   para el comercio demasiado largo, en español y en inglés; el resto con el Asistente conectado
   (docs/mobile-device-checklist.md, «Producto 25A-04», «Over-long names»).

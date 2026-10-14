@@ -22,25 +22,30 @@ import { categoryChoices, categoryKey, customCategory } from './categories';
  * The value and the detail may each take two lines: a long account name or
  * a budget sentence with its amount is shown whole, never cut to fit. A
  * detail that carries an amount comes with `spokenDetail`, the same sentence
- * built with the spoken formatters, which VoiceOver reads instead. */
-export function SelectorCard({ label, value, placeholder, detail, spokenDetail, icon, tone = 'neutral', color, disabled = false, onPress, detailTone }: {
-  label: string; value?: string; placeholder: string; detail?: string; spokenDetail?: string; icon: IconName; tone?: Tone; color?: string; disabled?: boolean; onPress: () => void;
-  detailTone?: 'neutral' | 'warning' | 'expense';
+ * built with the spoken formatters, which VoiceOver reads instead. `fixed` (25VIS2) is a side the screen decides, the
+ * card or debt a payment settles: the same card read as a fact, at full strength, with no chevron, and VoiceOver hears
+ * text, not a dimmed button. */
+export function SelectorCard({ label, value, placeholder, detail, spokenDetail, icon, tone = 'neutral', color, disabled = false, fixed = false, onPress, detailTone }: {
+  label: string; value?: string; placeholder: string; detail?: string; spokenDetail?: string; icon: IconName; tone?: Tone; color?: string; disabled?: boolean;
+  fixed?: boolean; onPress?: () => void; detailTone?: 'neutral' | 'warning' | 'expense';
 }) {
   const p = usePalette();
+  const { speechLanguage } = useI18n();
   const detailColor = detailTone === 'expense' ? p.expense : detailTone === 'warning' ? p.warning : p.secondary;
   const spoken = spokenDetail ?? detail;
-  return <PressFeedback accessibilityRole="button" accessibilityLabel={`${label}: ${value ?? placeholder}${spoken ? ', ' + spoken : ''}`}
-    accessibilityState={{ disabled }} disabled={disabled} onPress={onPress}
-    style={[{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14, borderRadius: radius.group, backgroundColor: p.surface, minHeight: 72, opacity: disabled ? 0.6 : 1 }, surfaceShadow(p)]}>
-    <GlyphTile icon={icon} tone={tone} color={color} size={44} />
-    <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-      <AppText secondary variant="caption" style={{ fontWeight: '500' }}>{label}</AppText>
-      <AppText numberOfLines={2} style={{ fontWeight: '600', color: value ? p.text : p.primary }}>{value ?? placeholder}</AppText>
-      {!!detail && <AppText numberOfLines={2} variant="footnote" style={{ color: detailColor }}>{detail}</AppText>}
-    </View>
-    <Ionicons name="chevron-forward" size={18} color={p.tertiary} accessible={false} />
-  </PressFeedback>;
+  const accessibilityLabel = `${label}: ${value ?? placeholder}${spoken ? ', ' + spoken : ''}`;
+  const style = [{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14, borderRadius: radius.group, backgroundColor: p.surface, minHeight: 72,
+    opacity: disabled && !fixed ? 0.6 : 1 } as const, surfaceShadow(p)];
+  const tile = <GlyphTile icon={icon} tone={tone} color={color} size={44} />;
+  const body = <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+    <AppText secondary variant="caption" style={{ fontWeight: '500' }}>{label}</AppText>
+    <AppText numberOfLines={2} style={{ fontWeight: '600', color: value ? p.text : p.primary }}>{value ?? placeholder}</AppText>
+    {!!detail && <AppText numberOfLines={2} variant="footnote" style={{ color: detailColor }}>{detail}</AppText>}
+  </View>;
+  // A plain View is its own VoiceOver element here, so it carries the language as PressFeedback does for a Pressable.
+  if (fixed) return <View accessible accessibilityLabel={accessibilityLabel} accessibilityLanguage={speechLanguage} style={style}>{tile}{body}</View>;
+  return <PressFeedback accessibilityRole="button" accessibilityLabel={accessibilityLabel} accessibilityState={{ disabled }} disabled={disabled} onPress={onPress}
+    style={style}>{tile}{body}<Ionicons name="chevron-forward" size={18} color={p.tertiary} accessible={false} /></PressFeedback>;
 }
 
 // Native presentation only. No navigation redirects, captured backgrounds or
@@ -344,7 +349,8 @@ export function BottomSheet({ visible, title, onClose, onDone, onDismissed, floa
         {/* The scrim cancels; VoiceOver never lands on it (the card below is modal). */}
         <Pressable accessible={false} importantForAccessibility="no" style={{ flex: 1 }} onPress={onClose} />
       </Animated.View>
-      <Animated.View accessibilityViewIsModal onLayout={event => measuredCard(event.nativeEvent.layout.height)}
+      {/* VoiceOver's escape gesture cancels, as Cancelar does (25VIS2; the hub's card already had it). */}
+      <Animated.View accessibilityViewIsModal onAccessibilityEscape={onClose} onLayout={event => measuredCard(event.nativeEvent.layout.height)}
         style={[{ backgroundColor: p.surface, borderTopLeftRadius: radius.sheet, borderTopRightRadius: radius.sheet, overflow: 'hidden',
           paddingBottom: Math.max(insets.bottom, space.m) }, cardStyle]}>
         <View accessible={false} style={{ alignItems: 'center', paddingTop: 8 }}>

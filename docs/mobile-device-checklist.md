@@ -7,6 +7,7 @@ Colour tokens only (`apps/mobile/src/ui/palette.ts`): Electric Lime replaced tok
 **Needs a new development build from `master` first** (the installed one predates PR #106's native changes; owner
 authorization for the EAS build), then Metro from this branch. The end of Más reads «FinanzApp 0.1.0 (25VIS2)». Each
 item in light **and** dark, and the owner scores B against A (Electric Lime, `master`) on brand-brief.md §4.5.
+Since 2026-10-14 the same PR also carries the approved composer and accessibility polish (its section below).
 
 - [ ] **Inicio's field:** the sapphire field with white units; the currency symbol and the cents a step quieter, still
   legible; «Hasta hoy» and the month label; the status bar **light** over the field, the scheme's own once scrolled past.
@@ -33,6 +34,59 @@ item in light **and** dark, and the owner scores B against A (Electric Lime, `ma
   handled by the app, before or after); Smart Invert.
 - [ ] **Owner choices before approval:** the slate transfer kept or not; one dark brand fill or the three
   (#3D60D4 buttons and swipes, #4568DA switches, #7E9BF7 «+»); the cobalt account preset.
+
+### Same PR — movement composer and accessibility polish (2026-10-14; JavaScript only)
+
+The owner-approved items of the private UX review (decision record of 2026-10-14): V1, V2, V3, V7, 44 pt targets,
+VoiceOver and Reduce Motion. Not in it: autofocus, a discard confirmation, any change to the dock's appearance, any
+other field. No financial, schema (14), backup (v14), navigation or recovery change. Metro from this branch serves it
+(no native change of its own). Light **and** dark.
+
+- [ ] **The switch during a save (V1).** Save an expense, an income and a transfer: each closes as before. While the
+  write runs the Gasto / Ingreso / Transferencia switch dims for that moment: check the dim is not jarring as the modal
+  leaves. The locked state after an unknown outcome needs a storage fault (saves are local SQLite; airplane mode does
+  not cause one), so it is covered by the Node tests, not checked here.
+- [ ] **One category per kind (V2).** Gasto → choose «Comida» → Ingreso: Categoría is empty and Save is disabled; choose
+  «Sueldo» → back to Gasto: «Comida» again → Ingreso: «Sueldo» again; amount, comercio, account and date kept through
+  every switch; save the income: Movimientos shows it under «Sueldo». An edited movement opens on its own category.
+- [ ] **The amount on Save for transfers (V3).** Transferencia, type 1234,5: «Registrar transferencia · $ 1.234,50»;
+  VoiceOver reads «Registrar transferencia, 1234,50 pesos». «Usar todo» updates it; a dollar source shows «US$». Pagar
+  tarjeta → «Pagar total»: «Registrar pago · $ …» with the pending amount; a debt's «Saldar» opens already echoing it;
+  «0» or nothing typed: the plain words; editing a transfer: «Guardar cambios». At the largest text size the label
+  wraps without cutting the amount.
+- [ ] **The card or debt being paid (V7).** Pagar tarjeta and Saldar: the card or debt is drawn at full strength with
+  no chevron; tapping it does nothing; VoiceOver reads «Tarjeta: Visa, Saldo pendiente …» without «botón» or
+  «atenuado».
+- [ ] **44 pt targets, same look.** The Gasto / Ingreso / Transferencia track and «Una vez | En cuotas» look exactly as
+  tall as before; a tap 3–4 pt above or below the track still selects the segment (the slop now reaches 44 pt; whether
+  iOS honours it outside the track is the device check). The plain action of a section heading (Presupuestos,
+  Reportes) answers a tap just above or below its text. The amount field just below the switch still takes its own taps.
+- [ ] **VoiceOver.** Comercio and Nota are read once (not the caption, then the field); the amount field once, with its
+  currency; the keyboard's «Listo» is read «Listo» and Voice Control's «Tocar Listo» works; on the date sheet the
+  two-finger scrub closes without changing the date; a refused save (a card payment above the pending amount) is
+  announced as its sentence, and a different refusal after it is announced too (the same one repeated is not). On
+  «Registrar devolución», typing 12,5 is not announced as an error at the comma; a refusal from Save is.
+- [ ] **Reduce Motion on.** Pressing Save, a category or account card, a dock tab and «+» dims while held (no scale);
+  pressing a dock tab on the glass dock does not flicker the pill's material. An account's detail (Más → Cuentas → an
+  account): its three pills (Gasto, Ingreso, Transferir) show no pressed state while they are glass, by design, and dim
+  like a button when they are solid (Reduce Transparency on). With Reduce Motion off the 0.97 scale is unchanged.
+- [ ] **Shared controls elsewhere.** The first opening (name, opening balance, Continuar) and Más → Nueva cuenta:
+  captions read once, «Listo», button presses with Reduce Motion. Más → Nueva categoría: its Gasto | Ingreso segments
+  answer a tap just above or below the track and look as before. (The dim of a disabled segmented control lasts only
+  the instant of a local write; it is pinned by the Node tests.)
+
+### The dark dock (reviewed, not changed in this PR)
+
+- No dock change: no iPhone photos were available, and one ring colour cannot clear every ground: #4F4D47 would be
+  2.33:1 on the canvas, 2.06 on surface rows, 1.86 on inset rows, 1.52 on elevated rows and 1.03 on the dark sapphire
+  field (arithmetic). The dock fill #201F1C is 1.19 / 1.06 / 1.05 / 1.29 against the first four and 2.01 against the
+  field.
+- Correction: the hairline (`rgba(255,255,255,0.12)`, 1.73:1 on the canvas) is drawn only on the solid path (Reduce
+  Transparency, Expo Go, iOS before 26). On glass the app draws no edge; whether iOS draws a rim is what the photos
+  show.
+- [ ] **Photos for the owner's decision (dark):** the iOS version; Reduce Transparency off and on (the end of Más names
+  the material); the dock over the canvas, surface rows, inset rows, elevated rows, Inicio's field (a short Inicio at the
+  top, then scrolled) and the open capture hub; the «+» beside the pill.
 
 ## Fix — «Pagar tarjeta» readable in dark (PR #107, merged)
 

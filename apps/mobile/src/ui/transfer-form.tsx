@@ -19,17 +19,19 @@ import { accountDisplayName } from './liability-presentation';
  * collection (cash → debt, receivable → cash). The obligation side is fixed by
  * the caller; only the cash side is chosen here. */
 export function TransferForm({ original, accountId, fromAccountId: requestedFrom, toAccountId: requestedTo,
-  title, defaultNote, maxAmountMinor, amountMinor, onAccountChange }: {
+  title, defaultNote, maxAmountMinor, amountMinor, onAccountChange, onLockedChange }: {
   original?: TransferRecord; accountId?: string; fromAccountId?: string; toAccountId?: string; title?: string;
   defaultNote?: string; maxAmountMinor?: string;
   /** 24UX4 («Saldar»): a debt's whole outstanding balance, prefilled in its own minor units and still editable. */
   amountMinor?: string;
   /** Lets the host carry the source account over when the mode changes. */
   onAccountChange?: (accountId: string) => void;
+  /** 25VIS2: tells the host when a save is in flight or frozen for retry (exactly `busy || pending !== null`), so its switch locks. */
+  onLockedChange?: (locked: boolean) => void;
 }) {
   const { snapshot, archive, addTransfer, updateTransfer } = useLedger();
   const p = usePalette();
-  const { t, formatMoneyAmount, spokenMinor } = useI18n();
+  const { t, formatMoneyAmount, moneyText, spokenMinor, spokenMoney } = useI18n();
   // A debt's hidden account is named from the debt, in the interface language (see accountDisplayName).
   const nameOf = (account: Account) => accountDisplayName(account, archive?.debts ?? [], t);
   const accounts = snapshot?.accounts ?? [];
@@ -129,6 +131,9 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
   async function save() {
     if (saving.current || !snapshot) return;
     saving.current = true; setBusy(true); setError(null); Keyboard.dismiss();
+    // 25VIS2: the host's switch stays locked while this runs and for as long as a submission stays frozen afterwards.
+    onLockedChange?.(true);
+    let frozen = pending !== null;
     try {
       let submission = pending;
       if (!submission) {
@@ -140,13 +145,13 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
         if (before && sameTransfer(before.transfer, transfer)) { saving.current = false; close(); return; }
         const change = before ? makeTransferChange(operation.id, before, 'edit', new Date().toISOString(), transfer) : undefined;
         if (change) validateTransferChange(change, accounts);
-        submission = { transfer, change }; setPending(submission);
+        submission = { transfer, change }; setPending(submission); frozen = true;
       }
       if (submission.change) await updateTransfer(submission.change); else await addTransfer(submission.transfer);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       saving.current = false; close();
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'transferForm.saveUnverified'); }
-    finally { saving.current = false; setBusy(false); }
+    finally { saving.current = false; setBusy(false); onLockedChange?.(frozen); }
   }
   // An account's recorded figure with its currency: a card owed or in credit and a debt pending are worded,
   // with the code where the language places it ("Deuda ARS 50,00", "Owed ARS 50.00"); cash is its code and
@@ -164,6 +169,14 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
   const noCashCounterpart = !!obligation && !cash.some(a => a.currency === obligation.currency);
   const submitLabel = pending && error ? t('common.retrySave') : before ? t('common.saveChanges')
     : t(obligationKind === 'card' ? 'transferForm.recordPayment' : obligationKind === 'debt' ? (lockedTo ? 'transferForm.recordPayment' : 'transferForm.recordCollection') : 'transferForm.recordTransfer');
+  // 25VIS2: a new transfer, payment or collection echoes the amount it records, as a new expense or income does
+  // ("Registrar transferencia · $ 1.234,50"; VoiceOver hears the spoken form). Read exactly as the save reads it; an
+  // edit or a retry keeps its plain words.
+  let parsed: number | null = null;
+  try { parsed = amountCurrency ? minorFromEditedDraft(amount, amountCurrency, stored) : null; } catch { parsed = null; }
+  const submit: { text: string; spoken?: string } = !before && !(pending && error) && parsed && parsed > 0 && amountCurrency
+    ? { text: submitLabel + '\u00A0·\u00A0' + moneyText(parsed, amountCurrency), spoken: submitLabel + ', ' + spokenMoney(parsed, amountCurrency) }
+    : { text: submitLabel };
   // The whole recorded figure a shortcut may fill: the source's positive balance
   // for a transfer, the outstanding obligation for a payment or collection. It is
   // read from the current records (minus the transfer being edited), never from a
@@ -205,7 +218,7 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
         onPress={shortcut.fill > 0 && amountCurrency ? () => { setAmount(amountFromMinor(shortcut.fill, amountCurrency)); setError(null); } : undefined} />}
       <View style={{ gap: space.m }}>
         {lockedFrom ? <SelectorCard label={kindLabel(lockedFrom.id)} value={nameOf(lockedFrom)} placeholder="" detail={balanceDetail(lockedFrom.id)} spokenDetail={balanceDetail(lockedFrom.id, spokenMinor)}
-          icon={obligationKind === 'card' ? 'card-outline' : 'people-outline'} color={p.primary} disabled onPress={() => {}} />
+          icon={obligationKind === 'card' ? 'card-outline' : 'people-outline'} color={p.primary} fixed />
           : <AccountField label={t('transferForm.from')} accounts={cashSources} value={fromId} disabled={locked} kindOf={kindLabel} typeOf={typeOf} prominent detail={balanceDetail(fromId)} spokenDetail={balanceDetail(fromId, spokenMinor)} onChange={id => {
             setFromId(id);
             onAccountChange?.(id);
@@ -213,7 +226,7 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
             if (!lockedTo && (toId === id || to?.currency !== source?.currency)) setToId('');
           }} />}
         {lockedTo ? <SelectorCard label={kindLabel(lockedTo.id)} value={nameOf(lockedTo)} placeholder="" detail={balanceDetail(lockedTo.id)} spokenDetail={balanceDetail(lockedTo.id, spokenMinor)}
-          icon={obligationKind === 'card' ? 'card-outline' : 'people-outline'} color={p.primary} disabled onPress={() => {}} />
+          icon={obligationKind === 'card' ? 'card-outline' : 'people-outline'} color={p.primary} fixed />
           : <AccountField label={t('transferForm.to')} accounts={lockedFrom ? targets.filter(a => a.id !== lockedFrom.id) : targets} value={toId} onChange={setToId}
             kindOf={kindLabel} typeOf={typeOf}
             prominent detail={balanceDetail(toId)} spokenDetail={balanceDetail(toId, spokenMinor)} disabled={locked || !targets.length} />}
@@ -234,7 +247,7 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
       </AppText>
       <ErrorMessage message={error} />
       {pending && error && <AppText secondary variant="footnote">{t('transferForm.retryNote')}</AppText>}
-      <ActionButton label={submitLabel} busy={busy} disabled={!amount.trim() || !from || !to || from.id === to.id || from.currency !== to.currency || !fit.ok} onPress={save} />
+      <ActionButton label={submit.text} spokenLabel={submit.spoken} busy={busy} disabled={!amount.trim() || !from || !to || from.id === to.id || from.currency !== to.currency || !fit.ok} onPress={save} />
     </>}
   </Screen>;
 }

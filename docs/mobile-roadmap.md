@@ -1,6 +1,10 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-14, latest (**Producto 25VIS2, Sapphire + Sand trial**, on its branch, **unmerged until physical
+Updated: 2026-10-14, latest (**25VIS2 + movement composer and accessibility polish**, same draft PR #112, owner-approved
+items of the private UX review: the kind switch locked during a save, one category per kind, the amount on transfer
+Saves, the fixed card or debt, 44 pt targets without larger drawings, VoiceOver and Reduce Motion pressed states; the
+dark dock reviewed and unchanged (no photos); `master` merged in; no financial, schema, backup, navigation or recovery
+change; «Producto 25VIS2», §2). Before (2026-10-14, **Producto 25VIS2, Sapphire + Sand trial**, on its branch, **unmerged until physical
 iPhone QA and the owner's approval**: brand-brief.md §4.9's sheet B token for token in `palette.ts`, the Lime identity
 tests rewritten, every accessibility assertion at WCAG AA or above (three Lime-only 7:1 bars lowered, named in the section); no layout, navigation or financial change; JavaScript only, but
 the iPhone check needs a new development build from `master`; «Producto 25VIS2», §2). Before (2026-10-14, later, 25A-06 **B8 preflight**, docs only: PRs #107 to #110 merged by the owner's instruction;
@@ -920,6 +924,8 @@ item unless a section says a new native build is needed. The checklist sections 
 - **25VIS2 — Sapphire + Sand trial (on its branch, unmerged; a new development build from `master` first):** the
   checklist's «Producto 25VIS2» in light and dark, then the owner's score against Electric Lime and three choices (the
   transfer tone, one or three dark brand fills, the cobalt account preset). Not merged until then.
+  Same PR (JavaScript only): the checklist's «Same PR — movement composer and accessibility polish» and the dark dock's
+  photos on every ground («The dark dock»).
 - **Fix — «Pagar tarjeta» in dark (PR #107, merged; no EAS build):** the checklist's section; nothing device-verified.
 - **25A-06 — ledger currencies (PR #101; no EAS build; nothing
   device-verified):** every build stays disconnected; the fixture view is unchanged. With a connected build (25A-07), a
@@ -4460,6 +4466,34 @@ nothing of it is on a screen yet.
   (#2557D6, close to the light brand).
 - **Gates.** Physical iPhone QA (the checklist's «Producto 25VIS2»), then the owner's explicit approval; only then a
   merge. Lime's values stay in git history.
+- **Movement composer and accessibility polish (same PR, 2026-10-14).** The owner approved the direction of the
+  private UX review (single-screen composer kept, its Gasto / Ingreso / Transferencia control kept) and these items:
+  - **V1.** `MovementForm` disables its switch while `EntryForm` or `TransferForm` reports a save in flight or a frozen
+    submission (`onLockedChange`, sent from the save handlers as `busy || pending !== null`). Recovery is unchanged:
+    both `save()` handlers only add the report (a local `frozen` mirror set with `setPending`, cleared with a
+    `releasesDraft` release); the frozen submission, the operation id and what `releasesDraft` releases behave as before.
+  - **V2.** `EntryForm` keeps one category per kind; **V3** the transfer, payment and collection Save echoes the amount
+    (on screen and spoken), read with the same `minorFromEditedDraft` as the save; **V7** the settled card or debt is a
+    `SelectorCard fixed` (full strength, no chevron, read as text).
+  - **Targets.** Default segments 32 pt + 6 pt vertical slop (44 pt; React Native 0.86's new architecture folds a
+    child's slop into its parent's overflow inset, so it hits outside the track); `MovementForm` keeps 4 pt under its
+    track; the plain `SectionTitle` action 36 + 4 + 4.
+  - **VoiceOver and Reduce Motion.** Field captions are not a separate stop; «Listo» is named «Listo»
+    (`common.closeAmountKeyboard` removed, English lock rewritten by `i18n:check -- --accept en`); the date sheet answers
+    the escape gesture; `ErrorMessage` announces on iOS (what Save refused: the refund form's live line passes
+    `announce={false}` until then); `PressFeedback` dims a `scale` control to 0.7 under Reduce Motion (an account
+    detail's quick-action pills opt out while they are glass); a disabled `Choices` is drawn at half opacity.
+  - **Not done, by decision:** autofocus, a discard confirmation, any other field, the dock's appearance (no photos;
+    #4F4D47 would be 1.52:1 on elevated rows and 1.03:1 on the dark sapphire field), Hacia preselection, merchant-first.
+  - **Approved in the review, not in this slice:** the failed-save haptics (Error / Warning), the Save-gating test
+    table (V8) and «Usar todo» / «Pagar total» dismissing the keyboard (V15). The 44 pt switch is reached by slop, not
+    by the taller `prominent` track the review proposed, because the owner asked not to enlarge the drawing.
+  - **Checks (local, Linux, worktree):** `typecheck` OK; `test:storage` 1384 passed, 0 failed (1385, one not run as
+    before; 14 new tests, each failing on the previous source); `currency:verify`, `regions:verify` OK; `i18n:check --
+    --strict` 0 errors, 0 stale; `export:ios` OK; bundle secret scan OK; `npm ls --all` OK; root `npm test` 703 passed;
+    `check:repo` OK. **`npm run check` fails** on upstream Expo patch drift (expo 57.0.29, expo-constants 57.0.22,
+    expo-linking 57.0.13, expo-router 57.0.27; no dependency changed here): its own chore PR after B8, as #106 was.
+    None of this is iPhone QA.
 
 ### Producto 25VIS1 — Electric Lime palette, accepted as the current palette (PR #83, merged)
 
