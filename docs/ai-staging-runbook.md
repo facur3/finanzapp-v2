@@ -1020,10 +1020,12 @@ none starts before step 0. An agent may do READ steps through read-only access; 
 | 18 | Drill 16, the race (§6.6; no provider): its setup, the probe, the race rows deleted, the baseline restore and check | WRITE + READ | open |
 | 19 | §12.5: `enabled = false`, the baseline check, the state counts (no `reserved`, race or kill row), `$P api` all PASS, the variables as §4.4, every drill key gone, the record | WRITE + READ + FREE | open |
 
-**Recovery** at any step is §12.1's abort, in full: the database switch off (or, if the database cannot be reached,
-`MOBILE_AI_ENABLED=false` and a redeploy), the baseline restore and check, every changed variable back, a redeploy,
-`$P api` all PASS, every temporary key revoked and confirmed gone from the provider's list, any `stagingprobe-race-%`
-or `stagingprobe-kill-%` row deleted, and the abort and its reason recorded in the roadmap. **The final state** is
+**Recovery** at any step is §12.1's abort, in full: the database switch off, the baseline restore and check, every
+variable a drill changed back, a redeploy, `$P api` all PASS, every temporary key revoked and confirmed gone from the provider's list, any `stagingprobe-race-%`
+or `stagingprobe-kill-%` row deleted, and the abort and its reason recorded in the roadmap. **If the database cannot
+be reached**, the deployment switch is the kill switch instead: `MOBILE_AI_ENABLED=false` and a redeploy, and it
+**stays `false`** (never put back with the drill's variables) until the database can be read, its switch is set
+`false` and the baseline check prints `enabled = false`; only then is it set back to `true` with a redeploy. **The final state** is
 §12.5's: the deployment switch `true`, the database switch `false`, `baseline_ok = true`, no `reserved` row, no drill
 key active.
 
