@@ -1,6 +1,10 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-12 (25A-06 B8 preparation, docs only: the B8 baseline with an app-wide month of USD 1, proposed by the
+Updated: 2026-10-14 (25A-06 B8 preparation, **automatic Production deployments of `master`**, PR #110:
+`vercel.json`'s `git.deploymentEnabled` (`"**": false`, `"master": true`) replaces the `ignoreCommand` that canceled
+every Git-triggered Production build, owner decision to fix it before B8; B8's revision check becomes a tested script
+that denies by default and accepts only that reviewed change; nothing deployed, merged or configured remotely;
+«Producto 25A-06», runbook §2.3, §4.3, §12.2). Before (2026-10-12, 25A-06 B8 preparation, docs only: the B8 baseline with an app-wide month of USD 1, proposed by the
 owner and not yet applied; drill restores, race setup and start-state checks corrected in the runbook; the owner's
 first start-state checks recorded, organization billing and a current staging deployment still open; nothing remote
 changed; «Producto 25A-06». Earlier the same day: Expo SDK 57 patch alignment for `expo install --check`, six packages,
@@ -6010,6 +6014,29 @@ nothing of it is on a screen yet.
     current Production deployment is `3043ca2` (2026-10-05), which is older than 900ee77, so the check does not print
     `COMPATIBLE` and B8 cannot start until a **new** Production deployment of current `master` exists and passes it
     (current `master` does). The B8 baseline is not applied; AI stays off.
+  - **Automatic Production deployments (2026-10-14, PR #110, owner decision: fix before B8).** The evidence: every
+    Git-triggered Production deployment of `master` since 2026-10-07 was Canceled at the Ignored Build Step, without a
+    build or a log (900ee77, 343ceb9, 79d1abc among them), while a manual Redeploy of 343ceb9 ran the same command and
+    built (it is Production today). The project's own Ignored Build Step is Automatic (owner, 2026-10-14);
+    `vercel.json`'s `ignoreCommand` overrode it. The fix: `git.deploymentEnabled` `{"**": false, "master": true}`
+    replaces `ignoreCommand` (Vercel's Git configuration reference: minimatch on the branch name, a deployment when any
+    matching rule is `true`). The rest of `vercel.json` is unchanged; no server, API, protocol or package file changes.
+    - *Preview and Development.* No push other than `master`'s creates a deployment; none has a variable (owner checks,
+      runbook §2.2); the runtime guard is unchanged. New test (`staging.test.js`): the deployed entrypoints
+      (`api/mobile/assistant.js`, `captures.js`) with every staging variable present and `VERCEL_ENV` `preview`,
+      `development` or unset answer 503 with no network call, and 401 offline in Production (so the 503 is the
+      environment's alone); removing `environmentOf`'s `VERCEL_ENV` check fails it. Coverage that existed:
+      `environmentOf`/`mobileDependencies` per environment (`handlers.test.js`), the empty-environment routes.
+    - *B8's revision check* (runbook §12.2) is now `node scripts/check-deployed-revision.mjs "$S"`, tested on a
+      scratch repository: on `origin/master`, at or after 900ee77, deny by default (only `apps/mobile`, `docs`,
+      `.github`, `scripts`, `LICENSES`, `.gitignore`, root `*.md` may differ), the two reviewed files pinned by blob
+      id. It also refuses a new root `middleware.js`, `proxy.js`, `vercel.ts`, `.vercelignore`, `.npmrc` or lockfile,
+      which the previous `git diff` accepted. 343ceb9 and 79d1abc still print `COMPATIBLE`; 3043ca2 does not.
+    - *Expected `S` after the merge:* PR #110's merge commit (or a later `master` commit, which passes only if it
+      changes nothing outside the inert paths). B8 starts only after the owner sees that deployment Ready, Current,
+      from `master`, created by the push, and the check prints `COMPATIBLE` (runbook §12.2).
+    - *Owner checks still open:* Git Fork Protection on (runbook §4.3; the read-only API does not show it), the
+      Ignored Build Step left Automatic.
 - **Owner refinements before accepting the runbook (2026-10-05, in this PR).**
   - **Staging region:** Vercel Functions `gru1` (São Paulo) and the staging Supabase project in the specific region
     `sa-east-1` (São Paulo), replacing `iad1` / us-east-1. The reasons: Argentina-first, the API compute next to its
