@@ -135,7 +135,9 @@ for (const [name, p] of [['light', lightPalette], ['dark', darkPalette]] as cons
     for (const [token, hex] of [...fields, ...brandText]) {
       const angle = hue(hex);
       assert.ok(angle >= 218 && angle <= 232, `${token} ${hex} is ${angle.toFixed(1)}°, outside the 218–232° sapphire window`);
-      assert.ok(saturationLightness(hex).s >= 0.55, `${token} ${hex} is saturated, not a grey-blue (S ${saturationLightness(hex).s.toFixed(2)})`);
+      const { s, l } = saturationLightness(hex);
+      assert.ok(s >= 0.55, `${token} ${hex} is saturated, not a grey-blue (S ${s.toFixed(2)})`);
+      assert.ok(l >= 0.4, `${token} ${hex} is a sapphire, not a navy (L ${l.toFixed(2)})`);
     }
     // What sits on each field: the hero's units AAA, the call to action and the «+» at least AA.
     assert.ok(contrast(p.heroInk, p.hero) >= 7, `the field's ink on the hero: ${ratio(p.heroInk, p.hero)}`);

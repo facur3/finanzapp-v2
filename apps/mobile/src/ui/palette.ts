@@ -30,7 +30,7 @@ export const lightPalette = {
   /** Ink: primary text and money, secondary text and labels, tertiary for decimals, placeholders and glyphs (3:1 or
    * more on every ground). */
   text: '#19191C', secondary: '#514E47', tertiary: '#625E56', line: '#DDD6C8',
-  /** Brand text: links, the selected choice, active glyphs. The sapphire itself (7.0:1 on the surface). */
+  /** Brand text: links, the selected choice, active glyphs. The sapphire itself (7.4:1 on the surface). */
   primary: '#2148C0',
   /** Brand fill: the filled call to action, sapphire with white on it (7.6:1). */
   primaryFill: '#2148C0', onPrimary: '#FFFFFF',

@@ -2,7 +2,7 @@
 
 Updated: 2026-10-14, latest (**Producto 25VIS2, Sapphire + Sand trial**, on its branch, **unmerged until physical
 iPhone QA and the owner's approval**: brand-brief.md §4.9's sheet B token for token in `palette.ts`, the Lime identity
-tests rewritten and every accessibility assertion kept; no layout, navigation or financial change; JavaScript only, but
+tests rewritten, every accessibility assertion at WCAG AA or above (three Lime-only 7:1 bars lowered, named in the section); no layout, navigation or financial change; JavaScript only, but
 the iPhone check needs a new development build from `master`; «Producto 25VIS2», §2). Before (2026-10-14, 25A-06 B8 preparation, **automatic Production deployments of `master`**, PR #110:
 `vercel.json`'s `git.deploymentEnabled` (`"**": false`, `"master": true`) replaces the `ignoreCommand` that canceled
 every Git-triggered Production build, owner decision to fix it before B8; B8's revision check becomes a tested script
@@ -4427,8 +4427,10 @@ nothing of it is on a screen yet.
   (PR #107's `onSemantic` included: white in light, #19191C in dark). Typography stays the system's (SF Pro); the
   four-tab dock and the separate «+» are unchanged; no layout, navigation, copy, domain, storage, schema (14), backup
   (v14), API or server change. The splash colour (`app.config.ts`, native) is left out so the trial stays JavaScript.
-- **Tests.** `tests/theme.node.ts`: every accessibility assertion kept, plus primary text on the inset and the field's
-  ink on its control fill; the Lime identity rewritten for sapphire (hue 218–232°, saturated; the amount's order by
+- **Tests.** `tests/theme.node.ts`: every accessibility assertion kept at WCAG AA or above, plus primary text on the
+  inset and the field's ink on its control fill. Three bars that were Lime's own 7:1 are lowered: text on the call to
+  action and the «+» ≥ 4.5 (dark 5.49 and 6.61), ink AAA on every brand field → only the hero's units (7.63 / 8.2), and
+  the «+» against the dock → against the canvas ≥ 3 (6.65 / 7.42; against the pill 2.21 in light); the Lime identity rewritten for sapphire (hue 218–232°, saturated, HSL lightness ≥ 0.40 so never navy; the amount's order by
   contrast against the field; warm neutrals; the slate transfer apart by Lab chroma ≤ 15 and ΔE ≥ 40 from every brand
   token; the «+» at least 3:1 against the canvas). `spending-home.node.ts` reads `heroStatusBar` (light over the
   field), `ui-rows.node.ts` the light ink on the thumb. The version line reads «FinanzApp 0.1.0 (25VIS2)».

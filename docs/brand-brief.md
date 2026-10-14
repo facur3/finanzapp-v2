@@ -260,8 +260,8 @@ name, logo or brand identity: the naming, trademark and confusing-similarity gat
 **Preferred for further comparison. Not selected; implemented only as an unmerged trial** (Producto 25VIS2, branch
 `feat/25vis2-sapphire-sand`, 2026-10-14: this sheet token for token, the theme tests split as item 4 says). *(Later on 2026-10-13 the owner named B the
 preferred main visual direction: it is planned as a separate trial PR on top of PR #107's `onSemantic`, kept unmerged
-until physical iPhone QA and the owner's explicit approval; no logo is selected.)* Electric Lime stays the product palette
-(`apps/mobile/src/ui/palette.ts`, §4.8). No production palette changes until the owner approves one, at step C of
+until physical iPhone QA and the owner's explicit approval; no logo is selected.)* Electric Lime stays the product palette on
+`master` (`apps/mobile/src/ui/palette.ts`, §4.8); the trial branch's `palette.ts` carries this sheet instead. No production palette changes until the owner approves one, at step C of
 [app-store-launch.md §9.4](app-store-launch.md#94-brand-naming-and-identity-gate).
 
 **What the comparison found** (2026-10-13; research material kept privately, not in the repository, as §4.7 records):
@@ -314,7 +314,7 @@ until physical iPhone QA and the owner's explicit approval; no logo is selected.
 6. **The iPhone.** The owner scores B against A on §4.5 through a local development build that swaps the token file.
    That build is not merged and carries no production change.
 
-**Token sheet B, as proposed** (light / dark; every token of `palette.ts`; not implemented):
+**Token sheet B, as proposed** (light / dark; every token of `palette.ts`; implemented only on the unmerged trial branch):
 
 | Token | Light | Dark |
 | --- | --- | --- |

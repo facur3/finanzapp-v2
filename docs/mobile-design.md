@@ -877,8 +877,9 @@ decorativas; ningún logo elegido.
   es marca es un neutro cálido (30–60°), nunca verde ni azul.
 - **Significados.** Ingreso, gasto y aviso sin cambios. La transferencia sigue pizarra: queda cerca del tono del zafiro
   y se separa por saturación (croma ≤ 15 contra ≥ 40; ΔE ≥ 40), decisión del dueño pendiente (§4.9, punto 2).
-- **Pruebas.** `tests/theme.node.ts` conserva cada aserción de accesibilidad y reescribe las de identidad de Lime: la
-  ventana de 218–232°, la jerarquía del monto por contraste contra el campo, los neutros cálidos, la transferencia por
+- **Pruebas.** `tests/theme.node.ts` conserva las aserciones de accesibilidad en WCAG AA o más (tres umbrales de 7:1 propios de
+  Lime bajan: el texto del botón y del «+» a 4,5; la tinta AAA solo en las cifras del campo; el «+» contra el lienzo, 3:1) y
+  reescribe las de identidad de Lime: la ventana de 218–232° (sin azul marino: luminosidad ≥ 0,40), la jerarquía del monto por contraste contra el campo, los neutros cálidos, la transferencia por
   croma y distancia de color, el «+» contra el lienzo (≥ 3:1) y el texto de marca sobre el inset. Las de Inicio y la
   fila de Gastado | Disponible leen el token, no el literal de Lime.
 
