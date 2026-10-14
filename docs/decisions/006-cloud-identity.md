@@ -83,6 +83,9 @@ cloud Assistant (roadmap «Producto 25A»).
   - a server route with its own narrowly scoped Supabase secret key (production-plan.md §4.6);
   - Apple's `/auth/revoke` with a client secret signed by the Apple key, server-side only;
   - deletion cascades the inbox and usage rows and keeps the reservations' charges unowned (`on delete set null`);
+  - **open issue (2026-10-13, a security LAUNCH BLOCKER for public AI):** a new sign-in after deletion is a new user,
+    so the per-person ceilings start again at zero. The proposed privacy-compatible carryover and its alternatives are in
+    production-plan.md §6.8; nothing is decided or implemented until a focused review;
 - the e-mail Apple relays (possibly a private relay address) is not used for anything in 25A.
 
 **StoreKit (25F):**

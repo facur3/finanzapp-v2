@@ -740,6 +740,19 @@ Using AI does not upload the ledger. A custom category name is the most personal
 The consent screen must say exactly this. New fact kinds (budgets, cards, commitments) are added one at a time, each
 with a reason, each visible in the consent text; "send everything and let the model sort it out" is not an option.
 
+**Balance facts for the AI-first v1 (owner preference, 2026-10-13; NOT IMPLEMENTED).** The narrow v1 scope (roadmap §4,
+«Owner preference, 2026-10-13») answers questions about the person's balances, which the table above does not send. A
+balance fact kind is one of the «new fact kinds added one at a time». The candidates are the balance of each live account
+that is neither a card nor a debt, per currency, and the «Disponible» figure that `availableFigure` computes: the same
+number Inicio shows, never a recomputation. Each one must be bounded, typed and cited like the others. Before any build
+sends one, it needs:
+1. the reason recorded here;
+2. its line in the consent text;
+3. eval corpus cases, and a protocol version if a new fact id needs it (§5.5a);
+4. a paid evaluation only under a new written approval (§5.5b, §5.8).
+
+Account names stay out unless that slice records why one is needed.
+
 **Exact date and date-range questions (DECIDED by the owner, 2026-10-05; IMPLEMENTATION GATE of 25A-07).** A question
 scoped to an exact calendar date or range («¿Qué gasté el 20 de septiembre?») is answered from deterministic local
 evidence, before any visual calendar exists:
@@ -1290,6 +1303,44 @@ ceilings of §6.6 will be sized and reviewed. No amount is set here.
 
 ---
 
+### 6.8 Account deletion and the per-person ceilings (LAUNCH BLOCKER, security; NOT IMPLEMENTED)
+
+**The loophole (recorded 2026-10-13, read from `server/mobile/schema.sql`).** Deleting an account cascades its
+`mobile_api_usage` rows and leaves its `mobile_ai_reservations` unowned (`user_id … on delete set null`), as decision
+006 specifies. Signing in again with the same Apple Account creates a new Supabase user. The per-person rate windows
+and money ceilings are counted from that user's own reservations, so they start again at zero. The global day and month
+ceilings still count the unowned rows, so total spend stays bounded by the app-wide cap. But one person can repeat
+delete → sign in to take far more than the per-person share, at the expense of everyone else's availability. **No public
+AI release ships until this is closed or the owner accepts, in writing, that the per-person ceilings reset on deletion.**
+
+**Proposed design (privacy-compatible; needs a focused security and privacy review before any code):**
+
+- **Key.** At deletion, before the auth user is removed, the server computes
+  `identity_key = HMAC-SHA256(QUOTA_PEPPER, "apple:" + sub)`:
+  - `sub` is Apple's stable, team-scoped identifier, read server-side from the user's verified identity;
+  - `QUOTA_PEPPER` is a server-only secret (an environment variable, never in the database or the app), so the
+    database alone cannot reverse or link the key.
+- **Stored.** A `mobile_ai_quota_carryover` row with only `identity_key`, the current UTC month, the month's and the
+  day's settled plus reserved µUSD and request counts, and `expires_at` (the end of the current UTC month plus a short
+  grace).
+  - Not stored: no user id, e-mail, name, content, device data or ledger data.
+  - No client role can read or write it.
+- **Applied.** At the next AI request of a new user, the server computes the same key from that user's Apple `sub`. A live
+  carryover row adds to the person's counters for its period, and is then deleted, or expires.
+- **Retention and disclosure.** Rows are deleted at `expires_at`; rotating the pepper at a month boundary drops every link.
+  - The privacy policy says it plainly: «Si borrás tu cuenta, guardamos hasta fin de mes un código irreversible derivado
+    de tu identificador de Apple y tu uso del Asistente de ese mes, solo para aplicar el límite mensual».
+  - The consent and deletion screens say the same in one line.
+  - Account deletion still removes every personal record (decision 006, guideline 5.1.1(v)).
+- **Legal note.** A peppered hash is still pseudonymous personal data. The legal basis (abuse prevention), the retention
+  window and the disclosure need the review; nothing here is legal advice.
+
+**Alternatives recorded for the review.**
+- Accept the reset, bounded by the global cap: an owner decision, to be weighed against the availability risk.
+- A cool-down before a deleted identity can use AI again: it needs the same key, so it is no simpler.
+- App Attest per-device keys: not an identity (decision 006). They do not survive a new device and are a later
+  complement only.
+
 ## 7. Wallet and Apple Pay capture (25A2)
 
 Roadmap: [mobile-roadmap.md](mobile-roadmap.md) «Producto 25A2 — Wallet Shortcut Capture». **NOT IMPLEMENTED.** No
@@ -1824,8 +1875,9 @@ Reconciliation notes:
 
 ## 14. Readiness
 
-**Release target (owner, 2026-10-10; a target, not a mandatory deadline):** an internal TestFlight candidate by the end
-of October; a public free-core release is an option pending the owner's approval; AI and Pro later, AI work in parallel; the
+**Release target (owner, 2026-10-10; amended by the owner's preference of 2026-10-13: no public release without a working
+Assistant, roadmap §4 «Owner preference, 2026-10-13»):** an internal TestFlight candidate by the end of October; the public
+release is an AI-first release with the narrow v1 Assistant scope, not credible by the 31st; Pro later; the
 dated critical path and go/no-go checks are the roadmap's §4 «Release plan to 2026-10-31». The rows below stay the
 detail of each gate.
 
@@ -1853,6 +1905,8 @@ Nothing below is complete unless it says **EXISTS TODAY**. "Launch §n" is a sec
 | Assistant capability boundary (no generic tools) | all | **DECIDED**; **EXISTS TODAY** (no tools; the adapter's request keys are allowlisted and a tool call is refused, 25A-05) | Kept by review of every Assistant change |
 | Closed Assistant protocol v2 and v3, validated on the server and the device | 25A | **EXISTS TODAY** (v2 in 25A-05; v3 in 25A-06: v2 plus the interface `language` the reply is written in, the server accepting both); v1 retired, never deployed | the remaining v3 fields (language-neutral facts, the currency fields of currency.md §11) server first, later |
 | Cloud-AI consent screen | 25A | **NOT IMPLEMENTED**, **LAUNCH BLOCKER** | Built and shown before any send |
+| Balance facts for the v1 Assistant | 25A (AI-first v1) | **NOT IMPLEMENTED**; required by the owner's preference of 2026-10-13 | Its slice (§5.4), consent text, evals and an approved paid evaluation |
+| Per-person ceilings survive account deletion | 25A (session slice) | **NOT IMPLEMENTED**, **LAUNCH BLOCKER** (security) for public AI | §6.8: the reviewed carryover design, or the owner's written acceptance of the reset |
 | Provider port, model as configuration | 25A | **EXISTS TODAY** (25A-05); the OpenAI adapter disabled, nothing configured | — |
 | Model evaluation and choice | 25A | Corpus, harness and thresholds **EXIST TODAY** (25A-05; fixture run only, not model results); `estimateExceededCount` = 0 and the live-run gates added (25A-06 Phase A); B7 runs #1 and #2 (2026-10-08 UTC): **`gpt-6-luna` FAILED adoption** both times (run #1 five thresholds, run #2 four: `schemaValidRate` 0.9806, `intentAccuracy` 0.9417, `clarificationAccuracy` 0.8696, `groundedEvidenceAccuracy` 0.9; thresholds unchanged; both one-run approvals, 2026-10-07 and 2026-10-08, consumed; roadmap «Producto 25A-06», B7); **RESEARCH GATE**, **OWNER ACTION** (paid, approved amount) | The two general instruction rules of the run #2 record are merged (PR #94; string and fixture tests only: not a prediction of a live result); model arithmetic is decided and applied (decision B, 2026-10-08: no model arithmetic, stated in the instructions and measured by the scorer, §5.2; PR #95's prose-figure validator left unmerged by owner direction 2026-10-09); the currency inference is decided and applied on the device (decision D, 2026-10-08; the 25A-06 currency-inference PR, ARS and USD; the instructions' regional-word line unchanged); over-long optional names are decided and applied at the protocol boundary (decision A, 2026-10-09, PR #99); the transfer sentence (decision C(a)) and the approval's shape (decision E(a): one complete passing run against every threshold opens B8–B11) are decided 2026-10-11; **B7 run #3 PASSED** (2026-10-11, one approved run of at most 200 000 µUSD, now consumed; 8 158 µUSD): `gpt-6-luna` adopted for staging, not for production; B8 ready for owner-led execution; any further run needs its own written approval (runbook B7) |
 | Replacement of `gpt-5-mini` before 2026-12-11 | 25A | **DONE in code** (25A-05: removed; no model in code) | The model chosen by 25A-06's evaluation |

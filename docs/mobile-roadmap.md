@@ -1,6 +1,10 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-12 (25A-06 B8 preparation, docs only: the B8 baseline with an app-wide month of USD 1, proposed by the
+Updated: 2026-10-13 (**owner preference: an AI-first public release**, docs only: no public App Store release
+without a working Assistant; the narrow v1 Assistant scope and the gates it needs are recorded in §4 «Release plan to
+2026-10-31», «Owner preference, 2026-10-13»; no unconditional or permanent free AI allowance is approved; the AI
+account-deletion quota loophole recorded as a production security blocker, production-plan.md §6.8; 2026-10-31 stays a
+target for the internal TestFlight candidate only). Before (2026-10-12, 25A-06 B8 preparation, docs only: the B8 baseline with an app-wide month of USD 1, proposed by the
 owner and not yet applied; drill restores, race setup and start-state checks corrected in the runbook; the owner's
 first start-state checks recorded, organization billing and a current staging deployment still open; nothing remote
 changed; «Producto 25A-06». Earlier the same day: Expo SDK 57 patch alignment for `expo install --check`, six packages,
@@ -6369,6 +6373,50 @@ unlimited (production-plan.md §6.6).
 ## 4. Launch
 
 ### Release plan to 2026-10-31 (owner target; recorded 2026-10-10, corrected after the owner's review)
+
+**Owner preference, 2026-10-13: an AI-first public release (recorded; it narrows what follows, it does not approve a
+release).** The owner prefers not to launch FinanzApp publicly without a real, working Assistant. What that changes in
+this plan:
+
+- **The public free-core option (milestone 2 below) is no longer a path to the public App Store.** Its gates stay valid
+  as part of the AI-first release. Choice 7 (the Assistant hidden in 1.0) applies only to an internal TestFlight
+  candidate without a production backend. Choice 11 (deferring the Assistant-produced device cases) is withdrawn for any
+  public build: those cases join its release gate. Choice 12 (a free-core exception) no longer applies. An AI-first public
+  release needs its own phase-order exception, 26 brought forward for 25A's narrow scope and 25A2 … 25F following as
+  updates in the same order: **OWNER DECISION, pending; not approved here**.
+- **The narrow v1 Assistant scope.**
+  1. A sentence becomes **one expense or income proposal** (protocol v5, `ProposalKind` expense | income). It exists in
+     code and is never connected on a device.
+  2. **Review before every write**: the review item and Confirmar on the one write path (25A-03, 25A-04). It exists.
+  3. **Verified answers** about the person's own transactions: month-to-date and previous-period totals, counts and
+     category facts (they exist), **and their balances**. Balance facts are **NOT IMPLEMENTED**, and production-plan.md §5.4
+     excludes them today. They need their own slice: the reason, the consent text, eval cases, a protocol bump if
+     needed, and a paid evaluation only under a new written approval (production-plan.md §5.5b, §5.8). The device
+     computes every number shown, and the model writes the language (decision B, 2026-10-08).
+
+  Shipped incrementally **after** the first release, as 25A slices: transfers, card payments, cuotas (25A-11), recurring,
+  debts, budgets, goals and calendar actions, several drafts per message, voice.
+- **Access to AI at 1.0 is open, and the server ceilings bind either way.** No unconditional or permanent free AI
+  allowance is approved; the owner's 2026-10-04 position stands. The two options are a time-limited launch allowance under
+  Sign in with Apple, the per-person money ceilings and an owner-set global cap, or StoreKit and Pro first (25F). Both are
+  an **OWNER DECISION**. Production ceilings come only from measured staging cost (production-plan.md §6.2).
+- **Release gates of an AI-first public release** (each detailed where cited; none is closed by this record):
+  - **Staging and model:** B8 to B11 on staging (runbook; B8 needs a new Production deployment of master and the
+    auto-recharge check); the model adopted for production, a release decision.
+  - **Identity and consent:** the session slice (Sign in with Apple, Keychain session, account deletion with Apple
+    token revocation; decision 006); the AI consent screen (production-plan.md §5.7).
+  - **Assistant work:** the balance-facts slice; 25A-07.
+  - **Production:** a production backend and provider project with its own key and hard limit (owner accounts and
+    authorised plans; AGENTS rule 3); the automated owner alert and the anomaly stop (production-plan.md §6.2).
+  - **Security:** **the AI account-deletion quota loophole** (production-plan.md §6.8, a security **LAUNCH BLOCKER**);
+    the whole-app security and privacy audit (production-plan.md §14.1).
+  - **Privacy and App Review:** the privacy policy naming the AI provider and the hosts, the App Privacy label and the age
+    rating re-answered for AI and accounts, and the App Review items 5.1.2(i), 5.1.1(v) and 4.7 (app-store-launch.md §12).
+  - **Device and identity:** the physical-device release gate including the connected Assistant (Sign in with Apple,
+    consent, capture → review → confirm, clarifications, answers matching the screens, quota exhausted, AI switched off,
+    offline, crash reconciliation, deletion); the data-protection evaluation; the identity decisions.
+- **Dates.** A public AI-first release is not credible by 2026-10-31. The 31st stays a target for the internal TestFlight
+  candidate (milestone 1). No public date is recorded until B8 to B11 and the session slice have run.
 
 **2026-10-31 is a target, not a mandatory public release deadline.** The preferred near-term milestone is an internally
 testable TestFlight candidate by the end of October; a public free-core release is a valid option the owner has **not
