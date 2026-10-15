@@ -870,9 +870,10 @@ vinculante del roadmap no cambia: la próxima entrega de producto es 24T3; 24UX6
 
 En su rama `feat/25vis2-sapphire-sand` desde master 6611376. **No se mergea hasta la revisión en el iPhone físico y la
 aprobación explícita del dueño**; hasta entonces Electric Lime («Producto 25VIS1») sigue siendo la paleta del producto.
-Implementa la hoja B de [brand-brief.md](brand-brief.md) §4.9 token por token, con los mismos nombres: ninguna
-pantalla, layout, navegación (las cuatro pestañas y el «+» aparte), texto, dominio, almacenamiento, esquema (14) ni
-backup (v14) cambia. La tipografía sigue siendo la del sistema (SF Pro): la app no carga otra fuente. Sin itálicas
+Implementa la hoja B de [brand-brief.md](brand-brief.md) §4.9 token por token, con los mismos nombres: la paleta no
+cambia ninguna pantalla, layout, navegación (las cuatro pestañas y el «+» aparte), dominio, almacenamiento, esquema (14)
+ni backup (v14); el pulido del registro de abajo cambia el rótulo de Registrar en transferencias y quita una clave del
+catálogo. La tipografía sigue siendo la del sistema (SF Pro): la app no carga otra fuente. Sin itálicas
 decorativas; ningún logo elegido.
 
 - **Marca.** Un zafiro real (≈225°, ni violeta ni azul marino): #2148C0 como campo de Inicio, botón principal y «+» en
@@ -899,10 +900,15 @@ navegación ni la recuperación de un guardado.
 - **El control se bloquea durante un guardado (V1).** Mientras se guarda, y mientras un guardado de resultado incierto
   queda congelado para reintentar exactamente lo mismo, Gasto / Ingreso / Transferencia está deshabilitado y atenuado:
   Reintentar no puede mandar un gasto con la pantalla de ingreso, ni pasar a Transferencia tirar el envío congelado. El
-  formulario lo informa desde su guardado (`onLockedChange`), igual que `busy || pending !== null`; un rechazo decidido
-  antes de escribir lo libera, como siempre.
+  formulario lo informa desde su guardado (`onLockedChange`), igual que `busy || pending !== null`; tras un guardado
+  correcto sigue bloqueado mientras el modal se cierra. Un rechazo de validación previo al congelado nunca llega a
+  bloquearlo; en un gasto o un ingreso, el rechazo que decide el almacenamiento antes de escribir (`releasesDraft`)
+  también lo libera; en una transferencia ese rechazo, como antes, deja el envío congelado hasta cerrar.
 - **Una categoría por tipo (V2).** La categoría elegida para Gasto no pasa a Ingreso (donde podía guardarse en un
-  ingreso); al volver a Gasto vuelve a estar. Monto, comercio, cuenta y fecha siguen pasando entre los dos.
+  ingreso); al volver a Gasto vuelve a estar. Monto, comercio, cuenta y fecha siguen pasando entre los dos. Lo mismo en
+  la regla recurrente (Más → Recurrentes → «+», desde el 2026-10-15), que antes guardaba una regla de ingreso con la
+  categoría de un gasto y la copiaba a cada movimiento que registraba; en una regla ya guardada, cambiar de tipo pide la
+  categoría del tipo nuevo, y volver devuelve la guardada.
 - **El monto en Guardar de una transferencia (V3).** «Registrar transferencia · $ 1.234,50», también para un pago de
   tarjeta, un pago o un cobro de deuda, y VoiceOver lo oye en su forma hablada, como ya pasaba con un gasto o un
   ingreso. Se lee igual que al guardar; una edición o un reintento conservan sus palabras.
@@ -914,7 +920,14 @@ navegación ni la recuperación de un guardado.
 - **VoiceOver.** El rótulo de un campo ya no es una parada aparte (el campo lo dice una vez); «Listo» del teclado del
   monto se llama «Listo» (Control por voz); el gesto de escape cierra la hoja de fecha sin cambiarla; un error que
   aparece se anuncia en iOS (la región viva es solo de Android): lo que Guardar rechazó, no la línea que una devolución
-  muestra mientras se escribe.
+  muestra mientras se escribe. En Android no se anuncia: TalkBack ya lee la región viva, y se oiría dos veces.
+- **Un guardado fallido se siente una vez (V4, 2026-10-15).** Un rechazo (antes de congelar el envío, o uno que el
+  almacenamiento decide antes de escribir) da el háptico de error; un resultado incierto, que pudo haberse escrito y
+  queda congelado para reintentar exactamente lo mismo, da el de aviso. Siempre con su frase en pantalla y en VoiceOver:
+  el háptico nunca es la única señal.
+- **Completar el monto baja el teclado (V15, 2026-10-15).** «Usar todo», «Pagar total» y «Total disponible» de una
+  devolución bajan el teclado al completar, así Registrar y su eco del monto quedan a la vista; tocar el monto lo vuelve
+  a subir con el valor completado.
 - **El dock oscuro, revisado y sin cambios.** Sin fotos del iPhone no se agrega borde: un solo color de anillo no
   alcanza en todos los fondos (#4F4D47: 2,33:1 sobre el lienzo, 1,52 sobre filas elevadas, 1,03 sobre el campo zafiro
   oscuro). El filete actual existe solo sin vidrio. Las fotos que hacen falta están en la lista del iPhone.
@@ -1710,7 +1723,7 @@ que tiene son, **como máximo, dos filas contextuales de atención**; todo lo de
   «Producto 25UX1».)* Con cualquier tarjeta activa hay una al frente; una selección que ya no existe (archivada
   o eliminada) le pasa el frente a la primera. Tocar una franja la elige (háptica de selección); tocar la del frente
   abre su detalle. Solo la elegida alimenta el resumen.
-- **Por qué (vinculante; refinamiento del dueño, 2026-10-01).** Tarjetas es una pantalla de estado financiero: con una
+- *(Reemplazado el 2026-10-02 por 25UX1: Tarjetas abre en reposo, sin tarjeta elegida, aunque haya una sola; el argumento queda como registro.)* **Por qué (vinculante; refinamiento del dueño, 2026-10-01).** Tarjetas es una pantalla de estado financiero: con una
   sola tarjeta, un toque más para ver su resumen sería pura fricción; con varias, la del frente ya comunica cuál está
   elegida. Si el resumen se siente denso, se refina su jerarquía; no se esconde información detrás de un toque.
 - **La regla de franjas** (`deckExposure(escala, cantidad)`, `DECK_FULL_STRIP_CARDS = 4`): hasta cuatro tarjetas las
@@ -2980,7 +2993,7 @@ botones al final del detalle. Nada nuevo en Inicio, Movimientos ni Reportes.
 - **Una fila abierta a la vez**: abrir otra cierra la anterior. Tocar una acción cierra la fila y
   después actúa.
 - **Botones sólidos de 76 pt** con glifo y etiqueta blanca en una línea (crecen con el texto
-  grande): gris para lo reversible (Pausar, Cerrar), azul transferencia para lo que avanza (Reanudar,
+  grande): gris para lo reversible (Pausar, Cerrar), el color de acento de deslizar (`swipeAccent`, el de la marca) para lo que avanza (Reanudar,
   Saldar, Reabrir), rojo para Eliminar, siempre el último, en el borde. Tres tonos nuevos en la
   paleta (`swipeDestructive`, `swipeNeutral`, `swipeAccent`), más profundos en oscuro para que el
   blanco mantenga 4,5:1 (el rojo y el azul de texto quedaban en 3:1).
@@ -3141,8 +3154,9 @@ color propio.
 ## Pendiente de revisión en iPhone
 
 - Producto 25VIS2, pulido del registro (misma PR; sin build propia): el control bloqueado durante un guardado, una
-  categoría por tipo, el monto en Registrar de transferencias y pagos, la tarjeta o deuda fija, los objetivos de 44 pt
-  con el mismo dibujo, VoiceOver y Reduce Motion; las fotos del dock oscuro en cada fondo (docs/mobile-device-checklist.md,
+  categoría por tipo (también en las reglas recurrentes), el monto en Registrar de transferencias y pagos, la tarjeta o
+  deuda fija, los objetivos de 44 pt con el mismo dibujo, VoiceOver y Reduce Motion, el háptico de un guardado fallido y
+  el teclado que baja al completar el monto; las fotos del dock oscuro en cada fondo (docs/mobile-device-checklist.md,
   «Same PR — movement composer and accessibility polish» y «The dark dock»).
 - Producto 25A-06 B7, decisión A (en su rama; sin build de EAS): en la vista de prueba, la nota debajo de la respuesta
   para el comercio demasiado largo, en español y en inglés; el resto con el Asistente conectado

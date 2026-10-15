@@ -1,6 +1,10 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-14, latest (**25VIS2 + movement composer and accessibility polish**, same draft PR #112, owner-approved
+Updated: 2026-10-15 (**25VIS2 finish line**, same draft PR #112: the rest of the approved composer scope, the failed-save
+haptics (V4), the Save-gating table (V8) and the keyboard lowered by «Pagar total» (V15); the recurring form keeps one
+category per kind; `ErrorMessage` announces only on iOS (Codex); the binding interface and motion rules no longer name a
+palette; checklist steps that described UI that does not exist corrected; the owner's five-choice sheet and the
+merge-time flip list; «Producto 25VIS2», §2). Before (2026-10-14, latest, **25VIS2 + movement composer and accessibility polish**, same draft PR #112, owner-approved
 items of the private UX review: the kind switch locked during a save, one category per kind, the amount on transfer
 Saves, the fixed card or debt, 44 pt targets without larger drawings, VoiceOver and Reduce Motion pressed states; the
 dark dock reviewed and unchanged (no photos); `master` merged in; no financial, schema, backup, navigation or recovery
@@ -382,9 +386,9 @@ history file keeps the evidence of when and why.
   an Xcode build; no frame-rate or App Store claim before verification.
 - **Interface rules.** Native navigation gestures, safe areas, Dynamic Type, Reduce Motion and
   Reduce Transparency honoured everywhere; Liquid Glass only on the control surfaces with
-  the opaque fallback (the dock's pill falls back to solid pine); the Forest identity of decision 005 (pine
-  primary, hue window 158–168°, never teal, cyan, emerald or blue; it supersedes the earlier cobalt/sapphire
-  primary) marks interaction and the brand only and keeps 4.5:1; `expense` is the negative colour
+  the opaque fallback (the dock's pill falls back to its solid fill); the brand colour (the palette in
+  `src/ui/palette.ts`, whose identity is decision 005's latest palette amendment; another palette is its own
+  owner-approved amendment) marks interaction and the brand only and keeps 4.5:1 as text; `expense` is the negative colour
   (destructive, overdue, over a limit), never ordinary spending; category colours unchanged; semantic colours
   carry meaning; 44 pt targets; no decorative glassmorphism, no large currency selector beside the main amount,
   no new navigation without a decision (the current navigation is decision 005's).
@@ -921,9 +925,10 @@ it was checked in). Metro from `master` (or a delivery's branch) on the installe
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
-- **25VIS2 — Sapphire + Sand trial (on its branch, unmerged; a new development build from `master` first):** the
-  checklist's «Producto 25VIS2» in light and dark, then the owner's score against Electric Lime and three choices (the
-  transfer tone, one or three dark brand fills, the cobalt account preset). Not merged until then.
+- **25VIS2 — Sapphire + Sand trial (on its branch, unmerged; one new development build first, cut from `master` after
+  PR #113's Expo alignment):** the checklist's «Producto 25VIS2» in light and dark, then the owner's score against
+  Electric Lime and the five choices of its sheet (the transfer tone, two or three dark brand fills, the cobalt account
+  preset, one bright object per screen, card faces). Not merged until then.
   Same PR (JavaScript only): the checklist's «Same PR — movement composer and accessibility polish» and the dark dock's
   photos on every ground («The dark dock»).
 - **Fix — «Pagar tarjeta» in dark (PR #107, merged; no EAS build):** the checklist's section; nothing device-verified.
@@ -4451,8 +4456,10 @@ nothing of it is on a screen yet.
 
 - **Scope.** brand-brief.md §4.9's sheet B in `apps/mobile/src/ui/palette.ts`, token for token under the same names
   (PR #107's `onSemantic` included: white in light, #19191C in dark). Typography stays the system's (SF Pro); the
-  four-tab dock and the separate «+» are unchanged; no layout, navigation, copy, domain, storage, schema (14), backup
-  (v14), API or server change. The splash colour (`app.config.ts`, native) is left out so the trial stays JavaScript.
+  four-tab dock and the separate «+» are unchanged; the palette itself changes no layout, navigation, domain, storage,
+  schema (14), backup (v14), API or server (the composer polish below changes the transfer Save label and removes one
+  catalogue key). The splash colour (`app.config.ts`, native) is left out so the trial stays JavaScript; it flips with
+  the release-candidate build (flip list below).
 - **Tests.** `tests/theme.node.ts`: every accessibility assertion kept at WCAG AA or above, plus primary text on the
   inset and the field's ink on its control fill. Three bars that were Lime's own 7:1 are lowered: text on the call to
   action and the «+» ≥ 4.5 (dark 5.49 and 6.61), ink AAA on every brand field → only the hero's units (7.63 / 8.2), and
@@ -4462,17 +4469,24 @@ nothing of it is on a screen yet.
   field), `ui-rows.node.ts` the light ink on the thumb. The version line reads «FinanzApp 0.1.0 (25VIS2)».
 - **Tight margins for the iPhone:** the cents 4.62:1 on the light field; dark primary on `elevated` 4.83:1; the dark
   switch track 3.18:1 on the inset; the field's control fill 1.28:1 against the field (a shape, with its text 7:1+).
-- **Owner decisions before approval:** the transfer tone; one dark brand fill or three; the cobalt account preset
-  (#2557D6, close to the light brand).
-- **Gates.** Physical iPhone QA (the checklist's «Producto 25VIS2»), then the owner's explicit approval; only then a
-  merge. Lime's values stay in git history.
+- **Owner decisions before approval** (answered with the date in the checklist's sheet): the transfer tone (slate
+  kept?); two or three dark brand fills (buttons and swipes join the switch's #4568DA?); the cobalt account preset
+  (#2557D6, close to the light brand; kept?); one bright object per screen (Movimientos' empty-state button secondary
+  when an account exists?); card faces (not changed by the palette).
+- **Gates.** PR #113 merged first (Expo alignment), then one new development build, the checklist's «Producto 25VIS2»
+  on the iPhone and the owner's explicit approval; only then a merge, whose last commit applies the flip list below.
+  Lime's values stay in git history.
 - **Movement composer and accessibility polish (same PR, 2026-10-14).** The owner approved the direction of the
   private UX review (single-screen composer kept, its Gasto / Ingreso / Transferencia control kept) and these items:
   - **V1.** `MovementForm` disables its switch while `EntryForm` or `TransferForm` reports a save in flight or a frozen
     submission (`onLockedChange`, sent from the save handlers as `busy || pending !== null`). Recovery is unchanged:
     both `save()` handlers only add the report (a local `frozen` mirror set with `setPending`, cleared with a
-    `releasesDraft` release); the frozen submission, the operation id and what `releasesDraft` releases behave as before.
-  - **V2.** `EntryForm` keeps one category per kind; **V3** the transfer, payment and collection Save echoes the amount
+    `releasesDraft` release in `EntryForm`; `TransferForm` has no release, so a refusal storage decides after the freeze
+    keeps its switch locked until the screen closes, as it already kept its fields); the frozen submission, the
+    operation id and what `releasesDraft` releases behave as before. After a successful save the switch stays locked
+    while the modal closes.
+  - **V2.** `EntryForm` and `RecurringForm` keep one category per kind (the recurring form had the same defect: a Gasto
+    category saved on an income rule and copied to every movement it records; extended 2026-10-15); **V3** the transfer, payment and collection Save echoes the amount
     (on screen and spoken), read with the same `minorFromEditedDraft` as the save; **V7** the settled card or debt is a
     `SelectorCard fixed` (full strength, no chevron, read as text).
   - **Targets.** Default segments 32 pt + 6 pt vertical slop (44 pt; React Native 0.86's new architecture folds a
@@ -4485,15 +4499,36 @@ nothing of it is on a screen yet.
     detail's quick-action pills opt out while they are glass); a disabled `Choices` is drawn at half opacity.
   - **Not done, by decision:** autofocus, a discard confirmation, any other field, the dock's appearance (no photos;
     #4F4D47 would be 1.52:1 on elevated rows and 1.03:1 on the dark sapphire field), Hacia preselection, merchant-first.
-  - **Approved in the review, not in this slice:** the failed-save haptics (Error / Warning), the Save-gating test
-    table (V8) and «Usar todo» / «Pagar total» dismissing the keyboard (V15). The 44 pt switch is reached by slop, not
-    by the taller `prominent` track the review proposed, because the owner asked not to enlarge the drawing.
-  - **Checks (local, Linux, worktree):** `typecheck` OK; `test:storage` 1384 passed, 0 failed (1385, one not run as
-    before; 14 new tests, each failing on the previous source); `currency:verify`, `regions:verify` OK; `i18n:check --
-    --strict` 0 errors, 0 stale; `export:ios` OK; bundle secret scan OK; `npm ls --all` OK; root `npm test` 703 passed;
-    `check:repo` OK. **`npm run check` fails** on upstream Expo patch drift (expo 57.0.29, expo-constants 57.0.22,
-    expo-linking 57.0.13, expo-router 57.0.27; no dependency changed here): its own chore PR after B8, as #106 was.
-    None of this is iPhone QA.
+  - **Completed 2026-10-15 (same PR), the rest of the approved scope:** **V4** a failed save taps once: Error for a
+    refusal (before the submission froze, or one storage decided before writing), Warning when it may have been written
+    and stays frozen for the exact retry; **V8** a table test: Save waits for each required input of a movement and a
+    transfer, and a complete draft saves once; **V15** «Usar todo», «Pagar total» and the refund's «Total disponible»
+    lower the keyboard as they fill, so Save and its echo are in view. Codex's review: `ErrorMessage` announces only on
+    iOS; Android keeps the alert role and the live region, which TalkBack speaks itself (Node-tested; Android is not
+    shipped). Coverage: the yen echo (a currency without decimals is never read as cents) and the switch locked after a
+    successful save. The 44 pt switch is reached by slop, not by the taller `prominent` track the review proposed,
+    because the owner asked not to enlarge the drawing.
+  - **Merge-time flip list** (only on the owner's approval, as the last commit before the merge; find each with
+    `grep -n -i -E 'electric lime|trial|unmerged|sin mergear|not selected|default identity'` over the files named):
+    decision 005 gets an «Enmienda <fecha> — Producto 25VIS2 (paleta Sapphire + Sand)» like 25VIS1's (accepted on the
+    owner's iPhone; Lime replaced token for token under the same names; the semantic rule, the graphite dock and the
+    navigation unchanged; the owner's answers above; not a public name or logo), and its header and 25VIS1 pointer say
+    so; this roadmap's header, §1 (a 25VIS2 bullet beside Lime's, Lime replaced), this section's title, decisions and
+    gates, «Product continuity» and the theme-pack lines naming Lime as the default identity; `apps/mobile/README.md`'s
+    «Implemented» line (no «colour tokens only» or trial wording; the polish named); brand-brief.md §4.8 and §4.9 (no
+    «Not selected; implemented only as an unmerged trial»); mobile-design.md's 25VIS2 header and its notice at the top;
+    the checklist's 25VIS2 heading (approved on <date>, results and answers recorded); README.md (desde 25VIS1 …),
+    go-to-market.md and app-store-launch.md (the default identity, the landing ornament); `palette.ts`'s header comment
+    (no «a palette trial»). Only if the answer is «two dark fills»: `palette.ts` dark `primaryFill` and `swipeAccent`
+    #3D60D4 → #4568DA, brand-brief.md's sheet rows and the Marca bullet, then `tests/theme.node.ts` again. **Not in the
+    merge (native):** the splash in `app.config.ts` (#F5F6F8 / #080B10 today, close to neither palette) flips to the
+    approved canvases (#F3EFE6 / #0C0B0A for Sapphire, Lime's if Lime is kept) with the release-candidate build, with
+    an `app-config.node.ts` assertion that they equal the palette's `background`.
+  - **Checks (local, Linux, worktree, 2026-10-15):** `typecheck` OK; `test:storage` 1389 passed, 0 failed, 1 skipped
+    (19 new tests over the two days, each failing on the source before its change); `currency:verify`,
+    `regions:verify` OK; `i18n:check -- --strict` 0 errors, 0 stale; `expo install --check` with `EXPO_OFFLINE=1` up to
+    date (the live check waits for PR #113 on `master`); `export:ios` OK; bundle secret scan OK; root `npm test` 703
+    passed; `check:repo` OK. CI runs the rest once `master` (with #113) is merged in. None of this is iPhone QA.
 
 ### Producto 25VIS1 — Electric Lime palette, accepted as the current palette (PR #83, merged)
 
@@ -6767,9 +6802,9 @@ amount field does not animate layout at all: its symbol is anchored and its digi
 grow from a fixed origin. One
 haptic per user action, always paired with a visual. Category hues come from
 `src/ui/category-color.ts` and never replace a name. Colour tokens live in
-`src/ui/palette.ts`: the Forest pine primary (decision 005, 2026-09-30; it supersedes
-the cobalt primary that this rule named until then) marks interaction, selection and the
-brand only, inside the 158–168° hue window (never teal, cyan, emerald or blue); the hero,
+`src/ui/palette.ts`: the brand primary (decision 005's latest palette amendment; another
+palette is its own owner-approved amendment) marks interaction, selection and the brand
+only; the hero,
 accent and dock tokens belong to Inicio's field, the «+» and the dock; `expense` is the
 negative colour (destructive, overdue, over a limit), not ordinary spending; the
 semantic colours carry meaning, normal text stays neutral, category colours are
