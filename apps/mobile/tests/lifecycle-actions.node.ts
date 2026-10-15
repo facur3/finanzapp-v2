@@ -82,7 +82,7 @@ test('deleting an account asks first and names what stays and what stops; Cancel
   // 25Q1: the recorded balance that leaves Disponible is named, and the last sentence says the deletion is final.
   const money = (minor: number) => bindLocale('es-AR').moneyText(minor, 'ARS');
   const final = ' Una cuenta eliminada no se puede volver a activar.';
-  assert.equal(view.alerts[0].message, 'Deja de aparecer en tus cuentas, en Disponible y en los formularios. Sus 2 movimientos y 1 transferencia siguen en Movimientos con su nombre y su moneda.'
+  assert.equal(view.alerts[0].message, 'Deja de aparecer en tus cuentas, en Disponible y en los formularios. Sus movimientos y transferencias siguen en Movimientos con su nombre y su moneda: 2 movimientos y 1 transferencia.'
     + ' Su saldo registrado, ' + money(94400) + ', deja de contar en Disponible. Su 1 recurrente activo se detendrá; lo ya registrado no cambia.' + final);
   assert.equal(JSON.stringify(view.alerts[0].buttons.map(button => [button.text, button.style])), JSON.stringify([['Cancelar', 'cancel'], ['Eliminar', 'destructive']]));
   assert.deepEqual(view.removed, [], 'nothing written before the destructive button');
@@ -92,7 +92,7 @@ test('deleting an account asks first and names what stays and what stops; Cancel
   assert.equal(done, 1);
   // A transfer counts as history too; an account with none says so and lists no rule.
   view.render('useAccountManagement').remove(other);
-  assert.equal(view.alerts[1].message, 'Deja de aparecer en tus cuentas, en Disponible y en los formularios. Sus 0 movimientos y 1 transferencia siguen en Movimientos con su nombre y su moneda.'
+  assert.equal(view.alerts[1].message, 'Deja de aparecer en tus cuentas, en Disponible y en los formularios. Sus movimientos y transferencias siguen en Movimientos con su nombre y su moneda: 0 movimientos y 1 transferencia.'
     + ' Su saldo registrado, ' + money(5000) + ', deja de contar en Disponible.' + final);
   view.render('useAccountManagement').remove(lonely);
   assert.equal(view.alerts[2].message, 'Deja de aparecer en tus cuentas y en los formularios. No tiene movimientos.' + final, 'a zero balance names no figure');
@@ -115,7 +115,7 @@ test('a failed deletion keeps the account as it was and says so; in English the 
   const english = harness({ language: 'en-US' as never });
   english.render('useAccountManagement').remove(cash);
   assert.equal(english.alerts[0].title, 'Delete Banco?');
-  assert.match(english.alerts[0].message, /^It leaves your accounts, Available and the forms\. Its 2 transactions and 1 transfer stay/);
+  assert.match(english.alerts[0].message, /^It leaves your accounts, Available and the forms\. Its transactions and transfers stay in Activity with its name and currency: 2 transactions and 1 transfer\./);
   assert.match(english.alerts[0].message, /Its recorded balance, .*944\.00, stops counting in Available\..* A deleted account can’t be reactivated\.$/);
 });
 

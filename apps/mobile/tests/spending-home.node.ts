@@ -713,6 +713,13 @@ test('25Q1 (REPORTS-01): the spending detail finds a category by its key whateve
     const detail = routeHarness('spending-detail.tsx', { ...params, category }, accented).render();
     assert.equal(detail.props.entries.map((e: domain.Entry) => e.id).join() + '|' + find(detail, 'Money').props.minor, 'edu|700', category);
   }
+  // A category with no line in the period keeps its own name and tile over its true zero (never «Gastos registrados»);
+  // a blank one is an invalid link, not «all expenses».
+  const quiet = routeHarness('spending-detail.tsx', { ...params, category: 'Supermercado' }, homeData).render();
+  assert.equal(quiet.props.entries.length + '|' + find(quiet, 'Money').props.minor, '0|0');
+  assert.equal(nodes(quiet).find((n: any) => n.type === 'AppText' && n.props.accessibilityRole === 'header')!.props.children, 'Supermercado');
+  assert.equal(find(quiet, 'CategoryBadge').props.category, 'Supermercado');
+  assert.equal(find(routeHarness('spending-detail.tsx', { ...params, category: '   ' }, homeData).render(), 'EmptyState').props.title, 'Período no válido');
   // End to end: the Assistant's evidence link carries the stored spelling («Salud») and opens the figure it cites.
   const facts = monthlyEvidence(homeData, 'ARS', '2026-09-12');
   const fact = facts.find(item => item.id.startsWith('current.category.'))!;

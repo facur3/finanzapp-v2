@@ -39,7 +39,7 @@ export const accounts: Pick<Messages, 'accounts'> = {
       delete: 'Delete',
       deleteAccount: 'Delete account',
       deleteTitle: 'Delete {name}?',
-      deleteDetail: 'It leaves your accounts, Available and the forms. Its {movements} and {transfers} stay in Activity with its name and currency.',
+      deleteDetail: 'It leaves your accounts, Available and the forms. Its transactions and transfers stay in Activity with its name and currency: {movements} and {transfers}.',
       deleteDetailEmpty: 'It leaves your accounts and the forms. It has no transactions.',
       movements: { one: '{count} transaction', other: '{count} transactions' },
       transfers: { one: '{count} transfer', other: '{count} transfers' },

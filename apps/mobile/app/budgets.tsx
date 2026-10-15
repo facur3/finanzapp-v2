@@ -84,7 +84,7 @@ export default function BudgetsScreen() {
         <IconButton name="chevron-forward" label={t('budgets.screen.nextMonth')} onPress={() => setMonthISO(value => shiftMonthISO(value, 1))} />
       </View>
       {/* 25Q1: no account ever held this currency, so the spent figure is no data, never a verified zero. */}
-      {!historyCurrencies(snapshot.accounts).includes(currency) && <AppText secondary variant="footnote" style={{ textAlign: 'center' }}>
+      {(total || activeCount > 0) && !historyCurrencies(snapshot.accounts).includes(currency) && <AppText secondary variant="footnote" style={{ textAlign: 'center' }}>
         {t('budgets.screen.noAccountsInCurrency', { currency: currencyUnit(currency) })}</AppText>}
     </View>
 

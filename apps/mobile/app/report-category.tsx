@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { expensesInPeriod, isStorableCurrency, spendingReport } from '@finanzapp/domain';
+import { categoryKey, expensesInPeriod, isStorableCurrency, spendingReport } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { useFinanceView } from '../src/fx/rates-provider';
 import { lineCounts, listingSnapshot, recordedCountLabel } from '../src/fx/finance-view';
@@ -24,7 +24,8 @@ export default function ReportCategoryScreen() {
   const snapshot = view?.snapshot ?? null;
   const { t, formatMonth } = useI18n();
   const lookOf = useCategoryLookOf('expense');
-  const key = typeof params.category === 'string' ? params.category : '';
+  // 25Q1: compared as the report's key, whatever spelling the link carries (as the spending detail does).
+  const key = typeof params.category === 'string' ? categoryKey(params.category) : '';
   // A drill-down never falls back to another currency: an unknown or unheld code is an invalid link.
   const selection = useMemo(() => snapshot ? strictReportSelection(snapshot, params.currency, params.month, day) : null,
     [snapshot, params.currency, params.month, day]);

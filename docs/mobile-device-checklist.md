@@ -21,16 +21,20 @@ of Más reads «FinanzApp 0.1.0 (25Q1)». Light and dark; Spanish unless a step 
   (VoiceOver «…, Saldo a favor · … pesos»); one owing keeps «Saldo pendiente $ …»; one at zero «Sin saldo pendiente».
 - [ ] **A budget in a currency with no account.** Presupuestos → + → General → EUR (no euro account) → an amount → Crear.
   **Expect:** a currency switch offers ARS and EUR; EUR shows the general budget with «Editar» and, under the month,
-  «Todavía no tenés cuentas en euros, así que no hay gastos para comparar con este presupuesto.» A second general EUR
-  budget for the month is still refused, and the one it names can now be opened and deleted.
+  «Todavía no tenés cuentas en euros, así que no hay gastos para comparar con este presupuesto.» (only in a month that
+  holds a EUR budget). A second general EUR budget for the month is still refused, and the one it names can now be
+  opened and deleted.
+- [ ] **A category link with nothing in the period.** From the Assistant fixtures, or after undoing the only Supermercado
+  expense of the period: the detail is still titled «Supermercado» with its tile and «$ 0,00» (never «Gastos
+  registrados»).
 - [ ] **A card with only cuotas to come.** Save a purchase «En cuotas» on a card before its first closing; Tarjetas → that
   card, then its detail. **Expect:** «Todavía no hay movimientos. Tus cuotas se registran cuando cierra cada resumen.»
   (before: «Todavía no registraste compras ni pagos en esta tarjeta.»), above the detail's «Cuotas» list.
 - [ ] **Deleting an account.** Más → Cuentas → swipe an account holding money → Eliminar. **Expect:** «Deja de aparecer
-  en tus cuentas, en Disponible y en los formularios. Sus N movimientos y M transferencias siguen en Movimientos con su
-  nombre y su moneda. Su saldo registrado, $ …, deja de contar en Disponible.» (and the recurring sentence when a rule
-  is active), ending «Una cuenta eliminada no se puede volver a activar.»; Cancelar changes nothing. An account at zero
-  names no balance.
+  en tus cuentas, en Disponible y en los formularios. Sus movimientos y transferencias siguen en Movimientos con su nombre
+  y su moneda: N movimientos y M transferencias. Su saldo registrado, $ …, deja de contar en Disponible.» (and the
+  recurring sentence when a rule is active), ending «Una cuenta eliminada no se puede volver a activar.»; Cancelar
+  changes nothing. An account at zero names no balance.
 - [ ] **Large text.** The new sentences at AX3 and AX5 wrap in full; nothing is clipped. No animation or haptic changed.
 
 ## Fix — «Pagar tarjeta» readable in dark (PR #107, merged)

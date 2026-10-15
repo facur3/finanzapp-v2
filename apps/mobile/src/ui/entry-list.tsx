@@ -12,7 +12,8 @@ export function EntryList({ entries, transfers, accounts, accountId, header, emp
   /** After the last movement: a detail screen's own actions (24UX4: close or delete a debt), where iOS places them. */
   footer?: ReactNode; context?: RowContext;
   /** 24UX6E: false on a list of movements that count nowhere (Movimientos deshechos): the day heading stands alone, with
-   * no signed net and no spoken «Neto del día» over records that are in no balance or report. */
+   * no signed net and no spoken «Neto del día» over records that are in no balance or report. 25Q1: false as well on a
+   * list that is only part of a day (a category's or a day's expenses, Movimientos under a filter or a search). */
   dayNet?: boolean;
 }) {
   const p = usePalette();

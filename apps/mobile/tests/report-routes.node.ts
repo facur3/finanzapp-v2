@@ -554,6 +554,10 @@ test('25Q1 (REPORTS-02): a consolidated month waiting for a rate keeps its budge
   assert.equal(rows(routeHarness('(tabs)/reports.tsx', { month: '2026-08' }, snapshot, { display, activity: 'idle' }).render()).length, 0, 'no budget, no block');
   // A category's or a day's drill-down lists expenses only: their headings carry no «Neto del día».
   assert.equal(routeHarness('report-category.tsx', { currency: 'ARS', month: '2026-08', category: 'salud' }).render().props.dayNet, false);
+  // The category report compares by the key too, whatever spelling a link carries.
+  const ids = (category: string) => routeHarness('report-category.tsx', { currency: 'ARS', month: '2026-08', category }).render().props.entries.map((e: domain.Entry) => e.id).join();
+  assert.equal(ids('Salud'), ids('salud'));
+  assert.notEqual(ids('salud'), '');
   assert.equal(routeHarness('report-day.tsx', { currency: 'ARS', date: '2026-08-10' }).render().props.dayNet, false);
 });
 

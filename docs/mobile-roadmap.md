@@ -4468,8 +4468,10 @@ nothing of it is on a screen yet.
 - **What.**
   - *The Assistant's category link* (`app/spending-detail.tsx`): the link carries the stored spelling («Supermercado»)
     and the screen compared it with normalised keys, so the evidence meant to verify an answer opened «$ 0,00»; both
-    sides now compare `categoryKey`. A gate for the AI-first release (AGENTS rule 12), latent while every build is
-    disconnected. The screen shows the category's net, as before; the Assistant's row is gross (the known gap of 25A).
+    sides now compare `categoryKey` (so does the category report). A category with no line in the period keeps its own
+    title and tile over its true zero, and a blank one is an invalid link. A gate for the AI-first release (AGENTS rule
+    12), latent while every build is disconnected. The screen shows the category's net, as before; the Assistant's row
+    is gross (the known gap of 25A).
   - *Budgets without a rate* (`app/(tabs)/reports.tsx`): a budget reads the real ledger in its own currency and needs
     no rate (currency.md), so Reportes keeps its block when a consolidated total waits for one.
   - *«Neto del día»* (`EntryList dayNet`): off on a category's or a day's drill-down (expenses only) and on Movimientos

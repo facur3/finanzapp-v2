@@ -366,6 +366,10 @@ test('25Q1 (BUDGETS-02): a budget in a currency no account holds stays reachable
   const read = withHistory();
   assert.equal(read.filter(node => node.type === 'AppText').map(textOf).includes(note), false);
   assert.equal(read.filter(node => node.type === 'Stat').map(node => (node.props.children as Node).props.minor)[0], 700, 'Gastado reads the deleted account\'s euros');
+  // In a month with no EUR budget the note does not speak of «este presupuesto».
+  const october = await budgetsScreen({ ...archive, budgets: [total, food, { ...eur, monthISO: '2026-10' }] });
+  october().find(node => node.type === 'CurrencySwitch')!.props.onChange('EUR');
+  assert.equal(october().filter(node => node.type === 'AppText').map(textOf).includes(note), false, 'September holds no EUR budget');
   // An inactive EUR budget adds no currency.
   assert.equal((await budgetsScreen({ ...archive, budgets: [total, food, { ...eur, active: false }] }))().some(node => node.type === 'CurrencySwitch'), false);
   const { budgetCurrencies } = await import('../src/ui/budget-presentation.ts');

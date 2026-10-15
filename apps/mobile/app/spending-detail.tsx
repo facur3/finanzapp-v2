@@ -32,7 +32,7 @@ export default function SpendingDetailScreen() {
   if (!currency || typeof startISO !== 'string' || typeof endISO !== 'string'
     || !validDateISO(startISO) || !validDateISO(endISO) || startISO > endISO || endISO > today
     || (Date.parse(endISO) - Date.parse(startISO)) / 86400000 > 30
-    || (category !== undefined && (typeof category !== 'string' || !category))) return <Screen><EmptyState title={t('spendingDetail.invalidTitle')} detail={t('spendingDetail.invalidDetail')} /></Screen>;
+    || (category !== undefined && (typeof category !== 'string' || !category.trim()))) return <Screen><EmptyState title={t('spendingDetail.invalidTitle')} detail={t('spendingDetail.invalidDetail')} /></Screen>;
   const period: ReportPeriod = { currency, startISO, endISO };
   const report = spendingOverview(snapshot, period);
   // 25Q1: a link may carry a category as it is stored («Supermercado», the Assistant's evidence) or as its key; both
@@ -45,8 +45,9 @@ export default function SpendingDetailScreen() {
   // The day headings carry no «Neto del día»: these rows are one category's (or all) expenses, not the day's movements.
   return <EntryList entries={entries} accounts={real.accounts} dayNet={false} header={<View style={{ gap: 22 }}>
     <View style={{ gap: 12, paddingTop: 8 }}>
-      {group && <CategoryBadge category={group.category} large />}
-      <AppText accessibilityRole="header" variant="title1">{group ? lookOf(group.category).label : t('spendingDetail.allExpenses')}</AppText>
+      {/* A category with no line in the period keeps its own name and tile over its true zero, never «Gastos registrados». */}
+      {category && <CategoryBadge category={group?.category ?? category.trim()} large />}
+      <AppText accessibilityRole="header" variant="title1">{category ? lookOf(group?.category ?? category.trim()).label : t('spendingDetail.allExpenses')}</AppText>
       <AppText secondary variant="subhead">{withCurrencyCode(periodLabel(period, locale), currency)}</AppText>
     </View>
     <View style={{ gap: 10 }}>
