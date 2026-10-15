@@ -133,10 +133,13 @@ caja de línea cuando un estilo cambia solo el tamaño.
 **Tipografía.** Fuente del sistema. Héroe 44/700 tabular con tracking negativo,
 título grande 34, título 22, encabezado 17/600, cuerpo 17, subtítulo 15, nota 13,
 etiqueta 12. Números siempre tabulares. **Importes responsivos:** un importe es
-siempre una sola línea; uno corto queda grande y uno largo se reduce hasta la
-mitad (héroe) o tres cuartos (fila) para caber, nunca se corta ni se parte. Dynamic
-Type aplica con un tope de 1,4× en héroes. El campo de importe baja de 46 a 32 y 24 pt
-según la cantidad de cifras.
+siempre una sola línea; uno corto queda grande y uno largo se achica para caber,
+nunca se corta ni se parte. El héroe calcula su tamaño en JavaScript, con un piso de
+la mitad; una fila deja el ajuste a iOS, que achica hasta 4 pt (el piso nativo de
+React Native: `minimumFontScale` solo se lee en Android), por eso una fila se apila
+antes de achicarse (`rowStacks`). Dynamic Type aplica con un tope de 1,4× en héroes y
+1,8× en filas (25D1: los dos topes viven en `geometry.ts`). El campo de importe baja de
+46 a 32 y 24 pt según la cantidad de cifras.
 
 **Espacio y forma.** Margen de pantalla 20, tarjeta 16, escala 4–32. Radios: chip
 14, tile 12, grupo 16, tarjeta 20, hoja 24, tarjeta de crédito 18. Elevación clara
@@ -865,6 +868,49 @@ La selección de porciones dentro de la dona (solo visual, dentro del reporte) *
 barras de Día a día y una cabecera fija sólida. Siguen permitidos para una pasada siguiente; no hay ruta de detalle por comercio. El orden
 vinculante del roadmap no cambia: la próxima entrega de producto es 24T3; 24UX6C (Movimientos y Más) y 24UX6D
 (Tarjetas) siguen a 24UX6B en el carril UX, y su lugar frente a 24T3 lo decide el dueño (ver `docs/mobile-roadmap.md`).
+
+## Producto 25D1 — legibilidad y toque (en su rama, sobre #112; sin rediseño)
+
+En la rama `feat/25d1-legibility-touch`, apilada sobre #112 (Sapphire + Sand): se mergea después de #112 y de su
+revisión en el iPhone. Solo JavaScript; no cambia navegación, dominio, almacenamiento, esquema (14), backup (v14),
+textos ni claves del catálogo. Los valores son juicio con cifras medidas (WCAG sobre los tokens reales; anchos
+estimados con los multiplicadores de React Native y `labelWidthEm`); cómo se ven lo decide el iPhone.
+
+- **Contraste.** El símbolo y los centavos de un héroe de color (un ingreso, una transferencia, un saldo negativo)
+  conservan su tono con menos alfa, solo hasta donde permite 3:1 (`QUIET_ALPHA`: claro E6 / CC, oscuro B3 / 99): en
+  claro los centavos estaban en 2,16–2,43:1 sobre la arena, ahora 3,29 o más (oscuro 3,35 o más); las cifras enteras
+  siguen llevando el número. «Otras» en la dona pasa a un neutro cálido (#7C786E claro, #7A766C oscuro): 3,44:1 o más
+  sobre el lienzo, la tarjeta y el anillo (era 1,54: un hueco, no una porción). La tilde del color elegido toma
+  `onSemantic`: blanca en claro, tinta en oscuro (el blanco caía a 1,97:1 en los puntos claros; ahora 5,31 o más).
+- **Toque.** Enviar y Detener del Asistente son un objetivo de 44 pt que sigue ocupando 40 en el diseño (2 pt dentro del
+  relleno de la barra, que no se mueve). Los chips de moneda normales suman 4 pt arriba y abajo (44). La hoja de fecha ya
+  no dibuja un asa que no se puede arrastrar (HIG: solo una hoja redimensionable la muestra); la tarjeta queda 5 pt más corta.
+- **Estados presionados.** Con Reducir movimiento, una tarjeta del mazo de Tarjetas se oscurece bajo el dedo (un velo
+  negro al 12 %, sin escala) en vez de no mostrar nada; el texto blanco queda en 6:1 o más y el emisor en AA. Sin
+  Reducir movimiento sigue la escala de 0,97. Un segmento de un control segmentado se atenúa al 60 % mientras se lo toca
+  (solo color: no hace falta otra variante); el elegido nunca, porque tocarlo no hace nada.
+- **Texto grande, pase 1** (cada defecto con la herramienta que la app ya tenía: un tope con nombre, o el apilado sobre
+  1,2×):
+
+  | Elemento | Antes | Ahora |
+  | --- | --- | --- |
+  | Mes de Inicio (título 2) | sin tope: «Septiembre» se partía desde AX3 | 1,4× (como el héroe), dos líneas |
+  | Mes de Reportes y Presupuestos (título 3, entre flechas) | sin tope | 1,4×, dos líneas: corta en el espacio del año |
+  | Leyenda bajo ese mes (período o estado, «Este mes») | sin tope: desde AX3 más grande que el mes | 2× (24 pt), siempre debajo de los 28 pt del mes |
+  | Título grande / título 1 (primera apertura, detalle de categoría) | × 3,571 en AX5 (34 → 121 pt) | la curva de Apple en AX5: 60 y 58 pt (`TITLE_MAX_SCALE`) |
+  | Filas de Más y de los selectores (`NavigationRow`, `CheckRow`) | dos líneas y «…» a cualquier tamaño | dos líneas hasta 1,2×; enteras desde el umbral de apilado |
+  | Barra de las hojas (Cancelar · título · Listo) | crecía hasta sacar Listo de la pantalla | 1,2× como una barra del sistema, con Large Content Viewer |
+  | Eje de meses de Evolución | seis paradas de VoiceOver repetidas | oculto para VoiceOver (cada barra dice mes, año e importe), 1,4×, una línea |
+  | Día a día | una fila en línea y otra apilada según su largo | todas apiladas: fecha y cantidad sobre el importe |
+  | `IconButton`, `InfoButton`, la ⓘ de Disponible | sin ayuda al no poder crecer | Large Content Viewer con su nombre de VoiceOver |
+
+  Los títulos 2 y 3 no tienen todavía la curva de Apple (decisión pendiente, después de mirar AX3 y AX5 en el iPhone).
+- **No incluido:** el tope de 1,8× de los importes de fila (decisión del dueño); un piso `minimumFontSize`
+  para las filas que hoy achica iOS hasta 4 pt (se decide en el dispositivo); la tarjeta del borrador del Asistente y
+  sus filas a texto grande, los segmentos en pantallas de 320 pt y los totales de Deudas (siguiente pase); Aumentar
+  contraste.
+- **Pendiente en el iPhone:** todo lo anterior, en claro y oscuro, al tamaño normal, AX3 y AX5, en español e inglés
+  (la lista «Producto 25D1» de [mobile-device-checklist.md](mobile-device-checklist.md)).
 
 ## Producto 25VIS2 — Sapphire + Sand, prueba (sin mergear; sin rediseño)
 

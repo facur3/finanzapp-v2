@@ -1,6 +1,11 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-15 (**25VIS2 finish line**, same draft PR #112: the rest of the approved composer scope, the failed-save
+Updated: 2026-10-15 (**25D1 legibility and touch**, on its branch stacked on draft PR #112, unmerged until #112 is
+approved and merged: contrast floors for a coloured hero's symbol and cents, «Otras» and the colour check; 44 pt
+Enviar/Detener and currency chips; no grabber on the date sheet; pressed states for Tarjetas' deck under Reduce Motion
+and for every segment; the first large-text pass (month titles, the two big titles on Apple's AX5 curve, Más and chooser
+rows, sheet bars, the month axis, Día a día, the Large Content Viewer); JavaScript only; «Producto 25D1», §2). Before
+(2026-10-15, **25VIS2 finish line**, same draft PR #112: the rest of the approved composer scope, the failed-save
 haptics (V4), the Save-gating table (V8) and the keyboard lowered by «Pagar total» (V15); the recurring form keeps one
 category per kind; `ErrorMessage` announces only on iOS (Codex); the binding interface and motion rules no longer name a
 palette; checklist steps that described UI that does not exist corrected; the owner's five-choice sheet and the
@@ -931,6 +936,9 @@ item unless a section says a new native build is needed. The checklist sections 
   preset, one bright object per screen, card faces). Not merged until then.
   Same PR (JavaScript only): the checklist's «Same PR — movement composer and accessibility polish» and the dark dock's
   photos on every ground («The dark dock»).
+- **25D1 — legibility and touch (on its branch, stacked on #112; JavaScript only, Metro on the same new development
+  build):** the checklist's «Producto 25D1» in light and dark, at the default size, AX3 and AX5, in Spanish and English;
+  merged only after #112.
 - **Fix — «Pagar tarjeta» in dark (PR #107, merged; no EAS build):** the checklist's section; nothing device-verified.
 - **25A-06 — ledger currencies (PR #101; no EAS build; nothing
   device-verified):** every build stays disconnected; the fixture view is unchanged. With a connected build (25A-07), a
@@ -4451,6 +4459,53 @@ nothing of it is on a screen yet.
   local, Linux, same results: root `npm test` 590 passed, 1 todo; `check:repo` OK; `typecheck` OK; `test:storage` 1247
   passed, 0 failed; `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0 errors, 0 stale; `check` OK;
   `export:ios` OK. No account, handle, ad account or campaign created.
+
+### Producto 25D1 — Legibility and touch (on its branch, stacked on #112; unmerged)
+
+- **Scope.** Branch `feat/25d1-legibility-touch` from #112's head (Sapphire + Sand), so it merges after #112. The
+  contrast, touch, pressed-state and large-text items of the owner's iOS quality review of 2026-10-15 (its record stays
+  private), JavaScript only: no navigation, domain, storage, schema (14), backup (v14), copy or catalogue change.
+  Each value is judgment backed by a figure (WCAG on the real tokens; widths from React Native's multipliers and
+  `labelWidthEm`); the iPhone decides.
+- **Contrast** (`palette.ts` `QUIET_ALPHA`, `quietTones`; `category-color.ts`; `appearance-picker.tsx`). A coloured
+  hero's symbol and cents keep their tone at alphas set by the 3:1 floor (light E6 / CC, dark B3 / 99; light cents were
+  2.16–2.43:1, now ≥ 3.29; dark ≥ 3.35); «Otras» a warm neutral ≥ 3.44:1 on the canvas, the surface and the ring track
+  (was 1.54); the chosen colour's check `onSemantic` (dark: ink ≥ 5.31:1, white was 1.97–3.30).
+- **Touch.** The composer's Enviar/Detener a 44 pt target in the same 40 pt of layout (−2 pt margin inside the bar's
+  padding); plain currency chips 4 pt vertical slop; the date sheet loses the grabber it could not honour (HIG: only a
+  resizable sheet shows one).
+- **Pressed states.** Under Reduce Motion a Tarjetas deck card shows a 12 % black wash while pressed (no scale; white
+  text ≥ 6:1, the issuer AA, pinned on every face); every segmented-control segment dims to 0.6 under the finger, the
+  chosen one never.
+- **Large text, pass 1.** `HERO_MAX_SCALE` and `ROW_MAX_SCALE` move to `geometry.ts` unchanged; `TITLE_MAX_SCALE` gives
+  `largeTitle` and `title1` the HIG's AX5 sizes (60 and 58 pt; React Native multiplies every style by 3.571); Inicio's
+  month and the Reportes and Presupuestos month titles stop at 1.4× on two lines, and the captions under the latter at 2×
+  (`MONTH_CAPTION_MAX_SCALE`: 24 pt, under the title's 28; uncapped they overtook it from AX3); `NavigationRow` and `CheckRow` lift
+  their two-line limit above the shared 1.2× stacking threshold; the sheet bars (the date sheet and the four page-sheet
+  pickers) stop at 1.2× through one local `SheetBarButton` with the Large Content Viewer and an 8 pt slop; the
+  Evolución axis is hidden from VoiceOver (each bar speaks month, year and amount) and capped at 1.4×; every Día a día
+  row is stacked; `IconButton`, `InfoButton` and `MetricHelp` offer the Large Content Viewer. `mobile-design.md`'s
+  typography paragraph no longer promises a half / three-quarters shrink floor for rows: iOS reads `minimumFontSize`
+  (default 4 pt), never `minimumFontScale` (`RCTTextLayoutManager.mm:246-249`, React Native 0.86.3).
+- **Tests.** New `tests/contrast-floors.node.ts`; `cards-deck` (the wash, its timings and its contrast), `ui-rows`
+  (segments' pressed style, rows by scale, the icon buttons, the page-sheet bar), `typography` (the title caps and the
+  first opening's words at AX5), `spending-home`, `report-routes`, `budgets-routes`, `date-field` (the bar, and the room
+  every catalogue sheet title keeps at 1.2×; no grabber), `spending-chart` (the hidden axis and its column fit),
+  `home-ranking`, `assistant-ui` (the 44 pt Enviar / Detener), `currency-copy` (the chips' slop), and the colour picker
+  rendered for its check. The props are pinned on the rendered elements, so reverting a change fails a test (checked by
+  reverting the picker's check and the grabber); a fit test's uncapped case only shows the defect it fixes. The typography goldens moved deliberately
+  (`'#008800E6'`; `['#131411E6','#131411CC']`). The version line reads «FinanzApp 0.1.0 (25D1)».
+- **Not done:** the 1.8× row-amount cap (owner decision) and a `minimumFontSize` floor for rows (device call);
+  title 2 and title 3 on Apple's curve; the Assistant's draft card, evidence and «Para revisar» rows at large text;
+  segments at 320 pt and Deudas' totals; Increase Contrast; the Large Content Viewer on the «+», its «×» and Inicio's
+  accounts button (each a later pass).
+- **Gates.** #112 approved and merged first; this branch then merges `master` (no force-push) and is checked on the
+  iPhone from the same development build; the owner approves.
+- **Checks (local, Linux, worktree, 2026-10-15):** `typecheck` OK; `test:storage` 1429 passed, 0 failed, 1 skipped
+  (15 new tests; the deck, segment and axis tests rewritten for the new behaviour); `currency:verify`, `regions:verify`
+  OK; `i18n:check -- --strict` 0 errors, 0 stale (no copy change); `expo install --check` with `EXPO_OFFLINE=1` up to
+  date (the live check fails on this base until PR #113 reaches it through #112); `npm ls --all` OK; `export:ios` OK;
+  bundle secret scan OK; root `npm test` 703 passed; `check:repo` OK. None of this is iPhone QA.
 
 ### Producto 25VIS2 — Sapphire + Sand trial (on its branch; unmerged until iPhone QA and the owner's approval)
 

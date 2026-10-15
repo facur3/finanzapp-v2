@@ -1,5 +1,61 @@
 # Physical iPhone acceptance checklist
 
+## Producto 25D1 — legibility and touch (on its branch, stacked on #112; JavaScript only)
+
+Branch `feat/25d1-legibility-touch`, built on #112 (Sapphire + Sand), so it merges only after #112. **The same new
+development build as 25VIS2** (cut from `master` after PR #113), then Metro from this branch: it serves #112 too, so the
+25VIS2 items above can be run from it. The end of Más reads «FinanzApp 0.1.0 (25D1)». Each item in light **and** dark;
+the large-text items at the default size, AX3 and AX5 (Settings › Accessibility › Display & Text Size › Larger Text,
+Larger Accessibility Sizes on), in Spanish and English. Record the iPhone model, iOS version, theme, language and text
+size with each result. Every figure below is an estimate from React Native's multipliers and the app's own width
+estimate (`labelWidthEm`); the iPhone decides. At the default size and up to Extra Large every screen looks as before,
+except the two noted («Día a día», the pressed segments).
+
+- [ ] **Coloured hero amounts:** an income movement's detail (green «+ $ 1.234,50»), a transfer's detail (slate) and an
+  account with a negative balance (red): the symbol and the cents a step quieter than the units, both clearly legible
+  on the sand (they were 2.2:1 in light; now 3.3:1 or more).
+- [ ] **«Otras» in Reportes' donut** (a month with more categories than the ring shows): a warm grey slice you can see
+  on the card, not a gap in the ring.
+- [ ] **The chosen colour's check** (Editar cuenta › Color, and a category's colour): in dark the check is ink on every
+  dot (it was white, 2:1 on the brighter ones); in light it stays white.
+- [ ] **Enviar and Detener in the Assistant's composer:** easy to hit at the disc's edge; the disc, the field and the bar
+  look exactly as before.
+- [ ] **The currency chips:** Reportes' «Total · USD» / «Solo USD» chip (from two currencies), and the currency row of
+  Presupuestos or a debt, budget or card form with **three or more** currencies (with two they show segments): a tap
+  just above or below the chip still opens it.
+- [ ] **The date sheet** (Nueva compra › Fecha): no grabber at the top of the card (it could not be dragged); the card is
+  5 pt shorter, with 8 pt above Cancelar | title | Listo; Cancelar, the dimmed backdrop and VoiceOver's escape gesture
+  close it. The capture hub (the «+») is unchanged: it never had one.
+- [ ] **Tarjetas with Reduce Motion on:** pressing a card darkens it while the finger is down (no shrink), and the name,
+  number and issuer stay legible; with Reduce Motion off the press still shrinks it slightly.
+- [ ] **Segmented controls** (Gasto / Ingreso / Transferencia; Categorías | Día a día; Gastado | Disponible): the
+  segment under the finger dims until it lifts; the chosen one never dims; nothing moves.
+- [ ] **Inicio's month at AX3, AX4, AX5** (set the date to September, November or December): «Septiembre» /
+  «September» in whole words, at most about 31 pt, smaller than the amount under it; the accounts button stays on the
+  right; VoiceOver still reads it as a heading.
+- [ ] **Reportes and Más › Presupuestos on a long month** at AX3 to AX5: «Septiembre de 2026» / «September 2026»
+  wraps at a space, never inside «Septiembre»; the arrows keep their size; the line under it («Hasta hoy · ARS», «Mes
+  en curso», «Este mes») stays smaller than the month (at most about 24 pt against 28).
+- [ ] **Más at AX3 and AX5, then Idioma, Región and Apariencia:** every title and subtitle in full, over as many lines
+  as it needs, none ending in «…» («Movimientos deshechos» over «2 recuperables», «Deudas y cobros» over «Debo · me
+  deben»); up to Extra Large the rows keep two lines at most. A very long word may still break inside itself at AX5.
+- [ ] **The first opening at AX5** (a clean install, the 25B way): «Tus gastos, claros.» about 60 pt (it was about
+  120 pt), «Tu primera cuenta» about 58 pt, whole words; Continuar, Crear cuenta and Ahora no reachable by scrolling.
+  On a 320 pt screen the English «spending,» may split (known).
+- [ ] **Sheet bars at AX3 to AX5** (Fecha, then the account, category and currency pickers): Cancelar and Listo about
+  19 pt on the title's row, Listo fully on screen and tappable; the title centred on one or two lines (on a 320 pt
+  screen «visualización» or «Categorías» may wrap inside the word). With the Large Content Viewer, a long press on
+  Cancelar or Listo shows the word large. VoiceOver order: Cancelar, the title (heading), Listo.
+- [ ] **Reportes › Evolución:** with VoiceOver, swiping from the section heading stops on each bar (month, year,
+  amount) and on the scale line, never on «sep», «oct»; at AX3 and AX5 the month labels under the bars stay one line
+  inside their columns; tapping a bar still selects its month.
+- [ ] **Reportes › Día a día** at the default size and AX3: every row has the same two lines, the date and count over
+  the amount, chevron on the right (before, a short day put its amount on the right and a long one under it).
+- [ ] **The Large Content Viewer at AX5** (Settings › Accessibility › Touch, if your iOS lists it there): a long press on
+  a modal's close button, a header «+», Reportes' month arrows, an ⓘ button and the ⓘ beside «Disponible» on Inicio
+  shows its name large («Mes anterior», «Cerrar»…). If a button in the native header shows nothing, note it: that is
+  the one open question.
+
 ## Producto 25VIS2 — Sapphire + Sand trial (this PR; **not merged until this check passes and the owner approves**)
 
 The palette (`apps/mobile/src/ui/palette.ts`): Electric Lime replaced token for token by sheet B of
@@ -35,8 +91,9 @@ form's per-kind category.
 - [ ] **Accounts:** an account using the cobalt preset (#2557D6) next to the sapphire brand in light (close in colour:
   an owner call whether it reads as a separate identity).
 - [ ] **The quiet zero hero** (an empty month) and the first opening (onboarding) on the sand canvas.
-- [ ] **Accessibility:** VoiceOver order unchanged; the largest Dynamic Type size on Inicio; Increase Contrast (not
-  handled by the app, before or after); Smart Invert.
+- [ ] **Accessibility:** VoiceOver order unchanged; the largest Dynamic Type size on Inicio (run from 25D1's branch, whose
+  month heading stops at 1.4×: from this branch alone the month breaks inside the word, a defect the palette did not
+  cause); Increase Contrast (not handled by the app, before or after); Smart Invert.
 - [ ] **Más, the choosers and the first frame.** Más → Finanzas and Datos on sand: tiles, rows, links and the version
   line; Idioma, Región and Apariencia in both themes (the selected row in sapphire / periwinkle); Apariencia Sistema →
   Oscuro switches without a flash. A cold launch in light and in dark: the native splash keeps its old colours
