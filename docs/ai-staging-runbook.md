@@ -20,8 +20,8 @@ second, separate one-run approval of 2026-10-08 (200 000 µUSD) was consumed by 
 neither authorizes a further run; B8 stayed blocked until a run passed. **2026-10-11:** the owner recorded decisions C(a) and E(a) and a
 third, separate approval for exactly one run, B7 run #3 (`gpt-6-luna`, at most 200 000 µUSD; not reusable). **B7 run
 #3 PASSED 2026-10-11** (from 900ee77, exit 0, every threshold; 8 158 µUSD; the approval consumed, no further paid run
-authorized): `gpt-6-luna` is adopted for staging, not for production. **B8 is ready for controlled owner-led
-execution** (§12, §6.6); AI stays off on staging until the owner performs it. B2–B6 were carried out before B1 closed. The results, with no account address, key, token, project ref or secret, are in
+authorized): `gpt-6-luna` is adopted for staging, not for production. **B8 ran 2026-10-14 and 2026-10-15 and is
+closed** (§12, §6.6; the record is the roadmap's «B8 record»); AI is off on staging again, and B9 is next. B2–B6 were carried out before B1 closed. The results, with no account address, key, token, project ref or secret, are in
 [mobile-roadmap.md](mobile-roadmap.md), «Producto 25A-06», «Phase B record»; the resources to keep and to clean up later
 are in §0.5.
 
@@ -55,7 +55,7 @@ Each checkpoint must pass before the next one starts. Do not skip ahead.
 | B5 | Boundary probe (§6.5) | Owner runs a script | **Passed** 2026-10-07. Every line PASS |
 | B6 | Vercel staging project deployed, AI off in the database (§4) | Owner | **Passed** 2026-10-07. `probe.js api` all PASS |
 | B7 | Real Luna evaluation (§11) | Owner approves the spend and runs it | Every threshold passes, or the run is recorded as a failure, never re-graded. **RUN #1 completed 2026-10-08 UTC: FAILED** (exit 1; `schemaValidRate`, `intentAccuracy`, `clarificationAccuracy`, `groundedEvidenceAccuracy`, `hallucinatedFactRate`; 7 818 µUSD). **RUN #2 completed 2026-10-08 UTC from merged PR #92: FAILED** (exit 1; `schemaValidRate` 0.9806, `intentAccuracy` 0.9417, `clarificationAccuracy` 0.8696, `groundedEvidenceAccuracy` 0.9; 7 836 µUSD). Two one-run approvals, 2026-10-07 (consumed by run #1) and 2026-10-08 (consumed by run #2), each 200 000 µUSD; neither authorizes a further run. A third, separate one-run approval (2026-10-11, 200 000 µUSD, `gpt-6-luna` only, after decisions C(a) and E(a); worst case 194 848 µUSD at 900ee77). **RUN #3 completed 2026-10-11 UTC from 900ee77: PASSED** (exit 0, `failures: []`; `schemaValidRate` 0.9903 and `hallucinatedFactRate` 0.0194 with no margin; 8 158 µUSD); the third approval consumed; `gpt-6-luna` adopted for staging only; any further run needs its own written approval |
-| B8 | AI enabled on staging, failure drills (§12), race (§6.6) | Owner | The deployed revision `COMPATIBLE` (§12.2); every drill as expected; race PASS; kill switch tested; B8 ends with the database switch off and the B8 baseline checked (§12.1, §12.5). **Ready for controlled owner-led execution** (B7 passed 2026-10-11); not started; the database switch stays off until the owner performs it. B8 baseline proposed by the owner 2026-10-12 (app-wide month `1000000` µUSD), not yet applied |
+| B8 | AI enabled on staging, failure drills (§12), race (§6.6) | Owner | The deployed revision `COMPATIBLE` (§12.2); every drill as expected; race PASS; kill switch tested; B8 ends with the database switch off and the B8 baseline checked (§12.1, §12.5). **Closed 2026-10-15 (owner decision)**: every drill run by the owner on 2026-10-14 and 2026-10-15 at `S` = 173ce76 with the B8 baseline (app-wide month `1000000` µUSD). Kept evidence shows the expected result for drills 1, 4, 5, 6, 13 (first run), 14, 15 and the race (PASS, 3 of 8); drills 2, 3, 7 to 12, 13's second run and the kill-switch drill 8 rest on the owner's statement (their outputs or telemetry categories were not kept and, by the owner's decision, were not re-run). It ended, by the owner's reads, with the database switch off, `baseline_ok = true`, no `reserved` row, no drill key active and 2 649 µUSD in the month. The record: the roadmap's B8 record, «Producto 25A-06» |
 | B9 | Cost reconciliation (§9.3) | Owner runs a script | No day `investigate`; `estimate_exceeded` = 0 |
 | B10 | Focused `/security_audit`, then `/security_review` (§14) | Claude, on the owner's request | No open High or Medium; findings fixed or recorded |
 | B11 | Results recorded; 25A-06 marked done | Claude, owner confirms | Roadmap and production-plan.md updated |
@@ -441,7 +441,7 @@ secrets **Sensitive**, which makes them unreadable after saving.
 | `MOBILE_INTEGRATIONS_ENABLED` | `true` | plain |
 | `MOBILE_SUPABASE_URL` | `https://<staging-ref>.supabase.co` | plain |
 | `MOBILE_SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_…` | plain (public by design, kept server-side) |
-| `MOBILE_SUPABASE_SECRET_KEY` | `sb_secret_…`, the **`mobile-api-staging`** key of §6.2 | **Sensitive** |
+| `MOBILE_SUPABASE_SECRET_KEY` | `sb_secret_…`, the **`mobile_api_staging`** key of §6.2 | **Sensitive** |
 | `MOBILE_AI_ENABLED` | `true` (the database switch stays off until B8, §12) | plain |
 | `MOBILE_AI_PROVIDER` | `openai` | plain |
 | `MOBILE_AI_MODEL` | `gpt-6-luna` | plain |
@@ -569,7 +569,7 @@ Authentication → Sign In / Providers and → Settings in the staging project. 
 Project Settings → API Keys.
 - [ ] The **publishable** key (default) → `MOBILE_SUPABASE_PUBLISHABLE_KEY`.
 - [ ] Create **two secret keys**:
-  - `mobile-api-staging`, only for the Vercel staging project (§4.4);
+  - `mobile_api_staging`, only for the Vercel staging project (§4.4);
   - `owner-probe-staging`, only for the owner's local `staging-db.env`.
 
   Revoking one never breaks the other. Each is a `service_role` credential: it never goes in an app, an `EXPO_PUBLIC_*`
@@ -621,6 +621,8 @@ Steps:
   - a duplicate request id is refused;
   - the per-user **day**, per-user **month**, global **day** and global **month** ceilings each fit exactly and refuse
     at +1 µUSD.
+- Never once AI has been enabled on the project: it FAILs when `enabled` is true or the month already holds a
+  reservation (after B8, any day of October 2026).
 - CI runs the same file on every push (job `mobile_api`). 13 planted faults were each caught while it was written:
   an execute grant to `authenticated`; a table grant to `service_role`; column grants to `anon` (with an open policy)
   and to `authenticated`; TRUNCATE to `authenticated`; REFERENCES to `service_role`; AI enabled; RLS off; an open inbox
@@ -644,7 +646,9 @@ real API gateway:
   the inbox;
 - the server path (the secret key alone) answers `disabled`, and `environment` for another name.
 
-Every line must be PASS (exit 0). The probe capture may stay; to remove it:
+Every line must be PASS (exit 0), and only with the database switch off: with the switch on, its server-path check
+writes a real reservation (`stagingprobe-server-01`) instead of reading `disabled`. The probe capture may stay; to
+remove it:
 `delete from public.mobile_capture_inbox where request_id = 'stagingprobe-inbox-0001';`.
 
 ### 6.6 Concurrency race on staging (OWNER, at B8, after AI was enabled once)
@@ -1011,7 +1015,7 @@ none starts before step 0. An agent may do READ steps through read-only access; 
 | 9 | §12.3 drills 2 and 3: a Vercel variable changed, a redeploy, `$P api`, then the restore and a redeploy | WRITE + FREE | open |
 | 10 | §12.3 drill 4: a third Supabase secret created, set, **revoked**; the original put back | WRITE + FREE | open |
 | 11 | §12.3 drill 5: `MOBILE_ENVIRONMENT=production`, then back to `staging` | WRITE + FREE | open |
-| 12 | §12.4 opening (`enabled = true`, the check `enabled = true`, `baseline_ok = true`), then drill 6: the smoke request and its duplicate. Its 200 and the telemetry's `model` = `gpt-6-luna` prove the AI variables' values | WRITE + **PAID** (about USD 0.0001 to 0.0003) | open |
+| 12 | §12.4 opening (`enabled = true`, the check `enabled = true`, `baseline_ok = true`), then drill 6: the smoke request and its duplicate. Its 200 proves the AI variables work; the telemetry's `model` is the configured value, written before the call, and its token fields, logged only when the served model and tier match it, prove what served the request | WRITE + **PAID** (about USD 0.0001 to 0.0004) | open |
 | 13 | Drills 7 and 8 (8 is SQL only, no provider; its `stagingprobe-kill-%` row deleted) | WRITE + FREE | open |
 | 14 | Drills 9 to 12: one limit set, `$P api --ai-enabled`, the baseline restore and check after each | WRITE + **PAID request expected to be refused before the provider** (evidence: telemetry) | open |
 | 15 | Drill 13: the rate limit (its first run is billed) | WRITE + **PAID** | open |
@@ -1028,6 +1032,9 @@ be reached**, the deployment switch is the kill switch instead: `MOBILE_AI_ENABL
 `false` and the baseline check prints `enabled = false`; only then is it set back to `true` with a redeploy. **The final state** is
 §12.5's: the deployment switch `true`, the database switch `false`, `baseline_ok = true`, no `reserved` row, no drill
 key active.
+
+**Executed 2026-10-14 and 2026-10-15; closed 2026-10-15.** The State column is the 2026-10-14 preflight; each row's
+outcome, and the evidence that was not kept, are in the roadmap's B8 record («Producto 25A-06»).
 
 ### 12.1 The B8 baseline
 
@@ -1139,10 +1146,15 @@ Base commands:
 - `P=node --env-file=$HOME/.config/finanzapp/staging-db.env server/mobile/staging/probe.js`
 - `$P api`: free; with the database switch off, all PASS proves the deployment is open, in `staging` and holds a working
   Supabase secret (the 503 must carry the reservation's own words).
-- `$P api --ai-enabled`: one billed request and its duplicate (refused before the provider), about USD 0.0001 to
-  0.0003. B8's billed requests total about USD 0.002.
+- `$P api --ai-enabled`: one billed request and its duplicate (refused before the provider): about 65 µUSD when the
+  instructions are already cached, about 330 µUSD when they are written to the cache (the first request after a
+  pause). B8's settled requests came to 788 µUSD. `$P api` without the flag is billed the same way while the database
+  switch is on: its 503 check then sends a real request.
 
-After each drill read its telemetry line (§4.7); Hobby keeps runtime logs for about one hour.
+Save every probe run's output with the drill's name, billed or not: a billed run nobody saved is counted in the month
+but cannot be attributed later (B8's fourth settled row). After each drill read its telemetry line (§4.7) and copy it
+into the record at once: Hobby keeps runtime logs one hour, and B8 lost the categories of drills 7 to 13 by reading
+later.
 
 ### 12.3 Deployment drills: database switch OFF, no provider call
 
@@ -1154,7 +1166,7 @@ restore is followed by `$P api` all PASS.
 | 1 | Invalid user token | `$P api` | 401 on no session, a malformed bearer and a forged token | nothing changed |
 | 2 | AI disabled (deployment) | Vercel: `MOBILE_AI_ENABLED=false`, redeploy; `$P api` | 503 «La integración todavía no está habilitada.» before the session is read, no telemetry line (no dependencies). `$P api`: sign-in and 405 PASS; the three 401 checks, the 415 check and the 503 check FAIL (route closed) | `true`, redeploy; `$P api` all PASS |
 | 3 | Missing API key | Vercel: delete `MOBILE_AI_API_KEY`, redeploy; `$P api` | the same as drill 2: route closed, the same five FAILs | add the **`finanzapp-staging-api`** key back from the password manager (Production only, Sensitive), redeploy; `$P api` all PASS. The key's value is proven by drill 6's 200 |
-| 4 | Bad Supabase secret | Create a third secret key, set it as `MOBILE_SUPABASE_SECRET_KEY`, redeploy, **revoke it**; `$P api` | 503 `database` on reservation («La integración no está disponible…»); nothing reaches the provider. `$P api`: only the 503 check FAILs (the session and content-type checks still run) | set the **`mobile-api-staging`** key back from the password manager, redeploy; `$P api` all PASS; Supabase's API keys list no longer shows the drill key |
+| 4 | Bad Supabase secret | Create a third secret key, set it as `MOBILE_SUPABASE_SECRET_KEY`, redeploy, **revoke it**; `$P api` | 503 `database` on reservation («La integración no está disponible…»); nothing reaches the provider. `$P api`: only the 503 check FAILs (the session and content-type checks still run) | set the **`mobile_api_staging`** key back from the password manager, redeploy; `$P api` all PASS; Supabase's API keys list no longer shows the drill key |
 | 5 | Wrong environment | Vercel: `MOBILE_ENVIRONMENT=production`, redeploy; `$P api` | route closed (the code refuses production), the same five FAILs as drill 2 | `staging`, redeploy; `$P api` all PASS |
 
 A Vercel secret marked Sensitive cannot be read back, so a restore is proven by behavior, never by looking at it.
@@ -1165,13 +1177,15 @@ A Vercel secret marked Sensitive cannot be read back, so a restore is proven by 
 `update public.mobile_ai_control set enabled = true;` and the baseline check: `enabled = true`, `baseline_ok = true`.
 **Before each drill:** `baseline_ok = true`. **After each limit drill:** the baseline restore, then the baseline check;
 the next drill does not start until it prints `baseline_ok = true`. The probe prints only PASS/FAIL, never a status,
-and `global_budget` carries the same words as `disabled`: in drills 9 to 15 the evidence is **the telemetry line's
-`status` and `category`** (§4.7), never the probe's output, whose 200 check FAILs there by design (except drill 13's
-first run).
+and `global_budget` carries the same words as `disabled`: in drills 7 to 15 the evidence is **the telemetry line's
+`status` and `category`** (§4.7), never the probe's output. `$P api` 7/7 reads the same with `disabled`,
+`global_budget`, `environment`, `reservation_unknown` or the provider's `spend_limit`. A refused `$P api --ai-enabled`
+prints 6 PASS / 2 FAIL: the 200 check, and the 409 check, because a refusal writes no row and the repeat meets the same
+refusal. The exceptions are drill 13's first run (8/8) and drill 15 (7/1: its row exists, so the 409 check passes).
 
 | # | Drill | How to cause it | Expect | Restore, then verify |
 | --- | --- | --- | --- | --- |
-| 6 | Smoke and duplicate request id | `$P api --ai-enabled` | 200 with a protocol result; the repeated id 409 `duplicate`; telemetry `settlement` settled | nothing changed |
+| 6 | Smoke and duplicate request id | `$P api --ai-enabled` | 200 with a protocol result; the repeated id 409 `duplicate`. Telemetry: the token fields and `chargedMicroUsd` below `reservedMicroUsd`, no `settlement` key (written only for `failed`). The row (read only): `settled`, `charged_micro_usd` below `max_micro_usd`, tokens present, `model` `openai:gpt-6-luna` (the price key; the telemetry's `model` is `gpt-6-luna`) | nothing changed |
 | 7 | AI disabled (database) | `update public.mobile_ai_control set enabled = false;` then `$P api` | 503 `disabled`; no provider call; `$P api` all PASS | `set enabled = true;` baseline check `enabled = true` |
 | 8 | Kill switch with a request in flight (database only, no provider) | SQL Editor, in order: (1) `select public.mobile_ai_reserve((select id from auth.users where email = '<test person A e-mail>'), 'stagingprobe-kill-0001', 'm', 1000, 1, 1, 'staging');` (2) `update public.mobile_ai_control set enabled = false;` (3) `select public.mobile_ai_settle((select id from auth.users where email = '<test person A e-mail>'), (select id from public.mobile_ai_reservations where request_id = 'stagingprobe-kill-0001'), 'settled', 0, 1, 0, 0, 1, 0);` then `$P api` | (1) an `id`, reserved while on; (3) `true`: the reservation made before the flip still settles; `$P api` all PASS (the next request 503 `disabled`, no new reservation) | `delete from public.mobile_ai_reservations where request_id like 'stagingprobe-kill-%';` then `set enabled = true;` and the baseline check |
 | 9 | User daily money ceiling | `update public.mobile_ai_control set user_day_ceiling_micro_usd = 1;` then `$P api --ai-enabled` | telemetry `429` `user_budget` | baseline restore and check |

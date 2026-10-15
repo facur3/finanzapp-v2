@@ -4,7 +4,13 @@ Updated: 2026-10-15 (**25VIS2 finish line**, same draft PR #112: the rest of the
 haptics (V4), the Save-gating table (V8) and the keyboard lowered by «Pagar total» (V15); the recurring form keeps one
 category per kind; `ErrorMessage` announces only on iOS (Codex); the binding interface and motion rules no longer name a
 palette; checklist steps that described UI that does not exist corrected; the owner's five-choice sheet and the
-merge-time flip list; «Producto 25VIS2», §2). Before (2026-10-14, latest, **25VIS2 + movement composer and accessibility polish**, same draft PR #112, owner-approved
+merge-time flip list; «Producto 25VIS2», §2). Before (2026-10-15, later, 25A-06 **B8 closed**: the owner-led drills ran on 2026-10-14 and 2026-10-15 at `S` 173ce76; the
+record names the evidence that was not kept, accounts for the fourth settled reservation by inference, gives the month total, 2 649
+µUSD, and B9's inputs; the runbook takes the corrections B8 found; `master` is unfrozen once this merges; «Producto
+25A-06», runbook §0.2, §6.4, §6.5, §12. **CI:** the Expo SDK 57 patches aligned again, with a native change, so a new
+development build comes before iPhone QA; a pull request now checks against the Expo table its lockfile pins, so a
+patch Expo publishes later stops failing unrelated PRs; §1 «Builds and tooling». No remote write, no paid call).
+Before (2026-10-14, latest, **25VIS2 + movement composer and accessibility polish**, same draft PR #112, owner-approved
 items of the private UX review: the kind switch locked during a save, one category per kind, the amount on transfer
 Saves, the fixed card or debt, 44 pt targets without larger drawings, VoiceOver and Reduce Motion pressed states; the
 dark dock reviewed and unchanged (no photos); `master` merged in; no financial, schema, backup, navigation or recovery
@@ -902,21 +908,23 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   owner's iPhone (FinanzApp Dev, `com.facur3.finanzapp.dev`); Metro from the branch for QA. CI:
   root tests/build/hygiene, mobile `npm ls`, `expo install --check`, typecheck, currency and
   region catalogue verification, strict localization check, the SQLite tests, the iOS export;
-  the mobile API's PostgreSQL tests. Expo SDK 57 patch releases last aligned 2026-10-12 for `expo install --check`
-  (`expo` 57.0.28, `expo-crypto` 57.0.4, `expo-dev-client` 57.0.20, `expo-router` 57.0.26, `expo-sharing` 57.0.23,
-  `expo-splash-screen` 57.0.10; before, 2026-10-07: `expo-constants` 57.0.21, `expo-linking` 57.0.12, `expo-sqlite`
-  57.0.4; React Native stays 0.86.3). **The installed development build predates native changes**, so physical iPhone
-  verification needs a new EAS development build first (an owner action, not made here): the 2026-10-12 alignment
-  changes autolinked iOS code in `expo-modules-core` (Fabric view headers), `expo-modules-jsi` (the JS runtime bridge)
-  and `@expo/ui` (SwiftUI views, a dependency of `expo-router`), on top of the 2026-10-07 native fixes in `expo-sqlite`
-  and `expo-modules-core`. JS-only QA through Metro on the old build is not evidence for this tree. `expo install --fix`
-  also offers the `expo-sharing` config plugin; it is not added: it only configures the opt-in share-into extension
-  (off by default, already present in 57.0.22), and the app uses `expo-sharing` only to share out a backup. Checked on
-  Linux from a clean `npm ci` (Node 24.21, npm 11.19): `npm ls --all`, `expo install --check` («Dependencies are up to
-  date»), typecheck, `currency:verify`, `regions:verify`, `i18n:check -- --strict` (0 errors), the SQLite tests (1366
-  of 1366), `export:ios` and the bundle secret scan, root `npm test` (697 passed, 1 todo) and `check:repo`, all OK;
-  `npm audit` 21 → 21. The `mobile_api` PostgreSQL tests were not run locally (no local PostgreSQL service); they ran in
-  CI on the PR. Blocker: none in the repository; iPhone evidence waits for the new development build.
+  the mobile API's PostgreSQL tests. On a pull request the Expo check runs against the table of the Expo version the
+  lockfile pins (`EXPO_OFFLINE=1`), so a patch Expo publishes later cannot fail an unrelated PR (PRs #105 and #112
+  were red for that alone); a push to `master` runs it live and reports the drift there («Expo patch drift»). Expo
+  SDK 57 patch releases last aligned 2026-10-15 (`expo` 57.0.30, `expo-constants` 57.0.22, `expo-linking` 57.0.13,
+  `expo-router` 57.0.28; 2026-10-12: `expo-crypto` 57.0.4, `expo-dev-client` 57.0.20, `expo-sharing` 57.0.23,
+  `expo-splash-screen` 57.0.10; 2026-10-07: `expo-sqlite` 57.0.4; React Native stays 0.86.3). **The installed
+  development build predates native changes**, so physical iPhone verification needs a new EAS development build
+  first (an owner action, not made here): the 2026-10-15 alignment changes iOS code in `expo-modules-core` 57.0.23 (a
+  crash fix for SwiftUI views hosted in a keyboard accessory view), on top of the 2026-10-12 changes (`expo-modules-core`,
+  `expo-modules-jsi`, `@expo/ui`) and the 2026-10-07 ones (`expo-sqlite`). JS-only QA through Metro on the old build is
+  not evidence for this tree. `expo install --fix` also offers the `expo-sharing` config plugin; it is not added: it
+  only configures the opt-in share-into extension (off by default), and the app uses `expo-sharing` only to share out
+  a backup. Checked on Linux from a clean `npm ci` on 2026-10-15: `npm ls --all`, `expo install --check` live and
+  with `EXPO_OFFLINE=1` («Dependencies are up to date»), typecheck, `currency:verify`, `regions:verify`, `i18n:check
+  -- --strict` (0 errors, 0 stale), the SQLite tests (1370 passed, 1 skipped), `export:ios` and the bundle secret
+  scan, root `npm test` (703 passed, 1 todo) and `check:repo`, all OK; `npm audit --omit=dev` 0. Blocker: none in the
+  repository; iPhone evidence waits for the new development build.
 
 ## 2. Device QA pending
 
@@ -1215,7 +1223,8 @@ before it passes (the runbook's §0.2):
    decimal scaled on the device (protocol v4, PR #100) and every ledger currency is carried (PR #101) and question facts
    are exact decimals (protocol v5, PR #103); decisions C(a) and E(a) and a third, separate one-run approval recorded
    2026-10-11, and **B7 run #3 PASSED** the same day (`gpt-6-luna` adopted for staging, not production; approval
-   consumed); next: **B8, ready for controlled owner-led execution**, AI off on staging until the owner performs it): the **real Luna evaluation** with an owner-approved spend (B7); AI enabled on staging,
+   consumed); **B8 closed 2026-10-15** (every drill run, AI off on staging again; «Producto 25A-06», «B8 record»); next:
+   **B9**, on or after 2026-10-17): the **real Luna evaluation** with an owner-approved spend (B7); AI enabled on staging,
    the failure drills and the race (B8); the **cost reconciliation** against the provider (B9).
 4. A focused **`/security_audit`**, then **`/security_review`** (B10); results recorded and 25A-06 marked done (B11).
 5. **Only then 25A-07 — Real Assistant product contract and polish** («Producto 25A», «Slices»), with the session slice
@@ -2038,7 +2047,7 @@ model choice is server configuration under the adoption procedure (production-pl
       live-evaluation gates (staging identity, price freshness, an approved worst case, `estimateExceededCount` = 0),
       the runbook and decision 006.
     - **Phase B — owner-led activation** (B1–B6 passed 2026-10-07, B7 failed twice 2026-10-08 and passed on run #3
-      2026-10-11, B8 ready for owner-led execution, B9–B11 not started: «Producto 25A-06», «Phase B record»; the runbook's checkpoints B1–B11): the
+      2026-10-11, B8 closed 2026-10-15, B9–B11 not started: «Producto 25A-06», «Phase B record», «B8 record»; the runbook's checkpoints B1–B11): the
       owner records the existing remote resources (B1); the owner creates a dedicated AI provider project with its own
       key and a small prepaid amount or hard spend limit, the server's ceilings set below it (B2); the owner creates the
       Supabase staging project (B3); the owner sets the secrets (`MOBILE_SUPABASE_SECRET_KEY`, `MOBILE_AI_API_KEY` and
@@ -5170,7 +5179,7 @@ nothing of it is on a screen yet.
   2026-10-08, consumed by run #2) are spent and neither authorizes a further run; decisions C(a) and E(a) and a third,
   separate one-run approval (2026-10-11, 200 000 µUSD) are recorded below; **B7 run #3 PASSED** 2026-10-11
   (`gpt-6-luna` adopted for staging, not for production; the third approval consumed; no further paid run authorized);
-  **B8 ready for controlled owner-led execution**, not started; B9–B11 not started.
+  **B8 closed 2026-10-15** (every drill run, the race PASS, AI off again; «B8 record» below); B9–B11 not started.
 - **Phase B record (2026-10-07, owner-verified; documentation only).** The owner reported each result below; no agent
   touched a service, ran remote SQL or called a provider. No account address, key, token, project ref, database
   password or secret value is recorded here, and none may be.
@@ -6180,6 +6189,77 @@ nothing of it is on a screen yet.
     environment and the Supabase variables; the AI values only drill 6's 200 and its telemetry `model`). Open, the owner's: the go
     (step 0), the organization's auto-recharge and balance (1b), the switch and room reads (4, 5), the baseline (6),
     `$P api` (7), Git Fork Protection (§4.3). `master` is frozen from the go until B8 is recorded.
+  - **B8 record (closed 2026-10-15; runbook §12.5 step 5).** The owner gave the go on 2026-10-14 (§12.0 step 0; not
+    written here then, `master` being frozen), kept every drill of §12.3 and §12.4 (the reduced risk-based profile was
+    proposed and not adopted), and ran them at `S` = `173ce767d4eacd287f9a91b7fa3d705d97d4bc52` (#111's merge): the
+    start state and drills 1 to 3 on 2026-10-14, drills 4 to 16 and the close on 2026-10-15. Start state, reported by the
+    owner: the OpenAI project's hard limit, alerts and model access, the organization's auto-recharge OFF (§12.0 row
+    1b), the B8 baseline applied (app-wide month `1000000` µUSD), the database switch off. `check-deployed-revision.mjs`
+    printed `COMPATIBLE` for `S` when the agent ran it (2026-10-14 and at the close). Every redeploy kept `S` (Ready,
+    `master`, `gru1`; the owner's report for 2026-10-14, the agent's Vercel reads for 2026-10-15); the last,
+    `dpl_8VEDnDPc…` (16:30:58), serves staging. Times are UTC. **Owner decision, 2026-10-15:** B8 closes on the evidence
+    below; evidence that expired before it was read is named, and no drill is run again to recover it (no new paid
+    call). «Passed» below means the kept evidence shows the expected result; «owner-attested» means it rests on the
+    owner's statement.
+
+    | Drill | Result | Evidence kept |
+    | --- | --- | --- |
+    | 1 Invalid user token | Passed | the three 401 checks in every saved probe run; `401 auth` lines in the telemetry |
+    | 2 AI disabled (deployment) | Passed, owner's report (2026-10-14) | 2 PASS / 5 FAIL, then 7/7; no output kept; a closed route writes no telemetry |
+    | 3 Missing API key | Passed, owner's report (2026-10-14) | the same five FAILs; `finanzapp-staging-api` restored, 7/7; no output kept |
+    | 4 Bad Supabase secret | Passed (re-run 2026-10-15) | temporary key 7/7; revoked 6/1 and telemetry 503 `database`; restored 7/7 |
+    | 5 Wrong environment | Passed | `production` 2 PASS / 5 FAIL; `staging` 7/7 |
+    | 6 Smoke and duplicate | Passed | 8/8; telemetry 200 `ok`, `gpt-6-luna`, 328 of 1 861 µUSD charged, then 409 `duplicate`; the row read not recorded |
+    | 7 AI disabled (database) | Executed, owner-attested | 7/7 kept (it reads the same under other refusals); the `disabled` category not kept |
+    | 8 Kill switch, request in flight | Executed, owner-attested | 7/7; the SQL outputs ((1) the id, (3) `true`) not kept; no kill row left |
+    | 9 User daily ceiling | Executed twice, owner-attested | 6 PASS / 2 FAIL each run; `429 user_budget` not kept |
+    | 10 User monthly ceiling | Executed, owner-attested | 6/2; `429 user_budget` not kept |
+    | 11 Global daily ceiling | Executed twice, owner-attested | 6/2 each run; `503 global_budget` not kept |
+    | 12 Global monthly ceiling | Executed twice, owner-attested | 6/2 each run; `503 global_budget` not kept |
+    | 13 Request rate | First run passed; second owner-attested | 8/8 (billed); then 6/2, `429 rate` not kept |
+    | 14 Concurrency | Passed | the repeat run's telemetry: 429 `busy` for the request and its repeat |
+    | 15 Bad provider key | Passed | telemetry 502 `provider_http`, reserved = charged = 1 861 µUSD, then 409; restored: 200 `ok`, 65 µUSD, then 409 |
+    | 16 Race (§6.6) | Passed | «race: 3 of 8 reserved at 1000 µUSD each, ceiling 3000 µUSD»; the race rows deleted |
+
+    - *What was not kept, and why.* From drill 7 on, the telemetry's `status` and `category` are the evidence
+      (§12.4): the probe's 7/7 or 6/2 also appears with the switch off or under a limit left from the previous drill.
+      Vercel Hobby keeps runtime logs one hour; they were read for drills 4 and 6 and from 16:08:19 on, so the
+      categories of drills 7 to 13 and of drill 14's first run expired unread. Not recorded either: drills 2 and 3's
+      outputs, the §12.4 opening check before drill 6, §12.2 step 5's start-of-B8 output, the drill-6 row, drill 8's
+      SQL outputs, why drills 9, 11, 12 and 14 ran twice, and why `MOBILE_AI_MODEL` was edited on 2026-10-14 at
+      16:42:25 (its value is proven by the telemetry's `model` and token fields at 14:16 and 16:31). For these the
+      evidence is the owner's statement that every drill gave its expected result.
+    - *Close (§12.5).* (1) `enabled = false`: the owner's step, shown by the closing request's telemetry, 503 `disabled`
+      at 16:39:29. (2) The baseline check, the owner's read: `enabled = false`, `environment = staging`, `baseline_ok =
+      true`. (3) The owner's read: `settled` 4, `unsettled` 1, `reserved` 0, no race or kill row. (4) `$P api` 7/7 (the
+      owner's run); Vercel holds exactly the 11 variables of §4.4, Production only, Sensitive, each last edited at its own
+      drill's restore, and no deployment after `dpl_8VEDnDPc…` (the agent's read at 19:20, no value read). The drill keys were refused after their revoke (503 `database` at 13:54:33,
+      502 `provider_http` at 16:29:08), and the owner read both key lists on 2026-10-15: in OpenAI `finanzapp-staging`
+      the drill-15 temporary key is no longer active and the original credentials are still available; in Supabase
+      `finanzapp-staging` no drill-4 temporary key remains and the permanent keys are still present. No drill key is
+      active. Final switches: deployment `true`, database `false`.
+    - *Month total (the query of §12.2 step 5, the owner's read): 2 649 µUSD*, B8's alone as far as the record shows
+      (the evaluations bypass the reservations, and every probe before B8 was refused before any row; §12.2 step 5's
+      start-of-B8 output was not recorded): 788 µUSD settled plus drill 15's unsettled row at its maximum, 1 861, counted
+      and never freed (§9.2); `open_rows` 1.
+    - *The fourth settled row* (an inference: the row itself was not read). The saved drills explain three: drill 6
+      (328 µUSD), drill 13's first run and drill 15's restore (65). Drill 13's row and the fourth total 788 − 328 − 65
+      = 395 µUSD, which is what the probe's request costs once with its 2 300-token instructions written to the cache
+      (about 330) and once read from it (about 65) at `pricing.js`'s `gpt-6-luna` prices, with outputs like the 80 to 83
+      tokens observed; no other combination of those costs adds to 395. The most likely origin is one more billed probe
+      run that was not saved (`$P api --ai-enabled`, or `$P api` while AI was on, whose 503 check is then a real
+      request), made before 16:08:19: the telemetry kept from then shows no other 200, and AI was off from 16:39:29.
+      It is not a kill, race or `reserved` row (none remains); it is settled, inside every ceiling and in the month
+      total. Its row holds its time and tokens if they are ever wanted (a read-only query ordered by `created_at`).
+    - *For B9* (on or after 2026-10-17; the period 2026-10-01 to 2026-10-15; the three B7 reports through `--eval`):
+      on 2026-10-15 the bound is 2 649 µUSD and the settled estimate 788. That day's bill should be at or slightly below
+      788: the revoked key's request was refused with an HTTP error, most likely unbilled, and estimates round up.
+      `reconcile.js` skips `over_estimate` on a day with an unsettled row, so the owner compares that day's bill with
+      788 by hand.
+    - *The runbook* takes B8's corrections: drill 6's settled state is read on its row (a success's telemetry has no
+      `settlement` key); telemetry is the evidence from drill 7 on, and a refused `--ai-enabled` probe prints 6/2; the
+      Supabase key's real name, `mobile_api_staging`; a probe request costs about 65 to 330 µUSD; `verify.sql` and
+      `$P boundary` never with the switch on; every probe run saved and every telemetry line copied at once.
 - **Owner refinements before accepting the runbook (2026-10-05, in this PR).**
   - **Staging region:** Vercel Functions `gru1` (São Paulo) and the staging Supabase project in the specific region
     `sa-east-1` (São Paulo), replacing `iad1` / us-east-1. The reasons: Argentina-first, the API compute next to its
@@ -6568,8 +6648,8 @@ this plan:
   Sign in with Apple, the per-person money ceilings and an owner-set global cap, or StoreKit and Pro first (25F). Both are
   an **OWNER DECISION**. Production ceilings come only from measured staging cost (production-plan.md §6.2).
 - **Release gates of an AI-first public release** (each detailed where cited; none is closed by this record):
-  - **Staging and model:** B8 to B11 on staging (runbook; B8 needs a new Production deployment of master and the
-    auto-recharge check); the model adopted for production, a release decision.
+  - **Staging and model:** B9 to B11 on staging (runbook; B8 closed 2026-10-15); the model adopted for production, a
+    release decision.
   - **Identity and consent:** the session slice (Sign in with Apple, Keychain session, account deletion with Apple
     token revocation; decision 006); the AI consent screen (production-plan.md §5.7).
   - **Assistant work:** the balance-facts slice; 25A-07.
@@ -6608,7 +6688,7 @@ the identifier, the privacy-policy URL and the first-TestFlight device prerequis
 | Navigation | Four tabs + floating «+» hub (Asistente, Gasto, Ingreso, Transferencia); Reduce Transparency fallback; mounted-tab mitigation |
 | Assistant on device | Every build **disconnected** (no API origin, no session); fixtures in development only; the screen tells a person it is not connected yet |
 | Assistant server | Staging only, fail-closed configuration; protocol v5 (decimal amounts and decimal question facts, 146 currencies; 2026-10-11) |
-| AI activation | B1–B6 passed (2026-10-07); B7 runs #1 and #2 FAILED (2026-10-08); **B7 run #3 PASSED** (2026-10-11, `gpt-6-luna` adopted for staging, not production; all three approvals consumed); **B8 ready for controlled owner-led execution**, AI off on staging; B9–B11 not started |
+| AI activation | B1–B6 passed (2026-10-07); B7 runs #1 and #2 FAILED (2026-10-08); **B7 run #3 PASSED** (2026-10-11, `gpt-6-luna` adopted for staging, not production; all three approvals consumed); **B8 closed 2026-10-15** (every drill run; AI off on staging; 2 649 µUSD in the month); B9 next, on or after 2026-10-17; B10–B11 not started |
 | Sign in with Apple, AI consent screen, account deletion | Not implemented (decision 006 accepted) |
 | Subscriptions | Nothing: no StoreKit or RevenueCat, no entitlements, no paywall, no Paid Apps Agreement |
 | Production backend | None: production is refused by configuration; no production Supabase, Vercel or provider project |

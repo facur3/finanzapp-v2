@@ -149,6 +149,10 @@ harness, and the repository guard) and `npm run check:repo`. CI (`.github/workfl
 `mobile` job (isolated `npm ci`, `npm ls --all`, `check`, `typecheck`, `currency:verify`,
 `regions:verify`, `i18n:check`, `test:storage`, `export:ios`), the `mobile_api` job (the
 PostgreSQL inbox, quota and Assistant reservation tests) and the root `domain` job (`npm test`, `npm run check:repo`).
+On a pull request `check` runs with `EXPO_OFFLINE=1`: the lockfile against the table of the Expo version it pins, so
+a patch Expo publishes later cannot fail an unrelated PR. A push to `master` runs it live; red there («Expo patch
+drift») means Expo published patches: align them with `npx expo install --fix` in a chore PR (it also offers the
+`expo-sharing` plugin, which stays out) and plan a new development build when they touch native code.
 
 `test:storage` runs the storage repository against a real temporary SQLite database
 (persistence, rejected writes, atomic migrations, repeated operation IDs) and the route
