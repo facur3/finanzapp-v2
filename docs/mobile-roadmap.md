@@ -2029,7 +2029,7 @@ model choice is server configuration under the adoption procedure (production-pl
       live-evaluation gates (staging identity, price freshness, an approved worst case, `estimateExceededCount` = 0),
       the runbook and decision 006.
     - **Phase B — owner-led activation** (B1–B6 passed 2026-10-07, B7 failed twice 2026-10-08 and passed on run #3
-      2026-10-11, B8 ready for owner-led execution, B9–B11 not started: «Producto 25A-06», «Phase B record»; the runbook's checkpoints B1–B11): the
+      2026-10-11, B8 closed 2026-10-15, B9–B11 not started: «Producto 25A-06», «Phase B record», «B8 record»; the runbook's checkpoints B1–B11): the
       owner records the existing remote resources (B1); the owner creates a dedicated AI provider project with its own
       key and a small prepaid amount or hard spend limit, the server's ceilings set below it (B2); the owner creates the
       Supabase staging project (B3); the owner sets the secrets (`MOBILE_SUPABASE_SECRET_KEY`, `MOBILE_AI_API_KEY` and
@@ -5083,7 +5083,7 @@ nothing of it is on a screen yet.
   2026-10-08, consumed by run #2) are spent and neither authorizes a further run; decisions C(a) and E(a) and a third,
   separate one-run approval (2026-10-11, 200 000 µUSD) are recorded below; **B7 run #3 PASSED** 2026-10-11
   (`gpt-6-luna` adopted for staging, not for production; the third approval consumed; no further paid run authorized);
-  **B8 ready for controlled owner-led execution**, not started; B9–B11 not started.
+  **B8 closed 2026-10-15** (every drill run, the race PASS, AI off again; «B8 record» below); B9–B11 not started.
 - **Phase B record (2026-10-07, owner-verified; documentation only).** The owner reported each result below; no agent
   touched a service, ran remote SQL or called a provider. No account address, key, token, project ref, database
   password or secret value is recorded here, and none may be.

@@ -20,8 +20,8 @@ second, separate one-run approval of 2026-10-08 (200 000 µUSD) was consumed by 
 neither authorizes a further run; B8 stayed blocked until a run passed. **2026-10-11:** the owner recorded decisions C(a) and E(a) and a
 third, separate approval for exactly one run, B7 run #3 (`gpt-6-luna`, at most 200 000 µUSD; not reusable). **B7 run
 #3 PASSED 2026-10-11** (from 900ee77, exit 0, every threshold; 8 158 µUSD; the approval consumed, no further paid run
-authorized): `gpt-6-luna` is adopted for staging, not for production. **B8 is ready for controlled owner-led
-execution** (§12, §6.6); AI stays off on staging until the owner performs it. B2–B6 were carried out before B1 closed. The results, with no account address, key, token, project ref or secret, are in
+authorized): `gpt-6-luna` is adopted for staging, not for production. **B8 ran 2026-10-14 and 2026-10-15 and is
+closed** (§12, §6.6; the record is the roadmap's «B8 record»); AI is off on staging again, and B9 is next. B2–B6 were carried out before B1 closed. The results, with no account address, key, token, project ref or secret, are in
 [mobile-roadmap.md](mobile-roadmap.md), «Producto 25A-06», «Phase B record»; the resources to keep and to clean up later
 are in §0.5.
 
