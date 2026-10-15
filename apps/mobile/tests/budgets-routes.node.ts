@@ -299,7 +299,7 @@ test('24B5: the budget form offers the gate\'s currencies before the amount; wit
 
 // Producto 24T3 (A24): the Presupuestos screen when devoluciones leave the month (or a category) below zero. The actual
 // route with its hosts as descriptors and the real projection (`snapshotFromArchive`) of a purchase operation.
-async function budgetsScreen(data: domain.LedgerArchive, locale: AppLocale = 'es-AR') {
+async function budgetsScreen(data: domain.LedgerArchive, locale: AppLocale = 'es-AR', route: Record<string, string> = { currency: 'ARS', month: '2026-09' }) {
   const presentation = await import('../src/ui/presentation.ts');
   const reportPresentation = await import('../src/ui/report-presentation.ts');
   const budgetPresentation = await import('../src/ui/budget-presentation.ts');
@@ -319,7 +319,7 @@ async function budgetsScreen(data: domain.LedgerArchive, locale: AppLocale = 'es
     } },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': { View: 'View', StyleSheet: { hairlineWidth: 0.5 }, useWindowDimensions: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }) },
-    'expo-router': { Stack: { Screen: 'Stack.Screen' }, useLocalSearchParams: () => ({ currency: 'ARS', month: '2026-09' }), router: { push: () => {} } },
+    'expo-router': { Stack: { Screen: 'Stack.Screen' }, useLocalSearchParams: () => route, router: { push: () => {} } },
     'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View' }, useSharedValue: (value: number) => ({ value }), withTiming: (value: number) => value, useAnimatedStyle: (fn: () => unknown) => fn() },
     '@expo/vector-icons/Ionicons': 'Ionicons',
     '@finanzapp/domain': domain,
@@ -366,6 +366,10 @@ test('25Q1 (BUDGETS-02): a budget in a currency no account holds stays reachable
   const read = withHistory();
   assert.equal(read.filter(node => node.type === 'AppText').map(textOf).includes(note), false);
   assert.equal(read.filter(node => node.type === 'Stat').map(node => (node.props.children as Node).props.minor)[0], 700, 'Gastado reads the deleted account\'s euros');
+  // Codex (#114): Reportes' «Administrar» names the budget's currency; Presupuestos opens on it although no account holds it.
+  const routed = (await budgetsScreen({ ...archive, budgets: [total, food, eur] }, 'es-AR', { currency: 'EUR', month: '2026-09' }))();
+  assert.equal(routed.find(node => node.type === 'CurrencySwitch')!.props.value, 'EUR');
+  assert.ok(routed.filter(node => node.type === 'AppText').map(textOf).includes(note));
   // In a month with no EUR budget the note does not speak of «este presupuesto».
   const october = await budgetsScreen({ ...archive, budgets: [total, food, { ...eur, monthISO: '2026-10' }] });
   october().find(node => node.type === 'CurrencySwitch')!.props.onChange('EUR');

@@ -34,7 +34,8 @@ export default function BudgetsScreen() {
   // The route's currency is honoured when an account holds it; otherwise the one default rule (25B2): the currency held,
   // the display currency among several, the region's tender, ARS last. An unknown code is never coerced.
   const suggested = useDefaultCurrency();
-  const initialCurrency: Currency = heldCurrency(snapshot?.accounts ?? [], params.currency) ?? suggested;
+  // 25Q1 (Codex): a budget-only currency the route names (Reportes' «Administrar») is honoured too.
+  const initialCurrency: Currency = currencies.find(code => code === params.currency) ?? heldCurrency(snapshot?.accounts ?? [], params.currency) ?? suggested;
   const [selectedCurrency, setSelectedCurrency] = useState<Currency>(initialCurrency);
   // 24UX6E: a month the domain accepts (the shape alone let «2026-13» through, and the summary below threw during render).
   const [monthISO, setMonthISO] = useState(() => params.month && validMonthISO(params.month) ? params.month : currentMonthISO(day));
