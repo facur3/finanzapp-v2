@@ -1,7 +1,7 @@
 # FinanzApp mobile: living roadmap
 
 Updated: 2026-10-15 (25A-06 **B8 closed**: the owner-led drills ran on 2026-10-14 and 2026-10-15 at `S` 173ce76; the
-record names the evidence that was not kept, reconciles the fourth settled reservation, gives the month total, 2 649
+record names the evidence that was not kept, accounts for the fourth settled reservation by inference, gives the month total, 2 649
 µUSD, and B9's inputs; the runbook takes the corrections B8 found; `master` is unfrozen once this merges; «Producto
 25A-06», runbook §0.2, §6.4, §6.5, §12. **CI:** the Expo SDK 57 patches aligned again, with a native change, so a new
 development build comes before iPhone QA; a pull request now checks against the Expo table its lockfile pins, so a
@@ -6096,12 +6096,15 @@ nothing of it is on a screen yet.
   - **B8 record (closed 2026-10-15; runbook §12.5 step 5).** The owner gave the go on 2026-10-14 (§12.0 step 0; not
     written here then, `master` being frozen), kept every drill of §12.3 and §12.4 (the reduced risk-based profile was
     proposed and not adopted), and ran them at `S` = `173ce767d4eacd287f9a91b7fa3d705d97d4bc52` (#111's merge): the
-    start state and drills 1 to 3 on 2026-10-14, drills 4 to 16 and the close on 2026-10-15. Start state, owner-verified:
-    the OpenAI project's hard limit, alerts and model access, the organization's auto-recharge OFF (§12.0 row 1b), the
-    B8 baseline applied (app-wide month `1000000` µUSD), the database switch off, `check-deployed-revision.mjs`
-    `COMPATIBLE`. Each drill's redeploy rebuilt `S` (Ready, `master`, `gru1`); the last, `dpl_8VEDnDPc…` (16:30:58),
-    serves staging. Times are UTC. **Owner decision, 2026-10-15:** B8 closes on the evidence below; evidence that
-    expired before it was read is named, and no drill is run again to recover it (no new paid call).
+    start state and drills 1 to 3 on 2026-10-14, drills 4 to 16 and the close on 2026-10-15. Start state, reported by the
+    owner: the OpenAI project's hard limit, alerts and model access, the organization's auto-recharge OFF (§12.0 row
+    1b), the B8 baseline applied (app-wide month `1000000` µUSD), the database switch off. `check-deployed-revision.mjs`
+    printed `COMPATIBLE` for `S` when the agent ran it (2026-10-14 and at the close). Every redeploy kept `S` (Ready,
+    `master`, `gru1`; the owner's report for 2026-10-14, the agent's Vercel reads for 2026-10-15); the last,
+    `dpl_8VEDnDPc…` (16:30:58), serves staging. Times are UTC. **Owner decision, 2026-10-15:** B8 closes on the evidence
+    below; evidence that expired before it was read is named, and no drill is run again to recover it (no new paid
+    call). «Passed» below means the kept evidence shows the expected result; «owner-attested» means it rests on the
+    owner's statement.
 
     | Drill | Result | Evidence kept |
     | --- | --- | --- |
@@ -6110,8 +6113,8 @@ nothing of it is on a screen yet.
     | 3 Missing API key | Passed, owner's report (2026-10-14) | the same five FAILs; `finanzapp-staging-api` restored, 7/7; no output kept |
     | 4 Bad Supabase secret | Passed (re-run 2026-10-15) | temporary key 7/7; revoked 6/1 and telemetry 503 `database`; restored 7/7 |
     | 5 Wrong environment | Passed | `production` 2 PASS / 5 FAIL; `staging` 7/7 |
-    | 6 Smoke and duplicate | Passed | 8/8; telemetry 200 `ok`, `gpt-6-luna`, 328 of 1 861 µUSD charged, then 409 `duplicate` |
-    | 7 AI disabled (database) | Passed (probe) | 7/7; the `disabled` category not kept |
+    | 6 Smoke and duplicate | Passed | 8/8; telemetry 200 `ok`, `gpt-6-luna`, 328 of 1 861 µUSD charged, then 409 `duplicate`; the row read not recorded |
+    | 7 AI disabled (database) | Executed, owner-attested | 7/7 kept (it reads the same under other refusals); the `disabled` category not kept |
     | 8 Kill switch, request in flight | Executed, owner-attested | 7/7; the SQL outputs ((1) the id, (3) `true`) not kept; no kill row left |
     | 9 User daily ceiling | Executed twice, owner-attested | 6 PASS / 2 FAIL each run; `429 user_budget` not kept |
     | 10 User monthly ceiling | Executed, owner-attested | 6/2; `429 user_budget` not kept |
@@ -6130,26 +6133,28 @@ nothing of it is on a screen yet.
       SQL outputs, why drills 9, 11, 12 and 14 ran twice, and why `MOBILE_AI_MODEL` was edited on 2026-10-14 at
       16:42:25 (its value is proven by the telemetry's `model` and token fields at 14:16 and 16:31). For these the
       evidence is the owner's statement that every drill gave its expected result.
-    - *Close (§12.5).* (1) `enabled = false`: the closing request's telemetry, 503 `disabled` at 16:39:29. (2) The
-      baseline check: `enabled = false`, `environment = staging`, `baseline_ok = true`. (3) `settled` 4, `unsettled` 1,
-      `reserved` 0, no race or kill row. (4) `$P api` 7/7; Vercel holds exactly the 11 variables of §4.4, Production
-      only, Sensitive, each last edited at its own drill's restore, and no deployment after `dpl_8VEDnDPc…` (read by
-      the agent at 19:20, no value read). The drill keys were refused after their revoke (503 `database` at 13:54:33,
+    - *Close (§12.5).* (1) `enabled = false`: the owner's step, shown by the closing request's telemetry, 503 `disabled`
+      at 16:39:29. (2) The baseline check, the owner's read: `enabled = false`, `environment = staging`, `baseline_ok =
+      true`. (3) The owner's read: `settled` 4, `unsettled` 1, `reserved` 0, no race or kill row. (4) `$P api` 7/7 (the
+      owner's run); Vercel holds exactly the 11 variables of §4.4, Production only, Sensitive, each last edited at its own
+      drill's restore, and no deployment after `dpl_8VEDnDPc…` (the agent's read at 19:20, no value read). The drill keys were refused after their revoke (503 `database` at 13:54:33,
       502 `provider_http` at 16:29:08), and the owner read both key lists on 2026-10-15: in OpenAI `finanzapp-staging`
       the drill-15 temporary key is no longer active and the original credentials are still available; in Supabase
       `finanzapp-staging` no drill-4 temporary key remains and the permanent keys are still present. No drill key is
       active. Final switches: deployment `true`, database `false`.
-    - *Month total (the query of §12.2 step 5): 2 649 µUSD*, all of it B8's (the evaluations bypass the
-      reservations): 788 µUSD settled plus drill 15's unsettled row at its maximum, 1 861, counted and never freed
-      (§9.2); `open_rows` 1.
-    - *The fourth settled row.* The drills explain three: drill 6 (328 µUSD), drill 13's first run and drill 15's
-      restore (65). The fourth is one billed request outside the saved probe runs. Drill 13's row and it total
-      788 − 328 − 65 = 395 µUSD: exactly the probe's request once with its 2 300-token instructions written to the
-      cache (about 330) and once read from it (about 65), at `pricing.js`'s `gpt-6-luna` prices. So it is another
-      `$P api --ai-enabled` run, or a `$P api` run while AI was on (its 503 check is then billed), made with the switch
-      on before 16:08:19: the telemetry kept from then shows no other 200, and AI was off from 16:39:29. It is not a
-      drill row (no kill, race or `reserved` row remains); it is settled and inside every ceiling. Its row holds its
-      time and tokens if they are ever wanted (a read-only query ordered by `created_at`).
+    - *Month total (the query of §12.2 step 5, the owner's read): 2 649 µUSD*, B8's alone as far as the record shows
+      (the evaluations bypass the reservations, and every probe before B8 was refused before any row; §12.2 step 5's
+      start-of-B8 output was not recorded): 788 µUSD settled plus drill 15's unsettled row at its maximum, 1 861, counted
+      and never freed (§9.2); `open_rows` 1.
+    - *The fourth settled row* (an inference: the row itself was not read). The saved drills explain three: drill 6
+      (328 µUSD), drill 13's first run and drill 15's restore (65). Drill 13's row and the fourth total 788 − 328 − 65
+      = 395 µUSD, which is what the probe's request costs once with its 2 300-token instructions written to the cache
+      (about 330) and once read from it (about 65) at `pricing.js`'s `gpt-6-luna` prices, with outputs like the 80 to 83
+      tokens observed; no other combination of those costs adds to 395. The most likely origin is one more billed probe
+      run that was not saved (`$P api --ai-enabled`, or `$P api` while AI was on, whose 503 check is then a real
+      request), made before 16:08:19: the telemetry kept from then shows no other 200, and AI was off from 16:39:29.
+      It is not a kill, race or `reserved` row (none remains); it is settled, inside every ceiling and in the month
+      total. Its row holds its time and tokens if they are ever wanted (a read-only query ordered by `created_at`).
     - *For B9* (on or after 2026-10-17; the period 2026-10-01 to 2026-10-15; the three B7 reports through `--eval`):
       on 2026-10-15 the bound is 2 649 µUSD and the settled estimate 788. That day's bill should be at or slightly below
       788: the revoked key's request was refused with an HTTP error, most likely unbilled, and estimates round up.
