@@ -41,7 +41,8 @@ export const SENSITIVE_FILES = [
 ];
 
 /* A real backup by its content, whatever its name or size (a backup may reach 5 MiB, above TEXT_LIMIT): the head of a
-   tracked .json or .txt carries the format's schema id. Synthetic backups belong under apps/mobile/tests/fixtures/. */
+   tracked .json or .txt carries the format's schema id. A synthetic backup belongs under apps/mobile/tests/fixtures/,
+   named without a date or the app's prefix (backup-v14.json): the name rules above apply there too. */
 export const BACKUP_HEADER = /"schema"\s*:\s*"finanzapp\.native-pilot\.v\d+"/;
 export const BACKUP_FIXTURES = /^apps\/mobile\/tests\/fixtures\//;
 const BACKUP_CANDIDATE = /\.(json|txt)$/i;
@@ -144,7 +145,7 @@ function readTracked(cwd) {
 }
 
 /* The first 4 KB of a tracked file, whatever its size: enough for a backup's header. */
-function readHead(cwd) {
+export function readHead(cwd) {
   return file => {
     const path = cwd + '/' + file;
     if (!existsSync(path) || !statSync(path).isFile()) return null;

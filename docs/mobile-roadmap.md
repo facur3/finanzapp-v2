@@ -4491,7 +4491,13 @@ nothing of it is on a screen yet.
   - `app/backup.tsx`: a native failure (availability, writing, the sheet) reads `backup.export.prepareFailed`; the
     temporary file is still deleted in every case.
   - `app/backup-import.tsx`: after a successful import, a file that fails returns to the choice with its sentence (it
-    left «Copia incorporada» on screen and said nothing); a native picker or read failure reads `backup.import.readFailed`.
+    left «Copia incorporada» on screen and said nothing); a file iOS cannot read reads `backup.import.readFailed`. (The
+    picker itself never rejects: expo-file-system 57 reports its own failures as a cancel, so they stay silent.)
+  - An independent review found nothing high or medium; its follow-ups are in: the dead picker branch removed, and tests
+    that fail if the cap counted characters instead of bytes, if a same-minute leftover blocked the export, if the
+    availability check's failure leaked, and for the guard's own head reader on a file above 2 MiB. Not done (known, as
+    before 25Q2): a plaintext copy left in Caches when iOS ends the app while the sheet is open; a sweep belongs to the
+    file-protection evaluation (25D), which needs a device observation.
   - Copy: the Backup screen opens with «Si borrás la app, tus registros se borran con ella.»; Más' row subtitle reads «Antes
     de borrar la app o cambiar de teléfono». *Owner decisions recorded here for review:* compact JSON (recommended: smaller,
     no format change), the file name, and this placement of the uninstall sentence (production-plan §12 leaves the

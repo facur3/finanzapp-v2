@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { audit, report, LEGACY_WEB, GENERATED, SENSITIVE_FILES, BACKUP_HEADER } from './check-repo.mjs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { audit, report, readHead, LEGACY_WEB, GENERATED, SENSITIVE_FILES, BACKUP_HEADER } from './check-repo.mjs';
 
 const clean = {
   'apps/mobile/src/ui/theme.ts': "import { todayKey } from '@finanzapp/domain';\n",
@@ -118,5 +121,13 @@ describe('check:repo', () => {
     expect(result.backups).toEqual(['data/export.json']);
     expect(report(result).join('\n')).toContain('a tracked file is a FinanzApp backup');
     expect(run(clean).backups).toEqual([]);
+    // The CLI's own head reader, on a real file above the 2 MiB text limit.
+    const dir = mkdtempSync(join(tmpdir(), 'check-repo-'));
+    try {
+      writeFileSync(join(dir, 'big.json'), header + ',"pad":"' + 'x'.repeat(3 * 1024 * 1024) + '"}');
+      expect(readHead(dir)('big.json')).toBe((header + ',"pad":"' + 'x'.repeat(4096)).slice(0, 4096));
+      expect(BACKUP_HEADER.test(readHead(dir)('big.json'))).toBe(true);
+      expect(readHead(dir)('missing.json')).toBe(null);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });

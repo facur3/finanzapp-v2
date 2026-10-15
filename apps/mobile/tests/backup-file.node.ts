@@ -39,7 +39,15 @@ test('25Q2: the export is compact JSON that this app restores, measured in bytes
   assert.equal(parsed.archive.records.length, 3);
   assert.equal(parsed.exportedAt, now.toISOString());
   // Over the cap: its own sentence, before any file exists, never the import's «Elegí una copia JSON de hasta 5 MB».
-  assert.throws(() => buildBackupFile(archiveOf(3), now, 100), (cause: unknown) => cause instanceof Error && cause.message === 'backup.export.tooLarge');
+  const tooLarge = (cause: unknown) => cause instanceof Error && cause.message === 'backup.export.tooLarge';
+  assert.throws(() => buildBackupFile(archiveOf(3), now, 100), tooLarge);
+  // The cap counts UTF-8 bytes, as the file is written and the importer measures it, not characters: accents cost two.
+  const accented: domain.LedgerArchive = { ...archiveOf(3), records: archiveOf(3).records.map(record => ({ ...record, entry: { ...record.entry, merchant: 'Panadería Ñandú ñññ' } })) };
+  const exact = buildBackupFile(accented, now);
+  assert.ok(exact.bytes > exact.json.length, 'accented text is longer in bytes than in characters');
+  assert.equal(buildBackupFile(accented, now, exact.bytes).bytes, exact.bytes, 'exactly at the cap is accepted');
+  assert.throws(() => buildBackupFile(accented, now, exact.bytes - 1), tooLarge);
+  assert.throws(() => buildBackupFile(accented, now, exact.json.length), tooLarge, 'a character count would have let it through');
 });
 
 test('25Q2: compact moves the 5 MB wall well past the pretty file (measured bytes per movement)', () => {

@@ -54,8 +54,8 @@ const HAIRLINE = 0.33;
 /** The appearance preference the harness hands the screens (24UX6A); reset by every harness. */
 const appearanceState = { preference: 'system', system: 'light', saved: [] as string[], refuse: false };
 // 25Q2: the export's file system and share sheet, observable; every harness() call resets them.
-const exportIo = { available: false, files: new Map<string, string>(), shares: [] as { uri: string; options: Record<string, unknown>; text: string | undefined }[],
-  failShare: false, failWrite: false, maxBytes: undefined as number | undefined, created: 0 };
+const exportIo = { available: false as boolean | 'throw', files: new Map<string, string>(), shares: [] as { uri: string; options: Record<string, unknown>; text: string | undefined }[],
+  failShare: false, failWrite: false, maxBytes: undefined as number | undefined, created: 0, now: undefined as Date | undefined };
 class MemoryFile {
   uri: string;
   constructor(parent: string, name: string) { this.uri = parent + '/' + name; }
@@ -79,7 +79,7 @@ function harness(file: string, data: domain.LedgerArchive = archive, released?: 
   // 24UX6E: Categorías wraps a name instead of cutting it when rows stack (accessibility text sizes).
   (components as Record<string, unknown>).useStacked = () => stackedRows;
   appearanceState.preference = 'system'; appearanceState.system = 'light'; appearanceState.saved = []; appearanceState.refuse = false;
-  Object.assign(exportIo, { available: false, failShare: false, failWrite: false, maxBytes: undefined, created: 0 });
+  Object.assign(exportIo, { available: false, failShare: false, failWrite: false, maxBytes: undefined, created: 0, now: undefined });
   exportIo.files.clear();
   exportIo.shares.length = 0;
   const theme = { usePalette: () => ({ text: '#000', secondary: '#666', line: '#ddd', isDark: false }),
@@ -97,12 +97,13 @@ function harness(file: string, data: domain.LedgerArchive = archive, released?: 
     'react-native': { View: 'View', StyleSheet: { hairlineWidth: HAIRLINE } },
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, router: { push: (to: unknown) => pushed.push(to), navigate: (to: unknown) => pushed.push(to) } },
     'expo-file-system': { File: MemoryFile, Paths: { cache: '/cache' } },
-    'expo-sharing': { isAvailableAsync: async () => exportIo.available, shareAsync: async (uri: string, options: Record<string, unknown>) => {
+    'expo-sharing': { isAvailableAsync: async () => { if (exportIo.available === 'throw') throw new Error('UIKit unavailable'); return exportIo.available; },
+      shareAsync: async (uri: string, options: Record<string, unknown>) => {
       exportIo.shares.push({ uri, options, text: exportIo.files.get(uri) });
       if (exportIo.failShare) throw new Error('UIActivityViewController failed');
     } },
     // The real module; a test may lower the cap without building a 5 MB ledger.
-    '../src/ui/backup-file': { ...backupFile, buildBackupFile: (data: domain.LedgerArchive, now?: Date) => backupFile.buildBackupFile(data, now, exportIo.maxBytes) },
+    '../src/ui/backup-file': { ...backupFile, buildBackupFile: (data: domain.LedgerArchive, now?: Date) => backupFile.buildBackupFile(data, exportIo.now ?? now, exportIo.maxBytes) },
     '@finanzapp/domain': domain,
     '../src/storage/LedgerProvider': ledger, '../../src/storage/LedgerProvider': ledger,
  '../../src/storage/currency-gate': currencyGate, '../src/storage/currency-gate': currencyGate,
@@ -306,10 +307,19 @@ test('25Q2: the export writes one dated compact file in the cache, shares it as 
   view = harness('backup.tsx', exportable); exportIo.available = true; exportIo.maxBytes = 50;
   await press(view);
   assert.deepEqual([errorOf(view), exportIo.created, exportIo.shares.length], ['backup.export.tooLarge', 0, 0]);
-  // No share sheet on this device.
+  // No share sheet on this device; the check itself failing.
   view = harness('backup.tsx', exportable);
   await press(view);
   assert.deepEqual([errorOf(view), exportIo.created], ['backup.export.sharingUnavailable', 0]);
+  view = harness('backup.tsx', exportable); exportIo.available = 'throw';
+  await press(view);
+  assert.deepEqual([errorOf(view), exportIo.created], ['backup.export.prepareFailed', 0]);
+  // A copy left from an export in the same minute (the app ended mid-sheet) is replaced, not refused, and deleted after.
+  view = harness('backup.tsx', exportable); exportIo.available = true; exportIo.now = new Date(2026, 9, 15, 14, 32);
+  exportIo.files.set('/cache/FinanzApp-backup-2026-10-15-1432.json', 'stale');
+  await press(view);
+  assert.deepEqual([errorOf(view), exportIo.shares.length, exportIo.files.size], [null, 1, 0]);
+  assert.notEqual(exportIo.shares[0].text, 'stale', 'the shared file is this export');
 });
 
 test('25Q2: the Backup screen and its Más row say that deleting the app deletes the records', () => {

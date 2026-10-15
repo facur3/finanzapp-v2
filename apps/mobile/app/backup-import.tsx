@@ -25,10 +25,11 @@ export default function BackupImportScreen() {
     working.current = true;
     setBusy(true);
     setError(null);
-    // 25Q2: a native failure (the picker, the file read) is told in the app's words, never as the platform's text.
+    // 25Q2: a native read failure is told in the app's words, never as the platform's text. (The picker itself never
+    // rejects: expo-file-system 57 turns its own failures into a cancel.)
     const readFailed = (): never => { throw new Error('backup.import.readFailed'); };
     try {
-      const picked = await File.pickFileAsync({ mimeTypes: ['application/json', 'text/plain'], multipleFiles: false }).catch(readFailed);
+      const picked = await File.pickFileAsync({ mimeTypes: ['application/json', 'text/plain'], multipleFiles: false });
       if (picked.canceled) return;
       // Read only the selected file. Never remove/overwrite the original,
       // including Android document-provider URIs and iOS picker copies.

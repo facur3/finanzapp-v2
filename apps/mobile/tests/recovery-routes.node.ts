@@ -267,14 +267,13 @@ test('25Q2: after an import, a file that fails leaves «Copia incorporada» for 
   assert.equal(find(view.render(), 'EmptyState').props.title, 'Recuperá tus registros', 'before 25Q2 nothing changed on screen');
   assert.equal(find(view.render(), 'ErrorMessage').props.message, 'El archivo no es una copia JSON válida.');
   assert.equal(view.restores.length, 1, 'only the good copy was imported');
-  for (const picker of [async () => { throw new Error('ENOENT: no such file or directory'); },
-    async () => ({ canceled: false, result: { size: 4, name: 'x.json', text: async () => { throw new Error('NSCocoaErrorDomain Code=260'); } } })]) {
-    const failing = harness('app/backup-import.tsx', {}, { picker });
-    await find(failing.render(), 'ActionButton', 'Elegir copia').props.onPress();
-    const message = find(failing.render(), 'ErrorMessage').props.message;
-    assert.equal(message, 'backup.import.readFailed', 'never the platform\'s text');
-    assert.equal(bindLocale('es-AR').errorText(message), 'No pudimos leer la copia. Tus datos y el archivo siguen intactos.');
-  }
+  // A file the picker returned but iOS cannot read (the picker itself never rejects: it reports its failures as a cancel).
+  const failing = harness('app/backup-import.tsx', {}, { picker: async () => ({ canceled: false, result: { size: 4, name: 'x.json',
+    text: async () => { throw new Error('NSCocoaErrorDomain Code=260'); } } }) });
+  await find(failing.render(), 'ActionButton', 'Elegir copia').props.onPress();
+  const message = find(failing.render(), 'ErrorMessage').props.message;
+  assert.equal(message, 'backup.import.readFailed', 'never the platform\'s text');
+  assert.equal(bindLocale('es-AR').errorText(message), 'No pudimos leer la copia. Tus datos y el archivo siguen intactos.');
 });
 test('oversized files are rejected before reading their content', async () => {
   let reads = 0;
