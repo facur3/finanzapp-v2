@@ -56,7 +56,17 @@ jobs:
       - name: Dependency tree integrity
         run: npm ls --all
 
-      - name: Expo dependency compatibility
+      # Pull requests check the lockfile against the table of the Expo version it pins, so a patch Expo publishes later
+      # cannot turn an unrelated PR red. Pushes to master check against Expo's live table: red there means «run
+      # `npx expo install --fix` in a chore PR», never a broken change.
+      - name: Expo dependency compatibility (the pinned Expo version's table)
+        if: github.event_name == 'pull_request'
+        env:
+          EXPO_OFFLINE: '1'
+        run: npm run check
+
+      - name: Expo patch drift (Expo's live table)
+        if: github.event_name != 'pull_request'
         run: npm run check
 
       - name: Typecheck
