@@ -54,7 +54,8 @@ export default function ActivityScreen() {
   useEffect(() => cancel, []);
   if (!snapshot) return null;
   const hasRecords = snapshot.entries.length + (snapshot.transfers?.length ?? 0) > 0;
-  return <EntryList entries={entries} transfers={transfers} accounts={snapshot.accounts}
+  // 25Q1: «Neto del día» only while nothing narrows the list: under Gastos, Ingresos or a search it would be a subset's sum.
+  return <EntryList entries={entries} transfers={transfers} accounts={snapshot.accounts} dayNet={filter === 'all' && !query.trim()}
     header={hasRecords ? <View style={{ gap: 14, paddingTop: 4 }}>
       <SearchField label={t('activity.search')} placeholder={t('activity.searchPlaceholder')} value={query} onChangeText={setQuery} />
       <Choices value={filter} onChange={setFilter}
