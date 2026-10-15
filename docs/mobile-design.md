@@ -137,9 +137,11 @@ siempre una sola línea; uno corto queda grande y uno largo se achica para caber
 nunca se corta ni se parte. El héroe calcula su tamaño en JavaScript, con un piso de
 la mitad; una fila deja el ajuste a iOS, que achica hasta 4 pt (el piso nativo de
 React Native: `minimumFontScale` solo se lee en Android), por eso una fila se apila
-antes de achicarse (`rowStacks`). Dynamic Type aplica con un tope de 1,4× en héroes y
-1,8× en filas (25D1: los dos topes viven en `geometry.ts`). El campo de importe baja de
-46 a 32 y 24 pt según la cantidad de cifras.
+antes de achicarse (`rowStacks`). Dynamic Type: un importe de fila hasta 53 pt (el cuerpo
+en AX5); un héroe hasta 1,4× o 53 pt, lo que sea mayor, ajustado al ancho, así que desde
+AX3 un importe largo puede verse tan grande como el mes de Inicio; todo otro texto hasta
+el tamaño que iOS da a su estilo en AX5 (25D1, `geometry.ts`). El campo
+de importe baja de 46 a 32 y 24 pt según la cantidad de cifras.
 
 **Espacio y forma.** Margen de pantalla 20, tarjeta 16, escala 4–32. Radios: chip
 14, tile 12, grupo 16, tarjeta 20, hoja 24, tarjeta de crédito 18. Elevación clara
@@ -874,7 +876,9 @@ vinculante del roadmap no cambia: la próxima entrega de producto es 24T3; 24UX6
 En la rama `feat/25d1-legibility-touch`, apilada sobre #112 (Sapphire + Sand): se mergea después de #112 y de su
 revisión en el iPhone. Solo JavaScript; no cambia navegación, dominio, almacenamiento, esquema (14), backup (v14),
 textos ni claves del catálogo. Los valores son juicio con cifras medidas (WCAG sobre los tokens reales; anchos
-estimados con los multiplicadores de React Native y `labelWidthEm`); cómo se ven lo decide el iPhone.
+estimados con los multiplicadores de React Native y `labelWidthEm`); cómo se ven lo decide el iPhone. Revisión del
+2026-10-15: los topes fijos del primer pase (1,4× en los meses y el eje, 2× en las leyendas) quedaban por debajo de lo que
+iOS dibuja en AX1; se reemplazaron por la regla de abajo.
 
 - **Contraste.** El símbolo y los centavos de un héroe de color (un ingreso, una transferencia, un saldo negativo)
   conservan su tono con menos alfa, solo hasta donde permite 3:1 (`QUIET_ALPHA`: claro E6 / CC, oscuro B3 / 99): en
@@ -889,26 +893,36 @@ estimados con los multiplicadores de React Native y `labelWidthEm`); cómo se ve
   negro al 12 %, sin escala) en vez de no mostrar nada; el texto blanco queda en 6:1 o más y el emisor en AA. Sin
   Reducir movimiento sigue la escala de 0,97. Un segmento de un control segmentado se atenúa al 60 % mientras se lo toca
   (solo color: no hace falta otra variante); el elegido nunca, porque tocarlo no hace nada.
-- **Texto grande, pase 1** (cada defecto con la herramienta que la app ya tenía: un tope con nombre, o el apilado sobre
-  1,2×):
+- **Contraste con Aumentar contraste.** Con el ajuste de iOS activado (Accesibilidad › Pantalla y tamaño de texto), el
+  símbolo y los centavos de cualquier héroe, de color, de tinta o sobre el campo de Inicio, se dibujan con la fuerza de
+  las cifras enteras: el paso atrás es una decisión de composición y no la paga quien pidió más contraste.
+- **Texto grande: la regla.** Ningún texto crece más allá del tamaño que iOS le da a su estilo en AX5 (la tabla del HIG:
+  título grande 60 pt, título 1 58, título 2 56, título 3 55, cuerpo 53, subtítulo 49, nota 44, leyenda 43;
+  `TEXT_STYLE_MAX_SCALE`, aplicado por `AppText`). React Native multiplica todos los estilos por un mismo factor (3,571
+  en AX5: un título grande de 34 pt llegaba a 121 pt, un cuerpo a 61), así que estos techos devuelven el orden que iOS
+  mantiene en cada ajuste. Por debajo de AX5 cada estilo crece como lo pide la persona; donde el diseño no lo sostiene,
+  **cambia el diseño, no se achica el texto**: el título pasa a su propia línea o las etiquetas se abrevian. El único
+  piso es que una palabra entre entera en su renglón. Lo que no puede crecer (las barras de las hojas, los botones de
+  ícono) ofrece el Large Content Viewer, como las barras del sistema.
 
   | Elemento | Antes | Ahora |
   | --- | --- | --- |
-  | Mes de Inicio (título 2) | sin tope: «Septiembre» se partía desde AX3 | 1,4× (como el héroe), dos líneas |
-  | Mes de Reportes y Presupuestos (título 3, entre flechas) | sin tope | 1,4×, dos líneas: corta en el espacio del año |
-  | Leyenda bajo ese mes (período o estado, «Este mes») | sin tope: desde AX3 más grande que el mes | 2× (24 pt), siempre debajo de los 28 pt del mes |
-  | Título grande / título 1 (primera apertura, detalle de categoría) | × 3,571 en AX5 (34 → 121 pt) | la curva de Apple en AX5: 60 y 58 pt (`TITLE_MAX_SCALE`) |
+  | Mes de Inicio (título 2) | sin tope: «Septiembre» se partía desde AX3 | hasta 56 pt; junto al botón de cuentas mientras entra (en un iPhone de 393 pt hasta AX2; antes en pantallas más chicas), si no en su propia línea con el botón debajo, a la derecha |
+  | Mes de Reportes y Presupuestos (título 3, entre flechas) | sin tope | hasta 55 pt; entre las flechas mientras entra, si no arriba con las flechas debajo; nunca corta «Septiembre» |
+  | Leyenda bajo ese mes (período o estado, «Este mes») | sin tope | su propio techo (43 pt): siempre debajo del mes |
+  | Filas de «Para revisar» y la evidencia de una respuesta del Asistente | el importe al lado ocupaba la fila: el nombre quedaba en cero | como las demás filas: desde 1,2× el importe pasa debajo y el texto se ve entero |
+  | Título grande / título 1 (primera apertura, detalle de categoría) | × 3,571 en AX5 (34 → 121 pt) | 60 y 58 pt en AX5 |
+  | Importes (`Money`) | fila 1,8× (30,6 pt) bajo nombres de 53 pt; un total de 28 pt llegaba a 39 | una fila hasta 53 pt (el cuerpo en AX5), cualquiera sea su tamaño; un héroe hasta 1,4× o 53 pt, lo que sea mayor (Inicio: 64 pt); los dos se ajustan a su ancho |
   | Filas de Más y de los selectores (`NavigationRow`, `CheckRow`) | dos líneas y «…» a cualquier tamaño | dos líneas hasta 1,2×; enteras desde el umbral de apilado |
   | Barra de las hojas (Cancelar · título · Listo) | crecía hasta sacar Listo de la pantalla | 1,2× como una barra del sistema, con Large Content Viewer |
-  | Eje de meses de Evolución | seis paradas de VoiceOver repetidas | oculto para VoiceOver (cada barra dice mes, año e importe), 1,4×, una línea |
+  | Eje de meses de Evolución | seis paradas de VoiceOver repetidas | oculto para VoiceOver (cada barra dice mes, año e importe); al tamaño de la persona: «sep» mientras entra en su columna, si no la inicial («S»), como los gráficos de Apple |
   | Día a día | una fila en línea y otra apilada según su largo | todas apiladas: fecha y cantidad sobre el importe |
   | `IconButton`, `InfoButton`, la ⓘ de Disponible | sin ayuda al no poder crecer | Large Content Viewer con su nombre de VoiceOver |
 
-  Los títulos 2 y 3 no tienen todavía la curva de Apple (decisión pendiente, después de mirar AX3 y AX5 en el iPhone).
-- **No incluido:** el tope de 1,8× de los importes de fila (decisión del dueño); un piso `minimumFontSize`
-  para las filas que hoy achica iOS hasta 4 pt (se decide en el dispositivo); la tarjeta del borrador del Asistente y
-  sus filas a texto grande, los segmentos en pantallas de 320 pt y los totales de Deudas (siguiente pase); Aumentar
-  contraste.
+- **No incluido:** un piso `minimumFontSize` para los importes de fila, que iOS achica hasta 4 pt si no entran (se
+  decide en el dispositivo; hoy las filas se apilan antes de achicarse); la tarjeta del borrador del Asistente y sus
+  filas a texto grande, los segmentos en pantallas de 320 pt y los totales de Deudas (siguiente pase); Aumentar
+  contraste para el resto de la paleta (separadores, texto terciario).
 - **Pendiente en el iPhone:** todo lo anterior, en claro y oscuro, al tamaño normal, AX3 y AX5, en español e inglés
   (la lista «Producto 25D1» de [mobile-device-checklist.md](mobile-device-checklist.md)).
 

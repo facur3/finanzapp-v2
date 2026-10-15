@@ -30,12 +30,15 @@ except the two noted («Día a día», the pressed segments).
   number and issuer stay legible; with Reduce Motion off the press still shrinks it slightly.
 - [ ] **Segmented controls** (Gasto / Ingreso / Transferencia; Categorías | Día a día; Gastado | Disponible): the
   segment under the finger dims until it lifts; the chosen one never dims; nothing moves.
-- [ ] **Inicio's month at AX3, AX4, AX5** (set the date to September, November or December): «Septiembre» /
-  «September» in whole words, at most about 31 pt, smaller than the amount under it; the accounts button stays on the
-  right; VoiceOver still reads it as a heading.
-- [ ] **Reportes and Más › Presupuestos on a long month** at AX3 to AX5: «Septiembre de 2026» / «September 2026»
-  wraps at a space, never inside «Septiembre»; the arrows keep their size; the line under it («Hasta hoy · ARS», «Mes
-  en curso», «Este mes») stays smaller than the month (at most about 24 pt against 28).
+- [ ] **Inicio's month from AX1 to AX5** (set the date to September, November or December): «Septiembre» /
+  «September» stays beside the accounts button while it fits (on a 393 pt iPhone up to AX2; earlier on smaller
+  screens), bigger than at the default size; then it takes its own line, about 56 pt at AX5 (iOS's own Title 2), and the
+  accounts button sits under it on the right; whole words always; a long amount under it may read about as large as the
+  month (the amount fits the field's width); VoiceOver still reads it as a heading.
+- [ ] **Reportes and Más › Presupuestos on a long month** from AX1 to AX5: «Septiembre de 2026» / «September 2026»
+  beside the arrows while it fits, then on its own line with the two arrows under it (left and right), up to about 55 pt
+  at AX5; never split inside «Septiembre»; the line under it («Hasta hoy · ARS», «Mes en curso», «Este mes») follows your
+  text size and stays smaller than the month. VoiceOver once stacked: the month (heading), its line, then the arrows.
 - [ ] **Más at AX3 and AX5, then Idioma, Región and Apariencia:** every title and subtitle in full, over as many lines
   as it needs, none ending in «…» («Movimientos deshechos» over «2 recuperables», «Deudas y cobros» over «Debo · me
   deben»); up to Extra Large the rows keep two lines at most. A very long word may still break inside itself at AX5.
@@ -47,10 +50,19 @@ except the two noted («Día a día», the pressed segments).
   screen «visualización» or «Categorías» may wrap inside the word). With the Large Content Viewer, a long press on
   Cancelar or Listo shows the word large. VoiceOver order: Cancelar, the title (heading), Listo.
 - [ ] **Reportes › Evolución:** with VoiceOver, swiping from the section heading stops on each bar (month, year,
-  amount) and on the scale line, never on «sep», «oct»; at AX3 and AX5 the month labels under the bars stay one line
-  inside their columns; tapping a bar still selects its month.
+  amount) and on the scale line, never on the month labels. At the default size the labels read «sep», «oct»…; at the
+  larger sizes they grow with your text and, once «sep» no longer fits its column, become initials («S», «O», «N»)
+  at your full size; one line each, inside their columns; tapping a bar still selects its month.
 - [ ] **Reportes › Día a día** at the default size and AX3: every row has the same two lines, the date and count over
   the amount, chevron on the right (before, a short day put its amount on the right and a long one under it).
+- [ ] **Amounts in rows at AX2 to AX5** (Movimientos, Cuentas, a budget's categories, Día a día, Deudas and Recurrentes
+  totals, the total under Reportes' donut): the amount sits under the name and reads about as large as the name, at most
+  about 53 pt (it stopped at about 31 pt before), shrinking only when it would not fit its line; never cut or split.
+- [ ] **«Para revisar» and an Assistant answer's evidence at AX3:** the amount sits under the merchant or the label,
+  and both read whole (before, the amount beside them took the whole row).
+- [ ] **Increase Contrast** (Settings › Accessibility › Display & Text Size › Increase Contrast), light and dark: the
+  symbol and cents of Inicio's amount, of an income or transfer detail and of an account in debt are drawn at the same
+  strength as the whole units; off again, they step back as before.
 - [ ] **The Large Content Viewer at AX5** (Settings › Accessibility › Touch, if your iOS lists it there): a long press on
   a modal's close button, a header «+», Reportes' month arrows, an ⓘ button and the ⓘ beside «Disponible» on Inicio
   shows its name large («Mes anterior», «Cerrar»…). If a button in the native header shows nothing, note it: that is

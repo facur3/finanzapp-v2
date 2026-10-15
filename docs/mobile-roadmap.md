@@ -3,8 +3,9 @@
 Updated: 2026-10-15 (**25D1 legibility and touch**, on its branch stacked on draft PR #112, unmerged until #112 is
 approved and merged: contrast floors for a coloured hero's symbol and cents, «Otras» and the colour check; 44 pt
 Enviar/Detener and currency chips; no grabber on the date sheet; pressed states for Tarjetas' deck under Reduce Motion
-and for every segment; the first large-text pass (month titles, the two big titles on Apple's AX5 curve, Más and chooser
-rows, sheet bars, the month axis, Día a día, the Large Content Viewer); JavaScript only; «Producto 25D1», §2). Before
+and for every segment; large text under one rule: no style past the size iOS gives it at AX5, layouts that adapt
+instead of caps (month titles, the month axis, row amounts), Increase Contrast honoured by the quiet parts of a hero,
+the Large Content Viewer where a control cannot grow; JavaScript only; «Producto 25D1», §2). Before
 (2026-10-15, **25VIS2 finish line**, same draft PR #112: the rest of the approved composer scope, the failed-save
 haptics (V4), the Save-gating table (V8) and the keyboard lowered by «Pagar total» (V15); the recurring form keeps one
 category per kind; `ErrorMessage` announces only on iOS (Codex); the binding interface and motion rules no longer name a
@@ -4479,42 +4480,59 @@ nothing of it is on a screen yet.
 - **Contrast** (`palette.ts` `QUIET_ALPHA`, `quietTones`; `category-color.ts`; `appearance-picker.tsx`). A coloured
   hero's symbol and cents keep their tone at alphas set by the 3:1 floor (light E6 / CC, dark B3 / 99; light cents were
   2.16–2.43:1, now ≥ 3.29; dark ≥ 3.35); «Otras» a warm neutral ≥ 3.44:1 on the canvas, the surface and the ring track
-  (was 1.54); the chosen colour's check `onSemantic` (dark: ink ≥ 5.31:1, white was 1.97–3.30).
+  (was 1.54); the chosen colour's check `onSemantic` (dark: ink ≥ 5.31:1, white was 1.97–3.30). With iOS's Increase
+  Contrast on (`subscribeIncreaseContrast`, the palette's `increaseContrast`), every hero's symbol and cents take the
+  units' full strength: the step back is composition, never paid by someone who asked for contrast.
 - **Touch.** The composer's Enviar/Detener a 44 pt target in the same 40 pt of layout (−2 pt margin inside the bar's
   padding); plain currency chips 4 pt vertical slop; the date sheet loses the grabber it could not honour (HIG: only a
   resizable sheet shows one).
 - **Pressed states.** Under Reduce Motion a Tarjetas deck card shows a 12 % black wash while pressed (no scale; white
   text ≥ 6:1, the issuer AA, pinned on every face); every segmented-control segment dims to 0.6 under the finger, the
   chosen one never.
-- **Large text, pass 1.** `HERO_MAX_SCALE` and `ROW_MAX_SCALE` move to `geometry.ts` unchanged; `TITLE_MAX_SCALE` gives
-  `largeTitle` and `title1` the HIG's AX5 sizes (60 and 58 pt; React Native multiplies every style by 3.571); Inicio's
-  month and the Reportes and Presupuestos month titles stop at 1.4× on two lines, and the captions under the latter at 2×
-  (`MONTH_CAPTION_MAX_SCALE`: 24 pt, under the title's 28; uncapped they overtook it from AX3); `NavigationRow` and `CheckRow` lift
-  their two-line limit above the shared 1.2× stacking threshold; the sheet bars (the date sheet and the four page-sheet
-  pickers) stop at 1.2× through one local `SheetBarButton` with the Large Content Viewer and an 8 pt slop; the
-  Evolución axis is hidden from VoiceOver (each bar speaks month, year and amount) and capped at 1.4×; every Día a día
-  row is stacked; `IconButton`, `InfoButton` and `MetricHelp` offer the Large Content Viewer. `mobile-design.md`'s
-  typography paragraph no longer promises a half / three-quarters shrink floor for rows: iOS reads `minimumFontSize`
-  (default 4 pt), never `minimumFontScale` (`RCTTextLayoutManager.mm:246-249`, React Native 0.86.3).
-- **Tests.** New `tests/contrast-floors.node.ts`; `cards-deck` (the wash, its timings and its contrast), `ui-rows`
-  (segments' pressed style, rows by scale, the icon buttons, the page-sheet bar), `typography` (the title caps and the
-  first opening's words at AX5), `spending-home`, `report-routes`, `budgets-routes`, `date-field` (the bar, and the room
-  every catalogue sheet title keeps at 1.2×; no grabber), `spending-chart` (the hidden axis and its column fit),
-  `home-ranking`, `assistant-ui` (the 44 pt Enviar / Detener), `currency-copy` (the chips' slop), and the colour picker
-  rendered for its check. The props are pinned on the rendered elements, so reverting a change fails a test (checked by
-  reverting the picker's check and the grabber); a fit test's uncapped case only shows the defect it fixes. The typography goldens moved deliberately
-  (`'#008800E6'`; `['#131411E6','#131411CC']`). The version line reads «FinanzApp 0.1.0 (25D1)».
-- **Not done:** the 1.8× row-amount cap (owner decision) and a `minimumFontSize` floor for rows (device call);
-  title 2 and title 3 on Apple's curve; the Assistant's draft card, evidence and «Para revisar» rows at large text;
-  segments at 320 pt and Deudas' totals; Increase Contrast; the Large Content Viewer on the «+», its «×» and Inicio's
-  accounts button (each a later pass).
+- **Large text: one rule (revised 2026-10-15 after the owner asked that no cap trade legibility for composition).** No
+  text grows past the size iOS gives its style at AX5 (the HIG table: Large Title 60, Title 1 58, Title 2 56, Title 3
+  55, Body 53, Subhead 49, Footnote 44, Caption 43; `TEXT_STYLE_MAX_SCALE`, applied by `AppText`), which also restores
+  iOS's order at every setting (React Native scales every style by one factor: 3.571 at AX5). Below that, where a layout
+  cannot hold a size, the layout adapts instead of the text shrinking: Inicio's month (Title 2) and the Reportes and
+  Presupuestos month titles (Title 3) stay beside their controls while the year's longest month word fits there, then
+  take their own line (the accounts button moves under it, right-aligned; the arrows move under the title), growing to
+  iOS's own 56 / 55 pt (`titleFit`; the only floor is a whole word). The first pass's fixed caps are gone: 1.4× on the
+  month titles (30.8 / 28 pt, under even iOS's AX1 34 / 31), 2× on the captions under them (24 pt), 1.4× on the month
+  axis, which now shows the short month while it fits its column at the person's size and the month's initial past
+  that, as Apple's charts do (`axisLabels`, hidden from VoiceOver: each bar speaks month, year and amount). Amounts are
+  never smaller than body text can be (`amountMaxScale`): a row amount grows to 53 pt (Body's AX5 size) whatever its own
+  size (it stopped at 1.8×: 30.6 pt under 53 pt names, a 24 pt total at 43), a hero to 1.4× or 53 pt, whichever is
+  larger (a 28 pt total reached 39); both still shrink to fit their line, so from AX3 a long amount on Inicio can draw
+  about as large as the month above it. «Para revisar» rows and the Assistant's evidence rows now stack above 1.2× like
+  every other row (beside a growing amount their label had no room). Kept from the first pass: `NavigationRow` and
+  `CheckRow` lift their two-line limit above the 1.2× stacking threshold; the sheet bars stop at 1.2× like a system bar,
+  through one `SheetBarButton` with the Large Content Viewer and an 8 pt slop; every Día a día row is stacked;
+  `IconButton`, `InfoButton` and `MetricHelp` offer the Large Content Viewer. `mobile-design.md`'s typography paragraph
+  no longer promises a half / three-quarters shrink floor for rows: iOS reads `minimumFontSize` (default 4 pt), never
+  `minimumFontScale` (`RCTTextLayoutManager.mm:246-249`, React Native 0.86.3).
+- **Tests.** New `tests/contrast-floors.node.ts`; `typography` (every style's AX5 ceiling and iOS's order at all ten
+  settings; the row-amount cap; Increase Contrast on the canvas, in colour and on the field; the first opening's words
+  at AX5), `spending-home` (Inicio's month at 1×, AX1–AX5 and 320–430 pt, whole words, under the hero, never under iOS's
+  AX1 size; rendered at AX5), `report-routes` and `budgets-routes` (the month title beside or above the arrows, rendered
+  from 1× to AX5 and 320–393 pt; the captions on their own ceiling), `spending-chart` (the axis at every width and
+  setting drawn at the person's size inside its column; the donut readout under the new row cap), `material` (the
+  Increase Contrast subscription and its wiring in the theme), `review-routes` and `assistant-ui` (the two rows that
+  now stack), `cards-deck`, `ui-rows`, `date-field`, `home-ranking`, `assistant-ui`,
+  `currency-copy` and the colour picker rendered for its check. Reverting a change fails a test (checked on the picker's
+  check and the grabber). `tests/contrast.ts` holds the WCAG helper so no test file imports another: `appearance` and
+  `contrast-floors` were re-registering the theme's 25 tests (the suite's count drops by 50, nothing was lost). The
+  typography goldens moved deliberately (`'#008800E6'`; `['#131411E6','#131411CC']`; the row amount 53/17). The version
+  line reads «FinanzApp 0.1.0 (25D1)».
+- **Not done:** a `minimumFontSize` floor for row amounts (device call); the Assistant's draft card at large text; segments at 320 pt and Deudas' totals; Increase Contrast for the rest of the palette
+  (separators, tertiary text); the Large Content Viewer on the «+», its «×» and Inicio's accounts button (each a later
+  pass).
 - **Gates.** #112 approved and merged first; this branch then merges `master` (no force-push) and is checked on the
   iPhone from the same development build; the owner approves.
-- **Checks (local, Linux, worktree, 2026-10-15):** `typecheck` OK; `test:storage` 1429 passed, 0 failed, 1 skipped
-  (15 new tests; the deck, segment and axis tests rewritten for the new behaviour); `currency:verify`, `regions:verify`
-  OK; `i18n:check -- --strict` 0 errors, 0 stale (no copy change); `expo install --check` with `EXPO_OFFLINE=1` up to
-  date (the live check fails on this base until PR #113 reaches it through #112); `npm ls --all` OK; `export:ios` OK;
-  bundle secret scan OK; root `npm test` 703 passed; `check:repo` OK. None of this is iPhone QA.
+- **Checks (local, Linux, worktree, 2026-10-15, after merging #112 with `master`):** `typecheck` OK; `test:storage` 1382 passed, 0 failed, 1 skipped
+  (the suite no longer counts the theme's 25 tests three times); `i18n:extract` no copy outside the catalogue; `currency:verify`, `regions:verify` OK; `i18n:check --
+  --strict` 0 errors, 0 stale (no copy change); `expo install --check` up to date, with `EXPO_OFFLINE=1` and live;
+  `npm ls --all` OK; `export:ios` OK; bundle secret scan OK; root `npm test` 703 passed; `check:repo` OK. None of this
+  is iPhone QA.
 
 ### Producto 25VIS2 — Sapphire + Sand trial (on its branch; unmerged until iPhone QA and the owner's approval)
 
