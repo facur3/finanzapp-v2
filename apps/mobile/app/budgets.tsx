@@ -6,14 +6,14 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { currentMonthISO, shiftMonthISO, summarizeMonthlyBudgets, validMonthISO, type BudgetProgress, type CategoryMonthlyBudget, type Currency,
   type MonthlyBudgetSummary, type TotalMonthlyBudget } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
-import { budgetCategoriesCaption, budgetTone, percentUsed } from '../src/ui/budget-presentation';
+import { budgetCategoriesCaption, budgetCurrencies, budgetTone, percentUsed } from '../src/ui/budget-presentation';
 import { useCategoryLabel } from '../src/ui/category-hues';
 import { ActionButton, AppText, CategoryBadge, EmptyState, IconButton, Money, PressFeedback, Screen, SectionTitle, Stat, StatRow, Surface } from '../src/ui/components';
 import { CurrencySwitch } from '../src/ui/currency-switch';
 import { labelAmountStacks } from '../src/ui/geometry';
 import { useDefaultCurrency } from '../src/ui/use-default-currency';
 import { useI18n } from '../src/i18n/provider';
-import { availableCurrencies } from '../src/ui/presentation';
+import { availableCurrencies, historyCurrencies } from '../src/ui/presentation';
 import { heldCurrency } from '../src/ui/report-presentation';
 import { timing } from '../src/ui/motion';
 import { space, useCurrentDay, usePalette, useReduceMotion } from '../src/ui/theme';
@@ -29,8 +29,8 @@ export default function BudgetsScreen() {
   const { archive, snapshot } = useLedger();
   const day = useCurrentDay();
   const p = usePalette();
-  const { t, formatMonthTitle, moneyText, spokenMoney } = useI18n();
-  const currencies = availableCurrencies(snapshot?.accounts ?? []);
+  const { t, formatMonthTitle, moneyText, spokenMoney, currencyUnit } = useI18n();
+  const currencies = budgetCurrencies(availableCurrencies(snapshot?.accounts ?? []), archive?.budgets ?? []);
   // The route's currency is honoured when an account holds it; otherwise the one default rule (25B2): the currency held,
   // the display currency among several, the region's tender, ARS last. An unknown code is never coerced.
   const suggested = useDefaultCurrency();
@@ -83,6 +83,9 @@ export default function BudgetsScreen() {
         </View>
         <IconButton name="chevron-forward" label={t('budgets.screen.nextMonth')} onPress={() => setMonthISO(value => shiftMonthISO(value, 1))} />
       </View>
+      {/* 25Q1: no account ever held this currency, so the spent figure is no data, never a verified zero. */}
+      {!historyCurrencies(snapshot.accounts).includes(currency) && <AppText secondary variant="footnote" style={{ textAlign: 'center' }}>
+        {t('budgets.screen.noAccountsInCurrency', { currency: currencyUnit(currency) })}</AppText>}
     </View>
 
     {!summary ? <EmptyState title={t('budgets.screen.unavailableTitle')} detail={t('budgets.screen.unavailableDetail')} icon="speedometer-outline" />

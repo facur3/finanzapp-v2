@@ -44,7 +44,8 @@ export default function ReportCategoryScreen() {
   // A category with a movement that has no rate shows no total rather than a partial one.
   const category = view.complete(report.startISO, report.endISO, 'expense') ? report.categories.find(item => item.key === key) : undefined;
   const label = category?.category ?? entries[0].category;
-  return <EntryList entries={entries} accounts={real.accounts} header={<View style={{ gap: 22 }}>
+  // 25Q1: no «Neto del día» on the headings: these rows are one category's expenses, not the day's movements.
+  return <EntryList entries={entries} accounts={real.accounts} dayNet={false} header={<View style={{ gap: 22 }}>
     <View style={{ gap: 12, paddingTop: 8 }}>
       <CategoryBadge category={label} large />
       <AppText accessibilityRole="header" variant="title1">{lookOf(label).label}</AppText>

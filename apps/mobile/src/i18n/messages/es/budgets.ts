@@ -28,6 +28,8 @@ export const budgets = {
       /** 24UX6E: the month's summary could not be computed (its recorded spending leaves the safe range). */
       unavailableTitle: 'No pudimos calcular este mes',
       unavailableDetail: 'Tus presupuestos y movimientos siguen guardados.',
+      /** 25Q1: a budget in a currency no account ever held: its spent figure is no data. «{currency}» is the plural unit («euros»). */
+      noAccountsInCurrency: 'Todavía no tenés cuentas en {currency}, así que no hay gastos para comparar con este presupuesto.',
     },
     /** Caption of "Por categoría", parts joined with " · ": "3 categorías · 1 excedida · 1 cerca del límite". */
     caption: {

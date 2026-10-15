@@ -1,6 +1,6 @@
 import { View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { expensesInPeriod, isStorableCurrency, spendingOverview, validDateISO, type ReportPeriod } from '@finanzapp/domain';
+import { categoryKey, expensesInPeriod, isStorableCurrency, spendingOverview, validDateISO, type ReportPeriod } from '@finanzapp/domain';
 import { useMemo } from 'react';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { useFinanceView } from '../src/fx/rates-provider';
@@ -35,11 +35,15 @@ export default function SpendingDetailScreen() {
     || (category !== undefined && (typeof category !== 'string' || !category))) return <Screen><EmptyState title={t('spendingDetail.invalidTitle')} detail={t('spendingDetail.invalidDetail')} /></Screen>;
   const period: ReportPeriod = { currency, startISO, endISO };
   const report = spendingOverview(snapshot, period);
-  const entries = selectEntries(expensesInPeriod(listingSnapshot(real, view), period, category), real.accounts);
-  const group = category ? report.categories.find(c => c.key === category) : undefined;
+  // 25Q1: a link may carry a category as it is stored («Supermercado», the Assistant's evidence) or as its key; both
+  // compare as the key, as the report does, so the figure it opens is the one it cites, never a «$ 0,00».
+  const key = category ? categoryKey(category) : undefined;
+  const entries = selectEntries(expensesInPeriod(listingSnapshot(real, view), period, key), real.accounts);
+  const group = key ? report.categories.find(c => c.key === key) : undefined;
   const total = report.status === 'ready' && view.complete(startISO, endISO, 'expense') ? category ? group?.amountMinor ?? 0 : report.expenseMinor : null;
   // Same header as the report's category screen: the category as its tile, the name, the period, the total.
-  return <EntryList entries={entries} accounts={real.accounts} header={<View style={{ gap: 22 }}>
+  // The day headings carry no «Neto del día»: these rows are one category's (or all) expenses, not the day's movements.
+  return <EntryList entries={entries} accounts={real.accounts} dayNet={false} header={<View style={{ gap: 22 }}>
     <View style={{ gap: 12, paddingTop: 8 }}>
       {group && <CategoryBadge category={group.category} large />}
       <AppText accessibilityRole="header" variant="title1">{group ? lookOf(group.category).label : t('spendingDetail.allExpenses')}</AppText>

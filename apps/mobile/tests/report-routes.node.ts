@@ -541,6 +541,22 @@ test('24C1: a consolidated month with an expense that has no rate shows per-curr
   assert.equal(find(comparison, 'EmptyState').props.detail, 'Sin cotización para sumarlo en EUR', 'no difference is claimed');
 });
 
+test('25Q1 (REPORTS-02): a consolidated month waiting for a rate keeps its budgets, which need no rate; the drill-downs carry no day net', () => {
+  const display = displayCurrency.createDisplayCurrencyStore(memoryPreferences({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated', [displayCurrency.DISPLAY_CURRENCY_KEY]: 'EUR' }).store);
+  const budget: domain.MonthlyBudget = { id: 'b-aug', scope: 'total', currency: 'ARS', monthISO: '2026-08', amountMinor: 1000, active: true, createdAt, revision: 0, updatedAt: createdAt };
+  const rows = (root: Node) => nodes(root).filter(n => typeof n.type === 'function' && (n.type as { name: string }).name === 'BudgetStatusRow');
+  const root = routeHarness('(tabs)/reports.tsx', { month: '2026-08' }, snapshot, { display, activity: 'idle', archive: { budgets: [budget] } }).render();
+  assert.equal(nodes(root).some(n => n.type === 'Money' || n.type === 'MonthBars' || n.type === 'DonutChart'), false, 'still no converted total');
+  assert.equal(rows(root).length, 1, 'the budget block stays under the per-currency subtotals');
+  assert.equal(JSON.stringify([rows(root)[0].props.spent, rows(root)[0].props.limit]), JSON.stringify([606, 1000]), 'ARS 6,06 of 10,00, on the real ledger');
+  const title = nodes(root).find(n => n.type === 'SectionTitle' && String(n.props.children).startsWith('Presupuestos'))!;
+  assert.equal(String(title.props.children).replace(/\u00a0/g, ' '), 'Presupuestos · ARS');
+  assert.equal(rows(routeHarness('(tabs)/reports.tsx', { month: '2026-08' }, snapshot, { display, activity: 'idle' }).render()).length, 0, 'no budget, no block');
+  // A category's or a day's drill-down lists expenses only: their headings carry no «Neto del día».
+  assert.equal(routeHarness('report-category.tsx', { currency: 'ARS', month: '2026-08', category: 'salud' }).render().props.dayNet, false);
+  assert.equal(routeHarness('report-day.tsx', { currency: 'ARS', date: '2026-08-10' }).render().props.dayNet, false);
+});
+
 test('24C1 review: comparing two complete past months is not blocked by a later month still waiting for its rate', () => {
   const book = domain.rateBook([
     { base: 'USD', quote: 'ARS', rate: '1000', effectiveDate: '2026-08-07', source: 'Frankfurter', fetchedAt: '2026-09-01T00:00:00.000Z' },

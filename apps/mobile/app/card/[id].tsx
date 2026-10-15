@@ -77,7 +77,7 @@ export default function CardDetailScreen() {
 
         <SectionTitle caption={statementCaption(statement, inline, t) + (statement.refundsMinor > 0 ? t('cards.panel.refunds', { amount: money(statement.refundsMinor) }) : '')}>{t('cards.panel.movements')}</SectionTitle>
       </View>}
-      empty={<AppText secondary variant="subhead">{t('cards.panel.noActivity')}</AppText>}
+      empty={<AppText secondary variant="subhead">{t(summary.futurePlanCount > 0 ? 'cards.panel.noActivityPlans' : 'cards.panel.noActivity')}</AppText>}
       footer={plans.length > 0 ? <View>
         <SectionTitle caption={plansCaption(money)} captionLabel={plansCaption(minor => spokenMoney(minor, account.currency))}>{t('cards.panel.plans')}</SectionTitle>
         <Surface grouped>

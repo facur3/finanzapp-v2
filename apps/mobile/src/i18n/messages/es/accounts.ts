@@ -43,11 +43,15 @@ export const accounts = {
       delete: 'Eliminar',
       deleteAccount: 'Eliminar cuenta',
       deleteTitle: '¿Eliminar {name}?',
-      deleteDetail: 'Deja de aparecer en tus cuentas, en Disponible y en los formularios. No borra nada: {movements} y {transfers} siguen en Movimientos con su nombre y su moneda.',
+      deleteDetail: 'Deja de aparecer en tus cuentas, en Disponible y en los formularios. Sus {movements} y {transfers} siguen en Movimientos con su nombre y su moneda.',
       deleteDetailEmpty: 'Deja de aparecer en tus cuentas y en los formularios. No tiene movimientos.',
       movements: { one: '{count} movimiento', other: '{count} movimientos' },
       transfers: { one: '{count} transferencia', other: '{count} transferencias' },
       /** Appended when active recurring rules post to the account. */
+      /** 25Q1: appended when the account's recorded balance is not zero (either sign). */
+      deleteBalance: ' Su saldo registrado, {amount}, deja de contar en Disponible.',
+      /** 25Q1: always last: no screen reactivates a deleted account. */
+      deleteFinal: ' Una cuenta eliminada no se puede volver a activar.',
       deleteRecurring: { one: ' Su {count} recurrente activo se detendrá; lo ya registrado no cambia.', other: ' Sus {count} recurrentes activos se detendrán; lo ya registrado no cambia.' },
       deleteConfirm: 'Eliminar',
       deleteFailed: 'No pudimos eliminar la cuenta. Sigue como estaba; probá nuevamente.',

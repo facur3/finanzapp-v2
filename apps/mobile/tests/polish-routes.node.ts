@@ -734,7 +734,7 @@ test('25B2: every Cuentas row swipes to one destructive Eliminar (the same actio
   rows[0].props.actions[0].onPress();
   assert.equal(view.alerts.length, 1);
   assert.equal(view.alerts[0].title, '¿Eliminar Banco?');
-  assert.match(view.alerts[0].message, /^Deja de aparecer en tus cuentas, en Disponible y en los formularios\. No borra nada: \d+ movimientos y \d+ transferencias? siguen en Movimientos/);
+  assert.match(view.alerts[0].message, /^Deja de aparecer en tus cuentas, en Disponible y en los formularios\. Sus \d+ movimientos y \d+ transferencias? siguen en Movimientos/);
   assert.equal(view.removedIds.length, 0);
   view.alerts[0].buttons[0].onPress?.();
   assert.equal(view.removedIds.length, 0, 'Cancelar writes nothing');

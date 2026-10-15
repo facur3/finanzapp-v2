@@ -121,7 +121,7 @@ function CardSnapshot({ summary, day, onOpen }: { summary: CardSummary; day: str
         caption={statement ? statementCaption(statement, inline, t) : undefined}>{t('cards.panel.recent')}</SectionTitle>
       {recent.length ? <Surface grouped>
         {recent.map((item, index) => <MovementRow key={item.key} item={item} accounts={snapshot.accounts} accountId={account.id} context="card" last={index === recent.length - 1} />)}
-      </Surface> : <AppText secondary variant="subhead">{t('cards.panel.noActivity')}</AppText>}
+      </Surface> : <AppText secondary variant="subhead">{t(summary.futurePlanCount > 0 ? 'cards.panel.noActivityPlans' : 'cards.panel.noActivity')}</AppText>}
     </ValueTransition></Reflow>
   </View>;
 }
