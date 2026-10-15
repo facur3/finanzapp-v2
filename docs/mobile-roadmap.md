@@ -4498,7 +4498,12 @@ nothing of it is on a screen yet.
     that renames it fails instead of dropping the fallback). «No pudimos mostrar esta pantalla» / «Lo que ya guardaste
     sigue ahí. Podés volver atrás o abrir otra pestaña.» and «Volver a intentar», which draws that screen again. It never
     shows the error (no names or amounts from it) and never touches storage (AGENTS rule 9). Drawing errors only: a
-    handler, an effect or a promise is not caught, so no crash-free claim is made.
+    handler, an effect or a promise is not caught, so no crash-free claim is made. The tabs layout hands the same
+    fallback to its own four screens (Codex, PR #116): expo-router wraps each leaf route inside its navigator and never a
+    layout, so a tab that fails is replaced inside the tabs layout and the dock stays; the explicit prop keeps that true
+    without relying on the root stack's context, a render test with expo-router's own `Try` shows the dock staying (and
+    lost if the boundary wrapped the layout), and the library's wrapping rule is pinned. A throw in the tabs layout
+    itself (the dock) is still not caught.
   - `app/+not-found.tsx`: «Pantalla no encontrada», «No encontramos esa pantalla», «El enlace no lleva a ninguna
     pantalla de FinanzApp.» and «Ir a Inicio» (`router.replace('/')`; a cold start has no back stack). The framework's
     fallback, not a destination: decision 005 holds.

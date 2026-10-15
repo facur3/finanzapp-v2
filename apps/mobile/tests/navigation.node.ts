@@ -32,6 +32,7 @@ function renderLayout(background: string) {
     // 24UX6C: the layout draws no header buttons any more, so it needs no component module: an IconButton coming back fails here.
     '../../src/ui/floating-tab-bar': { FloatingTabBar: 'FloatingTabBar' },
     '../../src/ui/navigation': { tabHostOptions, tabScreenOptions },
+    '../../src/ui/screen-failure': { ScreenFailure: 'ScreenFailure' },
     '../../src/ui/motion': { selectionHaptic: () => {} },
     '../../src/storage/LedgerProvider': { useLedger: () => ({ review: reviewTray }) },
     '../../src/ui/theme': { usePalette: () => ({ background, primary: '#5B87FF', text: '#FFFFFF', tertiary: '#7C7C84', secondary: '#A6B0C0', surface: '#151A22', line: '#2B3544' }) },
@@ -48,6 +49,7 @@ const ROOTS = 'index,activity,reports,settings';
 for (const [theme, background] of [['light', '#F5F6F8'], ['dark', '#080B10']]) {
   test('tab layout keeps all four scenes opaque, mounted and unfrozen in ' + theme, () => {
     const { props } = renderLayout(background);
+    assert.equal(props.unstable_screenErrorBoundary, 'ScreenFailure', '25Q3: a tab that fails is replaced inside the layout; the dock stays');
     assert.equal(props.detachInactiveScreens, false);
     const screens = props.children;
     assert.equal(screens.map((screen: any) => screen.props.name).join(','), ROOTS);

@@ -76,3 +76,59 @@ test('25Q3: the root stack hands ScreenFailure to every route, through a prop th
   const installed = readFileSync(require.resolve('expo-router/build/layouts/withLayoutContext.js'), 'utf8');
   assert.match(installed, /unstable_screenErrorBoundary/);
 });
+
+// Codex (PR #116): does a tab that throws take the dock with it? expo-router wraps each leaf route, inside its navigator,
+// in its own `Try` boundary (useScreens.js, pinned below); the tabs layout, which draws the dock, is never wrapped. This
+// renders that shape with expo-router's real `Try` and React's real error handling.
+const requireHere = createRequire(import.meta.url);
+const React = requireHere('react');
+const TestRenderer = requireHere('react-test-renderer');
+function routerTry() {
+  const module = { exports: {} as { Try: any } };
+  const stubs: Record<string, unknown> = { react: React, 'react/jsx-runtime': requireHere('react/jsx-runtime'),
+    './Splash': { hideAsync: () => {} }, '../rsc/router/errors': { MetroServerError: class extends Error {} } };
+  runInNewContext(readFileSync(requireHere.resolve('expo-router/build/views/Try.js'), 'utf8'), { module, exports: module.exports, __DEV__: false, Object, Promise,
+    require: (name: string) => { if (!Object.hasOwn(stubs, name)) throw new Error('Unexpected Try dependency: ' + name); return stubs[name]; } });
+  return module.exports.Try;
+}
+
+test('25Q3 (Codex, PR #116): a tab that throws is replaced inside the tabs layout, the dock stays and retry draws the tab again; around the layout it would take the dock', async () => {
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  const Try = routerTry();
+  const h = React.createElement;
+  let broken = true;
+  const ReportsTab = () => { if (broken) throw new Error('probe 1234,50'); return h('Text', null, 'Reportes'); };
+  const Fallback = ({ retry }: { retry: () => Promise<void> }) => h('ScreenFailure', { retry });
+  const tabsLayout = (scene: unknown) => h('TabsLayout', null, h('Scene', null, scene), h('Dock'));
+  const quiet = console.error;
+  console.error = () => {}; // React reports every caught render error; expected here.
+  try {
+    let root: any;
+    await TestRenderer.act(async () => { root = TestRenderer.create(tabsLayout(h(Try, { catch: Fallback }, h(ReportsTab)))); });
+    assert.equal(root.root.findAllByType('Dock').length, 1, 'the dock stays beside the failed tab');
+    assert.equal(root.root.findAllByType('ScreenFailure').length, 1);
+    assert.equal(JSON.stringify(root.toJSON()).includes('1234'), false);
+    broken = false;
+    // Not awaited inside act: Try's retry resolves in its setState callback, which runs when act flushes.
+    await TestRenderer.act(async () => { void root.root.findByType('ScreenFailure').props.retry(); });
+    assert.equal(root.root.findAllByType('ScreenFailure').length, 0, 'retry draws the tab again');
+    assert.ok(JSON.stringify(root.toJSON()).includes('Reportes'));
+    // The shape the finding feared: a boundary around the layout replaces the dock with the tab.
+    broken = true;
+    let whole: any;
+    await TestRenderer.act(async () => { whole = TestRenderer.create(h(Try, { catch: Fallback }, tabsLayout(h(ReportsTab)))); });
+    assert.equal(whole.root.findAllByType('Dock').length, 0);
+    await TestRenderer.act(async () => { root.unmount(); whole.unmount(); });
+  } finally { console.error = quiet; }
+});
+
+test('25Q3 (Codex, PR #116): expo-router wraps leaf routes only, inside their navigator; the root stack and the tabs both hand the fallback on', () => {
+  const screens = readFileSync(requireHere.resolve('expo-router/build/useScreens.js'), 'utf8');
+  assert.match(screens, /const isRouteType = value\.type === 'route';/);
+  assert.match(screens, /ScreenErrorBoundary && isRouteType \? \(\(0, jsx_runtime_1\.jsx\)\(Try_1\.Try, \{ catch: ScreenErrorBoundary, children: screenComponent \}\)\)/,
+    'a layout route (the tabs) is never wrapped by the inherited boundary; each of its screens is');
+  const layoutContext = readFileSync(requireHere.resolve('expo-router/build/layouts/withLayoutContext.js'), 'utf8');
+  assert.match(layoutContext, /ScreenErrorBoundaryContext, \{ value: unstable_screenErrorBoundary, children: content \}/);
+  const tabs = readFileSync(new URL('../app/(tabs)/_layout.tsx', import.meta.url), 'utf8');
+  assert.match(tabs, /<Tabs unstable_screenErrorBoundary=\{ScreenFailure\} /);
+});

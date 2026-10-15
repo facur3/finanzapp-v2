@@ -4,6 +4,7 @@ import { usePalette } from '../../src/ui/theme';
 import { FloatingTabBar } from '../../src/ui/floating-tab-bar';
 import { selectionHaptic } from '../../src/ui/motion';
 import { tabHostOptions, tabScreenOptions } from '../../src/ui/navigation';
+import { ScreenFailure } from '../../src/ui/screen-failure';
 import { useI18n } from '../../src/i18n/provider';
 import { useLedger } from '../../src/storage/LedgerProvider';
 
@@ -26,7 +27,9 @@ export default function TabsLayout() {
   // Sections switch instantly (no slide, no fade: the mounted-tab mitigation); a selection tick confirms the change
   // without delaying it. The dock (`FloatingTabBar`) draws the four tabs icon-only on a graphite pill and the «+» beside it;
   // since 25UX1 it floats over the roots, which keep their last row clear of it (`useDockClearance`).
-  return <Tabs {...tabHostOptions} tabBar={props => <FloatingTabBar {...props} />}
+  // 25Q3 (Codex, PR #116): the tabs hand ScreenFailure to their own screens too, so a tab that fails to draw is replaced
+  // inside this layout and the dock beside it stays, without relying on the root stack's context reaching this far.
+  return <Tabs unstable_screenErrorBoundary={ScreenFailure} {...tabHostOptions} tabBar={props => <FloatingTabBar {...props} />}
     screenListeners={({ navigation }) => ({ tabPress: () => { if (!navigation.isFocused()) selectionHaptic(); } })}
     screenOptions={{ ...tabScreenOptions,
     headerStyle: { backgroundColor: p.background },
