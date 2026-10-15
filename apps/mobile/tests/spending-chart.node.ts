@@ -118,7 +118,7 @@ test('24B1: the MonthBars scale caption for ARS and USD, whole units from cents,
   assert.equal(caption('es-US', 'USD'), 'Mes en curso hasta hoy · escala de 0 a US$\u00A01,234,568');
 });
 
-test('23.1C2, 25D1: a month bar speaks the full month name; the axis keeps the short one for the eye, hidden from VoiceOver and capped', () => {
+test('23.1C2, 25D1: a month bar speaks the full month name; the axis keeps the short one for the eye, hidden from VoiceOver and fitted to its column', () => {
   const points = [{ monthISO: '2026-03', amountMinor: 123456, partial: false }, { monthISO: '2026-05', amountMinor: 50000, partial: true }];
   const read = (i18n: ReturnType<typeof bindLocale>) => {
     const chart = chartsModule(i18n).MonthBars({ points, selected: '2026-05', onSelect: () => {}, currency: 'ARS' });
@@ -134,11 +134,11 @@ test('23.1C2, 25D1: a month bar speaks the full month name; the axis keeps the s
     assert.deepEqual(chart.axis, axis);
     // The ticks were one VoiceOver stop each, repeating what the bars say (HIG, charts: hide axis labels).
     assert.deepEqual([chart.row.props.accessibilityElementsHidden, chart.row.props.importantForAccessibility], [true, 'no-hide-descendants'], locale);
+    const fitted = (chartsModule(bindLocale(locale)).axisLabels as unknown as (shorts: string[], width: number, scale: number) => { maxScale: number })([...axis], chartWidth, 1);
     for (const tick of chart.ticks) {
-      assert.deepEqual([tick.numberOfLines, tick.maxFontSizeMultiplier, tick.accessibilityLanguage], [1, 1.4, undefined], locale);
+      assert.deepEqual([tick.numberOfLines, tick.maxFontSizeMultiplier, tick.accessibilityLanguage], [1, fitted.maxScale, undefined], locale);
     }
   }
-  assert.equal(chartsModule(bindLocale('es-AR')).AXIS_MAX_SCALE, 1.4);
   const donut = (i18n: ReturnType<typeof bindLocale>) => chartsModule(i18n).DonutChart({ slices: [{ key: 'a', label: 'Food', value: 1, color: '#1' }], currency: 'ARS',
     caption: 'Total', shareOf: () => ({ label: '100 %', spoken: '100 %' }) });
   // 24UX6C2: the chart's root is an outer View (the readout can move under the donut), so the element is found by type.
@@ -147,23 +147,33 @@ test('23.1C2, 25D1: a month bar speaks the full month name; the axis keeps the s
   assert.equal(pressOf(donut(bindLocale('es-AR', 'native', 'es'))).props.accessibilityLanguage, undefined);
 });
 
-test('25D1: every short month fits its axis column on one line at the 1.4× cap, from 320 pt; uncapped at AX3 it would not', () => {
+test('25D1: the axis follows the person\'s text size at every setting: the short month while it fits its column, else its initial, never capped below the setting', () => {
   const charts = chartsModule(bindLocale('es-AR'));
-  const cap = charts.AXIS_MAX_SCALE as unknown as number;
+  const fit = charts.axisLabels as unknown as (shorts: string[], width: number, scale: number) => { labels: string[]; maxScale: number };
   // The column: the screen less its padding (2 × 20) and the card's (2 × 16), less five 6 pt gaps, over six months.
   const column = (width: number) => (width - 72 - 30) / 6;
-  let widest = 0;
   for (const locale of ['es-AR', 'en-US'] as const) {
     const formatDate = (dateISO: string, style: 'day') => i18nFormat.formatDate(dateISO, style, locale);
-    for (let month = 1; month <= 12; month++) {
-      const label = (charts.shortMonth as unknown as (monthISO: string, format: typeof formatDate) => string)(`2026-${String(month).padStart(2, '0')}`, formatDate);
-      // The chosen month is semibold, about 6 % wider.
-      const width = geometry.labelWidthEm(label) * 12 * 1.06;
-      widest = Math.max(widest, width);
-      for (const screen of [320, 375, 393, 430]) assert.ok(width * cap <= column(screen), `${locale} «${label}» at ${screen} pt: ${(width * cap).toFixed(1)} > ${column(screen).toFixed(1)}`);
+    const short = (month: number) => (charts.shortMonth as unknown as (monthISO: string, format: typeof formatDate) => string)(`2026-${String(month).padStart(2, '0')}`, formatDate);
+    for (let first = 1; first <= 7; first++) {
+      const shorts = Array.from({ length: 6 }, (_, i) => short(first + i));
+      for (const width of [320, 375, 393, 430]) {
+        for (const scale of [1, 1.353, 1.786, 2.143, 2.643, 3.143, 3.571]) {
+          const { labels, maxScale } = fit(shorts, width, scale);
+          const drawn = Math.min(scale, maxScale);
+          const at = `${locale} ${shorts.join(' ')} at ${width} pt ×${scale}`;
+          // The person's setting is honoured (React Native's largest is 3.571, under Caption 1's AX5 ceiling of 43/12).
+          assert.equal(drawn, scale, at + ': drawn at the person\'s size');
+          for (const label of labels) assert.ok(geometry.labelWidthEm(label) * 12 * 1.06 * drawn <= column(width), `${at}: «${label}» fits its column`);
+          if (scale === 1) assert.equal(JSON.stringify(labels), JSON.stringify(shorts), at + ': the short month at the default size');
+        }
+      }
     }
+    // At AX5 the short month no longer fits any column, so the axis shows the initial («S», «O», «N»), at the full size.
+    const ax5 = fit(Array.from({ length: 6 }, (_, i) => short(7 + i)), 393, 3.571);
+    assert.equal(ax5.labels.join(' '), 'J A S O N D');
   }
-  assert.ok(widest * 2.643 > column(375), 'uncapped at AX3 the widest month leaves its column');
+  assert.equal(JSON.stringify(fit([], 393, 1)), JSON.stringify({ labels: [], maxScale: 1 }));
 });
 
 test('24B3: the MonthBars scale and the bar labels use each currency\'s own units: yen whole, dinars to the fil', () => {
@@ -483,11 +493,13 @@ test('24UX6C2: at large text (1.353) the chosen readout moves under the donut; 2
     assertReadoutBelow(donut(), { texts: ['Total del período'], minor: DONUT_TOTAL });
     assertReadoutBelow(donut({ locale: 'en-US' }), { texts: ['Period total'], minor: DONUT_TOTAL });
   } finally { chartFontScale = 1; }
-  // At the AX sizes a long total under the donut steps down to keep to the row (Money caps its own scale at 1.8×).
+  // At the AX sizes a long total under the donut steps down to keep to the row. 25D1: a row amount stops at 53 pt (Body's
+  // AX5 size; it stopped at 1.8×, so this total drew 26 × 1.8 = 46.8 pt); no step fits this one at 53 pt, so it takes the
+  // last step and iOS shrinks it to the row natively.
   chartFontScale = 3.1;
   try {
     const millions = [{ key: 'a', label: 'Supermercado', value: FOUR_MILLION, color: '#111' }];
-    assertReadoutBelow(donut({ slices: millions, total: FOUR_MILLION }), { texts: ['Total del período'], minor: FOUR_MILLION, size: 26 });
+    assertReadoutBelow(donut({ slices: millions, total: FOUR_MILLION }), { texts: ['Total del período'], minor: FOUR_MILLION, size: 18 });
     const huge = 1234567890123;
     assertReadoutBelow(donut({ slices: [{ key: 'a', label: 'Supermercado', value: huge, color: '#111' }], total: huge }), { texts: ['Total del período'], minor: huge, size: 18 });
   } finally { chartFontScale = 1; }

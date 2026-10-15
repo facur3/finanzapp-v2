@@ -118,17 +118,40 @@ export function amountTextRoom(rowWidth: number, symbol: string, symbolSize: num
 
 /** Rows that put a name beside an amount stack (amount under the name) at this system text scale. */
 export const ROW_STACK_SCALE = 1.2;
-/** The Dynamic Type multiplier a hero amount stops growing at (and, 25D1, the month titles beside the hero and between the
- * month arrows), and the one a row amount stops at. */
-export const HERO_MAX_SCALE = 1.4, ROW_MAX_SCALE = 1.8;
-/** 25D1: the captions under a capped month title (its period or state and «Este mes», 12 pt) stop at 2×, 24 pt, under the
- * title's 28 pt (20 × 1.4): uncapped they reached 31.7 pt at AX3 and read larger than the month they describe. Up to AX1
- * (1.786) nothing changes. */
-export const MONTH_CAPTION_MAX_SCALE = 2;
-/** 25D1: UIKit grows each text style on its own curve (the HIG's larger accessibility sizes at AX5: Large Title 34 → 60 pt,
- * Title 1 28 → 58 pt); React Native multiplies every text by one factor (3.571 at AX5), so a 34 pt title drew about 121 pt.
- * These caps land the two big titles on Apple's AX5 size; every other style keeps React Native's own growth. */
-export const TITLE_MAX_SCALE: Readonly<Partial<Record<string, number>>> = { largeTitle: 60 / 34, title1: 58 / 28 };
+/** 25D1: no text grows past the size iOS gives its style at the largest accessibility size (the HIG's AX5 table over each
+ * style's default size). React Native multiplies every style by one factor (3.571 at AX5: a 34 pt Large Title drew 121
+ * pt, a 22 pt Title 2 79, a 17 pt Body 61); these ceilings land each style on Apple's AX5 size and keep the order iOS
+ * keeps there (Title 3 55 pt above Body 53 above Caption 43). Below AX5 a style grows as React Native scales it; where a
+ * layout cannot hold that, the layout adapts (it stacks or wraps), the text is not capped lower. The eyebrow is a
+ * Caption 1. `hero` has none: amounts use `amountMaxScale`. */
+export const TEXT_STYLE_MAX_SCALE: Readonly<Partial<Record<string, number>>> = {
+  largeTitle: 60 / 34, title1: 58 / 28, title2: 56 / 22, title3: 55 / 20, headline: 53 / 17, body: 53 / 17, subhead: 49 / 15,
+  footnote: 44 / 13, caption: 43 / 12, eyebrow: 43 / 12,
+};
+/** 25D1: an amount is never smaller than body text can be. A row amount (under 28 pt) grows to Body's AX5 size, 53 pt, and
+ * no further, whatever its own size (it stopped at 1.8×: 30.6 pt under 53 pt names, while a 24 pt total reached 43); a hero
+ * (28 pt or more) to 1.4× its size or 53 pt, whichever is larger (Inicio's 46 pt hero: 64 pt; a 28 pt total: 53, not 39).
+ * Both then shrink to fit their line: a hero to its measured width (`fitFontSize`), a row amount natively. */
+export const HERO_MAX_SCALE = 1.4, AMOUNT_AX5_SIZE = 53;
+export function amountMaxScale(size: number, hero: boolean): number {
+  return Math.max(hero ? HERO_MAX_SCALE : 1, AMOUNT_AX5_SIZE / size);
+}
+/** How much wider than `labelWidthEm`'s estimate (regular to medium) a semibold and a bold word run. */
+export const WEIGHT_WIDTH = { semibold: 1.06, bold: 1.08 } as const;
+
+/** The widest word of `texts`, in ems: a title wraps between words, so this is what must fit one line. */
+export function widestWordEm(texts: readonly string[]): number {
+  return Math.max(0, ...texts.flatMap(text => text.split(/\s+/)).map(labelWidthEm));
+}
+
+/** 25D1: where a title (`size` points, its weight included) goes and how far it grows. Beside its controls while its widest
+ * word fits `beside` at the current scale; otherwise on its own line (`alone`). It grows to its style's `ceiling`, or less
+ * where that word would not fit its line, never below the default size: a whole word is the floor, not a composition. */
+export function titleFit(fontScale: number, ceiling: number, wordEm: number, size: number, beside: number, alone: number): { stacked: boolean; maxScale: number } {
+  const width = wordEm * size;
+  const stacked = width * Math.min(Math.max(fontScale, 1), ceiling) > beside;
+  return { stacked, maxScale: Math.max(1, Math.min(ceiling, (stacked ? alone : beside) / width)) };
+}
 /** Points a list row spends around its text on a phone: screen padding (20 + 20), row padding (16 + 16), the identity tile (40) and its gap (12). */
 export const ROW_CHROME = 124;
 /** 24UX6E: what a row's trailing chevron adds to `ROW_CHROME`: the 16 pt `chevron-forward` glyph and the row's 12 pt gap

@@ -61,6 +61,8 @@ function displayStore(initial: Record<string, string> = {}) {
   return displayCurrency.createDisplayCurrencyStore(() => ({ getItemSync: (key: string) => rows.get(key) ?? null, setItemSync: (key: string, value: string) => { rows.set(key, value); }, removeItemSync: (key: string) => rows.delete(key) }));
 }
 
+/** The window Inicio is drawn in (25D1: a test may set a width or a text size, and restores it). */
+let homeWindow = { width: 393, height: 852, fontScale: 1, scale: 3 };
 function routeHarness(file: string, params: Record<string, unknown>, initialData = snapshot, extra: Partial<domain.LedgerArchive> = {}, display = displayStore(),
   rates: { book: domain.RateBook; activity?: ratesStore.RatesActivity; ensured?: { months: readonly string[]; quotes: readonly string[] }[] } = { book: domain.rateBook([]) }) {
   // The ledger as the provider hands it; `setData` stands for a write landing while the screen stays mounted.
@@ -107,7 +109,7 @@ function routeHarness(file: string, params: Record<string, unknown>, initialData
       return [state[index], (value: unknown) => { state[index] = typeof value === 'function' ? (value as (current: unknown) => unknown)(state[index]) : value; }];
     } },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
-    'react-native': { View: 'View', ScrollView: 'ScrollView', FlatList: 'FlatList', StyleSheet: { hairlineWidth: 1, create: <T,>(styles: T) => styles, absoluteFill: {} }, useWindowDimensions: () => ({ width: 393, height: 852, fontScale: 1, scale: 3 }) },
+    'react-native': { View: 'View', ScrollView: 'ScrollView', FlatList: 'FlatList', StyleSheet: { hairlineWidth: 1, create: <T,>(styles: T) => styles, absoluteFill: {} }, useWindowDimensions: () => homeWindow },
     'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View', FlatList: 'FlatList' },
       useSharedValue: (value: number) => ({ value }), withTiming: (value: number) => value,
       useAnimatedStyle: (fn: () => unknown) => fn() },
@@ -126,7 +128,7 @@ function routeHarness(file: string, params: Record<string, unknown>, initialData
     '../src/ui/report-presentation': reportPresentation,
     '../src/ui/spending-chart': { CategorySpendingRow: 'CategorySpendingRow', CategoryLegendRow: 'CategoryLegendRow' },
     '../src/ui/geometry': geometry,
-    '../src/ui/charts': { DonutChart: 'DonutChart', MonthBars: 'MonthBars', OTHERS_KEY: ' others', MONEY_MAX_SCALE: 1.8,
+    '../src/ui/charts': { DonutChart: 'DonutChart', MonthBars: 'MonthBars', OTHERS_KEY: ' others',
       donutSlices: (items: { key: string; label: string; value: number }[]) => items.slice(0, 5).map((item, index) => ({ ...item, color: 'c' + index })) },
     '../src/ui/budget-presentation': budgetPresentation,
     '@expo/vector-icons/Ionicons': 'Ionicons',
@@ -270,9 +272,9 @@ test('24UX6A: the month is the current one, a header label, never a control: no 
   assert.equal(month.props.color ?? month.props.style?.color, lightPalette.heroInk);
   for (const prop of ['onPress', 'onLongPress', 'onPressIn', 'accessibilityHint', 'accessibilityActions']) assert.equal(prop in month.props, false, 'the month has no ' + prop);
   assert.equal(month.props.accessibilityRole, 'header', 'a header, not a button');
-  // 25D1: it grows with the text only as far as the hero amount under it (1.4×), on two lines at most.
-  assert.deepEqual([month.props.maxFontSizeMultiplier, month.props.numberOfLines], [1.4, 2]);
-  assert.equal(geometry.HERO_MAX_SCALE, 1.4);
+  // 25D1: at the default size it sits beside the accounts button, free to grow as far as Title 2 does while it fits there.
+  assert.equal(month.props.style.flex, 1);
+  assert.ok(month.props.maxFontSizeMultiplier >= 1 && month.props.maxFontSizeMultiplier <= 56 / 22, String(month.props.maxFontSizeMultiplier));
   // No ancestor turns it into a control.
   const pressable = nodes(root).filter(n => typeof n.props.onPress === 'function' || typeof n.props.onLongPress === 'function');
   assert.equal(pressable.some(n => nodes(n).includes(month)), false, 'no pressable wraps the month');
@@ -413,23 +415,37 @@ test('24UX6A: the number is the field\'s ink at 46 pt, and the secondary ink whe
     root = routeHarness('(tabs)/index.tsx', {}, homeData).render();
     assert.deepEqual([fieldOf(root).props.style.backgroundColor, find(root, 'Money').props.color], [darkPalette.hero, darkPalette.heroInk]);
     assert.equal(monthOf(root).props.style.color, darkPalette.heroInk);
-    assert.equal(monthOf(root).props.maxFontSizeMultiplier, geometry.HERO_MAX_SCALE);
   } finally { dark = false; }
 });
 
-test('25D1: every month name fits beside the accounts button in whole words at its 1.4× cap, from 320 pt; uncapped at AX3 it would not', () => {
-  // The row: the screen less the field's padding (2 × 20), the 44 pt accounts button and the 12 pt gap. Title 2 is bold, 22 pt.
-  const column = (width: number) => width - 96;
-  let widest = 0;
+test('25D1: the month grows to Title 2\'s iOS size, in whole words: beside the accounts button while it fits, else on its own line with the button under it', () => {
   for (const locale of ['es-AR', 'en-US'] as const) {
-    for (let month = 1; month <= 12; month++) {
-      const name = i18nFormat.formatDate(`2026-${String(month).padStart(2, '0')}-15`, 'month', locale);
-      const width = geometry.labelWidthEm(name.charAt(0).toUpperCase() + name.slice(1)) * 22 * 1.08;
-      widest = Math.max(widest, width);
-      for (const screen of [320, 375, 393, 430]) assert.ok(width * geometry.HERO_MAX_SCALE <= column(screen), `${locale} ${name} at ${screen} pt`);
+    const names = Array.from({ length: 12 }, (_, i) => { const name = i18nFormat.formatDate(`2026-${String(i + 1).padStart(2, '0')}-15`, 'month', locale); return name.charAt(0).toUpperCase() + name.slice(1); });
+    const wordEm = geometry.widestWordEm(names);
+    for (const width of [320, 375, 393, 430]) {
+      for (const scale of [1, 1.353, 1.786, 2.643, 3.571]) {
+        const fit = geometry.titleFit(scale, 56 / 22, wordEm, 22 * 1.08, width - 96, width - 40);
+        const drawn = 22 * Math.min(scale, fit.maxScale);
+        const at = `${locale} ${width} pt ×${scale}`;
+        assert.ok(wordEm * 22 * 1.08 * Math.min(scale, fit.maxScale) <= (fit.stacked ? width - 40 : width - 96) + 1e-9, at + ': the longest name stays whole');
+        if (scale === 1) assert.equal(fit.stacked, false, at);
+        // Never smaller than iOS draws Title 2 at the first accessibility size (34 pt) once the person is past it.
+        if (scale >= 1.786) assert.ok(drawn >= 34, `${at}: ${drawn.toFixed(1)} pt`);
+      }
     }
   }
-  assert.ok(widest * 2.643 > column(375), 'uncapped at AX3 «Septiembre» breaks inside the word');
+  // (No size order with the amount is claimed: the hero is fitted to the field's width, so from AX3 a long amount can draw
+  // about as large as the month. It stays right under it, bold and whole.)
+  // Rendered at AX5 on a 393 pt iPhone: the month takes the full line and reaches iOS's own 56 pt; the button wraps under it, on the right.
+  homeWindow = { width: 393, height: 852, fontScale: 3.571, scale: 3 };
+  try {
+    const root = routeHarness('(tabs)/index.tsx', {}, homeData).render();
+    const month = monthOf(root);
+    const row = nodes(fieldOf(root)).find(n => n.type === 'View' && [n.props.children].flat().includes(month))!;
+    assert.deepEqual([row.props.style.flexWrap, row.props.style.justifyContent, month.props.style.flexBasis, month.props.style.flex], ['wrap', 'flex-end', '100%', undefined]);
+    assert.equal(Math.round(22 * Math.min(3.571, month.props.maxFontSizeMultiplier)), 56);
+    assert.equal([row.props.children].flat().filter(Boolean).map((n: Node) => n.type).join('|'), 'AppText|FieldButton', 'the same two elements, the button after the month');
+  } finally { homeWindow = { width: 393, height: 852, fontScale: 1, scale: 3 }; }
 });
 
 test('24UX6A: the status bar is the field\'s own over it (`heroStatusBar`: light over the sapphire since 25VIS2), the scheme\'s own after scrolling past it or when another screen is in front', () => {

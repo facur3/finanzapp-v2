@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { ScrollView, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { ScrollView, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { setStatusBarStyle } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,7 +19,7 @@ import { historyCurrencies, homeNamesCategory, sharedGlyphs, visibleNamesAccount
 import { useCategoryLookOf } from '../../src/ui/category-hues';
 import { space, useCurrentDay, usePalette } from '../../src/ui/theme';
 import { useDockInset } from '../../src/ui/dock-clearance';
-import { HERO_MAX_SCALE } from '../../src/ui/geometry';
+import { TEXT_STYLE_MAX_SCALE, WEIGHT_WIDTH, titleFit, widestWordEm } from '../../src/ui/geometry';
 
 type HomeMetric = 'spending' | 'available';
 
@@ -67,6 +67,12 @@ export default function HomeScreen() {
   const dock = useDockInset();
   const insets = useSafeAreaInsets();
   const { t, formatDate, formatNumericDate, currencyName } = useI18n();
+  // 25D1: the month (Title 2, bold) grows to the size iOS gives Title 2 at the person's setting; when its longest name no
+  // longer fits beside the accounts button it takes its own line and the button moves under it, on the right. The longest
+  // of the twelve names decides, so the layout does not change from one month to the next.
+  const { width, fontScale } = useWindowDimensions();
+  const monthEm = useMemo(() => widestWordEm(Array.from({ length: 12 }, (_, i) => capitalized(formatDate(`2026-${String(i + 1).padStart(2, '0')}-15`, 'month')))), [formatDate]);
+  const monthTitle = titleFit(fontScale, TEXT_STYLE_MAX_SCALE.title2!, monthEm, 22 * WEIGHT_WIDTH.bold, width - 2 * space.xl - space.m - 44, width - 2 * space.xl);
   const expenseLook = useCategoryLookOf('expense');
   const [metric, setMetric] = useState<HomeMetric>('spending');
   // Every currency the ledger ever held (25B2 review): a deleted account's history keeps its currency in the view and the chip.
@@ -145,11 +151,9 @@ export default function HomeScreen() {
       style={{ backgroundColor: p.hero, paddingTop: insets.top + space.m, paddingBottom: space.xxl, paddingHorizontal: space.xl,
         borderBottomLeftRadius: FIELD_RADIUS, borderBottomRightRadius: FIELD_RADIUS, gap: space.l }}>
       {/* 1. The current month (not a control) and the accounts behind the number. */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.m }}>
-        {/* 25D1: the month grows with the text as far as the hero amount under it does (1.4×), so the amount stays the
-            larger of the two and «Septiembre» keeps whole words beside the accounts button. */}
-        <AppText accessibilityRole="header" variant="title2" maxFontSizeMultiplier={HERO_MAX_SCALE} numberOfLines={2}
-          style={{ flex: 1, color: p.heroInk }}>{capitalized(formatDate(day, 'month'))}</AppText>
+      <View style={{ flexDirection: 'row', flexWrap: monthTitle.stacked ? 'wrap' : 'nowrap', justifyContent: 'flex-end', alignItems: 'center', gap: space.m }}>
+        <AppText accessibilityRole="header" variant="title2" maxFontSizeMultiplier={monthTitle.maxScale} numberOfLines={2}
+          style={{ ...(monthTitle.stacked ? { flexBasis: '100%' } : { flex: 1 }), color: p.heroInk }}>{capitalized(formatDate(day, 'month'))}</AppText>
         <FieldButton icon="wallet-outline" label={t('nav.seeAccounts')} onPress={() => router.push('/accounts')} />
       </View>
       {/* 2. The scope, only when there is more than one currency to choose (25B2). Outside the keyed crossfade: the chip's

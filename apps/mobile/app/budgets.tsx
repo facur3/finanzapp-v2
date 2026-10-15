@@ -10,7 +10,7 @@ import { budgetCategoriesCaption, budgetTone, percentUsed } from '../src/ui/budg
 import { useCategoryLabel } from '../src/ui/category-hues';
 import { ActionButton, AppText, CategoryBadge, EmptyState, IconButton, Money, PressFeedback, Screen, SectionTitle, Stat, StatRow, Surface } from '../src/ui/components';
 import { CurrencySwitch } from '../src/ui/currency-switch';
-import { HERO_MAX_SCALE, MONTH_CAPTION_MAX_SCALE, labelAmountStacks } from '../src/ui/geometry';
+import { TEXT_STYLE_MAX_SCALE, WEIGHT_WIDTH, labelAmountStacks, titleFit, widestWordEm } from '../src/ui/geometry';
 import { useDefaultCurrency } from '../src/ui/use-default-currency';
 import { useI18n } from '../src/i18n/provider';
 import { availableCurrencies } from '../src/ui/presentation';
@@ -30,6 +30,7 @@ export default function BudgetsScreen() {
   const day = useCurrentDay();
   const p = usePalette();
   const { t, formatMonthTitle, moneyText, spokenMoney } = useI18n();
+  const { width, fontScale } = useWindowDimensions();
   const currencies = availableCurrencies(snapshot?.accounts ?? []);
   // The route's currency is honoured when an account holds it; otherwise the one default rule (25B2): the currency held,
   // the display currency among several, the region's tender, ARS last. An unknown code is never coerced.
@@ -57,6 +58,12 @@ export default function BudgetsScreen() {
   const exceeded = summary ? summary.rows.filter(row => budgetTone(row) === 'expense').length : 0;
   const near = summary ? summary.rows.filter(row => budgetTone(row) === 'warning').length : 0;
   const isCurrent = monthISO === currentMonthISO(day);
+  // 25D1: the month title of Reportes, with the same rule: Title 3's iOS size, beside the arrows while its longest word
+  // fits there, otherwise on its own line with the arrows under it (the year's longest title decides).
+  const monthTitle = titleFit(fontScale, TEXT_STYLE_MAX_SCALE.title3!, widestWordEm(Array.from({ length: 12 }, (_, i) => formatMonthTitle(monthISO.slice(0, 4) + '-' + String(i + 1).padStart(2, '0')))),
+    20 * WEIGHT_WIDTH.semibold, width - 2 * space.xl - 2 * 44 - 2 * 8, width - 2 * space.xl);
+  const monthArrow = (step: -1 | 1) => <IconButton name={step < 0 ? 'chevron-back' : 'chevron-forward'} label={t(step < 0 ? 'budgets.screen.previousMonth' : 'budgets.screen.nextMonth')}
+    onPress={() => setMonthISO(value => shiftMonthISO(value, step))} />;
   const total = summary?.total ?? null;
   const newBudget = (scope: 'total' | 'category') => router.push({ pathname: '/new-budget', params: { currency, month: monthISO, scope } });
 
@@ -67,24 +74,22 @@ export default function BudgetsScreen() {
 
     <View style={{ gap: space.m }}>
       {currencies.length > 1 && <CurrencySwitch value={currency} currencies={currencies} onChange={setSelectedCurrency} />}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <IconButton name="chevron-back" label={t('budgets.screen.previousMonth')} onPress={() => setMonthISO(value => shiftMonthISO(value, -1))} />
-        <View style={{ flex: 1, alignItems: 'center', gap: 2 }}>
-          {/* 25D1: as in Reportes, the month stops at 1.4× between the arrows and wraps at the space before the year. */}
-          <AppText accessibilityRole="header" variant="title3" maxFontSizeMultiplier={HERO_MAX_SCALE} numberOfLines={2}
+      <View style={monthTitle.stacked ? { gap: 8 } : { flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        {!monthTitle.stacked && monthArrow(-1)}
+        <View style={[!monthTitle.stacked && { flex: 1 }, { alignItems: 'center', gap: 2 }]}>
+          <AppText accessibilityRole="header" variant="title3" maxFontSizeMultiplier={monthTitle.maxScale} numberOfLines={2}
             style={{ textAlign: 'center' }}>{formatMonthTitle(monthISO)}</AppText>
           {/* 24UX6E: the state and «Este mes» wrap onto two centred lines at large text instead of overflowing the
               column; the link keeps its 28 pt line and reaches 44 pt with its slop. */}
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', columnGap: 10, rowGap: 2 }}>
-            <AppText secondary variant="caption" maxFontSizeMultiplier={MONTH_CAPTION_MAX_SCALE} style={{ textAlign: 'center' }}>
-              {t(isCurrent ? 'budgets.screen.currentMonth' : monthISO > currentMonthISO(day) ? 'budgets.screen.futureMonth' : 'budgets.screen.closedMonth')}</AppText>
+            <AppText secondary variant="caption" style={{ textAlign: 'center' }}>{t(isCurrent ? 'budgets.screen.currentMonth' : monthISO > currentMonthISO(day) ? 'budgets.screen.futureMonth' : 'budgets.screen.closedMonth')}</AppText>
             {!isCurrent && <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('budgets.screen.backToCurrent')} onPress={() => setMonthISO(currentMonthISO(day))}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ minHeight: 28, justifyContent: 'center' }}>
-              <AppText variant="caption" maxFontSizeMultiplier={MONTH_CAPTION_MAX_SCALE} style={{ fontWeight: '600', color: p.link }}>{t('budgets.screen.thisMonth')}</AppText>
+              <AppText variant="caption" style={{ fontWeight: '600', color: p.link }}>{t('budgets.screen.thisMonth')}</AppText>
             </PressFeedback>}
           </View>
         </View>
-        <IconButton name="chevron-forward" label={t('budgets.screen.nextMonth')} onPress={() => setMonthISO(value => shiftMonthISO(value, 1))} />
+        {monthTitle.stacked ? <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>{monthArrow(-1)}{monthArrow(1)}</View> : monthArrow(1)}
       </View>
     </View>
 

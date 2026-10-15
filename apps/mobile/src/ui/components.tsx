@@ -12,7 +12,7 @@ import { tintOf } from './category-color';
 import { quietTones } from './palette';
 import { useDockInset } from './dock-clearance';
 import { useAccountLook, useAccountNameOf, useCategoryLook } from './category-hues';
-import { AMOUNT_FIELD, HERO_MAX_SCALE, PROMINENT_SEGMENT, ROW_CHEVRON, ROW_MAX_SCALE, ROW_STACK_SCALE, SEGMENT_GAP, SEGMENT_PADDING, TITLE_MAX_SCALE, amountFieldLayout, fitFontSize,
+import { AMOUNT_FIELD, HERO_MAX_SCALE, PROMINENT_SEGMENT, ROW_CHEVRON, ROW_STACK_SCALE, SEGMENT_GAP, SEGMENT_PADDING, TEXT_STYLE_MAX_SCALE, amountFieldLayout, amountMaxScale, fitFontSize,
   rowStacks, segmentLayout } from './geometry';
 import { duration, easeOut, selectionHaptic, timing } from './motion';
 import { AmountInput, displayAmount, precisionOf, splitAmount, type AmountNotice, type PasteRejection } from './money-input';
@@ -74,8 +74,8 @@ export const UNAVAILABLE_AMOUNT = '—';
  * language, so a matching setup keeps the voice chosen in iOS Settings. An
  * explicit `accessibilityLanguage` from the caller wins (an autonym).
  *
- * 25D1: the two big titles stop at Apple's AX5 size (`TITLE_MAX_SCALE`); an
- * explicit `maxFontSizeMultiplier` still wins. */
+ * 25D1: every style stops at the size iOS gives it at AX5 (`TEXT_STYLE_MAX_SCALE`);
+ * an explicit `maxFontSizeMultiplier` still wins. */
 export function AppText({ children, style, secondary = false, tertiary = false, variant = 'body', ...props }: TextProps & {
   secondary?: boolean; tertiary?: boolean; variant?: keyof typeof type;
 }) {
@@ -83,7 +83,7 @@ export function AppText({ children, style, secondary = false, tertiary = false, 
   const { speechLanguage } = useI18n();
   const flat = StyleSheet.flatten(style);
   const fits = flat?.fontSize && !flat.lineHeight ? { lineHeight: Math.round(flat.fontSize * 1.25) } : null;
-  return <Text {...props} accessibilityLanguage={props.accessibilityLanguage ?? speechLanguage} maxFontSizeMultiplier={props.maxFontSizeMultiplier ?? TITLE_MAX_SCALE[variant]}
+  return <Text {...props} accessibilityLanguage={props.accessibilityLanguage ?? speechLanguage} maxFontSizeMultiplier={props.maxFontSizeMultiplier ?? TEXT_STYLE_MAX_SCALE[variant]}
     style={[type[variant], { color: tertiary ? p.tertiary : secondary ? p.secondary : p.text }, style, fits]}>{children}</Text>;
 }
 
@@ -591,7 +591,8 @@ export function Money({ minor, currency, large = false, color, signed = false, s
   const hero = base >= 28;
   const safe = Number.isSafeInteger(minor);
   const text = rowAmountText(minor, currency, signed, locale);
-  const fontSize = hero ? fitFontSize(text, width, base, Math.round(base / 2), Math.min(fontScale, HERO_MAX_SCALE)) : base;
+  const scaleCap = amountMaxScale(base, hero);
+  const fontSize = hero ? fitFontSize(text, width, base, Math.round(base / 2), Math.min(fontScale, scaleCap)) : base;
   // An unrepresentable value shows a dash and says so: never NaN, Infinity or a misleading zero (24B3).
   const label = safe ? spokenMoney(minor, currency) : t('amount.unavailable');
   const ink = color ?? semantic;
@@ -600,11 +601,13 @@ export function Money({ minor, currency, large = false, color, signed = false, s
   // baseline, one accessibility label; nested spans keep it one line. 25D1: a
   // coloured hero keeps its hue and lowers its alpha only as far as 3:1 allows
   // (QUIET_ALPHA); a colour that is not a six-digit hex takes the neutral pair.
+  // With iOS's Increase Contrast on, nothing steps back: the quiet parts are a
+  // composition choice, never one a person who asked for contrast pays for.
   const parts = hero && safe ? splitAmount(text, amountFormat) : null;
-  const quiet = onField ? { symbol: p.heroMoneySymbol, cents: p.heroMoneyCents }
+  const quiet = p.increaseContrast ? { symbol: ink, cents: ink } : onField ? { symbol: p.heroMoneySymbol, cents: p.heroMoneyCents }
     : ink === p.text ? { symbol: p.secondary, cents: p.tertiary } : quietTones(ink, p.isDark) ?? { symbol: p.secondary, cents: p.tertiary };
   const body = <Text accessibilityLabel={label} accessibilityLanguage={speechLanguage} numberOfLines={1} adjustsFontSizeToFit={!hero} minimumFontScale={0.75}
-    maxFontSizeMultiplier={hero ? HERO_MAX_SCALE : ROW_MAX_SCALE}
+    maxFontSizeMultiplier={scaleCap}
     style={{ color: ink, fontSize, lineHeight: hero ? Math.round(fontSize * 1.18) : undefined, fontWeight: weight ?? (large ? '700' : '600'),
       letterSpacing: hero ? -fontSize * 0.03 : -0.2, fontVariant: ['tabular-nums'], flexShrink: 1, maxWidth: '100%', textAlign: align }}>
     {parts ? <>

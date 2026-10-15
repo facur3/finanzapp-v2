@@ -86,7 +86,8 @@ function harness(file: string, ledger: Ledger, params: Record<string, string> = 
   });
   const names = ['ActionButton', 'AmountField', 'AppText', 'Choices', 'DetailRow', 'EmptyState', 'ErrorMessage', 'Field', 'GlyphTile', 'IconButton', 'LifecycleNote',
     'Money', 'PressFeedback', 'Screen', 'SectionTitle', 'Surface'];
-  const components: Record<string, unknown> = { ...Object.fromEntries(names.map(name => [name, name])), STACK_AT_SCALE: ROW_STACK_SCALE };
+  const components: Record<string, unknown> = { ...Object.fromEntries(names.map(name => [name, name])), STACK_AT_SCALE: ROW_STACK_SCALE,
+    useStacked: () => (options.fontScale ?? 1) > ROW_STACK_SCALE };
   const hues = { useCategoryLabel: (stored: string) => stored, useAccountNameOf: () => (account: domain.Account) => account.name };
   const theme = { space: { s: 8, m: 12, l: 16, xl: 24 }, usePalette: () => ({ ...lightPalette, isDark: false }) };
   const modules: Record<string, unknown> = {
@@ -197,6 +198,19 @@ test('a row names kind, amount, merchant, category, destination, date, source an
   // VoiceOver: one sentence, the amount and the date in their spoken forms.
   assert.equal(planRow.props.accessibilityLabel, `Gasto, 15000,00 pesos, Coto, Supermercado, Dónde se registra: Visa, ${i18nFormat.formatDate(today, 'long', 'es-AR')}, En 6 cuotas, Asistente, Lista para confirmar`);
   assert.match(emptyRow.props.accessibilityLabel, /^Gasto o ingreso, Sin monto, Sin comercio, Categoría: Falta completar, Dónde se registra: Falta completar, Fecha: Falta completar, Asistente, Faltan 7 datos$/);
+});
+
+test('25D1: a row keeps the amount beside the merchant up to 1.2×; above, the amount goes under it and every line is whole', () => {
+  const plan = itemOf(drafted({ destinationId: cardAccount.id, purchase: { mode: 'installments', count: 6, placement: 'current' } }));
+  for (const [fontScale, stacked] of [[1, false], [1.2, false], [1.786, true], [3.571, true]] as const) {
+    const [row] = all(harness('review.tsx', { review: trayOf([plan]), calls: [] }, {}, { fontScale }).render(), 'PressFeedback');
+    const line = all(row, 'View').find(node => [node.props.children].flat().some((child: any) => child?.type === 'Money'))!;
+    const [merchant, ...rest] = all(row, 'AppText');
+    assert.equal(line.props.style.flexDirection, stacked ? undefined : 'row', 'at ' + fontScale);
+    assert.equal(merchant.props.numberOfLines, stacked ? undefined : 1, 'at ' + fontScale);
+    for (const text of rest.slice(0, 2)) assert.equal(text.props.numberOfLines, stacked ? undefined : 2, 'at ' + fontScale);
+    assert.equal(all(row, 'Money')[0].props.minor, 1500000);
+  }
 });
 
 test('an incomplete draft reads neutral, never as an error; stale and interrupted ask in amber; only a conflict takes the negative tone; the brand is never a state', () => {

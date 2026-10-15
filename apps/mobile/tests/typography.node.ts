@@ -154,7 +154,7 @@ test('rowStacks: large text always stacks; otherwise a long amount stacks on a n
 
 // The Money component itself: heroes measure their container and size from it;
 // rows keep the native fit without a fixed line height.
-function loadComponents(locale: AppLocale = 'es-AR', deviceLanguage: string | null = null, held: readonly domain.Currency[] = []) {
+function loadComponents(locale: AppLocale = 'es-AR', deviceLanguage: string | null = null, held: readonly domain.Currency[] = [], palette: Record<string, unknown> = {}) {
   const source = readFileSync(new URL('../src/ui/components.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: any, props: any) => ({ type, props });
@@ -176,7 +176,7 @@ function loadComponents(locale: AppLocale = 'es-AR', deviceLanguage: string | nu
     '@finanzapp/domain': { formatMinorUnits: (minor: number) => (minor / 100).toLocaleString('es-AR', { minimumFractionDigits: 2 }), accountBalanceMinor: () => 0, labelFromISO: () => '',
       draftFitsCurrency: domain.draftFitsCurrency, editedDraftFits: domain.editedDraftFits },
     'expo-router': { router: {} },
-    './theme': { radius: {}, space: {}, type: { body: { fontSize: 17, lineHeight: 22 } }, useCurrentDay: () => '2026-09-20', useReduceMotion: () => true, usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', income: '#008800', transfer: '#03c', warning: '#a60', heroInk: '#131411', heroMoneySymbol: '#3A3C3F', heroMoneyCents: '#505255' }) },
+    './theme': { radius: {}, space: {}, type: { body: { fontSize: 17, lineHeight: 22 } }, useCurrentDay: () => '2026-09-20', useReduceMotion: () => true, usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', income: '#008800', transfer: '#03c', warning: '#a60', heroInk: '#131411', heroMoneySymbol: '#3A3C3F', heroMoneyCents: '#505255', ...palette }) },
     './categories': { categoryIcon: () => 'pricetag-outline' },
     './palette': paletteModule, './dock-clearance': { useDockInset: () => ({ extraPadding: 0, indicator: undefined }) }, './category-color': { tintOf: (c: string) => c }, './category-hues': { useCategoryColor: () => '#111', useCategoryLook: (label: string) => ({ label, hex: '#111', glyph: 'pricetag-outline' }), useAccountLook: () => ({ glyph: 'wallet-outline', hex: '#2557D6' }) },
     './geometry': geometry, './merchant-mark': merchantMark, './money-input': moneyInput, './motion': { duration: {}, easeOut: {}, selectionHaptic: () => {}, timing: () => ({}) },
@@ -215,6 +215,14 @@ test('Money sizes a hero from its measured width and leaves rows to the native f
   assert.equal(text.props.style.fontSize, 40, 'sized from the measured width');
   assert.equal(text.props.style.lineHeight, Math.round(40 * 1.18));
   assert.equal(text.props.maxFontSizeMultiplier, 1.4);
+  // 25D1 (deliberate golden change): an amount is never smaller than body text can be. A row amount stops at Body's AX5
+  // size, 53 pt, whatever its own size (it stopped at 1.8×: 30.6 pt under 53 pt names, while a 24 pt total reached 43);
+  // a hero at 1.4× or 53 pt, whichever is larger (a 28 pt total reached 39); each still shrinks to fit its line.
+  const rowAmount = render({ minor: 1234, currency: 'ARS' });
+  assert.deepEqual([rowAmount.props.maxFontSizeMultiplier, rowAmount.props.adjustsFontSizeToFit, rowAmount.props.numberOfLines], [53 / 17, true, 1]);
+  const ceiling = (size: number) => { const node = render({ minor: 1234, currency: 'ARS', size }); return (node.type === 'View' ? node.props.children : node).props.maxFontSizeMultiplier as number; };
+  for (const size of [15, 17, 20, 22, 24, 26]) assert.equal(Math.round(size * ceiling(size)), 53, size + ' pt row amount: 53 pt at most');
+  for (const [size, top] of [[28, 53], [40, 56], [46, 64.4]] as const) assert.equal(Math.round(size * ceiling(size) * 10) / 10, top, size + ' pt hero');
   const income = render({ minor: 1234, currency: 'USD', large: true, signed: true, tone: 'income' }).props.children;
   const [greenSymbol, greenWhole, greenCents] = income.props.children.props.children;
   assert.equal(greenSymbol.props.children + greenWhole + greenCents.props.children, '+US$\u00A012,34');
@@ -254,15 +262,36 @@ test('25A-03: a hero on Inicio\'s field takes the solid graphite symbol and cent
   assert.deepEqual([canvas[0].props.style.color, canvas[2].props.style.color], ['#666', '#999']);
 });
 
-test('25D1: AppText stops the two big titles at Apple\'s AX5 size; every other style keeps its growth; an explicit cap wins', () => {
+test('25D1: AppText stops every style at the size iOS gives it at AX5, which keeps iOS\'s order at every setting; an explicit cap wins', () => {
   const { render } = loadComponents();
-  const cap = (props: Record<string, unknown>) => render('AppText', { children: 'x', ...props }).props.maxFontSizeMultiplier;
-  // The HIG's larger accessibility sizes at AX5: Large Title 34 → 60 pt, Title 1 28 → 58 pt.
-  assert.equal(Math.round(34 * cap({ variant: 'largeTitle' })), 60);
-  assert.equal(Math.round(28 * cap({ variant: 'title1' })), 58);
-  for (const variant of [undefined, 'body', 'title2', 'title3', 'headline', 'footnote']) assert.equal(cap({ variant }), undefined, String(variant));
+  const cap = (props: Record<string, unknown>) => render('AppText', { children: 'x', ...props }).props.maxFontSizeMultiplier as number;
+  // The HIG's AX5 table (Larger Accessibility Sizes), over each style's default size.
+  const AX5: Record<string, [number, number]> = { largeTitle: [34, 60], title1: [28, 58], title2: [22, 56], title3: [20, 55], headline: [17, 53], body: [17, 53],
+    subhead: [15, 49], footnote: [13, 44], caption: [12, 43] };
+  for (const [variant, [base, ax5]] of Object.entries(AX5)) assert.equal(Math.round(base * cap({ variant })), ax5, variant);
+  assert.equal(cap({}), cap({ variant: 'body' }), 'the default style is Body');
+  assert.equal(cap({ variant: 'eyebrow' }), cap({ variant: 'caption' }), 'the eyebrow is a Caption 1');
+  // React Native multiplies every style by one factor per setting (xS … AX5); a larger style is never drawn smaller.
+  const order = ['largeTitle', 'title1', 'title2', 'title3', 'headline', 'subhead', 'footnote', 'caption'];
+  for (const factor of [0.823, 1, 1.118, 1.235, 1.353, 1.786, 2.143, 2.643, 3.143, 3.571]) {
+    const sizes = order.map(variant => AX5[variant][0] * Math.min(factor, cap({ variant })));
+    for (let i = 1; i < sizes.length; i++) assert.ok(sizes[i - 1] >= sizes[i], `×${factor}: ${order[i - 1]} ${sizes[i - 1]} ≥ ${order[i]} ${sizes[i]}`);
+  }
   assert.equal(cap({ variant: 'largeTitle', maxFontSizeMultiplier: 1.2 }), 1.2);
   assert.equal(cap({ variant: 'body', maxFontSizeMultiplier: 1.4 }), 1.4);
+});
+
+test('25D1: with iOS\'s Increase Contrast on, a hero\'s symbol and cents are drawn at the units\' full strength, on the canvas, in colour and on the field', () => {
+  const quiet = (palette: Record<string, unknown>, props: Record<string, unknown>) => {
+    const { render } = loadComponents('es-AR', null, [], palette);
+    const [symbol, , cents] = render('Money', { minor: 123456, currency: 'ARS', large: true, ...props }).props.children.props.children.props.children;
+    return [symbol.props.style.color, cents.props.style.color];
+  };
+  assert.deepEqual(quiet({}, {}), ['#666', '#999'], 'off: the quiet pair, as drawn');
+  assert.deepEqual(quiet({ increaseContrast: true }, {}), ['#000', '#000'], 'the canvas ink');
+  assert.deepEqual(quiet({ increaseContrast: true }, { tone: 'income', signed: true }), ['#008800', '#008800'], 'a coloured hero keeps its hue at full strength');
+  assert.deepEqual(quiet({ increaseContrast: true }, { color: '#131411', onField: true, size: 46 }), ['#131411', '#131411'], 'on the field');
+  assert.deepEqual(quiet({}, { color: '#131411', onField: true, size: 46 }), ['#3A3C3F', '#505255'], 'off: the field\'s solid greys');
 });
 
 test('25D1: the first opening\'s titles keep every word whole at AX5 on 375 and 393 pt (they drew about 120 pt before)', () => {

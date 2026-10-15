@@ -8,7 +8,7 @@ import * as appearance from '../src/ui/appearance.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 import { darkPalette, lightPalette, quietTones, QUIET_ALPHA } from '../src/ui/palette.ts';
 import { othersColor } from '../src/ui/category-color.ts';
-import { contrast } from './theme.node.ts';
+import { contrast } from './contrast.ts';
 
 // Producto 25D1: the colours that stood under their contrast floor on Sapphire + Sand, measured with WCAG's formula on the
 // real tokens. Figures, not taste: how a tone reads on the iPhone is the device check.

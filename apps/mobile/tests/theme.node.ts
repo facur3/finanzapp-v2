@@ -1,13 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { darkPalette, lightPalette } from '../src/ui/palette.ts';
+import { contrast, luminance } from './contrast.ts';
 
 // WCAG 2 contrast over the actual palette. A pure check of the numbers: the
 // rendered look, blending on device and Dynamic Type still need the iPhone.
-function luminance(hex: string): number {
-  const channel = (value: number) => { const c = value / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
-  return 0.2126 * channel(parseInt(hex.slice(1, 3), 16)) + 0.7152 * channel(parseInt(hex.slice(3, 5), 16)) + 0.0722 * channel(parseInt(hex.slice(5, 7), 16));
-}
 /** Hue angle in degrees, to tell pine apart from teal, cyan or blue where a contrast ratio cannot. */
 function hue(hex: string): number {
   const [r, g, b] = [1, 3, 5].map(index => parseInt(hex.slice(index, index + 2), 16) / 255);
@@ -30,10 +27,6 @@ function lab(hex: string): [number, number, number] {
 }
 const chroma = (hex: string) => { const [, a, b] = lab(hex); return Math.hypot(a, b); };
 const deltaE = (one: string, two: string) => { const [p, q] = [lab(one), lab(two)]; return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]); };
-export function contrast(a: string, b: string): number {
-  const [light, dark] = [luminance(a), luminance(b)].sort((x, y) => y - x);
-  return (light + 0.05) / (dark + 0.05);
-}
 const ratio = (a: string, b: string) => contrast(a, b).toFixed(2);
 
 for (const [name, p] of [['light', lightPalette], ['dark', darkPalette]] as const) {

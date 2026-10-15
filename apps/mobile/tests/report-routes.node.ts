@@ -93,7 +93,7 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
     '@finanzapp/domain': domain,
     '../src/storage/LedgerProvider': { useLedger: () => ({ snapshot: data, archive: { accounts: data.accounts, records: [], ...archive } }) },
     '../src/ui/geometry': geometry,
-    '../src/ui/charts': { DonutChart: 'DonutChart', MonthBars: 'MonthBars', OTHERS_KEY: ' others', MONEY_MAX_SCALE: 1.8,
+    '../src/ui/charts': { DonutChart: 'DonutChart', MonthBars: 'MonthBars', OTHERS_KEY: ' others',
       // Like the real one: at most five slices, the tail grouped into one neutral «Otras» slice keyed OTHERS_KEY.
       donutSlices: (items: { key: string; label: string; value: number }[], _p: unknown, _hues: unknown, othersLabel: string) => {
         const head = items.slice(0, items.length > 5 ? 4 : 5).map((item, index) => ({ ...item, color: 'c' + index }));
@@ -219,23 +219,39 @@ test('daily view opens only expenses in the selected date and currency', () => {
   assert.deepEqual(detail.props.entries.map((e: domain.Entry) => e.id).sort(), ['b', 'c']);
   assert.equal(find(detail, 'Money').props.minor, 505);
 });
-test('25D1: the month title between the two arrows stops at 1.4× and wraps at the year, never inside the month; its captions stay under it', () => {
-  const root = routeHarness('(tabs)/reports.tsx', { currency: 'ARS', month: '2026-08' }).render();
-  const title = nodes(root).find(n => n.type === 'AppText' && n.props.accessibilityRole === 'header' && n.props.variant === 'title3')!;
-  assert.deepEqual([title.props.maxFontSizeMultiplier, title.props.numberOfLines], [geometry.HERO_MAX_SCALE, 2]);
-  // The period and «Este mes» under it (August is a past month, so the link shows) stop at 2×: 24 pt under the title's 28.
-  const block = nodes(root).find(n => [n.props.children].flat().includes(title))!;
-  const captions = nodes(block.props.children).filter(n => n.type === 'AppText' && n.props.variant === 'caption');
-  assert.equal(JSON.stringify(captions.map(n => n.props.maxFontSizeMultiplier)), '[2,2]');
-  assert.ok(12 * geometry.MONTH_CAPTION_MAX_SCALE < 20 * geometry.HERO_MAX_SCALE, 'a caption never reads larger than its month');
-  assert.ok(12 * 2.643 > 20 * geometry.HERO_MAX_SCALE, 'uncapped at AX3 it did');
-  // «Septiembre» at 20 pt, semibold, capped, fits the column of a 320 pt screen: less its padding (2 × 20), the two 44 pt
-  // arrows and their 8 pt gaps. Uncapped at AX3 it did not fit the 249 pt column of a 393 pt screen.
-  const column = (width: number) => width - 40 - 88 - 16;
-  const septiembre = geometry.labelWidthEm('Septiembre') * 20 * 1.06;
-  assert.ok(septiembre * geometry.HERO_MAX_SCALE <= column(320));
-  assert.ok(septiembre * 2.643 > column(393));
+test('25D1: the month title grows to Title 3\'s iOS size; beside the arrows while its longest word fits, else on its own line with the arrows under it', () => {
+  const titleOf = (root: Node) => nodes(root).find(n => n.type === 'AppText' && n.props.accessibilityRole === 'header' && n.props.variant === 'title3')!;
+  const titles = Array.from({ length: 12 }, (_, i) => bindLocale('es-AR').formatMonthTitle('2026-' + String(i + 1).padStart(2, '0')));
+  const wordEm = geometry.widestWordEm(titles);
+  for (const [width, fontScale] of [[393, 1], [320, 1], [393, 1.786], [393, 3.571], [375, 3.571], [320, 3.571]] as const) {
+    const root = routeHarness('(tabs)/reports.tsx', { currency: 'ARS', month: '2026-08' }, snapshot, { window: { width, height: 852, fontScale, scale: 3 } }).render();
+    const title = titleOf(root);
+    const expected = geometry.titleFit(fontScale, 55 / 20, wordEm, 20 * 1.06, width - 144, width - 40);
+    const at = `${width} pt ×${fontScale}`;
+    assert.deepEqual([title.props.maxFontSizeMultiplier, title.props.numberOfLines], [expected.maxScale, 2], at);
+    const drawn = 20 * Math.min(fontScale, expected.maxScale);
+    // «Septiembre» stays whole on its line: beside the arrows (2 × 44 pt and two 8 pt gaps) or alone on the screen's width.
+    assert.ok(wordEm * 20 * 1.06 * Math.min(fontScale, expected.maxScale) <= (expected.stacked ? width - 40 : width - 144) + 1e-9, at);
+    const stepper = nodes(root).find(n => n.type === 'View' && [n.props.children].flat().some((child: any) => child?.type === 'ValueTransition'))!;
+    const arrows = nodes(stepper).filter(n => n.type === 'IconButton').map(n => n.props.label);
+    assert.equal(JSON.stringify(arrows), JSON.stringify(['Mes anterior', 'Mes siguiente']), at);
+    const first = [stepper.props.children].flat().filter(Boolean)[0];
+    if (expected.stacked) {
+      assert.equal(first.type, 'ValueTransition', at + ': the title first, the arrows under it');
+      assert.ok(fontScale >= 1.786, at);
+    } else assert.equal(first.type, 'IconButton', at + ': the arrows beside the title');
+    // The captions under it (August is past, so «Este mes» shows) take Caption 1\'s own ceiling, through AppText: never
+    // larger than the title at any setting.
+    const captions = nodes(stepper).filter(n => n.type === 'AppText' && n.props.variant === 'caption');
+    assert.equal(captions.length, 2, at);
+    for (const caption of captions) assert.equal(caption.props.maxFontSizeMultiplier, undefined, at);
+    assert.ok(12 * Math.min(fontScale, 43 / 12) <= drawn, `${at}: caption ${12 * Math.min(fontScale, 43 / 12)} pt under the title's ${drawn.toFixed(1)}`);
+  }
+  // At AX5 the title is far larger than the 28 pt it was capped at, and on a 393 pt screen it reaches iOS's own 55 pt.
+  const ax5 = geometry.titleFit(3.571, 55 / 20, wordEm, 20 * 1.06, 393 - 144, 393 - 40);
+  assert.deepEqual([ax5.stacked, Math.round(20 * Math.min(3.571, ax5.maxScale))], [true, 55]);
 });
+
 test('day and comparison cutoff reject malformed or future scope', () => {
   for (const date of [['2026-08-10'], '2026-02-30', '2026-09-13', undefined]) {
     assert.equal(find(routeHarness('report-day.tsx', { currency: 'ARS', date }).render(), 'EmptyState').props.title, 'Día no válido');

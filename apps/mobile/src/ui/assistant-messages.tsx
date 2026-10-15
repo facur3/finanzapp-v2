@@ -9,7 +9,7 @@ import type { ReviewItem } from '../storage/review-database';
 import type { LanguageCode } from '../i18n/locale';
 import { useI18n } from '../i18n/provider';
 import { useCategoryLook, useCategoryLookOf } from './category-hues';
-import { AccountBadge, ActionButton, AppText, CategoryBadge, Money, PressFeedback, Surface, type IconName } from './components';
+import { AccountBadge, ActionButton, AppText, CategoryBadge, Money, PressFeedback, Surface, useStacked, type IconName } from './components';
 import { Appear, Reflow, selectionHaptic } from './motion';
 import { activityDateLabel } from './presentation';
 import { reviewFacts } from './review-presentation';
@@ -146,6 +146,8 @@ export function AnswerEvidence({ content, onOpen }: { content: AnswerContent; on
   const p = usePalette();
   const { t, spokenMoney, speechLanguage } = useI18n();
   const categoryLook = useCategoryLookOf('expense');
+  // 25D1: above the shared stacking threshold each figure goes under its label, as on every other row.
+  const stacked = useStacked();
   if (!content.rows.length && !content.links.length) return null;
   const currency = content.currency;
   // A difference that grew is said as such ("42500,00 pesos más"); a lower one already starts with "Menos".
@@ -155,8 +157,9 @@ export function AnswerEvidence({ content, onOpen }: { content: AnswerContent; on
     {content.rows.length > 0 && <View style={[styles.evidence, { borderColor: p.line }]}>
       {content.rows.map(row => {
         const label = evidenceLabel(row, t, stored => categoryLook(stored).label);
-        return <View key={row.id} accessible accessibilityLabel={label + ', ' + spoken(row)} accessibilityLanguage={speechLanguage} style={styles.evidenceRow}>
-          <AppText secondary variant="subhead" numberOfLines={2} style={{ flex: 1, minWidth: 0 }}>{label}</AppText>
+        return <View key={row.id} accessible accessibilityLabel={label + ', ' + spoken(row)} accessibilityLanguage={speechLanguage}
+          style={[styles.evidenceRow, stacked && styles.evidenceStacked]}>
+          <AppText secondary variant="subhead" numberOfLines={stacked ? undefined : 2} style={!stacked && { flex: 1, minWidth: 0 }}>{label}</AppText>
           <Money minor={row.amountMinor} currency={currency} signed={row.signed} size={15} weight="600" />
         </View>;
       })}
@@ -278,6 +281,7 @@ const styles = StyleSheet.create({
   chip: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: radius.chip + 6, borderWidth: StyleSheet.hairlineWidth, minHeight: 44, justifyContent: 'center' },
   evidence: { borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth },
   evidenceRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8, minHeight: 40 },
+  evidenceStacked: { flexDirection: 'column', alignItems: 'flex-start', gap: 2 },
   links: { flexDirection: 'row', flexWrap: 'wrap', gap: space.m },
   link: { flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: 44 },
   collapsed: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4 },
