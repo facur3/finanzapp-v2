@@ -858,6 +858,18 @@ barras de Día a día y una cabecera fija sólida. Siguen permitidos para una pa
 vinculante del roadmap no cambia: la próxima entrega de producto es 24T3; 24UX6C (Movimientos y Más) y 24UX6D
 (Tarjetas) siguen a 24UX6B en el carril UX, y su lugar frente a 24T3 lo decide el dueño (ver `docs/mobile-roadmap.md`).
 
+## Producto 25Q2 — una copia que se completa o dice por qué (en su rama)
+
+- **El archivo** se llama `FinanzApp-backup-<fecha local>-<HHmm>.json` y es una sola línea de JSON (sin cambio de
+  formato: toda versión lo lee). Se mide en bytes antes de escribirlo: si supera 5 MB, lo dice con su frase («No borres
+  la app: tus datos siguen guardados…»), no con la de importar.
+- **Las fallas nativas** (el sistema de archivos, la hoja de compartir, el selector, la lectura) se cuentan con las
+  palabras de la app, nunca con el texto en inglés de la plataforma.
+- **Después de importar**, si el archivo siguiente falla, la pantalla vuelve a elegir copia con su frase (antes se quedaba
+  en «Copia incorporada» sin decir nada).
+- **Borrar la app**: la pantalla de copia empieza con «Si borrás la app, tus registros se borran con ella.» y la fila de
+  Más dice «Antes de borrar la app o cambiar de teléfono».
+
 ## Producto 25Q1 — cifras que dicen la verdad (en su rama)
 
 Correcciones de lectura, sin cambios de dominio, almacenamiento, esquema (14), backup (v14), navegación ni movimiento.
@@ -3097,6 +3109,10 @@ crédito, marca elegida) y los filetes de las píldoras, el chip y el compositor
 color propio.
 
 ## Pendiente de revisión en iPhone
+
+- Producto 25Q2 (en su rama; el build de desarrollo posterior a #113): el nombre y el contenido de una línea del archivo
+  por AirDrop, Mail y Archivos, la hoja cancelada, una copia mala después de importar y las frases nuevas
+  (docs/mobile-device-checklist.md, «Producto 25Q2»).
 
 - Producto 25Q1 (en su rama; el build de desarrollo posterior a #113): el enlace de categoría del Asistente, los
   presupuestos de Reportes sin cotización, el neto del día con filtros, la tarjeta archivada a favor, el presupuesto en
