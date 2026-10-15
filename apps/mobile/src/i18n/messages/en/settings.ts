@@ -29,7 +29,7 @@ export const settings: Pick<Messages, 'settings'> = {
       categoriesSubtitle: 'Expenses and income',
       categoriesCount: { one: '{count} customized', other: '{count} customized' },
       backup: 'Backup',
-      backupSubtitle: 'Share and import',
+      backupSubtitle: 'Before deleting the app or changing phones',
       undone: 'Undone transactions',
       undoneNone: 'None',
       undoneCount: { one: '{count} can be restored', other: '{count} can be restored' },

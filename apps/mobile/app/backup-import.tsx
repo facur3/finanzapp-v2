@@ -25,17 +25,21 @@ export default function BackupImportScreen() {
     working.current = true;
     setBusy(true);
     setError(null);
+    // 25Q2: a native failure (the picker, the file read) is told in the app's words, never as the platform's text.
+    const readFailed = (): never => { throw new Error('backup.import.readFailed'); };
     try {
-      const picked = await File.pickFileAsync({ mimeTypes: ['application/json', 'text/plain'], multipleFiles: false });
+      const picked = await File.pickFileAsync({ mimeTypes: ['application/json', 'text/plain'], multipleFiles: false }).catch(readFailed);
       if (picked.canceled) return;
       // Read only the selected file. Never remove/overwrite the original,
       // including Android document-provider URIs and iOS picker copies.
       if (picked.result.size > BACKUP_MAX_BYTES) throw new Error('backup.import.tooLarge');
-      const backup = parsePilotBackup(await picked.result.text());
+      const backup = parsePilotBackup(await picked.result.text().catch(readFailed));
       setReview({ backup, preview: previewBackupImport(archive, backup.archive), name: picked.result.name });
       setDone(false);
     } catch (cause) {
       setReview(null);
+      // 25Q2: after an import, a file that fails leaves «Copia incorporada» for the choice and its sentence (it said nothing).
+      setDone(false);
       setError(cause instanceof Error ? cause.message : 'backup.import.readFailed');
     } finally { working.current = false; setBusy(false); }
   }

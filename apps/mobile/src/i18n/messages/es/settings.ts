@@ -32,7 +32,7 @@ export const settings = {
       /** Category definitions the person created or edited. */
       categoriesCount: { one: '{count} personalizada', other: '{count} personalizadas' },
       backup: 'Copia de seguridad',
-      backupSubtitle: 'Compartir e importar',
+      backupSubtitle: 'Antes de borrar la app o cambiar de teléfono',
       undone: 'Movimientos deshechos',
       undoneNone: 'Ninguno',
       undoneCount: { one: '{count} recuperable', other: '{count} recuperables' },

@@ -12,6 +12,7 @@ import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 import * as localeOptions from '../src/ui/locale-options.ts';
 import * as operationPresentation from '../src/ui/operation-presentation.ts';
+import * as backupFile from '../src/ui/backup-file.ts';
 import { createLocaleStore } from '../src/i18n/store.ts';
 import type { AppLocale, ReleasedSets } from '../src/i18n/locale.ts';
 function localeStore(released?: ReleasedSets) {
@@ -52,6 +53,17 @@ let reviewTray: unknown = undefined;
 const HAIRLINE = 0.33;
 /** The appearance preference the harness hands the screens (24UX6A); reset by every harness. */
 const appearanceState = { preference: 'system', system: 'light', saved: [] as string[], refuse: false };
+// 25Q2: the export's file system and share sheet, observable; every harness() call resets them.
+const exportIo = { available: false, files: new Map<string, string>(), shares: [] as { uri: string; options: Record<string, unknown>; text: string | undefined }[],
+  failShare: false, failWrite: false, maxBytes: undefined as number | undefined, created: 0 };
+class MemoryFile {
+  uri: string;
+  constructor(parent: string, name: string) { this.uri = parent + '/' + name; }
+  get exists() { return exportIo.files.has(this.uri); }
+  create() { if (this.exists) throw new Error('File exists'); exportIo.created++; exportIo.files.set(this.uri, ''); }
+  write(text: string) { if (exportIo.failWrite) throw new Error('ENOSPC: no space left on device'); exportIo.files.set(this.uri, text); }
+  delete() { exportIo.files.delete(this.uri); }
+}
 function harness(file: string, data: domain.LedgerArchive = archive, released?: ReleasedSets, locale: AppLocale | null = null, gate?: domain.CurrencyGate, dev = true) {
   currentLocaleStore = localeStore(released);
   forcedLocale = locale;
@@ -67,6 +79,9 @@ function harness(file: string, data: domain.LedgerArchive = archive, released?: 
   // 24UX6E: Categorías wraps a name instead of cutting it when rows stack (accessibility text sizes).
   (components as Record<string, unknown>).useStacked = () => stackedRows;
   appearanceState.preference = 'system'; appearanceState.system = 'light'; appearanceState.saved = []; appearanceState.refuse = false;
+  Object.assign(exportIo, { available: false, failShare: false, failWrite: false, maxBytes: undefined, created: 0 });
+  exportIo.files.clear();
+  exportIo.shares.length = 0;
   const theme = { usePalette: () => ({ text: '#000', secondary: '#666', line: '#ddd', isDark: false }),
     // 24UX6A: the appearance preference as `useThemePreference` hands it (the store itself: tests/theme-preference.node.ts).
     useThemePreference: () => ({ preference: appearanceState.preference, system: appearanceState.system,
@@ -81,8 +96,13 @@ function harness(file: string, data: domain.LedgerArchive = archive, released?: 
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': { View: 'View', StyleSheet: { hairlineWidth: HAIRLINE } },
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, router: { push: (to: unknown) => pushed.push(to), navigate: (to: unknown) => pushed.push(to) } },
-    'expo-file-system': { File: class {}, Paths: { cache: '/cache' } },
-    'expo-sharing': { isAvailableAsync: async () => false, shareAsync: async () => {} },
+    'expo-file-system': { File: MemoryFile, Paths: { cache: '/cache' } },
+    'expo-sharing': { isAvailableAsync: async () => exportIo.available, shareAsync: async (uri: string, options: Record<string, unknown>) => {
+      exportIo.shares.push({ uri, options, text: exportIo.files.get(uri) });
+      if (exportIo.failShare) throw new Error('UIActivityViewController failed');
+    } },
+    // The real module; a test may lower the cap without building a 5 MB ledger.
+    '../src/ui/backup-file': { ...backupFile, buildBackupFile: (data: domain.LedgerArchive, now?: Date) => backupFile.buildBackupFile(data, now, exportIo.maxBytes) },
     '@finanzapp/domain': domain,
     '../src/storage/LedgerProvider': ledger, '../../src/storage/LedgerProvider': ledger,
  '../../src/storage/currency-gate': currencyGate, '../src/storage/currency-gate': currencyGate,
@@ -103,7 +123,7 @@ function harness(file: string, data: domain.LedgerArchive = archive, released?: 
   };
   const module = { exports: {} as { default?: () => Node } };
   // A development build unless a test says otherwise (24UX5: the diagnostics line exists only there).
-  runInNewContext(code, { module, exports: module.exports, Date, __DEV__: dev, require: (name: string) => {
+  runInNewContext(code, { module, exports: module.exports, Date, Error, __DEV__: dev, require: (name: string) => {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected Más dependency: ' + name);
     return modules[name];
   } });
@@ -149,7 +169,7 @@ test('Más groups permanent navigation into Finanzas and App y datos, with live 
   assert.equal(value('Apariencia'), 'Sistema', '24UX6A: the default follows the device');
   assert.equal(nodes(root).some(node => node.type === 'ActionButton'), false);
   const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
-  assert.match(texts, /FinanzApp 0\.1\.0 \(25Q1\)/, 'the version line, like the About line of an iOS app');
+  assert.match(texts, /FinanzApp 0\.1\.0 \(25Q2\)/, 'the version line, like the About line of an iOS app');
   assert.match(texts, /Material opaco \(Expo Go\)/, 'a development build says which control material this session draws, so a tester can confirm the mode');
   assert.doesNotMatch(texts, /Piloto nativo|Producto 24/, '24UX5: no project vocabulary on the settings screen');
   assert.equal(value('Categorías'), 'Gastos e ingresos');
@@ -257,6 +277,50 @@ test('the backup screen keeps export and import together and links the review fl
   assert.equal(nodes(disabled.render()).find(node => node.type === 'ActionButton')!.props.disabled, false, 'an empty ledger can still be backed up');
 });
 
+test('25Q2: the export writes one dated compact file in the cache, shares it as JSON and always deletes it; every failure says why in the app\'s words', async () => {
+  const press = async (view: ReturnType<typeof harness>) => { await nodes(view.render()).find(node => node.type === 'ActionButton')!.props.onPress(); };
+  const errorOf = (view: ReturnType<typeof harness>) => nodes(view.render()).find(node => node.type === 'ErrorMessage')!.props.message;
+  // A ledger the domain backs up (the shared fixture's hand-made undone record is not a stored shape).
+  const exportable: domain.LedgerArchive = { accounts: [cash, debtAccount], records: entries.map(domain.initialRecord) };
+  let view = harness('backup.tsx', exportable);
+  exportIo.available = true;
+  await press(view);
+  assert.equal(exportIo.shares.length, 1, 'error: ' + errorOf(view));
+  const [share] = exportIo.shares;
+  assert.match(share.uri, /^\/cache\/FinanzApp-backup-\d{4}-\d{2}-\d{2}-\d{4}\.json$/, 'named by its date, no «piloto», no epoch');
+  assert.equal(JSON.stringify(share.options), JSON.stringify({ mimeType: 'application/json', UTI: 'public.json', dialogTitle: 'Guardar copia de FinanzApp' }));
+  assert.equal(share.text!.includes('\n'), false, 'compact: one line');
+  assert.equal(domain.parsePilotBackup(share.text!).archive.records.length, exportable.records.length, 'this app restores what it shared');
+  assert.equal(exportIo.files.size, 0, 'the plaintext copy is deleted once the sheet closes');
+  assert.equal(errorOf(view), null);
+  // The sheet fails: its text never reaches the person, and the file still goes.
+  view = harness('backup.tsx', exportable); exportIo.available = true; exportIo.failShare = true;
+  await press(view);
+  assert.deepEqual([errorOf(view), exportIo.files.size], ['backup.export.prepareFailed', 0]);
+  assert.equal(bindLocale('es-AR').errorText('backup.export.prepareFailed'), 'No se pudo preparar la copia. Tus datos siguen en el dispositivo.');
+  // Writing fails: nothing is shared.
+  view = harness('backup.tsx', exportable); exportIo.available = true; exportIo.failWrite = true;
+  await press(view);
+  assert.deepEqual([errorOf(view), exportIo.shares.length, exportIo.files.size], ['backup.export.prepareFailed', 0, 0]);
+  // Over the cap: its own sentence, before any file exists (before 25Q2 the import's «Elegí una copia JSON de hasta 5 MB»).
+  view = harness('backup.tsx', exportable); exportIo.available = true; exportIo.maxBytes = 50;
+  await press(view);
+  assert.deepEqual([errorOf(view), exportIo.created, exportIo.shares.length], ['backup.export.tooLarge', 0, 0]);
+  // No share sheet on this device.
+  view = harness('backup.tsx', exportable);
+  await press(view);
+  assert.deepEqual([errorOf(view), exportIo.created], ['backup.export.sharingUnavailable', 0]);
+});
+
+test('25Q2: the Backup screen and its Más row say that deleting the app deletes the records', () => {
+  const intro = (locale: AppLocale | null) => nodes(harness('backup.tsx', archive, undefined, locale).render()).filter(node => node.type === 'AppText')[0].props.children;
+  assert.match(intro(null), /^Si borrás la app, tus registros se borran con ella\. Guardá tus cuentas/);
+  assert.match(intro('en-AR'), /^If you delete the app, your records are deleted with it\. Save your accounts/);
+  const row = (locale: AppLocale | null) => rows(harness('(tabs)/settings.tsx', archive, undefined, locale).render()).find(item => item.props.title === (locale ? 'Backup' : 'Copia de seguridad'))!;
+  assert.equal(row(null).props.subtitle, 'Antes de borrar la app o cambiar de teléfono');
+  assert.equal(row('en-AR').props.subtitle, 'Before deleting the app or changing phones');
+});
+
 test('the categories screen lists presets, custom and historical categories with usage, opens the editor, and never edits the ledger', () => {
   const before = JSON.stringify(archive);
   const view = harness('categories.tsx');
@@ -312,7 +376,7 @@ test('23.1B2 English Más: every row, count, note and the diagnostic footer are 
   for (const row of rows(root)) row.props.onPress();
   assert.equal(view.pushed.join(','), '/accounts,/cards,/budgets,/recurring,/debts,/categories,/backup,/undone-entries,/language,/region,/appearance');
   const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
-  assert.match(texts, /FinanzApp 0\.1\.0 \(25Q1\)/);
+  assert.match(texts, /FinanzApp 0\.1\.0 \(25Q2\)/);
   assert.match(texts, /Opaque material \(Expo Go\) · Language: default/);
   assert.match(texts, /saved only on this device and work offline/);
   assert.doesNotMatch(texts, /Material opaco|Idioma|Región|sincronización/);
@@ -360,7 +424,7 @@ test('24UX5: a preview or store build shows the version and the local-storage no
   for (const locale of [null, 'en-AR'] as const) {
     const root = harness('(tabs)/settings.tsx', archive, undefined, locale, undefined, false).render();
     const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
-    assert.match(texts, /FinanzApp 0\.1\.0 \(25Q1\)/);
+    assert.match(texts, /FinanzApp 0\.1\.0 \(25Q2\)/);
     assert.doesNotMatch(texts, /Material|material|Idioma:|Language:/, 'no material or locale diagnostics outside a development build');
     assert.match(texts, locale ? /saved only on this device/ : /se guardan solo en este dispositivo/, 'privacy and storage information stays');
   }

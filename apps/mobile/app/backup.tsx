@@ -2,14 +2,15 @@ import { useRef, useState } from 'react';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { router } from 'expo-router';
-import { BACKUP_MAX_BYTES, createRecoveryBackup, parsePilotBackup } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { ActionButton, AppText, ErrorMessage, NavigationRow, Screen, SectionTitle, Surface } from '../src/ui/components';
 import { useI18n } from '../src/i18n/provider';
+import { buildBackupFile } from '../src/ui/backup-file';
 
 /** Export and import of the native pilot backup, moved out of the Más hub so
- * that screen stays a list. The export logic is unchanged: a snapshot this app
- * can restore, shared through the system sheet, never uploaded on its own. */
+ * that screen stays a list. A snapshot this app can restore, shared through the
+ * system sheet, never uploaded on its own. 25Q2: measured before anything is
+ * written, named by its date, and a native failure is told in the app's words. */
 export default function BackupScreen() {
   const { archive } = useLedger();
   const { t } = useI18n();
@@ -23,16 +24,16 @@ export default function BackupScreen() {
     setBusy(true);
     setError(null);
     let file: File | null = null;
+    // A native failure (the file system, the share sheet) is told in the app's words, never as the platform's text.
+    const prepareFailed = (): never => { throw new Error('backup.export.prepareFailed'); };
     try {
-      if (!await Sharing.isAvailableAsync()) throw new Error('backup.export.sharingUnavailable');
-      const backup = createRecoveryBackup(archive);
-      const json = JSON.stringify(backup, null, 2);
-      parsePilotBackup(json); // Only export a snapshot this app can restore.
-      file = new File(Paths.cache, `finanzapp-piloto-${Date.now()}.json`);
-      file.create();
-      file.write(json);
-      if (file.size > BACKUP_MAX_BYTES) throw new Error('backup.export.tooLarge');
-      await Sharing.shareAsync(file.uri, { mimeType: 'application/json', UTI: 'public.json', dialogTitle: t('backup.export.dialogTitle') });
+      if (!await Sharing.isAvailableAsync().catch(prepareFailed)) throw new Error('backup.export.sharingUnavailable');
+      // Built, measured and checked for a restore before any file exists (a copy over the cap says so in its own words).
+      const backup = buildBackupFile(archive);
+      const target = new File(Paths.cache, backup.name);
+      file = target;
+      try { if (target.exists) target.delete(); target.create(); target.write(backup.json); } catch { prepareFailed(); }
+      await Sharing.shareAsync(target.uri, { mimeType: 'application/json', UTI: 'public.json', dialogTitle: t('backup.export.dialogTitle') }).catch(prepareFailed);
       // The sheet can be cancelled. Do not announce a successful export here.
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'backup.export.prepareFailed');
