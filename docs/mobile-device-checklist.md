@@ -1,5 +1,24 @@
 # Physical iPhone acceptance checklist
 
+## Producto 25Q3 — calm failures and a dock that never ignores a tap (this PR)
+
+JavaScript only; Metro from this branch on the development build cut after PR #113. «FinanzApp 0.1.0 (25Q3)».
+
+- [ ] **A held dock tab.** Press and hold Movimientos for a full second, then lift: it opens (before: nothing). The same
+  with every tab; a quick tap as before. With Larger Accessibility Sizes, holding still shows iOS's Large Content Viewer.
+- [ ] **An unknown link.** From Notes tap `finanzapp-dev://nope` (or `xcrun simctl openurl booted finanzapp-dev://nope`),
+  in Spanish and in English. **Expect:** no black screen, no «Unmatched Route» or Sitemap; the header «Pantalla no
+  encontrada», the compass card «No encontramos esa pantalla», «El enlace no lleva a ninguna pantalla de FinanzApp.» and
+  «Ir a Inicio», which opens Inicio with the dock.
+- [ ] **A screen that fails** (a local probe, never committed): add `throw new Error('probe 1234,50 Visa')` at the top of
+  the render of `app/(tabs)/reports.tsx`, start Metro with `--no-dev --minify` (a development bundle draws React
+  Native's red box over any error), open Reportes, then Inicio, Reportes again and «Volver a intentar». **Expect:** the
+  alert card «No pudimos mostrar esta pantalla», «Lo que ya guardaste sigue ahí…» and «Volver a intentar», clear of the
+  status bar and the dock; the dock and the other tabs work; the probe text never appears; retry fails again the same
+  way (no crash, no loop). Then the same probe in `app/categories.tsx` (Más → Categorías): the header and the back swipe
+  stay. With VoiceOver: the title is read as a heading, then the text, then «Volver a intentar, botón». Remove the probe.
+
+
 ## Producto 25Q2 — a backup that completes or says why (this PR)
 
 JavaScript only; Metro from this branch on the development build cut after PR #113. The end of Más reads «FinanzApp

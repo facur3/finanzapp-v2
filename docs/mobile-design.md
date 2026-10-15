@@ -858,6 +858,15 @@ barras de Día a día y una cabecera fija sólida. Siguen permitidos para una pa
 vinculante del roadmap no cambia: la próxima entrega de producto es 24T3; 24UX6C (Movimientos y Más) y 24UX6D
 (Tarjetas) siguen a 24UX6B en el carril UX, y su lugar frente a 24T3 lo decide el dueño (ver `docs/mobile-roadmap.md`).
 
+## Producto 25Q3 — fallas tranquilas y un dock que no ignora un toque (en su rama)
+
+- **Una pantalla que no se puede dibujar** muestra, en su lugar, «No pudimos mostrar esta pantalla», «Lo que ya guardaste
+  sigue ahí. Podés volver atrás o abrir otra pestaña.» y «Volver a intentar»; la cabecera, el gesto de volver y el dock
+  siguen. Nunca muestra el error ni toca el almacenamiento. Solo cubre errores de dibujo.
+- **Un enlace desconocido** abre «Pantalla no encontrada» en el idioma de la app, con «Ir a Inicio»; nunca la pantalla
+  negra en inglés de Expo.
+- **El dock** ya no tiene pulsación larga: una pestaña sostenida más de medio segundo se elige al soltar, como en iOS.
+
 ## Producto 25Q2 — una copia que se completa o dice por qué (en su rama)
 
 - **El archivo** se llama `FinanzApp-backup-<fecha local>-<HHmm>.json` y es una sola línea de JSON (sin cambio de
@@ -3109,6 +3118,10 @@ crédito, marca elegida) y los filetes de las píldoras, el chip y el compositor
 color propio.
 
 ## Pendiente de revisión en iPhone
+
+- Producto 25Q3 (en su rama; el build de desarrollo posterior a #113): una pestaña sostenida del dock, un enlace
+  desconocido y una falla de prueba local en una pestaña y en una pantalla apilada (docs/mobile-device-checklist.md,
+  «Producto 25Q3»).
 
 - Producto 25Q2 (en su rama; el build de desarrollo posterior a #113): el nombre y el contenido de una línea del archivo
   por AirDrop, Mail y Archivos, la hoja cancelada, una copia mala después de importar y las frases nuevas
