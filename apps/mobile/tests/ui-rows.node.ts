@@ -27,7 +27,7 @@ function load(file: string, extra: Record<string, unknown> = {}, fontScale = 1, 
   const jsx = (type: any, props: any) => ({ type, props });
   const state: unknown[] = [];
   const alerts: { title: string; message: string; buttons?: { text: string }[] }[] = [];
-  const haptics: string[] = [];
+  const haptics: string[] = [], keyboard: string[] = [];
   let cursor = 0;
   const p = palette ?? { isDark: false, surface: '#FFFFFF', inset: '#EEEEF3', text: '#0A0A0C', secondary: '#6E7078', tertiary: '#8E9098', line: '#E6E6EC', primary: '#2557D6', primaryFill: '#2557D6', onPrimary: '#FFF', primarySoft: '#E5ECFB', background: '#F2F2F6',
     income: '#1F7A4D', expense: '#C0392B', warning: '#B26A00', transfer: '#2D6476', transferSoft: '#E2EDF1', incomeSoft: '#E3F1E8' };
@@ -37,7 +37,7 @@ function load(file: string, extra: Record<string, unknown> = {}, fontScale = 1, 
       Children: { map: (children: unknown, fn: (child: unknown) => unknown) => (Array.isArray(children) ? children : [children]).map(fn) } },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': { View: 'View', Text: 'Text', TextInput: 'TextInput', ScrollView: 'ScrollView', Pressable: 'Pressable', ActivityIndicator: 'ActivityIndicator', InputAccessoryView: 'InputAccessoryView',
-      FlatList: 'FlatList', Modal: 'Modal', Platform: { OS: 'ios' }, Keyboard: { dismiss() {} }, StyleSheet: { hairlineWidth: 0.5, create: (styles: unknown) => styles, flatten: (style: any) => Object.assign({}, ...(Array.isArray(style) ? style.flat(Infinity).filter(Boolean) : [style])), absoluteFill: {} },
+      FlatList: 'FlatList', Modal: 'Modal', Platform: { OS: 'ios' }, Keyboard: { dismiss() { keyboard.push('dismiss'); } }, StyleSheet: { hairlineWidth: 0.5, create: (styles: unknown) => styles, flatten: (style: any) => Object.assign({}, ...(Array.isArray(style) ? style.flat(Infinity).filter(Boolean) : [style])), absoluteFill: {} },
       useWindowDimensions: () => ({ fontScale, width, height: 844 }), Alert: { alert: (title: string, message: string, buttons?: { text: string }[]) => alerts.push({ title, message, buttons }) } },
     'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View', Text: 'Animated.Text' }, useSharedValue: (value: number) => ({ value }), withTiming: (value: number) => value, useAnimatedStyle: (fn: () => unknown) => fn() },
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
@@ -62,7 +62,7 @@ function load(file: string, extra: Record<string, unknown> = {}, fontScale = 1, 
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected ' + file + ' dependency: ' + name);
     return modules[name];
   } });
-  return { exports: module.exports, render: (component: string, props: any) => { cursor = 0; return module.exports[component](props); }, alerts, haptics };
+  return { exports: module.exports, render: (component: string, props: any) => { cursor = 0; return module.exports[component](props); }, alerts, haptics, keyboard };
 }
 function nodes(value: any): Node[] {
   if (!value || typeof value !== 'object') return [];
@@ -436,6 +436,11 @@ test('AmountShortcut and SelectionRow read their spoken twins; the visible capti
   const plain = ui.render('AmountShortcut', { label: 'Usar todo', caption: 'Saldo', onPress: () => {} });
   assert.equal(nodes(plain).find(node => is(node, 'PressFeedback'))!.props.accessibilityLabel, 'Usar todo, Saldo');
   assert.equal(texts(plain)[0].props.accessibilityLabel, undefined);
+  // 25VIS2 (V15): the fill lowers the keyboard first, so Save and its echo of the filled amount come into view.
+  const filled: string[] = [];
+  const pay = ui.render('AmountShortcut', { label: 'Pagar total', caption: 'Saldo pendiente', onPress: () => filled.push('fill') });
+  nodes(pay).find(node => is(node, 'PressFeedback'))!.props.onPress();
+  assert.equal(ui.keyboard.join(',') + '|' + filled.join(','), 'dismiss|fill');
   const row = ui.render('SelectionRow', { label: 'Cuenta', value: 'Banco', detail: 'Saldo $ 1.234,56', spokenDetail: 'Saldo 1234,56 pesos', onPress: () => {} });
   assert.equal(nodes(row).find(node => is(node, 'PressFeedback'))!.props.accessibilityLabel, 'Cuenta: Banco, Saldo 1234,56 pesos');
   assert.equal(texts(row)[2].props.children, 'Saldo $ 1.234,56');
@@ -942,21 +947,43 @@ test('25VIS2: a section\'s plain action reaches 44 pt with slop, as the quiet on
   }
 });
 
-test('25VIS2: ErrorMessage tells VoiceOver on iOS when an error appears (the live region is Android\'s)', () => {
-  const said: string[] = [], deps: string[] = [];
+// ErrorMessage alone on a platform. The effect stub follows React's rule (it runs again only when its keys changed), so
+// «a re-render is not spoken» is exercised, not read off the deps array; one slot is enough because nothing else renders.
+function errorMessageOn(os: 'ios' | 'android') {
+  const said: string[] = [];
+  let last: string | undefined;
   const ui = load('components.tsx', {
-    react: { useState: (value: unknown) => [value, () => {}], useEffect: (effect: () => void, keys: unknown[]) => { deps.push(JSON.stringify(keys)); effect(); }, useId: () => 'id', useRef: (value: unknown) => ({ current: value }), useMemo: (fn: () => unknown) => fn(),
-      Children: { map: () => [] } },
-    'react-native': { View: 'View', Text: 'Text', Pressable: 'Pressable', Platform: { OS: 'ios' }, StyleSheet: { hairlineWidth: 0.5, create: (styles: unknown) => styles },
+    react: { useState: (value: unknown) => [value, () => {}], useEffect: (effect: () => void, keys: unknown[]) => { const next = JSON.stringify(keys); if (next !== last) { last = next; effect(); } },
+      useId: () => 'id', useRef: (value: unknown) => ({ current: value }), useMemo: (fn: () => unknown) => fn(), Children: { map: () => [] } },
+    'react-native': { View: 'View', Text: 'Text', Pressable: 'Pressable', Platform: { OS: os }, StyleSheet: { hairlineWidth: 0.5, create: (styles: unknown) => styles },
       AccessibilityInfo: { announceForAccessibility: (text: string) => said.push(text) } },
   });
-  ui.render('ErrorMessage', { message: null });
+  const alert = (root: Node) => nodes(root).find(node => node.type === 'Text' && node.props.accessibilityRole === 'alert')!;
+  return { said, show: (props: Record<string, unknown>) => ui.render('ErrorMessage', props), alert };
+}
+
+test('25VIS2: on iOS ErrorMessage tells VoiceOver when an error appears or changes, never twice for the same one, and not for a line shown while typing', () => {
+  const { said, show, alert } = errorMessageOn('ios');
+  const sentence = bindLocale('es-AR').errorText('transferForm.overCardDebt');
+  show({ message: null });
   assert.equal(said.length, 0);
-  ui.render('ErrorMessage', { message: 'transferForm.overCardDebt' });
-  assert.deepEqual(said, [bindLocale('es-AR').errorText('transferForm.overCardDebt')], 'the translated sentence, not the key');
-  assert.equal(deps.at(-1), '["transferForm.overCardDebt",true]', 'keyed on the message: a new error is spoken, a re-render is not');
-  ui.render('ErrorMessage', { message: 'entryForm.futureDate', announce: false });
-  assert.equal(said.length, 1, 'a line a form shows while typing is not spoken');
+  const line = show({ message: 'transferForm.overCardDebt' });
+  assert.deepEqual(said, [sentence], 'the translated sentence, not the key');
+  show({ message: 'transferForm.overCardDebt' });
+  assert.equal(said.length, 1, 'a re-render of the same error is not spoken again');
+  show({ message: 'entryForm.futureDate' });
+  assert.equal(said.length, 2, 'a new error is spoken');
+  show({ message: 'transferForm.overCardDebt', announce: false });
+  assert.equal(said.length, 2, 'a line a form shows while typing is not spoken');
+  assert.equal(alert(line).props.accessibilityLiveRegion, 'polite', 'the live region stays for Android');
+});
+
+test('25VIS2: on Android ErrorMessage announces nothing itself: TalkBack speaks its live region, so each error is said once', () => {
+  const { said, show, alert } = errorMessageOn('android');
+  const line = show({ message: 'transferForm.overCardDebt' });
+  show({ message: 'entryForm.futureDate' });
+  assert.equal(said.length, 0, 'one utterance per error: the live region\'s');
+  assert.equal(alert(line).props.accessibilityLiveRegion, 'polite');
 });
 
 test('25VIS2 (V7): a fixed SelectorCard reads as a fact: full strength, no chevron, no button role, the same label and the language', () => {

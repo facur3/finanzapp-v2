@@ -383,10 +383,12 @@ export function AmountShortcut({ label, caption, spokenCaption, onPress, disable
   label?: string; caption: string; spokenCaption?: string; onPress?: () => void; disabled?: boolean;
 }) {
   const p = usePalette();
+  // 25VIS2 (V15): the fill lowers the keyboard, so Save and its echo of the filled amount come into view.
+  const fill = () => { Keyboard.dismiss(); onPress?.(); };
   return <View style={{ flexDirection: 'row', justifyContent: 'flex-start', alignItems: 'center', flexWrap: 'wrap', gap: 4, marginTop: -8 }}>
     <AppText secondary variant="footnote" accessibilityLabel={spokenCaption}>{caption}{label && onPress ? ' ·' : ''}</AppText>
     {label && onPress && <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={label + ', ' + (spokenCaption ?? caption)}
-      onPress={onPress} disabled={disabled} accessibilityState={{ disabled }} hitSlop={8}
+      onPress={fill} disabled={disabled} accessibilityState={{ disabled }} hitSlop={8}
       style={{ paddingVertical: 6, paddingHorizontal: 4, opacity: disabled ? 0.5 : 1 }}>
       <AppText variant="footnote" style={{ color: p.primary, fontWeight: '600' }}>{label}</AppText>
     </PressFeedback>}
@@ -540,8 +542,9 @@ export function ErrorMessage({ message, announce = true }: {
   const p = usePalette();
   const { errorText, speechLanguage } = useI18n();
   // 25VIS2: iOS has no live region (`accessibilityLiveRegion` is Android's), so VoiceOver is told when an error appears or
-  // changes. The same message set again in one update (a repeated refusal) is not repeated; it is still on screen.
-  useEffect(() => { if (announce && message) AccessibilityInfo.announceForAccessibility?.(errorText(message)); }, [message, announce]);
+  // changes. On Android TalkBack speaks the live region below by itself, so announcing too would say each error twice
+  // (AGENTS rule 13). The same message set again in one update (a repeated refusal) is not repeated; it is still on screen.
+  useEffect(() => { if (Platform.OS === 'ios' && announce && message) AccessibilityInfo.announceForAccessibility?.(errorText(message)); }, [message, announce]);
   return message ? <View style={{ padding: 14, borderRadius: radius.button, backgroundColor: p.expenseSoft }}>
     <Text accessibilityRole="alert" accessibilityLiveRegion="polite" accessibilityLanguage={speechLanguage} style={[type.subhead, { color: p.expense }]}>{errorText(message)}</Text>
   </View> : null;

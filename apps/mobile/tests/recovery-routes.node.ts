@@ -42,7 +42,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   const state: any[] = [];
   const refs: any[] = [];
   let cursor = 0, refCursor = 0, uuid = 0, backs = 0;
-  const pushed: any[] = [], alerts: any[] = [], updates: domain.EntryChange[] = [], additions: domain.Entry[] = [], restores: any[] = [];
+  const pushed: any[] = [], alerts: any[] = [], updates: domain.EntryChange[] = [], additions: domain.Entry[] = [], restores: any[] = [], haptics: string[] = [];
   const transfers: domain.Transfer[] = [], transferChanges: domain.TransferChange[] = [], accountChanges: domain.AccountChange[] = [], newAccounts: domain.Account[] = [], rules: domain.RecurringRule[] = [];
   // null: the ledger has not hydrated yet; setData moves it on.
   let data = (options.data === undefined ? archive : options.data) as domain.LedgerArchive;
@@ -83,7 +83,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, useLocalSearchParams: () => options.params ?? {},
       router: { canGoBack: () => true, back: () => { backs++; }, push: (value: any) => pushed.push(value), replace: (value: any) => pushed.push(value) } },
     'expo-crypto': { randomUUID: () => 'operation-' + (++uuid) },
-    'expo-haptics': { NotificationFeedbackType: { Success: 'Success' }, notificationAsync: async () => {}, selectionAsync: async () => {} },
+    'expo-haptics': { NotificationFeedbackType: { Success: 'Success', Warning: 'Warning', Error: 'Error' }, notificationAsync: async (type: string) => { haptics.push(type); }, selectionAsync: async () => {} },
     'expo-file-system': { File: { pickFileAsync: options.picker ?? (async () => ({ canceled: true })) } },
     '@finanzapp/domain': domain,
     '@expo/vector-icons/Ionicons': 'Ionicons',
@@ -129,7 +129,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
       return node; },
     setData: (next: domain.LedgerArchive | null) => { data = next as domain.LedgerArchive; },
     setLocale: (next: AppLocale) => { locale = next; },
-    pushed, alerts, updates, additions, restores, transfers, transferChanges, accountChanges, newAccounts, rules, backs: () => backs,
+    pushed, alerts, updates, additions, restores, transfers, transferChanges, accountChanges, newAccounts, rules, haptics, backs: () => backs,
   };
 }
 function nodes(value: any): Node[] {
@@ -1079,6 +1079,44 @@ test('24B6: a recurring income offers cash accounts only, a card chosen for a re
   assert.deepEqual([field.props.value, field.props.accounts.map((item: domain.Account) => item.id)], ['card-acc', ['a', 'card-acc']], 'its own card stays offered beside cash in that currency');
 });
 
+test('25VIS2 (V2, recurring form): a rule keeps one category per kind; Gasto\'s never rides into Ingreso, and switching back finds it', async () => {
+  const view = harness('src/ui/recurring-form.tsx', { accountId: 'a' }, { data: liabilityData });
+  find(view.render(), 'AmountField').props.onChangeText('100');
+  find(view.render(), 'Field').props.onChangeText('Alquiler');
+  find(view.render(), 'CategoryField').props.onChange('Comida');
+  let root = view.render();
+  assert.deepEqual([find(root, 'CategoryField').props.value, find(root, 'ActionButton').props.disabled], ['Comida', false]);
+  find(root, 'Choices').props.onChange('income');
+  root = view.render();
+  assert.deepEqual([find(root, 'CategoryField').props.kind, find(root, 'CategoryField').props.value, find(root, 'ActionButton').props.disabled], ['income', '', true],
+    'Comida does not ride into Ingreso, and Save waits for an income category');
+  assert.deepEqual([find(root, 'AmountField').props.value, find(root, 'Field').props.value], ['100', 'Alquiler'], 'the rest of the draft is kept');
+  find(root, 'CategoryField').props.onChange('Sueldo');
+  find(view.render(), 'Choices').props.onChange('expense');
+  assert.equal(find(view.render(), 'CategoryField').props.value, 'Comida', 'back on Gasto, its category is there again');
+  find(view.render(), 'Choices').props.onChange('income');
+  root = view.render();
+  assert.deepEqual([find(root, 'CategoryField').props.value, find(root, 'ActionButton').props.disabled], ['Sueldo', false]);
+  await find(root, 'ActionButton').props.onPress();
+  assert.deepEqual([view.rules[0].kind, view.rules[0].category, view.rules[0].amountMinor], ['income', 'Sueldo', 10000]);
+});
+
+test('25VIS2 (V2, recurring form): editing a rule, flipping its kind asks for that kind\'s category, and flipping back restores the stored one', async () => {
+  const rule: domain.RecurringRule = { id: 'salary', accountId: 'a', kind: 'income', amountMinor: 500000, merchant: 'Empresa', category: 'Sueldo', frequency: 'monthly',
+    anchorDateISO: '2026-01-05', nextDateISO: '2099-10-05', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
+  const view = harness('src/ui/recurring-form.tsx', { original: rule }, { data: { ...liabilityData, recurring: [rule] } });
+  assert.equal(find(view.render(), 'CategoryField').props.value, 'Sueldo');
+  find(view.render(), 'Choices').props.onChange('expense');
+  let root = view.render();
+  assert.deepEqual([find(root, 'CategoryField').props.value, find(root, 'ActionButton').props.disabled], ['', true], 'an expense rule needs an expense category');
+  find(root, 'Choices').props.onChange('income');
+  root = view.render();
+  assert.equal(find(root, 'CategoryField').props.value, 'Sueldo', 'flipping back restores the stored category');
+  find(root, 'AmountField').props.onChangeText('6000');
+  await find(view.render(), 'ActionButton').props.onPress();
+  assert.deepEqual([view.rules[0].kind, view.rules[0].category, view.rules[0].amountMinor], ['income', 'Sueldo', 600000]);
+});
+
 // ---- 24B6 review: a ledger holding only cards ---------------------------------------------------------------
 
 const cardOnly: domain.LedgerArchive = { accounts: [cardAccount, { ...cardAccount, id: 'usd-card', name: 'Visa USD', currency: 'USD' }], records: [],
@@ -1535,20 +1573,25 @@ test('25VIS2 (V1): the entry form reports the lock exactly while busy or frozen;
   await find(view.render(), 'ActionButton').props.onPress();
   assert.equal(reports.splice(0).join(','), 'true,false');
   assert.equal(view.additions.length, 0);
+  assert.equal(view.haptics.splice(0).join(','), 'Error', '25VIS2 (V4): a refusal taps Error');
   find(view.render(), 'AmountField').props.onChangeText('10');
   find(view.render(), 'Field').props.onChangeText('Kiosco');
   find(view.render(), 'CategoryField').props.onChange('Comida');
   await find(view.render(), 'ActionButton').props.onPress();
   assert.equal(reports.splice(0).join(','), 'true,true', 'an unknown outcome stays frozen, and so does the switch');
+  assert.equal(view.haptics.splice(0).join(','), 'Warning', '25VIS2 (V4): it may have been written, so Warning, not Error');
   assert.equal(find(view.render(), 'AmountField').props.editable, false);
   assert.ok(presentation.releasesDraft(domain.CARD_DELETED_MESSAGE));
   outcome = 'released';
   await find(view.render(), 'ActionButton', 'Reintentar guardado').props.onPress();
   assert.equal(reports.splice(0).join(','), 'true,false', 'a refusal storage decided before writing releases the draft and the switch');
+  assert.equal(view.haptics.splice(0).join(','), 'Error', '25VIS2 (V4): nothing was written, so Error');
   assert.equal(find(view.render(), 'AmountField').props.editable, true);
   outcome = 'ok';
   await find(view.render(), 'ActionButton').props.onPress();
   assert.equal(view.backs(), 1);
+  assert.equal(reports.splice(0).at(-1), true, 'a saved form leaves the switch locked while its modal closes: nothing switches under a closing screen');
+  assert.equal(view.haptics.splice(0).join(','), 'Success');
   assert.equal(view.additions.length, 3);
   assert.equal(new Set(view.additions.map(item => item.id)).size, 1, 'every attempt carried the one operation id');
   assert.deepEqual([view.additions[2].kind, view.additions[2].category, view.additions[2].amountMinor], ['expense', 'Comida', 1000]);
@@ -1561,11 +1604,13 @@ test('25VIS2 (V1): the transfer form reports the same lock; a failed write stays
   find(view.render(), 'AmountField').props.onChangeText('12abc');
   await find(view.render(), 'ActionButton').props.onPress();
   assert.equal(reports.splice(0).join(','), 'true,false', 'an unreadable amount is refused before anything is written');
+  assert.equal(view.haptics.splice(0).join(','), 'Error', '25VIS2 (V4): a refusal taps Error');
   fillTransfer(view);
   await find(view.render(), 'ActionButton').props.onPress();
   assert.equal(reports.splice(0).join(','), 'true,true');
   await find(view.render(), 'ActionButton', 'Reintentar guardado').props.onPress();
   assert.equal(reports.splice(0).join(','), 'true,true');
+  assert.equal(view.haptics.splice(0).join(','), 'Warning,Warning', '25VIS2 (V4): an outcome that may have been written taps Warning, each time');
   assert.equal(view.transfers.length, 2);
   assert.equal(view.transfers[0].id, view.transfers[1].id, 'the retry resends the same transfer');
 });
@@ -1594,6 +1639,32 @@ test('25VIS2 (V2): Gasto and Ingreso keep separate categories; an expense catego
   root = prefilled.render();
   assert.deepEqual([find(root, 'CategoryField').props.value, find(root, 'Field').props.value, find(root, 'AmountField').props.value], ['Sueldo', 'Empresa', '1.500,00']);
   assert.equal(prefilled.additions.length, 0, 'a prefill only seeds the fields');
+});
+
+test('25VIS2 (V8): Save waits for every required input of a movement and of a transfer; a complete draft saves once', async () => {
+  // Each row leaves one required input out of a complete draft; «none» leaves nothing out.
+  const entryRows = ['amount', 'merchant', 'category', 'category of the new kind', 'none'] as const;
+  for (const missing of entryRows) {
+    const props: Record<string, unknown> = { kind: 'expense', accountId: 'a', onKindChange: () => {} };
+    const view = harness('src/ui/entry-form.tsx', props, { data: liabilityData });
+    if (missing !== 'amount') find(view.render(), 'AmountField').props.onChangeText('10');
+    if (missing !== 'merchant') find(view.render(), 'Field').props.onChangeText('Kiosco');
+    if (missing !== 'category') find(view.render(), 'CategoryField').props.onChange('Comida');
+    if (missing === 'category of the new kind') props.kind = 'income';
+    const save = find(view.render(), 'ActionButton');
+    assert.equal(save.props.disabled, missing !== 'none', 'movement without its ' + missing);
+    if (missing === 'none') await save.props.onPress();
+    assert.equal(view.additions.length, missing === 'none' ? 1 : 0, 'movement without its ' + missing);
+  }
+  for (const missing of ['amount', 'destination', 'none'] as const) {
+    const view = harness('src/ui/transfer-form.tsx', { accountId: 'a' }, { data: transferData });
+    if (missing !== 'amount') find(view.render(), 'AmountField').props.onChangeText('12');
+    if (missing !== 'destination') find(view.render(), 'AccountField', 'Hacia').props.onChange('b');
+    const save = find(view.render(), 'ActionButton');
+    assert.equal(save.props.disabled, missing !== 'none', 'transfer without its ' + missing);
+    if (missing === 'none') await save.props.onPress();
+    assert.equal(view.transfers.length, missing === 'none' ? 1 : 0, 'transfer without its ' + missing);
+  }
 });
 
 test('25VIS2 (V3): a new transfer, card payment and collection echo the amount they record, on screen and for VoiceOver; editing, retrying, zero and unreadable text do not', async () => {
@@ -1627,6 +1698,25 @@ test('25VIS2 (V3): a new transfer, card payment and collection echo the amount t
   assert.deepEqual([find(editing.render(), 'ActionButton').props.label, find(editing.render(), 'ActionButton').props.spokenLabel], ['Guardar cambios', undefined]);
   await find(editing.render(), 'ActionButton').props.onPress();
   assert.deepEqual([find(editing.render(), 'ActionButton').props.label, find(editing.render(), 'ActionButton').props.spokenLabel], ['Reintentar guardado', undefined]);
+});
+
+test('25VIS2 (V3): a currency without decimals echoes whole: 1234 yen read as 1234 yen, never as cents, on screen, aloud and when saved', async () => {
+  const yen = (id: string): domain.Account => ({ ...account, id, name: 'Yenes ' + id, currency: 'JPY', openingMinor: 100000 });
+  const data: domain.LedgerArchive = { ...archive, accounts: [yen('ya'), yen('yb')] };
+  for (const locale of ['es-AR', 'en-US'] as const) {
+    const bound = bindLocale(locale);
+    const view = harness('src/ui/transfer-form.tsx', { accountId: 'ya' }, { data, locale });
+    find(view.render(), 'AmountField').props.onChangeText('1234');
+    const save = find(view.render(), 'ActionButton');
+    const word = locale === 'es-AR' ? 'Registrar transferencia' : 'Record transfer';
+    assert.equal(save.props.label, word + '\u00A0·\u00A0' + bound.moneyText(1234, 'JPY'), locale + ': 123400 would mean the yen were read as cents');
+    assert.equal(save.props.spokenLabel, word + ', ' + bound.spokenMoney(1234, 'JPY'), locale);
+    assert.doesNotMatch(save.props.label, /[.,]00$/, locale + ': no decimals for a currency that has none');
+    if (locale !== 'es-AR') continue;
+    find(view.render(), 'AccountField', 'Hacia').props.onChange('yb');
+    await find(view.render(), 'ActionButton').props.onPress();
+    assert.equal(view.transfers[0].amountMinor, 1234, 'the saved amount is the echoed one');
+  }
 });
 
 test('25VIS2 (V7): the card or debt a payment settles is a fixed fact, not a disabled button', () => {

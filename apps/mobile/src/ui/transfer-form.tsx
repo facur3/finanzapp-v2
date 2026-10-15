@@ -9,7 +9,7 @@ import { useLedger } from '../storage/LedgerProvider';
 import { ActionButton, AmountField, AmountShortcut, AppText, DetailRow, EmptyState, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
 import { amountFromMinor, draftFromMinor } from './money-input';
 import { AccountField, DateField, SelectorCard } from './form-controls';
-import { initialAccountId } from './presentation';
+import { initialAccountId, releasesDraft } from './presentation';
 import { space, usePalette } from './theme';
 import { useI18n } from '../i18n/provider';
 import { accountDisplayName } from './liability-presentation';
@@ -150,7 +150,13 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
       if (submission.change) await updateTransfer(submission.change); else await addTransfer(submission.transfer);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       saving.current = false; close();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'transferForm.saveUnverified'); }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'transferForm.saveUnverified');
+      // 25VIS2 (V4): a refusal (before the submission froze, or one storage decided before writing) taps Error; an outcome
+      // that may have been written taps Warning. Either way a frozen submission stays frozen here, for the exact retry.
+      const refused = !frozen || (cause instanceof Error && releasesDraft(cause.message));
+      void Haptics.notificationAsync(refused ? Haptics.NotificationFeedbackType.Error : Haptics.NotificationFeedbackType.Warning).catch(() => {});
+    }
     finally { saving.current = false; setBusy(false); onLockedChange?.(frozen); }
   }
   // An account's recorded figure with its currency: a card owed or in credit and a debt pending are worded,

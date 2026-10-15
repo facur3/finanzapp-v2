@@ -32,7 +32,12 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
   });
   const [amount, setAmount] = useState(stored?.draft ?? '');
   const [merchant, setMerchant] = useState(before?.merchant ?? '');
-  const [category, setCategory] = useState(before?.category ?? '');
+  // 25VIS2 (V2, as in EntryForm): one category per kind. A category belongs to a kind, so the one picked for Gasto never
+  // rides along into Ingreso (Save would store it on an income rule and on every movement the rule records); switching
+  // back finds it again.
+  const [categories, setCategories] = useState<Partial<Record<EntryKind, string>>>(() => ({ [before?.kind ?? 'expense']: before?.category ?? '' }));
+  const category = categories[kind] ?? '';
+  const setCategory = (value: string) => setCategories(current => ({ ...current, [kind]: value }));
   const [frequency, setFrequency] = useState<RecurringFrequency>(before?.frequency ?? 'monthly');
   const [date, setDate] = useState(() => new Date((before?.nextDateISO ?? todayKey()) + 'T12:00:00'));
   const [busy, setBusy] = useState(false);

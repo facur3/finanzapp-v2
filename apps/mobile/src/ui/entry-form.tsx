@@ -215,6 +215,9 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
       // (A13): the same for every refusal storage decides before writing (a purchase with devoluciones edited below them, a
       // deleted account…): the fields unlock for review. An unknown outcome keeps the submission frozen for an exact retry.
       if (cause instanceof Error && releasesDraft(cause.message)) { setPending(null); frozen = false; }
+      // 25VIS2 (V4): a refusal (before the submission froze, or one storage decided before writing) taps Error; an outcome
+      // that may have been written taps Warning, while the frozen draft waits for the exact retry.
+      void Haptics.notificationAsync(frozen ? Haptics.NotificationFeedbackType.Warning : Haptics.NotificationFeedbackType.Error).catch(() => {});
     } finally {
       saving.current = false;
       setBusy(false);
