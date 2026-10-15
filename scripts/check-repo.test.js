@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { audit, report, LEGACY_WEB, GENERATED, SENSITIVE_FILES } from './check-repo.mjs';
+import { audit, report, LEGACY_WEB, GENERATED, SENSITIVE_FILES, BACKUP_HEADER } from './check-repo.mjs';
 
 const clean = {
   'apps/mobile/src/ui/theme.ts': "import { todayKey } from '@finanzapp/domain';\n",
@@ -99,5 +99,24 @@ describe('check:repo', () => {
       ['server/mobile/openai.js', 'OpenAI API key'], ['docs/x.md', 'private key block'], ['scripts/db.mjs', 'Postgres URL with password']]);
     expect(run(clean).secrets).toEqual([]);
     expect(run({ 'server/mobile/handlers.test.js': "const headers = { authorization: 'Bearer fixture-token-0123456789' };\n" }).secrets).toEqual([]);
+  });
+
+  it('25Q2: recognises a real backup by its old, new or neutral dated name, and by its header whatever its name or size', () => {
+    for (const path of ['finanzapp-piloto-1728900000000.json', 'apps/mobile/FinanzApp-backup-2026-10-15-1432.json', 'docs/backup-2026-10-15-1432.json',
+      'copia_2026-10-15.json', 'respaldo 2026-10-15.json']) {
+      expect(SENSITIVE_FILES.some(re => re.test(path)), path).toBe(true);
+    }
+    for (const path of ['apps/mobile/tests/fixtures/backup-v8.json', 'apps/mobile/src/ui/backup-file.ts', 'docs/backup-plan.md']) {
+      expect(SENSITIVE_FILES.some(re => re.test(path)), path).toBe(false);
+    }
+    // Assembled at run time so this file itself never carries a backup header.
+    const header = '{"app":"FinanzApp","schema":"finanzapp.native-pilot.v' + '14","exportedAt":"2026-10-15T14:32:00.000Z"';
+    expect(BACKUP_HEADER.test(header)).toBe(true);
+    // Above the 2 MiB text limit read() returns null; the head still finds it.
+    const heads = { 'data/export.json': header, 'apps/mobile/tests/fixtures/sample.json': header, 'notes/backup.md': header, 'apps/mobile/package.json': '{ "name": "x" }' };
+    const result = audit(Object.keys(heads), () => null, f => heads[f]);
+    expect(result.backups).toEqual(['data/export.json']);
+    expect(report(result).join('\n')).toContain('a tracked file is a FinanzApp backup');
+    expect(run(clean).backups).toEqual([]);
   });
 });
