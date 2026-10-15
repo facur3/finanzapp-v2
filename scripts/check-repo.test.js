@@ -115,10 +115,12 @@ describe('check:repo', () => {
     // Assembled at run time so this file itself never carries a backup header.
     const header = '{"app":"FinanzApp","schema":"finanzapp.native-pilot.v' + '14","exportedAt":"2026-10-15T14:32:00.000Z"';
     expect(BACKUP_HEADER.test(header)).toBe(true);
-    // Above the 2 MiB text limit read() returns null; the head still finds it.
-    const heads = { 'data/export.json': header, 'apps/mobile/tests/fixtures/sample.json': header, 'notes/backup.md': header, 'apps/mobile/package.json': '{ "name": "x" }' };
+    // Above the 2 MiB text limit read() returns null; the head still finds it. No folder is exempt (Codex, PR #115): an
+    // export copied into the fixtures folder under a generic name is still a real backup.
+    const heads = { 'data/export.json': header, 'apps/mobile/tests/fixtures/sample.json': header, 'apps/mobile/tests/fixtures/backup-v8.json': header,
+      'notes/backup.md': header, 'apps/mobile/package.json': '{ "name": "x" }' };
     const result = audit(Object.keys(heads), () => null, f => heads[f]);
-    expect(result.backups).toEqual(['data/export.json']);
+    expect(result.backups).toEqual(['data/export.json', 'apps/mobile/tests/fixtures/sample.json', 'apps/mobile/tests/fixtures/backup-v8.json']);
     expect(report(result).join('\n')).toContain('a tracked file is a FinanzApp backup');
     expect(run(clean).backups).toEqual([]);
     // The CLI's own head reader, on a real file above the 2 MiB text limit.

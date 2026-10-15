@@ -44,7 +44,7 @@ apps/mobile/android/
 *.sqlite-wal
 
 # FinanzApp backups exported from the app (financial data; this repository is public). Any depth; bracket classes
-# because git's matching is case-sensitive on Linux. A synthetic test backup goes under apps/mobile/tests/fixtures/,
-# named without a date or the app's prefix (backup-v14.json).
+# because git's matching is case-sensitive on Linux. check:repo also refuses any tracked file carrying a backup's header,
+# in any folder; tests build their backups at run time.
 [Ff]inanz[Aa]pp-backup-*.json
 [Ff]inanz[Aa]pp-piloto-*.json

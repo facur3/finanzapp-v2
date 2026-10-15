@@ -4504,7 +4504,7 @@ nothing of it is on a screen yet.
     placement to the owner; nothing is claimed about iCloud, which is unverified).
   - `scripts/check-repo.mjs` and `.gitignore`: a tracked `finanzapp-piloto-*.json`, `FinanzApp-backup-*.json` or neutral
     dated backup name fails, and so does any tracked `.json` or `.txt` whose first 4 KB carry a backup's schema id,
-    whatever its size (synthetic backups belong under `apps/mobile/tests/fixtures/`).
+    whatever its size or folder (no folder is exempt: Codex on PR #115; tests build their backups at run time).
 - **Not in this PR** (next): the import review that predicts the write (the recurring dates a restore records right
   after, the export date, the conflicting records by name, same-name accounts), the guarded catch-up after a restore, a
   newer-schema file told as such at launch, «Importar copia» on an empty Inicio (owner decision) and undone rows that

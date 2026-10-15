@@ -40,11 +40,11 @@ export const SENSITIVE_FILES = [
   /(^|\/)(backup|respaldo)s?\/.*\.(json|sqlite|csv)$/i,
 ];
 
-/* A real backup by its content, whatever its name or size (a backup may reach 5 MiB, above TEXT_LIMIT): the head of a
-   tracked .json or .txt carries the format's schema id. A synthetic backup belongs under apps/mobile/tests/fixtures/,
-   named without a date or the app's prefix (backup-v14.json): the name rules above apply there too. */
+/* A real backup by its content, whatever its name, folder or size (a backup may reach 5 MiB, above TEXT_LIMIT): the head
+   of a tracked .json or .txt carries the format's schema id. No folder is exempt (Codex, PR #115: an export copied into a
+   fixtures folder under a generic name is still a real backup). Tests build their backups at run time; a static fixture,
+   if one is ever needed, is reviewed and exempted by its exact path in that change. */
 export const BACKUP_HEADER = /"schema"\s*:\s*"finanzapp\.native-pilot\.v\d+"/;
-export const BACKUP_FIXTURES = /^apps\/mobile\/tests\/fixtures\//;
 const BACKUP_CANDIDATE = /\.(json|txt)$/i;
 
 /* Content patterns of well-known credential shapes. Test fixtures use obviously fake values
@@ -118,7 +118,7 @@ export function audit(files, read, head = file => (read(file) ?? '').slice(0, 40
   const generated = files.filter(f => GENERATED.some(re => re.test(f)));
   const legacy = files.filter(f => LEGACY_WEB.some(re => re.test(f)));
   const sensitive = files.filter(f => SENSITIVE_FILES.some(re => re.test(f)));
-  const backups = files.filter(f => BACKUP_CANDIDATE.test(f) && !BACKUP_FIXTURES.test(f) && !SKIP_CONTENT.test(f) && BACKUP_HEADER.test(head(f) ?? ''));
+  const backups = files.filter(f => BACKUP_CANDIDATE.test(f) && !SKIP_CONTENT.test(f) && BACKUP_HEADER.test(head(f) ?? ''));
   const imports = [];
   const secrets = [];
   for (const file of files) {
