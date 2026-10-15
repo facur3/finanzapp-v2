@@ -1,6 +1,39 @@
 # Physical iPhone acceptance checklist
 
-## Fix — «Pagar tarjeta» readable in dark (this PR)
+## Producto 25Q1 — money that reads right (this PR)
+
+Read-side corrections only; JavaScript only. Metro from this branch on the development build cut after PR #113. The end
+of Más reads «FinanzApp 0.1.0 (25Q1)». Light and dark; Spanish unless a step says English.
+
+- [ ] **The Assistant's category link** (a development build with `EXPO_PUBLIC_ASSISTANT_FIXTURES=1`). Record an expense
+  in «Supermercado» dated between 1 and 21 September 2026 (the fixture's period). Asistente → «¿Cuánto gasté en comida
+  este mes?» → «Ver categoría». **Expect:** «Supermercado» with its tile and period, a total equal to your Supermercado
+  expenses of that period (never «$ 0,00») and their rows. The fixture's «$ 121.200,00» is scripted text, not your
+  ledger.
+- [ ] **Budgets without a rate.** Accounts in ARS and USD, Reportes in consolidated mode, a month where a USD expense has no
+  stored rate (offline on a month's first launch), and an ARS budget for that month. **Expect:** the per-currency
+  subtotals as before (no donut, no total) and, below them, «Presupuestos · ARS» with its row and bar. When the rate
+  arrives the donut and total appear above and the budget block neither moves nor repeats.
+- [ ] **«Neto del día».** Movimientos with Todos and no search: day headings show the date and the signed net, and
+  VoiceOver adds «Neto del día …». Choose Gastos, or type in the search: the headings show only the date. Reportes → a
+  category, and Reportes → a day: headings show only the date; the big total above is unchanged.
+- [ ] **An archived card in credit.** Tarjetas → Archivadas with a card archived while in credit: «Saldo a favor · $ …»
+  (VoiceOver «…, Saldo a favor · … pesos»); one owing keeps «Saldo pendiente $ …»; one at zero «Sin saldo pendiente».
+- [ ] **A budget in a currency with no account.** Presupuestos → + → General → EUR (no euro account) → an amount → Crear.
+  **Expect:** a currency switch offers ARS and EUR; EUR shows the general budget with «Editar» and, under the month,
+  «Todavía no tenés cuentas en euros, así que no hay gastos para comparar con este presupuesto.» A second general EUR
+  budget for the month is still refused, and the one it names can now be opened and deleted.
+- [ ] **A card with only cuotas to come.** Save a purchase «En cuotas» on a card before its first closing; Tarjetas → that
+  card, then its detail. **Expect:** «Todavía no hay movimientos. Tus cuotas se registran cuando cierra cada resumen.»
+  (before: «Todavía no registraste compras ni pagos en esta tarjeta.»), above the detail's «Cuotas» list.
+- [ ] **Deleting an account.** Más → Cuentas → swipe an account holding money → Eliminar. **Expect:** «Deja de aparecer
+  en tus cuentas, en Disponible y en los formularios. Sus N movimientos y M transferencias siguen en Movimientos con su
+  nombre y su moneda. Su saldo registrado, $ …, deja de contar en Disponible.» (and the recurring sentence when a rule
+  is active), ending «Una cuenta eliminada no se puede volver a activar.»; Cancelar changes nothing. An account at zero
+  names no balance.
+- [ ] **Large text.** The new sentences at AX3 and AX5 wrap in full; nothing is clipped. No animation or haptic changed.
+
+## Fix — «Pagar tarjeta» readable in dark (PR #107, merged)
 
 Colour only: a filled semantic button's label and glyph take `onSemantic` (white in light, ink in dark). Nothing else moves.
 

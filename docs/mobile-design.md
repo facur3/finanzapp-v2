@@ -210,7 +210,8 @@ que leen son ahora los de Forest. Su restyle por pantalla queda para 24UX6B–6D
   movimientos viven en Movimientos, el análisis en Reportes, los presupuestos en Presupuestos.
 - **Movimientos.** Buscador, filtro Todos / Gastos / Ingresos / Transf., secciones
   "Hoy · 20 sep", "Ayer", día de la semana en los últimos siete días y luego la fecha,
-  con el neto del día cuando hay una sola moneda.
+  con el neto del día cuando hay una sola moneda y nada acota la lista (25Q1: con Gastos, Ingresos o una búsqueda esa
+  cifra sería la suma de una parte, no el neto del día; tampoco en los detalles de una categoría o de un día).
 - **Detalle de movimiento.** Tile, importe con signo, comercio, fecha completa y
   estado; categoría, cuenta o tarjeta, contexto de presupuesto solo si existe uno
   activo para ese mes, moneda; editar y deshacer. Nada inventado: sin referencias
@@ -856,6 +857,25 @@ La selección de porciones dentro de la dona (solo visual, dentro del reporte) *
 barras de Día a día y una cabecera fija sólida. Siguen permitidos para una pasada siguiente; no hay ruta de detalle por comercio. El orden
 vinculante del roadmap no cambia: la próxima entrega de producto es 24T3; 24UX6C (Movimientos y Más) y 24UX6D
 (Tarjetas) siguen a 24UX6B en el carril UX, y su lugar frente a 24T3 lo decide el dueño (ver `docs/mobile-roadmap.md`).
+
+## Producto 25Q1 — cifras que dicen la verdad (en su rama)
+
+Correcciones de lectura, sin cambios de dominio, almacenamiento, esquema (14), backup (v14), navegación ni movimiento.
+
+- **El enlace de categoría del Asistente** abre la cifra que cita: la pantalla compara la categoría por su clave
+  (`categoryKey`), como el reporte, aunque el enlace traiga la forma guardada («Supermercado»).
+- **Presupuestos en Reportes sin cotización.** Un presupuesto lee el libro real en su moneda y no necesita cotización:
+  su bloque queda aunque el total consolidado espere una.
+- **El neto del día** encabeza solo los movimientos completos de un día: no en el detalle de una categoría o de un día
+  (son solo gastos) ni en Movimientos con Gastos, Ingresos o una búsqueda (sería la suma de una parte).
+- **Una tarjeta archivada con saldo a favor** lo dice («Saldo a favor · $ …»), nunca «Sin saldo pendiente».
+- **Un presupuesto en una moneda sin cuentas** (permitido, decisión 7.6.3) se puede abrir, editar y borrar: Presupuestos
+  ofrece su moneda, con una nota tranquila: «Todavía no tenés cuentas en euros, así que no hay gastos para comparar con
+  este presupuesto.»
+- **Una tarjeta con solo cuotas por venir** dice «Todavía no hay movimientos. Tus cuotas se registran cuando cierra cada
+  resumen.»
+- **Eliminar una cuenta** nombra el saldo registrado que deja de contar en Disponible y termina con «Una cuenta
+  eliminada no se puede volver a activar.»; ya no dice «No borra nada», que sonaba reversible.
 
 ## Producto 25A-06 — activación del staging de la IA, fase A (sin cambios visuales)
 
@@ -3077,6 +3097,11 @@ crédito, marca elegida) y los filetes de las píldoras, el chip y el compositor
 color propio.
 
 ## Pendiente de revisión en iPhone
+
+- Producto 25Q1 (en su rama; el build de desarrollo posterior a #113): el enlace de categoría del Asistente, los
+  presupuestos de Reportes sin cotización, el neto del día con filtros, la tarjeta archivada a favor, el presupuesto en
+  una moneda sin cuentas, la tarjeta con solo cuotas y el texto de eliminar una cuenta (docs/mobile-device-checklist.md,
+  «Producto 25Q1»).
 
 - Producto 25A-06 B7, decisión A (en su rama; sin build de EAS): en la vista de prueba, la nota debajo de la respuesta
   para el comercio demasiado largo, en español y en inglés; el resto con el Asistente conectado

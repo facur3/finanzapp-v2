@@ -1,6 +1,8 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-15 (25A-06 **B8 closed**: the owner-led drills ran on 2026-10-14 and 2026-10-15 at `S` 173ce76; the
+Updated: 2026-10-15, later (**25Q1 — money that reads right**, on its branch: the first delivery after the post-B8 audit,
+seven read-side corrections where the app showed a wrong or missing figure, plus an honest account-deletion confirmation;
+no domain, storage, schema 14, backup v14, navigation or animation change; «Producto 25Q1», §1, §2). Before (2026-10-15, 25A-06 **B8 closed**: the owner-led drills ran on 2026-10-14 and 2026-10-15 at `S` 173ce76; the
 record names the evidence that was not kept, accounts for the fourth settled reservation by inference, gives the month total, 2 649
 µUSD, and B9's inputs; the runbook takes the corrections B8 found; `master` is unfrozen once this merges; «Producto
 25A-06», runbook §0.2, §6.4, §6.5, §12. **CI:** the Expo SDK 57 patches aligned again, with a native change, so a new
@@ -393,6 +395,12 @@ history file keeps the evidence of when and why.
   branch and PR per delivery, CI green, the checks recorded in this file at handoff.
 
 ## 1. Implemented (current state)
+
+- **25Q1 — money that reads right (on its branch; Metro on the new development build).** «Producto 25Q1». The
+  Assistant's category link opens the figure it cites; Reportes keeps budgets while a consolidated total waits for a
+  rate; «Neto del día» heads only a whole day's movements; an archived card in credit says so; a budget in a currency no
+  account holds stays reachable; a card with only instalments to come says when they are recorded; deleting an account
+  names the balance leaving Disponible and that the deletion is final.
 
 What exists in code on `master` as of Producto 24T3 (PR #76, merge commit 399a1fa), after 24UX6E (PR #75, merge commit
 d30b77f), 24UX6D (PR #74, merge
@@ -922,6 +930,10 @@ it was checked in). Metro from `master` (or a delivery's branch) on the installe
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
+- **25Q1 — money that reads right (on its branch; the development build after PR #113):** the checklist's «Producto
+  25Q1»: the Assistant's category link (fixtures), Reportes without a rate, the day headings under a filter, an archived
+  card in credit, a budget in euros with no euro account, a card with only cuotas to come, the account deletion text.
+
 - **25A-06 — ledger currencies (PR #101; no EAS build; nothing
   device-verified):** every build stays disconnected; the fixture view is unchanged. With a connected build (25A-07), a
   ledger in MXN, COP, EUR or JPY records through the Assistant (the currency chips name any ledger currency in the
@@ -1171,6 +1183,11 @@ item unless a section says a new native build is needed. The checklist sections 
   TestFlight.
 
 ## 3. Next deliveries
+
+*(2026-10-15: after B8 the post-audit quality deliveries run one at a time, each a focused PR with its tests and its
+iPhone steps: #113 (B8 closed, Expo CI), #112's finish line, 25Q1 (money that reads right); next, in the owner's order
+of priorities, the payment-edit guards once #112 merges (they share its form), backup and recovery, touch reliability
+and robustness, accessibility, then the App Store shell when its inputs exist. Nothing here reorders a feature.)*
 
 **Recommended next (2026-10-10, corrected after the owner's review): the release plan.** 2026-10-31 is a **target, not a
 mandatory public release deadline**. *(Owner preference, 2026-10-13, §4 «Release plan to 2026-10-31»: milestone (2)
@@ -4442,6 +4459,47 @@ nothing of it is on a screen yet.
   local, Linux, same results: root `npm test` 590 passed, 1 todo; `check:repo` OK; `typecheck` OK; `test:storage` 1247
   passed, 0 failed; `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0 errors, 0 stale; `check` OK;
   `export:ios` OK. No account, handle, ad account or campaign created.
+
+### Producto 25Q1 — money that reads right (this PR)
+
+- **Why.** The whole-app audit of 2026-10-15 (private record) found screens that print a wrong, zero or missing figure.
+  These seven are read-side only and independent of PR #112; the write-side guards for editing or restoring a payment
+  share #112's transfer form and follow its merge.
+- **What.**
+  - *The Assistant's category link* (`app/spending-detail.tsx`): the link carries the stored spelling («Supermercado»)
+    and the screen compared it with normalised keys, so the evidence meant to verify an answer opened «$ 0,00»; both
+    sides now compare `categoryKey`. A gate for the AI-first release (AGENTS rule 12), latent while every build is
+    disconnected. The screen shows the category's net, as before; the Assistant's row is gross (the known gap of 25A).
+  - *Budgets without a rate* (`app/(tabs)/reports.tsx`): a budget reads the real ledger in its own currency and needs
+    no rate (currency.md), so Reportes keeps its block when a consolidated total waits for one.
+  - *«Neto del día»* (`EntryList dayNet`): off on a category's or a day's drill-down (expenses only) and on Movimientos
+    under Gastos, Ingresos or a search (a subset's sum, read aloud as the day's net); on for the whole day's
+    movements, as before. *The Movimientos part is its own commit, droppable if the owner prefers the figure there.*
+  - *An archived card in credit* reads «Saldo a favor · $ …», never «Sin saldo pendiente» (`ArchivedCardRow`).
+  - *A budget in a currency no account holds* (allowed by decision 7.6.3) can be opened, edited and deleted:
+    Presupuestos offers its currency, with one quiet note that there are no expenses to compare
+    (`budgetCurrencies`; a deleted account's history counts as held).
+  - *A card whose only records are instalments still to come* says «Todavía no hay movimientos. Tus cuotas se registran
+    cuando cierra cada resumen.» instead of «no registraste compras ni pagos» (Tarjetas and the card detail).
+  - *Deleting an account* (the only confirmation, from the row, the rotor or Editar cuenta) names the recorded balance
+    that stops counting in Disponible (either sign) and ends with «Una cuenta eliminada no se puede volver a activar.»;
+    «No borra nada» goes (it read as reversible).
+- **Copy for the owner to confirm** (Spanish; English in the catalogue): the two new sentences above, the budget note
+  («Todavía no tenés cuentas en {euros}, así que no hay gastos para comparar con este presupuesto.») and the two
+  deletion sentences. Not done, owner-gated: the capture hub's captions (decision 005 pins them).
+- **Tests.** Each new assertion fails on the source before its change: the category link by every spelling and end to
+  end from the Assistant's evidence (`spending-home`), the budget block without a rate and the drill-downs' day net
+  (`report-routes`), Movimientos' day net (`activity-route`), the archived credit and the plans-only card
+  (`installment-routes`), the unheld-currency budget and `budgetCurrencies` (`budgets-routes`), the deletion text with
+  its balance and finality (`lifecycle-actions`, `polish-routes`).
+- **Checks** (local, Linux, 2026-10-15): `typecheck` OK; `test:storage` 1375 passed, 0 failed, 1 skipped (5
+  new tests and new assertions in five others); `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0
+  errors, 0 stale (English accepted after review); `i18n:extract` no copy outside the catalogue; `expo install --check`
+  live and offline up to date; `export:ios` and the bundle secret scan OK; root `npm test` 703 passed; `check:repo` OK.
+  None of this is iPhone QA.
+- **Invariants.** Integer minor units only; unknown stays unknown (a missing rate still withholds every converted
+  total; a budget's zero in a never-held currency is explained, never shown as verified); no domain, storage, schema 14,
+  backup v14, navigation, motion or write-path change.
 
 ### Producto 25VIS1 — Electric Lime palette, accepted as the current palette (PR #83, merged)
 

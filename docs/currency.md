@@ -236,7 +236,7 @@ changes is only which currency's budgets Inicio and Reportes show (`budgetScope`
 shown, as before; consolidated, the display currency's budgets when it has one for the month, otherwise the first
 held currency's, with the section title naming that currency ("Presupuesto del mes · ARS"). Budget facts among the
 insights are written in the budget's currency; the largest expense and the growth in the shown one. Presupuestos is
-unchanged by 24C1. Budgets need no rate: a month without a rate keeps its budget card.
+unchanged by 24C1. Budgets need no rate: a month without a rate keeps its budget card (on Reportes too since 25Q1).
 
 **Transfers and card payments** are never spending in either mode (they are transfers, not entries); a card
 purchase is one expense on the card. Disponible never includes cards, debts or receivables.
@@ -887,7 +887,8 @@ Rules for every stage:
 **progressively**, each only when every path it touches is verified; zero- and
 three-decimal currencies need their own tests, including VoiceOver on an iPhone, before
 they open. The future selector lists only currencies actually enabled (7.6.2: the first
-option). A budget may be in a currency the person holds no account in (7.6.3: allowed).
+option). A budget may be in a currency the person holds no account in (7.6.3: allowed); since 25Q1 Presupuestos offers that
+currency, so the budget can be read, edited and deleted, with a note that no expenses exist to compare.
 New users choose their first currency in the onboarding; the preferences and data of
 existing users are never changed automatically. The irreversible SQLite upgrade (7.6.5) is
 **not authorized yet**: compatibility is implemented and verified first. The Assistant stays
