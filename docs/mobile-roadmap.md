@@ -6135,8 +6135,10 @@ nothing of it is on a screen yet.
       `reserved` 0, no race or kill row. (4) `$P api` 7/7; Vercel holds exactly the 11 variables of §4.4, Production
       only, Sensitive, each last edited at its own drill's restore, and no deployment after `dpl_8VEDnDPc…` (read by
       the agent at 19:20, no value read). The drill keys were refused after their revoke (503 `database` at 13:54:33,
-      502 `provider_http` at 16:29:08); OpenAI's and Supabase's key lists show no drill key active: **owner's read,
-      to confirm**. Final switches: deployment `true`, database `false`.
+      502 `provider_http` at 16:29:08), and the owner read both key lists on 2026-10-15: in OpenAI `finanzapp-staging`
+      the drill-15 temporary key is no longer active and the original credentials are still available; in Supabase
+      `finanzapp-staging` no drill-4 temporary key remains and the permanent keys are still present. No drill key is
+      active. Final switches: deployment `true`, database `false`.
     - *Month total (the query of §12.2 step 5): 2 649 µUSD*, all of it B8's (the evaluations bypass the
       reservations): 788 µUSD settled plus drill 15's unsettled row at its maximum, 1 861, counted and never freed
       (§9.2); `open_rows` 1.
