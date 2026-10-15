@@ -9,9 +9,11 @@ import { router } from 'expo-router';
 import { radius, space, type, useCurrentDay, usePalette, useReduceMotion, type Palette } from './theme';
 import type { IconName } from './categories';
 import { tintOf } from './category-color';
+import { quietTones } from './palette';
 import { useDockInset } from './dock-clearance';
 import { useAccountLook, useAccountNameOf, useCategoryLook } from './category-hues';
-import { AMOUNT_FIELD, PROMINENT_SEGMENT, ROW_CHEVRON, ROW_STACK_SCALE, SEGMENT_GAP, SEGMENT_PADDING, amountFieldLayout, fitFontSize, rowStacks, segmentLayout } from './geometry';
+import { AMOUNT_FIELD, HERO_MAX_SCALE, PROMINENT_SEGMENT, ROW_CHEVRON, ROW_MAX_SCALE, ROW_STACK_SCALE, SEGMENT_GAP, SEGMENT_PADDING, TITLE_MAX_SCALE, amountFieldLayout, fitFontSize,
+  rowStacks, segmentLayout } from './geometry';
 import { duration, easeOut, selectionHaptic, timing } from './motion';
 import { AmountInput, displayAmount, precisionOf, splitAmount, type AmountNotice, type PasteRejection } from './money-input';
 import { BUILD_MERCHANT_MARK_PREVIEW, merchantMark } from './merchant-mark';
@@ -70,7 +72,10 @@ export const UNAVAILABLE_AMOUNT = '—';
  * and the read-only SelectionRow here; raw elements at their call sites). It
  * is undefined unless the interface language differs from the device's first
  * language, so a matching setup keeps the voice chosen in iOS Settings. An
- * explicit `accessibilityLanguage` from the caller wins (an autonym). */
+ * explicit `accessibilityLanguage` from the caller wins (an autonym).
+ *
+ * 25D1: the two big titles stop at Apple's AX5 size (`TITLE_MAX_SCALE`); an
+ * explicit `maxFontSizeMultiplier` still wins. */
 export function AppText({ children, style, secondary = false, tertiary = false, variant = 'body', ...props }: TextProps & {
   secondary?: boolean; tertiary?: boolean; variant?: keyof typeof type;
 }) {
@@ -78,7 +83,7 @@ export function AppText({ children, style, secondary = false, tertiary = false, 
   const { speechLanguage } = useI18n();
   const flat = StyleSheet.flatten(style);
   const fits = flat?.fontSize && !flat.lineHeight ? { lineHeight: Math.round(flat.fontSize * 1.25) } : null;
-  return <Text {...props} accessibilityLanguage={props.accessibilityLanguage ?? speechLanguage}
+  return <Text {...props} accessibilityLanguage={props.accessibilityLanguage ?? speechLanguage} maxFontSizeMultiplier={props.maxFontSizeMultiplier ?? TITLE_MAX_SCALE[variant]}
     style={[type[variant], { color: tertiary ? p.tertiary : secondary ? p.secondary : p.text }, style, fits]}>{children}</Text>;
 }
 
@@ -199,8 +204,10 @@ export function ActionButton({ label, spokenLabel, onPress, disabled = false, bu
 
 export function IconButton({ name, label, onPress, disabled = false, color }: { name: IconName; label: string; onPress: () => void; disabled?: boolean; color?: string }) {
   const p = usePalette();
+  // 25D1: a control that cannot grow with the text offers the Large Content Viewer (a long press at the accessibility
+  // sizes shows its name large), as the dock tabs do.
   return <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={label} onPress={onPress}
-    disabled={disabled} accessibilityState={{ disabled }}
+    disabled={disabled} accessibilityState={{ disabled }} accessibilityShowsLargeContentViewer accessibilityLargeContentTitle={label}
     style={{ width: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.35 : 1 }}><Ionicons name={name} size={24} color={color ?? p.text} /></PressFeedback>;
 }
 
@@ -407,7 +414,10 @@ function Choice({ label, spokenLabel, selected, disabled, onPress, compact = fal
   // On the new architecture a child's slop outside its parent still hits (the parent's overflow inset includes it), as long
   // as nothing clips the track and no later sibling covers the slop (the composer's switch leaves room under it).
   return <Pressable accessibilityRole="button" accessibilityLabel={spokenLabel} accessibilityState={{ selected, disabled }} disabled={disabled} accessibilityLanguage={speechLanguage}
-    onPress={onPress} style={[styles.choice, compact && styles.choiceCompact, onField && styles.choiceField, prominent && { minHeight: PROMINENT_SEGMENT.minHeight }]}
+    // 25D1: a segment under the finger dims to 60 % until it lifts (touch-down feedback, colour only, so Reduce Motion
+    // needs nothing); the chosen one never dims, since tapping it does nothing.
+    onPress={onPress} style={({ pressed }) => [styles.choice, compact && styles.choiceCompact, onField && styles.choiceField, prominent && { minHeight: PROMINENT_SEGMENT.minHeight },
+      pressed && !selected ? { opacity: 0.6 } : null]}
     hitSlop={compact ? { top: 8, bottom: 8 } : onField || prominent ? 4 : { top: 6, bottom: 6 }}>
     {/* 24T3: the prominent label has no shrink-to-fit at all (its labels fit at the 1.3× cap; see PROMINENT_SEGMENT). */}
     {prominent ? <Animated.Text numberOfLines={1} maxFontSizeMultiplier={PROMINENT_SEGMENT.maxScale}
@@ -517,7 +527,9 @@ export function LifecycleNote({ icon, title, detail, tone = 'neutral' }: { icon:
 export function InfoButton({ title, detail, label }: { title: string; detail: string; label?: string }) {
   const p = usePalette();
   const { t } = useI18n();
-  return <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={label ?? t('common.moreInfoAbout', { title: title.toLowerCase() })} hitSlop={8}
+  const name = label ?? t('common.moreInfoAbout', { title: title.toLowerCase() });
+  return <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={name} hitSlop={8}
+    accessibilityShowsLargeContentViewer accessibilityLargeContentTitle={name}
     onPress={() => Alert.alert(title, detail, [{ text: t('common.ok'), style: 'cancel' }])} style={{ minHeight: 28, minWidth: 28, alignItems: 'center', justifyContent: 'center' }}>
     <Ionicons name="information-circle-outline" size={18} color={p.tertiary} accessible={false} />
   </PressFeedback>;
@@ -550,7 +562,6 @@ export function ErrorMessage({ message, announce = true }: {
   </View> : null;
 }
 
-const HERO_MAX_SCALE = 1.4, ROW_MAX_SCALE = 1.8;
 const AMOUNT_GAP = 6;
 /** The widest share of a row an amount may take beside a name before the row stacks: a full ARS price fits whole, the name still has half the row. */
 const AMOUNT_COLUMN = '56%';
@@ -586,10 +597,12 @@ export function Money({ minor, currency, large = false, color, signed = false, s
   const ink = color ?? semantic;
   // A hero is one amount in three weights of the same colour: the symbol and
   // the cents step back so the whole units carry the number. Same size, same
-  // baseline, one accessibility label; nested spans keep it one line.
+  // baseline, one accessibility label; nested spans keep it one line. 25D1: a
+  // coloured hero keeps its hue and lowers its alpha only as far as 3:1 allows
+  // (QUIET_ALPHA); a colour that is not a six-digit hex takes the neutral pair.
   const parts = hero && safe ? splitAmount(text, amountFormat) : null;
   const quiet = onField ? { symbol: p.heroMoneySymbol, cents: p.heroMoneyCents }
-    : ink === p.text ? { symbol: p.secondary, cents: p.tertiary } : { symbol: ink + 'B3', cents: ink + '8C' };
+    : ink === p.text ? { symbol: p.secondary, cents: p.tertiary } : quietTones(ink, p.isDark) ?? { symbol: p.secondary, cents: p.tertiary };
   const body = <Text accessibilityLabel={label} accessibilityLanguage={speechLanguage} numberOfLines={1} adjustsFontSizeToFit={!hero} minimumFontScale={0.75}
     maxFontSizeMultiplier={hero ? HERO_MAX_SCALE : ROW_MAX_SCALE}
     style={{ color: ink, fontSize, lineHeight: hero ? Math.round(fontSize * 1.18) : undefined, fontWeight: weight ?? (large ? '700' : '600'),
@@ -642,26 +655,29 @@ export function DetailRow({ label, value, spokenValue, icon, leading, onPress, l
  * title as the primary line, the description underneath it in the secondary
  * colour, and a chevron. Title and subtitle never compete for one line, so a
  * long title ("Deudas y cobros") and a long description ("Debo · me deben")
- * both fit at any text size; each may wrap to two lines before truncating. */
+ * each get two lines before truncating at the default sizes; above the shared
+ * stacking threshold (`useStacked`, 1.2×) the limit is lifted, as EntryRow
+ * does, so nothing is cut at the accessibility sizes (25D1). */
 export function NavigationRow({ title, subtitle, icon, leading, onPress, last = false, disabled = false }: {
   title: string; subtitle?: string; icon?: IconName; leading?: ReactNode; onPress: () => void; last?: boolean; disabled?: boolean;
 }) {
   const p = usePalette();
+  const lines = useStacked() ? undefined : 2;
   return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={subtitle ? title + ', ' + subtitle : title}
     disabled={disabled} accessibilityState={{ disabled }} onPress={onPress}
     style={[styles.navigationRow, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, opacity: disabled ? 0.6 : 1 }]}>
     {leading ?? (icon && <View style={styles.navigationGlyph}><Ionicons name={icon} size={22} color={p.secondary} accessible={false} /></View>)}
     <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-      <AppText numberOfLines={2} style={{ fontWeight: '600' }}>{title}</AppText>
-      {!!subtitle && <AppText secondary variant="footnote" numberOfLines={2}>{subtitle}</AppText>}
+      <AppText numberOfLines={lines} style={{ fontWeight: '600' }}>{title}</AppText>
+      {!!subtitle && <AppText secondary variant="footnote" numberOfLines={lines}>{subtitle}</AppText>}
     </View>
     <Ionicons name="chevron-forward" size={16} color={p.tertiary} accessible={false} />
   </PressFeedback>;
 }
 
 /** One option of a list where exactly one is chosen (Idioma, Región): the
- * NavigationRow shape (title over a footnote subtitle, each up to two lines,
- * 60 pt minimum) with a checkmark on the chosen option instead of a chevron,
+ * NavigationRow shape (title over a footnote subtitle, each up to two lines
+ * until the text is large enough to stack, then whole; 60 pt minimum) with a checkmark on the chosen option instead of a chevron,
  * because pressing it chooses rather than navigates. VoiceOver reads the
  * title and subtitle as one label and "selected" on the chosen one.
  * `accessibilityLanguage` overrides the interface language for that label: a
@@ -671,12 +687,13 @@ export function CheckRow({ title, subtitle, selected, onPress, last = false, dis
   title: string; subtitle?: string; selected: boolean; onPress: () => void; last?: boolean; disabled?: boolean; accessibilityLanguage?: string;
 }) {
   const p = usePalette();
+  const lines = useStacked() ? undefined : 2;
   return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={subtitle ? title + ', ' + subtitle : title}
     accessibilityLanguage={accessibilityLanguage} disabled={disabled} accessibilityState={{ disabled, selected }} onPress={onPress}
     style={[styles.navigationRow, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, opacity: disabled ? 0.6 : 1 }]}>
     <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-      <AppText numberOfLines={2} style={{ fontWeight: '600' }}>{title}</AppText>
-      {!!subtitle && <AppText secondary variant="footnote" numberOfLines={2}>{subtitle}</AppText>}
+      <AppText numberOfLines={lines} style={{ fontWeight: '600' }}>{title}</AppText>
+      {!!subtitle && <AppText secondary variant="footnote" numberOfLines={lines}>{subtitle}</AppText>}
     </View>
     <View style={styles.navigationGlyph}>{selected && <Ionicons name="checkmark" size={22} color={p.primary} accessible={false} />}</View>
   </PressFeedback>;

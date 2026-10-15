@@ -23,7 +23,10 @@ export function MetricHelp({ title, detail, color }: { title: string; detail: st
   const p = usePalette();
   const { t } = useI18n();
   // 24UX6A: a 44 pt target (the glyph is 18 pt; the slop makes up the rest), drawn in the field's secondary ink on Inicio.
-  return <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('common.whatIs', { title })} hitSlop={10}
+  // 25D1: the glyph cannot grow with the text, so a long press at the accessibility sizes shows its name large.
+  const name = t('common.whatIs', { title });
+  return <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={name} hitSlop={10}
+    accessibilityShowsLargeContentViewer accessibilityLargeContentTitle={name}
     onPress={() => Alert.alert(title, detail, [{ text: t('common.ok'), style: 'cancel' }])} style={{ minHeight: 24, paddingHorizontal: 4 }}>
     <Ionicons name="information-circle-outline" size={18} color={color ?? p.secondary} accessible={false} />
   </PressFeedback>;

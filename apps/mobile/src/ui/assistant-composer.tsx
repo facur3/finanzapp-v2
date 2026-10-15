@@ -52,11 +52,11 @@ export function AssistantComposer({ value, onChange, onSend, onStop, busy, disab
         selectionColor={p.primary} keyboardAppearance={p.isDark ? 'dark' : 'light'} textAlignVertical="center"
         style={[styles.input, { color: p.text, maxHeight, lineHeight: LINE_HEIGHT }]} />
       {busy
-        ? <PressFeedback accessibilityRole="button" accessibilityLabel={t('assistant.composer.stop')} onPress={onStop} style={styles.round}>
+        ? <PressFeedback accessibilityRole="button" accessibilityLabel={t('assistant.composer.stop')} onPress={onStop} containerStyle={styles.roundSlot} style={styles.round}>
           <View style={[styles.send, { backgroundColor: p.inset }]}><Ionicons name="stop" size={14} color={p.text} accessible={false} /></View>
         </PressFeedback>
         : <PressFeedback accessibilityRole="button" accessibilityLabel={t('assistant.composer.send')} accessibilityState={{ disabled: !canSend }} disabled={!canSend}
-          onPress={onSend} style={styles.round}>
+          onPress={onSend} containerStyle={styles.roundSlot} style={styles.round}>
           <View style={[styles.send, { backgroundColor: canSend ? p.primaryFill : p.inset }]}>
             <Ionicons name="arrow-up" size={18} color={canSend ? p.onPrimary : p.tertiary} accessible={false} />
           </View>
@@ -89,6 +89,9 @@ const styles = StyleSheet.create({
   bar: { flexDirection: 'row', alignItems: 'flex-end', gap: 2, paddingLeft: 16, paddingRight: 6, paddingVertical: 4, borderRadius: 24, minHeight: 48 },
   barShadow: { shadowColor: '#0A0A0C', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } },
   input: { flex: 1, fontSize: 17, paddingTop: Platform.OS === 'ios' ? 9 : 6, paddingBottom: Platform.OS === 'ios' ? 9 : 6, minHeight: 40 },
-  round: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', minHeight: 40 },
+  // 25D1: a real 44 pt target (it was 40) that still costs 40 pt of layout: the extra 2 pt each side sit inside the bar's
+  // 4 pt padding, so the 32 pt disc, the field and the 48 pt bar do not move.
+  round: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', minHeight: 44 },
+  roundSlot: { margin: -2 },
   send: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
 });

@@ -108,3 +108,16 @@ export const darkPalette: typeof lightPalette = {
 };
 
 export type PaletteColors = typeof lightPalette;
+
+/** 25D1: how much of a coloured hero's own tone its symbol and cents keep (two-digit hex alpha). The quiet parts sit over
+ * any ground (the canvas, a card, a sheet); on the light sand 30 to 45 % of the ground showed through and the cents fell
+ * to 2.2:1, under the 3:1 a hero's figure (28 pt or more) needs. Floors pinned by tests/contrast-floors.node.ts. */
+export const QUIET_ALPHA = { light: { symbol: 'E6', cents: 'CC' }, dark: { symbol: 'B3', cents: '99' } } as const;
+
+/** A coloured hero's symbol and cents: its own tone, quieter, one step each. `null` for an ink that is not a six-digit
+ * hex (no valid colour can be built from it; the caller falls back to the neutral pair). */
+export function quietTones(ink: string, isDark: boolean): { symbol: string; cents: string } | null {
+  if (!/^#[0-9A-Fa-f]{6}$/.test(ink)) return null;
+  const alpha = QUIET_ALPHA[isDark ? 'dark' : 'light'];
+  return { symbol: ink + alpha.symbol, cents: ink + alpha.cents };
+}

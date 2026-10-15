@@ -12,6 +12,7 @@ import type { AppLocale } from '../src/i18n/locale.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
 import * as i18nLocale from '../src/i18n/locale.ts';
 import * as movementAmount from '../src/ui/movement-amount.ts';
+import * as paletteModule from '../src/ui/palette.ts';
 
 const { AMOUNT_FIELD, amountFieldLayout, amountWidthEm, fitFontSize } = geometry;
 const { displayAmount } = moneyInput;
@@ -177,7 +178,7 @@ function loadComponents(locale: AppLocale = 'es-AR', deviceLanguage: string | nu
     'expo-router': { router: {} },
     './theme': { radius: {}, space: {}, type: { body: { fontSize: 17, lineHeight: 22 } }, useCurrentDay: () => '2026-09-20', useReduceMotion: () => true, usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', income: '#008800', transfer: '#03c', warning: '#a60', heroInk: '#131411', heroMoneySymbol: '#3A3C3F', heroMoneyCents: '#505255' }) },
     './categories': { categoryIcon: () => 'pricetag-outline' },
-    './dock-clearance': { useDockInset: () => ({ extraPadding: 0, indicator: undefined }) }, './category-color': { tintOf: (c: string) => c }, './category-hues': { useCategoryColor: () => '#111', useCategoryLook: (label: string) => ({ label, hex: '#111', glyph: 'pricetag-outline' }), useAccountLook: () => ({ glyph: 'wallet-outline', hex: '#2557D6' }) },
+    './palette': paletteModule, './dock-clearance': { useDockInset: () => ({ extraPadding: 0, indicator: undefined }) }, './category-color': { tintOf: (c: string) => c }, './category-hues': { useCategoryColor: () => '#111', useCategoryLook: (label: string) => ({ label, hex: '#111', glyph: 'pricetag-outline' }), useAccountLook: () => ({ glyph: 'wallet-outline', hex: '#2557D6' }) },
     './geometry': geometry, './merchant-mark': merchantMark, './money-input': moneyInput, './motion': { duration: {}, easeOut: {}, selectionHaptic: () => {}, timing: () => ({}) },
     '../i18n/provider': { useI18n: () => bindLocale(locale, 'native', deviceLanguage, held) }, '../i18n/format': i18nFormat, '../i18n/locale': i18nLocale, '../i18n/messages': {},
   };
@@ -217,7 +218,9 @@ test('Money sizes a hero from its measured width and leaves rows to the native f
   const income = render({ minor: 1234, currency: 'USD', large: true, signed: true, tone: 'income' }).props.children;
   const [greenSymbol, greenWhole, greenCents] = income.props.children.props.children;
   assert.equal(greenSymbol.props.children + greenWhole + greenCents.props.children, '+US$\u00A012,34');
-  assert.equal(greenSymbol.props.style.color, '#008800B3', 'a coloured hero keeps its hue and only lowers the alpha');
+  // 25D1 (deliberate golden change): in light the symbol keeps 90 % and the cents 80 % of the hue (were 70 % / 55 %,
+  // 2.2:1 on the sand); QUIET_ALPHA in palette.ts, floors in tests/contrast-floors.node.ts.
+  assert.equal(greenSymbol.props.style.color, '#008800E6', 'a coloured hero keeps its hue and only lowers the alpha');
   assert.equal(income.props.style.color, '#008800');
   // Regression for the clipped category title: a larger fontSize on the body variant must not keep the 22 pt line box.
   const heading = flatten(module.exports.AppText!({ children: 'Comida', style: { fontSize: 26, fontWeight: '700' } }).props.style);
@@ -246,9 +249,39 @@ test('25A-03: a hero on Inicio\'s field takes the solid graphite symbol and cent
   assert.deepEqual([symbol.props.style.fontWeight, cents.props.style.fontWeight], ['600', '600']);
   // Without the flag nothing changes: another coloured hero keeps its own hue at an alpha, an ink one the canvas greys.
   const [plainSymbol, , plainCents] = plain.props.children.props.children;
-  assert.deepEqual([plainSymbol.props.style.color, plainCents.props.style.color], ['#131411B3', '#1314118C']);
+  assert.deepEqual([plainSymbol.props.style.color, plainCents.props.style.color], ['#131411E6', '#131411CC']);
   const canvas = render('Money', { minor: 123456, currency: 'ARS', large: true }).props.children.props.children.props.children;
   assert.deepEqual([canvas[0].props.style.color, canvas[2].props.style.color], ['#666', '#999']);
+});
+
+test('25D1: AppText stops the two big titles at Apple\'s AX5 size; every other style keeps its growth; an explicit cap wins', () => {
+  const { render } = loadComponents();
+  const cap = (props: Record<string, unknown>) => render('AppText', { children: 'x', ...props }).props.maxFontSizeMultiplier;
+  // The HIG's larger accessibility sizes at AX5: Large Title 34 → 60 pt, Title 1 28 → 58 pt.
+  assert.equal(Math.round(34 * cap({ variant: 'largeTitle' })), 60);
+  assert.equal(Math.round(28 * cap({ variant: 'title1' })), 58);
+  for (const variant of [undefined, 'body', 'title2', 'title3', 'headline', 'footnote']) assert.equal(cap({ variant }), undefined, String(variant));
+  assert.equal(cap({ variant: 'largeTitle', maxFontSizeMultiplier: 1.2 }), 1.2);
+  assert.equal(cap({ variant: 'body', maxFontSizeMultiplier: 1.4 }), 1.4);
+});
+
+test('25D1: the first opening\'s titles keep every word whole at AX5 on 375 and 393 pt (they drew about 120 pt before)', () => {
+  // The screen draws them as the two big titles, so AppText's own cap applies to them.
+  const onboarding = readFileSync(new URL('../app/onboarding.tsx', import.meta.url), 'utf8');
+  assert.match(onboarding, /<AppText accessibilityRole="header" variant="largeTitle">\{t\('onboarding\.welcome\.title'\)\}<\/AppText>/);
+  assert.match(onboarding, /<AppText accessibilityRole="header" variant="title1">\{t\('onboarding\.account\.title'\)\}<\/AppText>/);
+  const { render } = loadComponents();
+  const capOf = (variant: string) => render('AppText', { variant, children: 'x' }).props.maxFontSizeMultiplier as number;
+  // The stage is the screen less 2 × 20 pt; a word is bold (+10 %). React Native multiplies every style by 3.571 at AX5.
+  for (const locale of ['es-AR', 'en-US'] as const) {
+    const { t } = bindLocale(locale);
+    for (const [key, size, ratio] of [['onboarding.welcome.title', 34, capOf('largeTitle')], ['onboarding.account.title', 28, capOf('title1')]] as const) {
+      const words = t(key).split(' ').map(word => geometry.labelWidthEm(word) * size * 1.1);
+      const screens = locale === 'es-AR' ? [320, 375, 393] : [375, 393]; // English «spending,» at 320 pt is a device check.
+      for (const width of screens) assert.ok(Math.max(...words) * ratio <= width - 40, `${locale} ${key} at ${width} pt`);
+      assert.ok(Math.max(...words) * 3.571 > 393 - 40, `${locale} ${key}: uncapped, its longest word broke`);
+    }
+  }
 });
 
 test('Money in the four language × region combinations: the region writes the number and the symbol, the language speaks it', () => {

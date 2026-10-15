@@ -126,8 +126,11 @@ export function donutRoom(size: number, thickness: number): number {
  * never below 18 pt. An amount that does not fit at 18 pt moves under the donut instead (never shrunk further, never
  * truncated, never approximated). */
 export const CENTRE_AMOUNT_STEPS = [26, 24, 22, 20, 18] as const;
-/** Money's own cap on Dynamic Type for an amount that is not a hero (`ROW_MAX_SCALE` in components.tsx). */
+/** Money's own cap on Dynamic Type for an amount that is not a hero (`ROW_MAX_SCALE` in geometry.ts). */
 export const MONEY_MAX_SCALE = 1.8;
+/** 25D1: the month axis under the bars stops at 1.4×: the widest short month (1.83 em at 12 pt, semibold when chosen)
+ * then needs about 33 pt, inside the 36 pt column of a 320 pt screen. */
+export const AXIS_MAX_SCALE = 1.4;
 
 /** The largest step of `CENTRE_AMOUNT_STEPS` at which `amountText` fits `room` at this text scale, or null when not even
  * the smallest does. */
@@ -272,7 +275,7 @@ function Sweep({ arcs, size, thickness, ring, reveal, chosen }: {
 }
 
 /** The locale's short month name ("sep", "Sep"): its short date of the first, without the day. For the
- * axis only: VoiceOver gets the full name, since a voice may read "mar" or "may" as a word. */
+ * axis only, which VoiceOver skips: each bar speaks the full name, since a voice may read "mar" or "may" as a word. */
 export function shortMonth(monthISO: string, formatDate: (dateISO: string, style: 'day') => string): string {
   return formatDate(monthISO.slice(0, 7) + '-01', 'day').replace(/(^1\s+|\s+1$)/, '');
 }
@@ -299,7 +302,7 @@ export function MonthBars({ points, selected, onSelect, currency, height = 120 }
 }) {
   const p = usePalette();
   const reduced = useReduceMotion();
-  const { t, formatDate, currencySymbol, formatWholeUnits, speechLanguage, moneyText, spokenMoney } = useI18n();
+  const { t, formatDate, currencySymbol, formatWholeUnits, moneyText, spokenMoney } = useI18n();
   const max = Math.max(...points.map(point => Math.max(0, point.amountMinor)), 1);
   const current = points.find(point => point.monthISO === selected);
   return <View style={{ gap: 8 }}>
@@ -307,8 +310,10 @@ export function MonthBars({ points, selected, onSelect, currency, height = 120 }
       {points.map(point => <Bar key={point.monthISO} point={point} fraction={Math.max(0, point.amountMinor) / max} selected={point.monthISO === selected}
         onPress={() => onSelect(point.monthISO)} currency={currency} height={height} />)}
     </View>
-    <View style={{ flexDirection: 'row', gap: 6 }}>
-      {points.map(point => <Animated.Text key={point.monthISO} accessibilityLanguage={speechLanguage} style={{ flex: 1, fontSize: 12, lineHeight: 16, textAlign: 'center', fontWeight: point.monthISO === selected ? '600' : '400',
+    {/* 25D1: the axis is for the eye only. Each bar already says its month, year and amount, so VoiceOver skips the six
+        ticks (HIG, charts: hide axis labels from assistive technology), and a tick stays one line inside its column. */}
+    <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{ flexDirection: 'row', gap: 6 }}>
+      {points.map(point => <Animated.Text key={point.monthISO} numberOfLines={1} maxFontSizeMultiplier={AXIS_MAX_SCALE} style={{ flex: 1, fontSize: 12, lineHeight: 16, textAlign: 'center', fontWeight: point.monthISO === selected ? '600' : '400',
         color: point.monthISO === selected ? p.primary : p.secondary, transitionProperty: 'color', transitionDuration: reduced ? 0 : duration.state }}>
         {shortMonth(point.monthISO, formatDate)}
       </Animated.Text>)}

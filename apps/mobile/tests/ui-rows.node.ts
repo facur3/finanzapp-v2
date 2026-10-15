@@ -7,6 +7,7 @@ import * as merchantMark from '../src/ui/merchant-mark.ts';
 import * as currencies from '../src/ui/currencies.ts';
 import { CURRENCIES, currencyOption, currencyOptions, searchCurrencies } from '../src/ui/currencies.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
+import * as paletteModule from '../src/ui/palette.ts';
 import * as geometry from '../src/ui/geometry.ts';
 import { formatMinorUnits } from '@finanzapp/domain';
 import * as i18nFormat from '../src/i18n/format.ts';
@@ -49,7 +50,7 @@ function load(file: string, extra: Record<string, unknown> = {}, fontScale = 1, 
     './theme': { radius: { chip: 14, tile: 12, group: 16, card: 20, sheet: 24, creditCard: 18, button: 14 }, space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
       type: { body: { fontSize: 17 }, subhead: { fontSize: 15 }, footnote: { fontSize: 13 }, caption: { fontSize: 12 }, title2: { fontSize: 22 }, title3: { fontSize: 20 }, headline: { fontSize: 17 }, eyebrow: {} },
       usePalette: () => p, useReduceMotion: () => true, useCurrentDay: () => '2026-09-22' },
-    './categories': {}, './dock-clearance': { useDockInset: () => ({ extraPadding: 0, indicator: undefined }) }, './category-color': { tintOf: () => '#EEE' }, './category-hues': { useAccountLook: () => ({ glyph: 'wallet-outline', hex: '#2557D6' }), useCategoryLook: () => ({ glyph: 'pricetag-outline', hex: '#3E6FB0', label: 'x' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ glyph: 'wallet-outline', hex: '#2557D6' }), useCategoriesInUse: () => [], useCategoryDefinitions: () => [] },
+    './palette': paletteModule, './categories': {}, './dock-clearance': { useDockInset: () => ({ extraPadding: 0, indicator: undefined }) }, './category-color': { tintOf: () => '#EEE' }, './category-hues': { useAccountLook: () => ({ glyph: 'wallet-outline', hex: '#2557D6' }), useCategoryLook: () => ({ glyph: 'pricetag-outline', hex: '#3E6FB0', label: 'x' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ glyph: 'wallet-outline', hex: '#2557D6' }), useCategoriesInUse: () => [], useCategoryDefinitions: () => [] },
     './geometry': geometry, './merchant-mark': merchantMark, './movement-amount': movementAmount,
     './motion': { duration: { press: 100, release: 160 }, easeOut: 'ease', selectionHaptic: () => haptics.push('selection'), timing: () => ({}) },
     './money-input': moneyInput,
@@ -72,6 +73,8 @@ function nodes(value: any): Node[] {
   return [value, ...own, ...nodes(value.props.children), ...nodes(value.props.ListFooterComponent)];
 }
 const flat = (style: any) => Object.assign({}, ...(Array.isArray(style) ? style.flat(Infinity).filter(Boolean) : [style]));
+/** A Pressable's style as drawn at rest, or under the finger: a function style resolved with { pressed }. */
+const styleOf = (node: Node, pressed = false) => flat(typeof node.props.style === 'function' ? node.props.style({ pressed }) : node.props.style);
 // Inside components.tsx the building blocks are the real functions, so match them by name as well as by descriptor.
 const is = (node: Node, name: string) => node.type === name || node.type?.name === name;
 // A real PressFeedback re-emits its children inside the Pressable, so the same node can be met twice: count each once.
@@ -109,6 +112,41 @@ test('NavigationRow stacks the title over the subtitle with the tile and a chevr
   assert.equal(nodes(disabled).find(node => is(node, 'PressFeedback'))!.props.accessibilityState.disabled, true);
 });
 
+test('25D1: NavigationRow and CheckRow keep two lines up to 1.2× and, from the stacking threshold on, show their words whole', () => {
+  for (const scale of [1, 1.2, 1.235, 2.643, 3.571]) {
+    const ui = load('components.tsx', {}, scale);
+    for (const row of [ui.render('NavigationRow', { title: 'Movimientos deshechos', subtitle: '2 recuperables', onPress: () => {} }),
+      ui.render('CheckRow', { title: 'Movimientos deshechos', subtitle: '2 recuperables', selected: true, onPress: () => {} })]) {
+      const [title, subtitle] = texts(row);
+      assert.deepEqual([title.props.numberOfLines, subtitle.props.numberOfLines], scale <= 1.2 ? [2, 2] : [undefined, undefined], 'at ' + scale);
+      assert.equal(nodes(row).find(node => is(node, 'PressFeedback'))!.props.accessibilityLabel, 'Movimientos deshechos, 2 recuperables');
+    }
+  }
+});
+
+test('25D1: icon-only controls offer the Large Content Viewer with their VoiceOver name, at the same 44 pt', () => {
+  const ui = load('components.tsx');
+  for (const disabled of [false, true]) {
+    const button = nodes(ui.render('IconButton', { name: 'close', label: 'Cerrar', onPress: () => {}, disabled })).find(node => is(node, 'PressFeedback'))!;
+    assert.deepEqual([button.props.accessibilityShowsLargeContentViewer, button.props.accessibilityLargeContentTitle, button.props.accessibilityLabel], [true, 'Cerrar', 'Cerrar']);
+    assert.deepEqual([flat(button.props.style).width, flat(button.props.style).minHeight], [44, 44]);
+  }
+});
+
+test('25D1: a page sheet\'s bar stops growing at 1.2× like a system bar; Cancelar keeps its 8 pt slop and offers the Large Content Viewer', () => {
+  const ui = load('form-controls.tsx');
+  let field = ui.render('CurrencyField', { value: 'USD', onChange: () => {} });
+  nodes(field).find(node => node.type === 'SelectionRow')!.props.onPress();
+  field = ui.render('CurrencyField', { value: 'USD', onChange: () => {} });
+  const sheet = nodes(field).find(node => node.type === 'Modal')!;
+  const cancel = nodes(sheet).find(node => node.type === 'PressFeedback' && nodes(node.props.children).some(child => child.type === 'AppText' && child.props.children === 'Cancelar'))!;
+  assert.deepEqual([cancel.props.hitSlop, cancel.props.accessibilityShowsLargeContentViewer, cancel.props.accessibilityLargeContentTitle], [8, true, 'Cancelar']);
+  assert.equal(nodes(cancel.props.children).find(node => node.type === 'AppText')!.props.maxFontSizeMultiplier, 1.2);
+  const title = nodes(sheet).find(node => node.type === 'AppText' && node.props.accessibilityRole === 'header')!;
+  assert.deepEqual([title.props.children, title.props.maxFontSizeMultiplier, title.props.numberOfLines], ['Elegir moneda', 1.2, 2]);
+  assert.equal(ui.exports.SHEET_BAR_MAX_SCALE as unknown, geometry.ROW_STACK_SCALE, 'the same threshold the rows stack at');
+});
+
 test('FieldNote keeps one short line under a field and opens the full explanation from its information glyph', () => {
   const ui = load('components.tsx');
   const note = ui.render('FieldNote', { children: 'Opcional. No cuenta como ingreso.', help: { title: 'Saldo inicial', detail: 'La explicación completa.' } });
@@ -118,6 +156,8 @@ test('FieldNote keeps one short line under a field and opens the full explanatio
   assert.equal(info.props.accessibilityRole, 'button');
   assert.equal(info.props.accessibilityLabel, 'Más información sobre saldo inicial');
   assert.equal(info.props.hitSlop, 8, 'a small glyph with a comfortable target');
+  assert.deepEqual([info.props.accessibilityShowsLargeContentViewer, info.props.accessibilityLargeContentTitle], [true, 'Más información sobre saldo inicial'],
+    '25D1: the glyph cannot grow with the text; a long press shows its name large');
   info.props.onPress();
   // The button is named from the catalogue: left to iOS it would read "OK" in the bundle's language, whatever Más says.
   assert.equal(JSON.stringify(ui.alerts), JSON.stringify([{ title: 'Saldo inicial', message: 'La explicación completa.', buttons: [{ text: 'OK', style: 'cancel' }] }]), 'the catalogue\'s OK, still the cancel action');
@@ -325,7 +365,7 @@ test('24T3 carry-in: Reportes\' prominent switch reads at the subhead size, semi
   assert.deepEqual(labels.map(label => flat(label.props.style).fontWeight), ['600', '500'], 'semibold chosen, medium other');
   const segments = [...new Set(nodes(control).filter(node => node.type === 'Pressable'))];
   assert.equal(segments.length, 2);
-  for (const segment of segments) assert.ok(flat(segment.props.style).minHeight + 2 * geometry.SEGMENT_PADDING >= 44, 'a 44 pt track');
+  for (const segment of segments) assert.ok(styleOf(segment).minHeight + 2 * geometry.SEGMENT_PADDING >= 44, 'a 44 pt track');
   // Every other caller keeps the 13 pt default with its shrink (Movimientos' four short labels need it).
   const plain = nodes(ui.render('Choices', { value: 'categories', onChange: () => {}, options })).filter(node => node.type === 'Animated.Text');
   assert.equal(flat(plain[0].props.style).fontSize, 13);
@@ -878,7 +918,7 @@ test('25VIS2: every segment is a 44 pt target without being drawn taller (the de
     const segments = [...new Set(nodes(control).filter(node => node.type === 'Pressable'))];
     assert.equal(segments.length, 3, variant);
     for (const segment of segments) {
-      assert.equal(flat(segment.props.style).minHeight, drawn, variant + ': drawn as before');
+      assert.equal(styleOf(segment).minHeight, drawn, variant + ': drawn as before');
       assert.ok(drawn + reach(segment.props.hitSlop) >= 44, variant + ': a 44 pt target');
     }
   }
@@ -887,6 +927,21 @@ test('25VIS2: every segment is a 44 pt target without being drawn taller (the de
   // The composer leaves the 4 pt the slop reaches below the 36 pt track clear of the scroller that follows it.
   const composer = readFileSync(new URL('../src/ui/movement-form.tsx', import.meta.url), 'utf8');
   assert.match(composer, /paddingTop: space\.m, paddingBottom: 4 \}\}>\s*<Choices<MovementKind>/);
+});
+
+test('25D1: a segment under the finger dims to 60 % until it lifts; the chosen one never dims; nothing moves', () => {
+  const ui = load('components.tsx');
+  const options = [{ value: 'expense', label: 'Gasto' }, { value: 'income', label: 'Ingreso' }];
+  for (const variant of ['default', 'compact', 'onField', 'prominent'] as const) {
+    const control = ui.render('Choices', { value: 'expense', onChange: () => {}, options, [variant]: true });
+    const [chosen, other] = [...new Set(nodes(control).filter(node => node.type === 'Pressable'))];
+    assert.equal(chosen.props.accessibilityState.selected, true, variant);
+    assert.equal(styleOf(other).opacity, undefined, variant + ': at rest, full strength');
+    assert.equal(styleOf(other, true).opacity, 0.6, variant + ': touch-down feedback');
+    assert.equal(styleOf(chosen, true).opacity, undefined, variant + ': tapping the chosen one does nothing, so it never answers');
+    const { opacity, ...pressedShape } = styleOf(other, true);
+    assert.equal(JSON.stringify(pressedShape), JSON.stringify(styleOf(other)), variant + ': colour only, the geometry never changes (Reduce Motion needs nothing)');
+  }
 });
 
 test('25VIS2: a disabled segmented control looks disabled and says so on every segment', () => {

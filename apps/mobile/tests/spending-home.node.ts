@@ -270,6 +270,9 @@ test('24UX6A: the month is the current one, a header label, never a control: no 
   assert.equal(month.props.color ?? month.props.style?.color, lightPalette.heroInk);
   for (const prop of ['onPress', 'onLongPress', 'onPressIn', 'accessibilityHint', 'accessibilityActions']) assert.equal(prop in month.props, false, 'the month has no ' + prop);
   assert.equal(month.props.accessibilityRole, 'header', 'a header, not a button');
+  // 25D1: it grows with the text only as far as the hero amount under it (1.4×), on two lines at most.
+  assert.deepEqual([month.props.maxFontSizeMultiplier, month.props.numberOfLines], [1.4, 2]);
+  assert.equal(geometry.HERO_MAX_SCALE, 1.4);
   // No ancestor turns it into a control.
   const pressable = nodes(root).filter(n => typeof n.props.onPress === 'function' || typeof n.props.onLongPress === 'function');
   assert.equal(pressable.some(n => nodes(n).includes(month)), false, 'no pressable wraps the month');
@@ -410,7 +413,23 @@ test('24UX6A: the number is the field\'s ink at 46 pt, and the secondary ink whe
     root = routeHarness('(tabs)/index.tsx', {}, homeData).render();
     assert.deepEqual([fieldOf(root).props.style.backgroundColor, find(root, 'Money').props.color], [darkPalette.hero, darkPalette.heroInk]);
     assert.equal(monthOf(root).props.style.color, darkPalette.heroInk);
+    assert.equal(monthOf(root).props.maxFontSizeMultiplier, geometry.HERO_MAX_SCALE);
   } finally { dark = false; }
+});
+
+test('25D1: every month name fits beside the accounts button in whole words at its 1.4× cap, from 320 pt; uncapped at AX3 it would not', () => {
+  // The row: the screen less the field's padding (2 × 20), the 44 pt accounts button and the 12 pt gap. Title 2 is bold, 22 pt.
+  const column = (width: number) => width - 96;
+  let widest = 0;
+  for (const locale of ['es-AR', 'en-US'] as const) {
+    for (let month = 1; month <= 12; month++) {
+      const name = i18nFormat.formatDate(`2026-${String(month).padStart(2, '0')}-15`, 'month', locale);
+      const width = geometry.labelWidthEm(name.charAt(0).toUpperCase() + name.slice(1)) * 22 * 1.08;
+      widest = Math.max(widest, width);
+      for (const screen of [320, 375, 393, 430]) assert.ok(width * geometry.HERO_MAX_SCALE <= column(screen), `${locale} ${name} at ${screen} pt`);
+    }
+  }
+  assert.ok(widest * 2.643 > column(375), 'uncapped at AX3 «Septiembre» breaks inside the word');
 });
 
 test('24UX6A: the status bar is the field\'s own over it (`heroStatusBar`: light over the sapphire since 25VIS2), the scheme\'s own after scrolling past it or when another screen is in front', () => {

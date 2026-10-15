@@ -19,6 +19,7 @@ import { historyCurrencies, homeNamesCategory, sharedGlyphs, visibleNamesAccount
 import { useCategoryLookOf } from '../../src/ui/category-hues';
 import { space, useCurrentDay, usePalette } from '../../src/ui/theme';
 import { useDockInset } from '../../src/ui/dock-clearance';
+import { HERO_MAX_SCALE } from '../../src/ui/geometry';
 
 type HomeMetric = 'spending' | 'available';
 
@@ -145,7 +146,10 @@ export default function HomeScreen() {
         borderBottomLeftRadius: FIELD_RADIUS, borderBottomRightRadius: FIELD_RADIUS, gap: space.l }}>
       {/* 1. The current month (not a control) and the accounts behind the number. */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.m }}>
-        <AppText accessibilityRole="header" variant="title2" style={{ flex: 1, color: p.heroInk }}>{capitalized(formatDate(day, 'month'))}</AppText>
+        {/* 25D1: the month grows with the text as far as the hero amount under it does (1.4×), so the amount stays the
+            larger of the two and «Septiembre» keeps whole words beside the accounts button. */}
+        <AppText accessibilityRole="header" variant="title2" maxFontSizeMultiplier={HERO_MAX_SCALE} numberOfLines={2}
+          style={{ flex: 1, color: p.heroInk }}>{capitalized(formatDate(day, 'month'))}</AppText>
         <FieldButton icon="wallet-outline" label={t('nav.seeAccounts')} onPress={() => router.push('/accounts')} />
       </View>
       {/* 2. The scope, only when there is more than one currency to choose (25B2). Outside the keyed crossfade: the chip's

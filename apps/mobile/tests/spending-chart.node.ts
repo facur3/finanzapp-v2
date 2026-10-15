@@ -118,28 +118,52 @@ test('24B1: the MonthBars scale caption for ARS and USD, whole units from cents,
   assert.equal(caption('es-US', 'USD'), 'Mes en curso hasta hoy · escala de 0 a US$\u00A01,234,568');
 });
 
-test('23.1C2: a month bar speaks the full month name and the axis keeps the short one', () => {
+test('23.1C2, 25D1: a month bar speaks the full month name; the axis keeps the short one for the eye, hidden from VoiceOver and capped', () => {
   const points = [{ monthISO: '2026-03', amountMinor: 123456, partial: false }, { monthISO: '2026-05', amountMinor: 50000, partial: true }];
   const read = (i18n: ReturnType<typeof bindLocale>) => {
     const chart = chartsModule(i18n).MonthBars({ points, selected: '2026-05', onSelect: () => {}, currency: 'ARS' });
     const bars = flat(chart).filter(node => typeof node.type === 'function').map(node => node.type(node.props));
     const axis = flat(chart).filter(node => node.type === 'AnimatedText');
-    return { labels: bars.map(bar => bar.props.accessibilityLabel), axis: axis.map(node => node.props.children), languages: axis.map(node => node.props.accessibilityLanguage) };
+    const row = flat(chart).find(node => node.type === 'View' && [node.props.children].flat(2).some((child: any) => child?.type === 'AnimatedText'));
+    return { labels: bars.map(bar => bar.props.accessibilityLabel), axis: axis.map(node => node.props.children), row, ticks: axis.map(node => node.props) };
   };
-  const spanish = read(bindLocale('es-AR'));
-  assert.deepEqual(spanish.labels, ['marzo 2026, 1234,56 pesos', 'mayo 2026, 500,00 pesos, mes en curso']);
-  assert.deepEqual(spanish.axis, ['mar', 'may']);
-  assert.deepEqual(spanish.languages, [undefined, undefined], 'a device in the interface language keeps its own voice');
-  const english = read(bindLocale('en-US', 'native', 'es'));
-  assert.deepEqual(english.labels, ['March 2026, 1234.56 pesos', 'May 2026, 500.00 pesos, month in progress']);
-  assert.deepEqual(english.axis, ['Mar', 'May']);
-  assert.deepEqual(english.languages, ['en', 'en'], 'English chosen on a Spanish iPhone: the axis is read with an English voice');
+  for (const [locale, device, labels, axis] of [['es-AR', undefined, ['marzo 2026, 1234,56 pesos', 'mayo 2026, 500,00 pesos, mes en curso'], ['mar', 'may']],
+    ['en-US', 'es', ['March 2026, 1234.56 pesos', 'May 2026, 500.00 pesos, month in progress'], ['Mar', 'May']]] as const) {
+    const chart = read(device ? bindLocale(locale, 'native', device) : bindLocale(locale));
+    assert.deepEqual(chart.labels, labels);
+    assert.deepEqual(chart.axis, axis);
+    // The ticks were one VoiceOver stop each, repeating what the bars say (HIG, charts: hide axis labels).
+    assert.deepEqual([chart.row.props.accessibilityElementsHidden, chart.row.props.importantForAccessibility], [true, 'no-hide-descendants'], locale);
+    for (const tick of chart.ticks) {
+      assert.deepEqual([tick.numberOfLines, tick.maxFontSizeMultiplier, tick.accessibilityLanguage], [1, 1.4, undefined], locale);
+    }
+  }
+  assert.equal(chartsModule(bindLocale('es-AR')).AXIS_MAX_SCALE, 1.4);
   const donut = (i18n: ReturnType<typeof bindLocale>) => chartsModule(i18n).DonutChart({ slices: [{ key: 'a', label: 'Food', value: 1, color: '#1' }], currency: 'ARS',
     caption: 'Total', shareOf: () => ({ label: '100 %', spoken: '100 %' }) });
   // 24UX6C2: the chart's root is an outer View (the readout can move under the donut), so the element is found by type.
   const pressOf = (tree: any) => flat(tree).find(node => node.type === 'Pressable');
   assert.equal(pressOf(donut(bindLocale('en-US', 'native', 'es'))).props.accessibilityLanguage, 'en');
   assert.equal(pressOf(donut(bindLocale('es-AR', 'native', 'es'))).props.accessibilityLanguage, undefined);
+});
+
+test('25D1: every short month fits its axis column on one line at the 1.4× cap, from 320 pt; uncapped at AX3 it would not', () => {
+  const charts = chartsModule(bindLocale('es-AR'));
+  const cap = charts.AXIS_MAX_SCALE as unknown as number;
+  // The column: the screen less its padding (2 × 20) and the card's (2 × 16), less five 6 pt gaps, over six months.
+  const column = (width: number) => (width - 72 - 30) / 6;
+  let widest = 0;
+  for (const locale of ['es-AR', 'en-US'] as const) {
+    const formatDate = (dateISO: string, style: 'day') => i18nFormat.formatDate(dateISO, style, locale);
+    for (let month = 1; month <= 12; month++) {
+      const label = (charts.shortMonth as unknown as (monthISO: string, format: typeof formatDate) => string)(`2026-${String(month).padStart(2, '0')}`, formatDate);
+      // The chosen month is semibold, about 6 % wider.
+      const width = geometry.labelWidthEm(label) * 12 * 1.06;
+      widest = Math.max(widest, width);
+      for (const screen of [320, 375, 393, 430]) assert.ok(width * cap <= column(screen), `${locale} «${label}» at ${screen} pt: ${(width * cap).toFixed(1)} > ${column(screen).toFixed(1)}`);
+    }
+  }
+  assert.ok(widest * 2.643 > column(375), 'uncapped at AX3 the widest month leaves its column');
 });
 
 test('24B3: the MonthBars scale and the bar labels use each currency\'s own units: yen whole, dinars to the fil', () => {

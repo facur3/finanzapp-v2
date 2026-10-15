@@ -118,6 +118,17 @@ export function amountTextRoom(rowWidth: number, symbol: string, symbolSize: num
 
 /** Rows that put a name beside an amount stack (amount under the name) at this system text scale. */
 export const ROW_STACK_SCALE = 1.2;
+/** The Dynamic Type multiplier a hero amount stops growing at (and, 25D1, the month titles beside the hero and between the
+ * month arrows), and the one a row amount stops at. */
+export const HERO_MAX_SCALE = 1.4, ROW_MAX_SCALE = 1.8;
+/** 25D1: the captions under a capped month title (its period or state and «Este mes», 12 pt) stop at 2×, 24 pt, under the
+ * title's 28 pt (20 × 1.4): uncapped they reached 31.7 pt at AX3 and read larger than the month they describe. Up to AX1
+ * (1.786) nothing changes. */
+export const MONTH_CAPTION_MAX_SCALE = 2;
+/** 25D1: UIKit grows each text style on its own curve (the HIG's larger accessibility sizes at AX5: Large Title 34 → 60 pt,
+ * Title 1 28 → 58 pt); React Native multiplies every text by one factor (3.571 at AX5), so a 34 pt title drew about 121 pt.
+ * These caps land the two big titles on Apple's AX5 size; every other style keeps React Native's own growth. */
+export const TITLE_MAX_SCALE: Readonly<Partial<Record<string, number>>> = { largeTitle: 60 / 34, title1: 58 / 28 };
 /** Points a list row spends around its text on a phone: screen padding (20 + 20), row padding (16 + 16), the identity tile (40) and its gap (12). */
 export const ROW_CHROME = 124;
 /** 24UX6E: what a row's trailing chevron adds to `ROW_CHROME`: the 16 pt `chevron-forward` glyph and the row's 12 pt gap

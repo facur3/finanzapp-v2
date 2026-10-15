@@ -359,6 +359,10 @@ test('24T3 (A24): devoluciones above a month\'s purchases leave the whole limit 
   const tree = (await budgetsScreen(data))();
   const textOf = (node: Node) => [node.props.children].flat().join('');
   const shown = tree.filter(node => node.type === 'AppText').map(textOf);
+  const month = tree.find(node => node.type === 'AppText' && node.props.accessibilityRole === 'header' && node.props.variant === 'title3')!;
+  assert.deepEqual([textOf(month), month.props.maxFontSizeMultiplier, month.props.numberOfLines], ['Septiembre de 2026', 1.4, 2], '25D1: the month stops at 1.4× between its arrows');
+  const state = tree.find(node => node.type === 'AppText' && node.props.variant === 'caption' && textOf(node) === 'Mes en curso')!;
+  assert.equal(state.props.maxFontSizeMultiplier, 2, '25D1: its caption stops at 2×, under the title');
   const hero = tree.find(node => node.type === 'Money' && node.props.large)!;
   assert.equal(hero.props.minor, 500000, 'Disponible is the limit, never above it');
   assert.ok(shown.includes('Las devoluciones superan lo gastado'));

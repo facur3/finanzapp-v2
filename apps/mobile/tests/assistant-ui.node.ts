@@ -116,6 +116,14 @@ test('the composer labels its field and send (no microphone until dictation exis
   assert.equal(byLabel(root, 'Enviar'), undefined);
   byLabel(root, 'Detener respuesta')!.props.onPress();
   assert.deepEqual(events, ['send', 'stop']);
+  // 25D1: Enviar and Detener are 44 pt targets that still take 40 pt of the bar: a −2 pt margin inside its padding, so the
+  // 32 pt disc, the field and the 48 pt bar do not move.
+  for (const control of [ready, byLabel(root, 'Detener respuesta')!]) {
+    const target = flat(control.props.style);
+    assert.deepEqual([target.width, target.height, target.minHeight, flat(control.props.containerStyle).margin], [44, 44, 44, -2]);
+    const disc = flat(nodes(control).find(node => node.type === 'View')!.props.style);
+    assert.deepEqual([disc.width, disc.height], [32, 32]);
+  }
   // No dictation note either, and no line under the bar when no note is passed (the disconnected caption is gone).
   root = ui.render('AssistantComposer', props);
   assert.equal(nodes(root).some(node => node.type === 'AppText'), false);

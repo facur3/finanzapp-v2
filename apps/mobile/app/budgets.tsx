@@ -10,7 +10,7 @@ import { budgetCategoriesCaption, budgetTone, percentUsed } from '../src/ui/budg
 import { useCategoryLabel } from '../src/ui/category-hues';
 import { ActionButton, AppText, CategoryBadge, EmptyState, IconButton, Money, PressFeedback, Screen, SectionTitle, Stat, StatRow, Surface } from '../src/ui/components';
 import { CurrencySwitch } from '../src/ui/currency-switch';
-import { labelAmountStacks } from '../src/ui/geometry';
+import { HERO_MAX_SCALE, MONTH_CAPTION_MAX_SCALE, labelAmountStacks } from '../src/ui/geometry';
 import { useDefaultCurrency } from '../src/ui/use-default-currency';
 import { useI18n } from '../src/i18n/provider';
 import { availableCurrencies } from '../src/ui/presentation';
@@ -70,14 +70,17 @@ export default function BudgetsScreen() {
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <IconButton name="chevron-back" label={t('budgets.screen.previousMonth')} onPress={() => setMonthISO(value => shiftMonthISO(value, -1))} />
         <View style={{ flex: 1, alignItems: 'center', gap: 2 }}>
-          <AppText accessibilityRole="header" variant="title3" style={{ textAlign: 'center' }}>{formatMonthTitle(monthISO)}</AppText>
+          {/* 25D1: as in Reportes, the month stops at 1.4× between the arrows and wraps at the space before the year. */}
+          <AppText accessibilityRole="header" variant="title3" maxFontSizeMultiplier={HERO_MAX_SCALE} numberOfLines={2}
+            style={{ textAlign: 'center' }}>{formatMonthTitle(monthISO)}</AppText>
           {/* 24UX6E: the state and «Este mes» wrap onto two centred lines at large text instead of overflowing the
               column; the link keeps its 28 pt line and reaches 44 pt with its slop. */}
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', columnGap: 10, rowGap: 2 }}>
-            <AppText secondary variant="caption" style={{ textAlign: 'center' }}>{t(isCurrent ? 'budgets.screen.currentMonth' : monthISO > currentMonthISO(day) ? 'budgets.screen.futureMonth' : 'budgets.screen.closedMonth')}</AppText>
+            <AppText secondary variant="caption" maxFontSizeMultiplier={MONTH_CAPTION_MAX_SCALE} style={{ textAlign: 'center' }}>
+              {t(isCurrent ? 'budgets.screen.currentMonth' : monthISO > currentMonthISO(day) ? 'budgets.screen.futureMonth' : 'budgets.screen.closedMonth')}</AppText>
             {!isCurrent && <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('budgets.screen.backToCurrent')} onPress={() => setMonthISO(currentMonthISO(day))}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ minHeight: 28, justifyContent: 'center' }}>
-              <AppText variant="caption" style={{ fontWeight: '600', color: p.link }}>{t('budgets.screen.thisMonth')}</AppText>
+              <AppText variant="caption" maxFontSizeMultiplier={MONTH_CAPTION_MAX_SCALE} style={{ fontWeight: '600', color: p.link }}>{t('budgets.screen.thisMonth')}</AppText>
             </PressFeedback>}
           </View>
         </View>

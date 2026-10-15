@@ -208,11 +208,33 @@ test('daily view opens only expenses in the selected date and currency', () => {
   nodes(view.render()).find(n => n.type === 'Choices' && n.props.value === 'categories')!.props.onChange('days');
   const list = view.render();
   assert.equal(list.props.data.length, 2);
+  // 25D1: one anatomy for every day, the date and count over the amount, whatever their lengths (the 30-character rule drew
+  // a short day beside its amount and a long one under it, in the same list).
+  const days = list.props.data.map((item: unknown, index: number) => find(list.props.renderItem({ item, index }), 'DetailRow'));
+  assert.deepEqual(days.map((day: Node) => day.props.layout), ['stacked', 'stacked']);
+  assert.ok(days.some((day: Node) => day.props.label.length + day.props.value.length <= 30), 'a short day is stacked too');
   const row = list.props.renderItem({ item: list.props.data[1], index: 1 });
   find(row, 'DetailRow').props.onPress();
   const detail = routeHarness('report-day.tsx', view.pushed[0].params).render();
   assert.deepEqual(detail.props.entries.map((e: domain.Entry) => e.id).sort(), ['b', 'c']);
   assert.equal(find(detail, 'Money').props.minor, 505);
+});
+test('25D1: the month title between the two arrows stops at 1.4× and wraps at the year, never inside the month; its captions stay under it', () => {
+  const root = routeHarness('(tabs)/reports.tsx', { currency: 'ARS', month: '2026-08' }).render();
+  const title = nodes(root).find(n => n.type === 'AppText' && n.props.accessibilityRole === 'header' && n.props.variant === 'title3')!;
+  assert.deepEqual([title.props.maxFontSizeMultiplier, title.props.numberOfLines], [geometry.HERO_MAX_SCALE, 2]);
+  // The period and «Este mes» under it (August is a past month, so the link shows) stop at 2×: 24 pt under the title's 28.
+  const block = nodes(root).find(n => [n.props.children].flat().includes(title))!;
+  const captions = nodes(block.props.children).filter(n => n.type === 'AppText' && n.props.variant === 'caption');
+  assert.equal(JSON.stringify(captions.map(n => n.props.maxFontSizeMultiplier)), '[2,2]');
+  assert.ok(12 * geometry.MONTH_CAPTION_MAX_SCALE < 20 * geometry.HERO_MAX_SCALE, 'a caption never reads larger than its month');
+  assert.ok(12 * 2.643 > 20 * geometry.HERO_MAX_SCALE, 'uncapped at AX3 it did');
+  // «Septiembre» at 20 pt, semibold, capped, fits the column of a 320 pt screen: less its padding (2 × 20), the two 44 pt
+  // arrows and their 8 pt gaps. Uncapped at AX3 it did not fit the 249 pt column of a 393 pt screen.
+  const column = (width: number) => width - 40 - 88 - 16;
+  const septiembre = geometry.labelWidthEm('Septiembre') * 20 * 1.06;
+  assert.ok(septiembre * geometry.HERO_MAX_SCALE <= column(320));
+  assert.ok(septiembre * 2.643 > column(393));
 });
 test('day and comparison cutoff reject malformed or future scope', () => {
   for (const date of [['2026-08-10'], '2026-02-30', '2026-09-13', undefined]) {
