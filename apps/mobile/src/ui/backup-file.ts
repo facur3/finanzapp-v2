@@ -1,7 +1,8 @@
-import { BACKUP_MAX_BYTES, createRecoveryBackup, parsePilotBackup, todayKey, type LedgerArchive } from '@finanzapp/domain';
+import { BACKUP_MAX_BYTES, assertOpenAccount, createRecoveryBackup, materializeRecurringRule, parsePilotBackup, planCatchUpInserts, todayKey, type ImportPreview,
+  type LedgerArchive } from '@finanzapp/domain';
 
-/** Producto 25Q2: the backup file a person shares. Pure, so the name, the size check and the round trip are tested
- * without React Native. */
+/** Producto 25Q2: the backup file a person shares, and (25Q4) what the import's review counts. Pure, so the name, the size
+ * check, the round trip and the count are tested without React Native. */
 
 /** The one place the working name reaches a file name (the naming workflow renames it, brand-brief.md §3). The format's
  * own identifiers inside the file (`app`, `schema`, `moneyUnit`) never follow the name: the importer reads content. */
@@ -35,4 +36,34 @@ export function buildBackupFile(archive: LedgerArchive, now = new Date(), maxByt
   if (bytes > maxBytes) throw new Error('backup.export.tooLarge');
   parsePilotBackup(json);
   return { name: backupFileName(now), json, bytes };
+}
+
+/** 25Q4: the movements a restore's catch-ups also record (what fell due since the copy was made), counted for the review
+ * by storage's own rules: database.ts `catchUpStep` and `catchUpRecurring` (nothing on a deleted account, card or debt; an
+ * id already in the ledger is never recorded again; at most 64 steps a pass) and `catchUpInstallments`. Only the copy's
+ * new rules and plans: the device's own were caught up by the foreground pass. */
+export function restoreCatchUp(current: LedgerArchive, preview: ImportPreview, todayISO: string, nowISO = new Date().toISOString()): number {
+  const accounts = [...current.accounts, ...preview.accounts];
+  const cards = [...current.cards ?? [], ...preview.cards];
+  const debts = [...current.debts ?? [], ...preview.debts];
+  const records = [...current.records, ...preview.records];
+  const known = new Set(records.map(record => record.entry.id));
+  let count = 0;
+  for (let rule of preview.recurring) {
+    try {
+      assertOpenAccount(rule.accountId, accounts, cards, debts);
+      for (let step = 0; step < 64; step++) {
+        const batch = materializeRecurringRule(rule, accounts, todayISO, nowISO);
+        count += batch.entries.filter(entry => !known.has(entry.id)).length;
+        if (batch.complete) break;
+        rule = batch.rule;
+      }
+    } catch { /* Storage leaves such a rule for review. */ }
+  }
+  const plans = { records, cards, installmentPlans: [...current.installmentPlans ?? [], ...preview.installmentPlans],
+    purchaseOperations: [...current.purchaseOperations ?? [], ...preview.purchaseOperations] };
+  for (const plan of preview.installmentPlans) {
+    try { count += planCatchUpInserts(plans, plan.id, todayISO).length; } catch { /* The pass reports it in the banner. */ }
+  }
+  return count;
 }

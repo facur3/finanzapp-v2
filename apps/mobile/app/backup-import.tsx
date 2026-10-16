@@ -2,23 +2,35 @@ import { useRef, useState } from 'react';
 import { Alert, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { File } from 'expo-file-system';
-import { BACKUP_MAX_BYTES, parsePilotBackup, previewBackupImport, sortCurrencies, type Currency, type ImportPreview, type ParsedBackup } from '@finanzapp/domain';
+import { BACKUP_MAX_BYTES, parsePilotBackup, previewBackupImport, sortCurrencies, type Currency, type ImportPreview, type LedgerArchive,
+  type ParsedBackup } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
+import { restoreCatchUp } from '../src/ui/backup-file';
 import { ActionButton, AppText, DetailRow, EmptyState, ErrorMessage, Money, Screen, SectionTitle, Surface } from '../src/ui/components';
 import { errorHaptic, successHaptic } from '../src/ui/motion';
+import { useCurrentDay } from '../src/ui/theme';
 import { useI18n } from '../src/i18n/provider';
 
-type Review = { backup: ParsedBackup; preview: ImportPreview; name: string };
+/** `due`: the movements the restore's catch-ups also record for the copy's rules and plans (`restoreCatchUp`). */
+type Review = { backup: ParsedBackup; preview: ImportPreview; name: string; due: number };
 
 export default function BackupImportScreen() {
   const { archive, restoreBackup } = useLedger();
-  const { t, formatDateTime, formatCount, failureMessage } = useI18n();
+  const { t, formatDate, formatDateTime, formatCount, failureMessage } = useI18n();
+  // The device's day, the one the restore's catch-ups run through.
+  const day = useCurrentDay();
   const [review, setReview] = useState<Review | null>(null);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const working = useRef(false);
   const confirming = useRef(false);
+
+  // 25Q4: the review also counts what the restore's catch-ups record (nothing while a conflict refuses the import).
+  function reviewOf(current: LedgerArchive, backup: ParsedBackup, name: string): Review {
+    const preview = previewBackupImport(current, backup.archive);
+    return { backup, preview, name, due: preview.conflicts ? 0 : restoreCatchUp(current, preview, day) };
+  }
 
   async function choose() {
     if (working.current || !archive) return;
@@ -35,7 +47,7 @@ export default function BackupImportScreen() {
       // including Android document-provider URIs and iOS picker copies.
       if (picked.result.size > BACKUP_MAX_BYTES) throw new Error('backup.import.tooLarge');
       const backup = parsePilotBackup(await picked.result.text().catch(readFailed));
-      setReview({ backup, preview: previewBackupImport(archive, backup.archive), name: picked.result.name });
+      setReview(reviewOf(archive, backup, picked.result.name));
       setDone(false);
     } catch (cause) {
       setReview(null);
@@ -48,7 +60,7 @@ export default function BackupImportScreen() {
   function refreshReview() {
     if (!review || !archive || working.current) return;
     try {
-      setReview({ ...review, preview: previewBackupImport(archive, review.backup.archive) });
+      setReview(reviewOf(archive, review.backup, review.name));
       setError(null);
     } catch (cause) { setError(failureMessage(cause, 'backup.import.reviewFailed')); }
   }
@@ -72,7 +84,7 @@ export default function BackupImportScreen() {
     if (!review || review.preview.conflicts || working.current || confirming.current || done) return;
     confirming.current = true;
     const selected = review;
-    Alert.alert(t('backup.import.confirmTitle'), t('backup.import.confirmMessage'), [
+    Alert.alert(t('backup.import.confirmTitle', { date: formatDateTime(selected.backup.exportedAt) }), t('backup.import.confirmMessage'), [
       { text: t('common.cancel'), style: 'cancel', onPress: () => { confirming.current = false; } },
       { text: t('backup.import.confirmButton'), onPress: () => { confirming.current = false; void apply(selected); } },
     ], { cancelable: true, onDismiss: () => { confirming.current = false; } });
@@ -88,6 +100,10 @@ export default function BackupImportScreen() {
   const hiddenIncoming = new Set([...plan?.cards ?? [], ...plan?.debts ?? []].map(item => item.accountId));
   // A count is grouped on screen ("1.234", "1,234"); VoiceOver gets the plain digits, which every voice reads as one number.
   const count = (value: number) => ({ value: formatCount(value), spokenValue: String(value) });
+  // 25Q4: what tells two copies apart before importing: the date the header carries and the newest live movement inside it.
+  const latest = review ? [...review.backup.archive.records.filter(record => !record.voided).map(record => record.entry.dateISO),
+    ...(review.backup.archive.transfers ?? []).filter(record => !record.voided).map(record => record.transfer.dateISO)]
+    .reduce<string | null>((max, date) => max === null || date > max ? date : max, null) : null;
   return <Screen>
     <Stack.Screen options={{ gestureEnabled: !busy, headerBackVisible: !busy }} />
     {done ? <EmptyState title={t('backup.import.doneTitle')} detail={t('backup.import.doneDetail')} icon="checkmark-circle-outline"
@@ -98,7 +114,8 @@ export default function BackupImportScreen() {
       {review && plan && <>
         <View style={{ gap: 6 }}><SectionTitle>{t('backup.import.reviewTitle')}</SectionTitle>
           <AppText secondary numberOfLines={2} style={{ fontSize: 14 }}>{review.name}</AppText>
-          <AppText secondary style={{ fontSize: 13 }}>{formatDateTime(review.backup.exportedAt)}</AppText>
+          <AppText secondary style={{ fontSize: 13 }}>{t('backup.import.exportedAt', { date: formatDateTime(review.backup.exportedAt) })}</AppText>
+          {latest && <AppText secondary style={{ fontSize: 13 }}>{t('backup.import.latestMovement', { date: formatDate(latest, 'dayYear') })}</AppText>}
         </View>
         <Surface grouped>
           <DetailRow label={t('backup.import.rows.accounts')} {...count(plan.accounts.filter(account => !hiddenIncoming.has(account.id)).length)} />
@@ -126,6 +143,7 @@ export default function BackupImportScreen() {
             </View>)}
             {!Object.keys(plan.after ?? {}).length && <AppText secondary>{t('backup.import.noAccounts')}</AppText>}
           </Surface>
+          {review.due > 0 && <AppText secondary style={{ fontSize: 13 }}>{t('backup.import.catchUp', { count: review.due })}</AppText>}
           <AppText secondary style={{ fontSize: 13 }}>{additions ? t('backup.import.onlyMissing') : t('backup.import.nothingNew')}</AppText>
         </>}
       </>}

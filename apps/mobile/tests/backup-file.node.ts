@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import * as domain from '@finanzapp/domain';
-import { BACKUP_FILE_PREFIX, backupFileName, buildBackupFile, utf8Length } from '../src/ui/backup-file.ts';
+import { BACKUP_FILE_PREFIX, backupFileName, buildBackupFile, restoreCatchUp, utf8Length } from '../src/ui/backup-file.ts';
 import { SENSITIVE_FILES } from '../../../scripts/check-repo.mjs';
 
 // Producto 25Q2: the backup file a person shares. Pure: no file system, no share sheet (more-routes covers the screen).
@@ -59,4 +59,24 @@ test('25Q2: compact moves the 5 MB wall well past the pretty file (measured byte
   const measured = `compact ${perCompact.toFixed(0)} B/movement (≈${wall(perCompact)} movements), pretty ${perPretty.toFixed(0)} B (≈${wall(perPretty)})`;
   assert.ok(compact * 1.25 <= pretty, measured);
   assert.ok(wall(perCompact) > 15000, measured);
+});
+
+test('25Q4: the restore\'s catch-up count follows storage\'s rules: each due date once, past a batch, and nothing for a paused, not yet due or deleted account\'s rule', () => {
+  const rent: domain.RecurringRule = { id: 'rent', accountId: 'a', kind: 'expense', amountMinor: 50000, merchant: 'Alquiler', category: 'Hogar', frequency: 'monthly',
+    anchorDateISO: '2026-07-01', nextDateISO: '2026-07-01', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
+  const empty: domain.LedgerArchive = { accounts: [], records: [] };
+  const count = (copy: Partial<domain.LedgerArchive>) => restoreCatchUp(empty, domain.previewBackupImport(empty, { accounts: [account], records: [], ...copy }), '2026-09-20');
+  assert.equal(count({ recurring: [rent] }), 3, '1 jul, 1 ago and 1 sep');
+  assert.equal(count({ recurring: [{ ...rent, active: false }] }), 0, 'paused');
+  assert.equal(count({ recurring: [{ ...rent, nextDateISO: '2026-10-01' }] }), 0, 'not due yet');
+  const deleted = { ...account, revision: 1, updatedAt: '2026-10-02T12:00:00.000Z', deletedAt: '2026-10-02T12:00:00.000Z' };
+  assert.equal(count({ accounts: [deleted], recurring: [rent] }), 0, 'nothing lands on a deleted account');
+  // A date the copy already holds (recorded, edited or undone) is never recorded again.
+  const held = domain.initialRecord({ id: domain.recurringEntryId('rent', '2026-07-01'), accountId: 'a', kind: 'expense', amountMinor: 50000, merchant: 'Alquiler',
+    category: 'Hogar', dateISO: '2026-07-01', createdAt });
+  assert.equal(count({ records: [held], recurring: [rent] }), 2);
+  // Eight years of a weekly rule is more than one batch (366 dates): every date, once.
+  const weekly = { ...rent, frequency: 'weekly' as const, anchorDateISO: '2018-09-21', nextDateISO: '2018-09-21' };
+  assert.equal(count({ recurring: [weekly] }), domain.recurringOccurrencesThrough(weekly, '2026-09-20', 1000).length);
+  assert.ok(count({ recurring: [weekly] }) > domain.RECURRING_BATCH_SIZE);
 });

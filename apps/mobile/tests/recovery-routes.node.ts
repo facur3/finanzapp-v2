@@ -22,6 +22,8 @@ import * as purchasePlan from '../src/ui/purchase-plan.ts';
 import * as movementAmount from '../src/ui/movement-amount.ts';
 // 24T3: the movement detail asks whether a devolución can be recorded (a dry run of the domain's creation).
 import * as operationPresentation from '../src/ui/operation-presentation.ts';
+// 25Q4: the backup review counts what the restore's catch-ups record (pure, real in the harness).
+import * as backupFile from '../src/ui/backup-file.ts';
 
 // Actual screen/form handlers with native hosts replaced by descriptors.
 // This does not render UIKit, the Files picker, animation frames or gestures.
@@ -113,6 +115,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     './purchase-plan': purchasePlan, './installment-purchase': { InstallmentPurchase: 'InstallmentPurchase' },
     './installment-presentation': installmentPresentation,
     '../../src/ui/operation-presentation': operationPresentation,
+    '../src/ui/backup-file': backupFile,
   };
   const require = (name: string) => {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected recovery dependency: ' + name);
@@ -125,6 +128,8 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   modules['../../src/ui/recurring-history'] = realModule('src/ui/recurring-history.tsx', require);
   // 24T2 (stream A): the movement detail reads which instalment of which plan recorded a movement.
   modules['../../src/ui/installment-presentation'] = installmentPresentation;
+  // 25Q4: the backup import reads the device's day (2026-09-20) for its catch-up count.
+  modules['../src/ui/theme'] = modules['../../src/ui/theme'];
   const module = { exports: {} as Record<string, (props: any) => Node> };
   runInNewContext(code, { module, exports: module.exports, Date, Error, require });
   return {
@@ -829,7 +834,8 @@ test('in English the account forms and the balance correction read in English an
 // labels, the confirmation and the conflict message change; the file that is
 // read, the preview and what is restored are exactly the Spanish ones.
 test('23.1B2 English backup import: review, confirmation and result are translated; the restored archive is identical to the Spanish import', async () => {
-  const json = JSON.stringify(domain.createRecoveryBackup(archive));
+  const exportedAt = '2026-10-14T17:32:00.000Z';
+  const json = JSON.stringify(domain.createRecoveryBackup(archive, new Date(exportedAt)));
   const picker = async () => ({ canceled: false, result: { size: json.length, name: 'test.json', text: async () => json } });
   const empty = { accounts: [], records: [] };
   const run = async (locale: AppLocale) => {
@@ -846,7 +852,7 @@ test('23.1B2 English backup import: review, confirmation and result are translat
   assert.ok(nodes(root).some(node => node.type === 'AppText' && node.props.children === 'test.json'), 'the file name is shown as it is');
   assert.ok(nodes(root).some(node => node.type === 'SectionTitle' && node.props.children === 'Available after import'));
   find(root, 'ActionButton', 'Confirm import').props.onPress();
-  assert.equal(english.alerts[0].title, 'Import this backup?');
+  assert.equal(english.alerts[0].title, 'Import the backup from ' + bindLocale('en-AR').formatDateTime(exportedAt) + '?');
   assert.equal(english.alerts[0].buttons.map((button: any) => button.text).join(','), 'Cancel,Import');
   english.alerts[0].buttons[1].onPress(); await flush();
   assert.equal(find(english.render(), 'EmptyState').props.title, 'Backup imported');
@@ -1615,6 +1621,55 @@ test('24T3: a backup whose only new rows are purchase operations offers the impo
   root = same.render();
   assert.equal(nodes(root).some(node => node.props.label === 'Confirmar importación'), false);
   assert.equal(nodes(root).some(node => node.type === 'DetailRow' && node.props.label === 'Devoluciones y adelantos nuevos'), false);
+});
+
+/** 25Q4: the backup review of `copy` on an empty device, its file picked and read. */
+async function reviewCopy(copy: domain.LedgerArchive, exportedAt = new Date()) {
+  const json = JSON.stringify(domain.createRecoveryBackup(copy, exportedAt));
+  const view = harness('app/backup-import.tsx', {}, { data: { accounts: [], records: [] },
+    picker: async () => ({ canceled: false, result: { size: json.length, name: 'copia.json', text: async () => json } }) });
+  await find(view.render(), 'ActionButton', 'Elegir copia').props.onPress();
+  return view;
+}
+const appTexts = (root: Node) => nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children));
+
+// The restore's catch-ups record what fell due since the copy was made (installments.node.ts checks the count against a
+// real restore); the review says how many, under «Disponible después», which stays the copy's own total.
+test('25Q4: a copy whose rules fell due since it was made says how many dates the import also records; «Disponible después» is unchanged; a paused or not-yet-due rule says nothing', async () => {
+  const rent: domain.RecurringRule = { id: 'rent', accountId: 'a', kind: 'expense', amountMinor: 50000, merchant: 'Alquiler', category: 'Hogar', frequency: 'monthly',
+    anchorDateISO: '2026-07-01', nextDateISO: '2026-07-01', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
+  // The harness's day is 2026-09-20: 1 jul, 1 ago and 1 sep fell due.
+  let root = (await reviewCopy({ ...archive, recurring: [rent] })).render();
+  assert.ok(appTexts(root).includes('Al importar también se registran 3 vencimientos de recurrentes y cuotas posteriores a la copia, así que tus saldos pueden diferir de esta revisión.'),
+    JSON.stringify(appTexts(root)));
+  assert.equal(find(root, 'Money').props.minor, 87655, 'the total stays what the copy holds');
+  root = (await reviewCopy({ ...archive, recurring: [{ ...rent, nextDateISO: '2026-09-01' }] })).render();
+  assert.ok(appTexts(root).includes('Al importar también se registra 1 vencimiento de un recurrente o una cuota posterior a la copia, así que tus saldos pueden diferir de esta revisión.'));
+  for (const quiet of [{ ...rent, active: false }, { ...rent, nextDateISO: '2026-10-01' }]) {
+    root = (await reviewCopy({ ...archive, recurring: [quiet] })).render();
+    assert.equal(appTexts(root).some(text => text.startsWith('Al importar también')), false, JSON.stringify(quiet));
+    assert.ok(find(root, 'ActionButton', 'Confirmar importación'));
+  }
+});
+
+test('25Q4: the review names the copy by its date and its newest live movement, and the confirmation restates that date and that an import is removed one item at a time', async () => {
+  const exportedAt = '2026-10-14T17:32:00.000Z';
+  const when = bindLocale('es-AR').formatDateTime(exportedAt);
+  const record = (id: string, dateISO: string) => domain.initialRecord({ ...entry, id, dateISO });
+  const undone = (value: domain.EntryRecord) => domain.makeEntryChange('undo', value, 'void', createdAt).after;
+  // The newest live record is the transfer of 5 mar: the movement undone on 1 abr and the transfer undone on 1 may are not.
+  const view = await reviewCopy({ ...transferData, records: [record('e', '2026-01-01'), record('e2', '2026-02-10'), undone(record('e3', '2026-04-01'))],
+    transfers: [domain.initialTransferRecord({ ...transfer, dateISO: '2026-03-05' }),
+      domain.makeTransferChange('undo', domain.initialTransferRecord({ ...transfer, id: 't2', dateISO: '2026-05-01' }), 'void', createdAt).after] }, new Date(exportedAt));
+  const root = view.render();
+  assert.ok(appTexts(root).includes('Copia del ' + when), JSON.stringify(appTexts(root)));
+  assert.ok(appTexts(root).includes('Último movimiento: 5 mar 2026'));
+  find(root, 'ActionButton', 'Confirmar importación').props.onPress();
+  assert.equal(view.alerts[0].title, '¿Importar la copia del ' + when + '?');
+  assert.equal(view.alerts[0].message, 'Se agregan solo los registros que faltan; no se reemplaza nada. Lo importado no se puede quitar de una sola vez: se deshace o se elimina de a uno.');
+  // A copy whose only movement was undone has none to name.
+  const quiet = (await reviewCopy({ ...archive, records: [undone(record('e', '2026-01-01'))] })).render();
+  assert.equal(appTexts(quiet).some(text => text.startsWith('Último movimiento')), false);
 });
 
 test('25VIS2 (V1): the Gasto / Ingreso / Transferencia switch locks while either form reports a save in flight or frozen, and only then', () => {
