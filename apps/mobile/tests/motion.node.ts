@@ -239,7 +239,7 @@ test('form selectors keep the category hue and give the account the interaction 
     '@react-native-community/datetimepicker': 'DateTimePicker',
     '@expo/vector-icons/Ionicons': 'Ionicons',
     './components': { useStacked: () => false, AccountBadge: 'AccountBadge', AppText: 'AppText', CategoryBadge: 'CategoryBadge', DetailRow: 'DetailRow', SelectionRow: 'SelectionRow', Field: 'Field', GlyphTile: 'GlyphTile', PressFeedback: 'PressFeedback', Surface: 'Surface', surfaceShadow: () => ({}) },
-    './currencies': currencies,
+    './currencies': currencies, './marks': { CurrencyMark: 'CurrencyMark' },
     '@finanzapp/domain': { todayKey: (d: Date) => d.toISOString().slice(0, 10) },
     './category-hues': { useCategoryColor: (label: string) => label ? '#B0507A' : '#000', useCategoriesInUse: () => [], useCategoryDefinitions: () => [], useCategoryLook: (label: string) => ({ label, hex: label ? '#B0507A' : '#000', glyph: 'paw-outline' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ glyph: 'wallet-outline', hex: '#2557D6' }) },
     './motion': { selectionHaptic: () => {}, timing: () => ({ duration: 0 }) },

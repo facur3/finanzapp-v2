@@ -13,6 +13,7 @@ import type { AppLocale } from '../src/i18n/locale.ts';
 import { realModule, swipeActionsMock } from './real-module.ts';
 import * as movementAmount from '../src/ui/movement-amount.ts';
 import * as geometry from '../src/ui/geometry.ts';
+import * as flags from '../src/i18n/flags.ts';
 
 // Budgets, Recurrentes, Cuentas and account detail handlers with native hosts
 // replaced by descriptors. Not a rendered iOS screen or gesture test.
@@ -85,7 +86,7 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
       router: { push: (to: unknown) => pushed.push(to), replace: (to: unknown) => pushed.push(to), canGoBack: () => true, back: () => { backs++; } } },
     '@finanzapp/domain': domain,
     '@expo/vector-icons/Ionicons': 'Ionicons',
-    '../src/ui/geometry': geometry, '../../src/ui/geometry': geometry,
+    '../src/ui/geometry': geometry, '../../src/ui/geometry': geometry, '../src/i18n/flags': flags, '../src/ui/marks': { InlineFlag: 'InlineFlag' },
     '../src/storage/LedgerProvider': ledger, '../../src/storage/LedgerProvider': ledger, '../storage/LedgerProvider': ledger,
     '../src/ui/swipe-actions': swipeActionsMock, '../../src/ui/swipe-actions': swipeActionsMock,
     './components': { ...Object.fromEntries(names.map(name => [name, name])), useStacked: () => false },
@@ -847,6 +848,21 @@ test('24UX6E: a Cuentas section header puts its total under the name at large te
   assert.equal(withWindow({ fontScale: 1.5 }, () => direction()), 'column', 'large text stacks');
   const rich = { ...archive, accounts: archive.accounts.map(item => item.id === 'usd' ? { ...item, openingMinor: 99999999999900 } : item) };
   assert.equal(withWindow({ width: 375 }, () => direction(rich, 1)), 'column', 'a twelve-digit total beside «Dólares estadounidenses» goes under it');
+});
+
+test('25O1: a Cuentas section header leads its name with the currency\'s mark (none for a supranational code), unspoken; an account row has no flag', () => {
+  const franc: domain.Account = { id: 'xof', name: 'Dakar', currency: 'XOF', openingMinor: 5000, createdAt };
+  const data = { ...archive, accounts: [...archive.accounts, franc] };
+  const list = find(harness('accounts.tsx', {}, data).render(), 'SectionList');
+  const headers = list.props.sections.map((section: { currency: string }) => list.props.renderSectionHeader({ section }) as Node);
+  const flagOf = (header: Node) => find(header, 'InlineFlag').props;
+  assert.deepEqual(headers.map((header: Node) => [flagOf(header).flag, flagOf(header).size]), [['🇦🇷', 15], ['🇺🇸', 15], [null, 15]], 'the issuer\'s flag at the name\'s size; XOF none');
+  const line = nodes(headers[0]).find(node => node.type === 'View' && node.props.style?.flexDirection === 'row' && nodes(node).some(child => child.type === 'InlineFlag'))!;
+  assert.deepEqual(nodes(line).filter(node => node.type === 'InlineFlag' || node.type === 'AppText').map(node => node.type), ['InlineFlag', 'AppText'], 'the flag before the name');
+  assert.equal(headers[0].props.accessibilityLabel, 'Pesos argentinos, saldo registrado 1423,00 pesos', 'VoiceOver hears the name and the figure, never the flag');
+  const items = list.props.sections.flatMap((section: { data: domain.Account[] }) => section.data.map((item, index) => list.props.renderItem({ item, index, section }) as Node));
+  assert.equal(items.some((item: Node) => nodes(item).some(node => node.type === 'InlineFlag' || node.type === 'RegionMark' || node.type === 'CurrencyMark')), false,
+    'an account has no country, only a currency: its section says which');
 });
 
 // ---- Producto 25B3: a rule's detail, read before it is edited ----------------------------------------------------------

@@ -9,6 +9,7 @@ import { AccountBadge, AppText, CategoryBadge, DetailRow, Field, GlyphTile, Pres
 import { SEARCHABLE_FROM, currencyChoices, currencyOption, offeredCurrencies, searchChoices, type CurrencyChoice } from './currencies';
 import { useI18n } from '../i18n/provider';
 import { useAccountLookOf, useCategoriesInUse, useCategoryDefinitions, useCategoryLook } from './category-hues';
+import { CurrencyMark } from './marks';
 import { selectionHaptic, sheetTiming } from './motion';
 
 /** The capture hub's corners: the hero's and the hub's 32 pt radius (Forest). */
@@ -134,7 +135,8 @@ export function AccountField({ accounts, value, onChange, disabled = false, labe
 
 /** The account's currency as one native row: the label "Moneda", the
  * currency's full name as the primary line, its code and symbol as the
- * detail line, a glyph and a chevron, stacked so "Dólares estadounidenses"
+ * detail line, its mark (25O1: the issuer's flag beside the code, the neutral
+ * glyph for a supranational one) and a chevron, stacked so "Dólares estadounidenses"
  * and "USD" each keep a whole line at any width or text size. The sheet is
  * the currency screen of docs/currency.md §7.5 stage 8 (24B5): it lists the
  * currencies the ledger can hold (`currencies`: the build's gate, ARS and USD
@@ -156,14 +158,14 @@ export function CurrencyField({ value, onChange, disabled = false, currencies }:
   return <>
     <Surface grouped>
       <SelectionRow label={t('selection.currency')} value={selected.name} detail={selected.code + ' · ' + selected.symbol}
-        icon="cash-outline" last disabled={disabled} onPress={onChange ? open : undefined} />
+        leading={<CurrencyMark currency={value} size={30} />} last disabled={disabled} onPress={onChange ? open : undefined} />
     </Surface>
     {onChange && <CurrencySheet visible={visible} title={t('selection.chooseCurrency')} options={options} value={value} searchable={options.length >= SEARCHABLE_FROM}
       note={t('selection.currencyNote')} onClose={() => setVisible(false)} onChange={currency => { onChange(currency); setVisible(false); }} />}
   </>;
 }
 
-/** The sheet that lists currencies for a choice: one row per option (the full name, then the
+/** The sheet that lists currencies for a choice: one row per option (its mark, the full name, then the
  * code and symbol), a checkmark on the current one, a selection tick when the choice changes.
  * The new-account form lists the currencies the ledger can hold, with a note under them; the
  * currency switch of Inicio, Reportes and Presupuestos lists the currencies held (24B3). With
@@ -180,7 +182,9 @@ export function CurrencySheet({ visible, title, options, value, note, searchable
   </SelectionSheet>;
 }
 
-/** The currency rows of a sheet: the searchable, windowed list both `CurrencySheet` and the display sheet draw. */
+/** The currency rows of a sheet: the searchable, windowed list both `CurrencySheet` and the display sheet draw. 25O1: a
+ * row leads with its issuer's flag (`CurrencyMark`, beside the code it marks; the neutral glyph for XOF and the other
+ * supranational codes), never a claim about where an account is; VoiceOver still hears the name and the code. */
 function CurrencyList({ options, value, note, searchable, query, onQuery, onChange }: {
   options: readonly CurrencyChoice[]; value: Currency; note?: string; searchable: boolean; query: string; onQuery: (query: string) => void; onChange: (currency: Currency) => void;
 }) {
@@ -200,7 +204,7 @@ function CurrencyList({ options, value, note, searchable, query, onQuery, onChan
       accessibilityLabel={item.name + ', ' + item.code}
       onPress={() => { if (item.code !== value) selectionHaptic(); onChange(item.code); }}
       style={{ flexDirection: 'row', alignItems: 'center', padding: 14, gap: 14, backgroundColor: p.surface, borderRadius: 16, marginBottom: 8, overflow: 'hidden' }}>
-      <GlyphTile icon="cash-outline" />
+      <CurrencyMark currency={item.code} />
       <View style={{ flex: 1, minWidth: 0, gap: 3 }}><AppText style={{ fontWeight: '600' }}>{item.name}</AppText>
         <AppText secondary variant="subhead">{item.code} · {item.symbol}</AppText></View>
       {item.code === value && <Ionicons name="checkmark-circle" color={p.primary} size={24} accessible={false} />}
@@ -242,7 +246,7 @@ export function DisplaySheet({ visible, mode, currency, consolidatedOptions, sin
         {modeRow('single', t('display.single'), t('display.singleDetail'), true)}
       </Surface>
       <Surface grouped>
-        <SelectionRow label={t('display.currency')} value={currencyName(currency) + ' · ' + currency} icon="cash-outline" last
+        <SelectionRow label={t('display.currency')} value={currencyName(currency) + ' · ' + currency} leading={<CurrencyMark currency={currency} size={30} />} last
           onPress={() => setStep('currency')} />
       </Surface>
       <AppText secondary variant="footnote" style={{ paddingHorizontal: 4 }}>{t('display.note')}</AppText>
