@@ -11,6 +11,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { currenciesPresent } from '@finanzapp/domain';
 import { LedgerProvider, useLedger } from '../src/storage/LedgerProvider';
+import { NEWER_SCHEMA_MESSAGE } from '../src/storage/database';
 import { CategoryHuesProvider } from '../src/ui/category-hues';
 import { DisplayCurrencyProvider } from '../src/ui/display-currency-provider';
 import { RatesProvider } from '../src/fx/rates-provider';
@@ -78,7 +79,8 @@ function Navigation() {
       {error || fontError ? <>
         <AppText variant="title1">{t('boot.openFailed')}</AppText>
         <ErrorMessage message={error ?? t('boot.resourcesFailed')} />
-        {!fontError && <ActionButton label={t('boot.retry')} onPress={retry} />}
+        {/* 25Q4: a file from a newer build never opens in this one: the sentence says to update; no retry can help. */}
+        {!fontError && error !== NEWER_SCHEMA_MESSAGE && <ActionButton label={t('boot.retry')} onPress={retry} />}
       </> : <ActivityIndicator accessibilityLabel={t('boot.opening')} accessibilityLanguage={speechLanguage} color={p.secondary} />}
     </View>
   </SafeAreaView>;

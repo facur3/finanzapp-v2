@@ -458,6 +458,9 @@ async function migrateV11(tx: SqlExecutor): Promise<void> {
 /** Every schema script in order, for tests that build a real file at an earlier version (never run by the app outside `initializeDatabase`). */
 export const SCHEMA_SCRIPTS: readonly string[] = [SCHEMA, MIGRATE_V2, MIGRATE_V3, MIGRATE_V4, MIGRATE_V5, MIGRATE_V6, MIGRATE_V7, MIGRATE_V8, MIGRATE_V9, MIGRATE_V10, MIGRATE_V11, MIGRATE_V12, MIGRATE_V13, MIGRATE_V14];
 
+/** 25Q4: the open refusal for a file a newer build wrote; said as itself at launch, with no retry (none can help). */
+export const NEWER_SCHEMA_MESSAGE = 'Estos datos requieren una versión más nueva de FinanzApp. No se modificaron.';
+
 export async function initializeDatabase(db: LedgerDatabase): Promise<void> {
   // Set before opening a transaction; foreign_keys is connection-local.
   await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
@@ -465,7 +468,7 @@ export async function initializeDatabase(db: LedgerDatabase): Promise<void> {
   await db.withExclusiveTransactionAsync(async tx => {
     const version = await readVersion(tx);
     if (version > DATABASE_VERSION) {
-      throw new Error('Estos datos requieren una versión más nueva de FinanzApp. No se modificaron.');
+      throw new Error(NEWER_SCHEMA_MESSAGE);
     }
     if (version === 0) await tx.execAsync(SCHEMA);
     if (version < 2) await tx.execAsync(MIGRATE_V2);

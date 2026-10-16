@@ -13,6 +13,8 @@ import { DISPLAY_CURRENCY_KEY } from '../src/ui/display-currency.ts';
 import { LANGUAGE_PREFERENCE_KEY, REGION_PREFERENCE_KEY, type PreferenceStore } from '../src/i18n/preference.ts';
 import { createLocaleStore, type DeviceReading } from '../src/i18n/store.ts';
 import { RELEASED, type ReleasedSets } from '../src/i18n/locale.ts';
+import { es } from '../src/i18n/messages/es/index.ts';
+import { NEWER_SCHEMA_MESSAGE } from '../src/storage/database.ts';
 
 // Producto 25B: the first opening. The pure rules (when it is shown, what it suggests, the two stages) are tested
 // directly; the route runs in the harness with its hosts replaced by names. Not a rendered iPhone screen.
@@ -256,4 +258,75 @@ test('the root layout sends a new installation to the setup before the splash li
   assert.match(layout, /if \(onboarding === 'new'\) router\.replace\('\/onboarding'\)/);
   assert.match(layout, /fontsLoaded && snapshot && onboarding !== null\)\) void SplashScreen\.hideAsync/, 'the splash waits for the decision');
   assert.match(layout, /<Stack\.Screen name="onboarding" options=\{\{ headerShown: false, gestureEnabled: false, animation: 'fade' \}\} \/>/);
+});
+
+// ---- the root layout ---------------------------------------------------------------------------------------
+
+/** 25Q4: the root layout's Navigation with its hosts replaced by names. `ledger` and `fonts` are what the provider and
+ * expo-font report on the next render; `prefs` is the key-value store the first-opening decision reads. */
+function rootLayout({ prefs = memory() } = {}) {
+  const source = readFileSync(new URL('../app/_layout.tsx', import.meta.url), 'utf8');
+  const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
+  const jsx = (type: unknown, props: Record<string, unknown>) => ({ type, props });
+  const state: unknown[] = [];
+  const deps: unknown[][] = [];
+  const routes: unknown[] = [];
+  let cursor = 0, effectCursor = 0, retries = 0;
+  const ledger: { snapshot: { accounts: domain.Account[]; entries: domain.Entry[] } | null; error: string | null } = { snapshot: null, error: null };
+  const fonts: { loaded: boolean; error: Error | null } = { loaded: false, error: null };
+  const names = (...list: string[]) => Object.fromEntries(list.map(name => [name, name]));
+  const modules: Record<string, unknown> = {
+    react: { useState: (initial: unknown) => { const index = cursor++; if (!(index in state)) state[index] = initial;
+      return [state[index], (value: unknown) => { state[index] = value; }]; },
+    useMemo: (fn: () => unknown) => fn(),
+    useEffect: (fn: () => void, next?: unknown[]) => { const index = effectCursor++; const previous = deps[index];
+      if (!previous || !next || next.length !== previous.length || next.some((item, i) => !Object.is(item, previous[i]))) { deps[index] = next ?? []; fn(); } } },
+    'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
+    'react-native': { ...names('ActivityIndicator', 'View'), useWindowDimensions: () => ({ fontScale: 1, height: 852 }) },
+    'react-native-gesture-handler': names('GestureHandlerRootView'),
+    'react-native-safe-area-context': names('SafeAreaProvider', 'SafeAreaView'),
+    'expo-router': { DarkTheme: { colors: {} }, DefaultTheme: { colors: {} }, Stack: { Screen: 'Stack.Screen' }, ThemeProvider: 'ThemeProvider', router: { replace: (to: unknown) => routes.push(to) } },
+    'expo-status-bar': names('StatusBar'),
+    'expo-splash-screen': { preventAutoHideAsync: async () => {}, hideAsync: async () => {} },
+    'expo-system-ui': { setBackgroundColorAsync: async () => {} },
+    'expo-font': { useFonts: () => [fonts.loaded, fonts.error] },
+    '@expo/vector-icons/Ionicons': { font: {} },
+    '@finanzapp/domain': domain,
+    '../src/storage/LedgerProvider': { LedgerProvider: 'LedgerProvider', useLedger: () => ({ ...ledger, retry: () => { retries++; } }) },
+    '../src/storage/database': { NEWER_SCHEMA_MESSAGE },
+    '../src/ui/category-hues': names('CategoryHuesProvider'),
+    '../src/ui/display-currency-provider': names('DisplayCurrencyProvider'),
+    '../src/fx/rates-provider': names('RatesProvider'),
+    '../src/ui/components': names('ActionButton', 'AppText', 'ErrorMessage'),
+    '../src/ui/geometry': { reviewSheetScrolls: () => false },
+    '../src/ui/screen-failure': names('ScreenFailure'),
+    '../src/ui/theme': { UIProvider: 'UIProvider', themePreferenceStore: () => {}, useReduceMotion: () => false,
+      usePalette: () => ({ isDark: false, background: '#fff', surface: '#fff', primary: '#2557D6', text: '#000', secondary: '#666', line: '#ddd' }) },
+    '../src/i18n/provider': { ...names('HeldCurrenciesProvider', 'I18nProvider'), useI18n: () => bindLocale('es-AR') },
+    '../src/i18n/preference': { defaultPreferenceStore: prefs.store },
+    '../src/ui/onboarding-flow': onboardingFlow,
+  };
+  const module = { exports: {} as { default?: () => Node } };
+  runInNewContext(code, { module, exports: module.exports, Date, Error, require: (name: string) => {
+    if (!Object.hasOwn(modules, name)) throw new Error('Unexpected layout dependency: ' + name);
+    return modules[name];
+  } });
+  // Navigation is not exported: it is the function element inside the providers.
+  const navigation = nodes(module.exports.default!()).find(node => typeof node.type === 'function' && node.type.name === 'Navigation')!.type as (props: object) => Node;
+  return { render: () => { cursor = 0; effectCursor = 0; return navigation({}); }, ledger, fonts, routes, prefs, retries: () => retries };
+}
+
+test('25Q4: at launch a ledger from a newer build is said as itself with no «Volver a intentar»; any other open failure keeps it', () => {
+  const view = rootLayout();
+  view.fonts.loaded = true;
+  view.ledger.error = NEWER_SCHEMA_MESSAGE;
+  let root = view.render();
+  assert.equal(find(root, 'ErrorMessage').props.message, NEWER_SCHEMA_MESSAGE);
+  assert.equal(nodes(root).some(node => node.type === 'ActionButton'), false, 'no retry can open a file a newer build wrote');
+  view.ledger.error = es.errors.storage.openFailed;
+  root = view.render();
+  find(root, 'ActionButton', 'Volver a intentar').props.onPress();
+  assert.equal(view.retries(), 1);
+  view.ledger.error = es.errors.storage.migrationReferences;
+  assert.ok(find(view.render(), 'ActionButton', 'Volver a intentar'), 'a migration rolled back whole may pass on another try');
 });
