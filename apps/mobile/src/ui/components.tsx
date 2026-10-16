@@ -75,9 +75,12 @@ export const UNAVAILABLE_AMOUNT = '—';
  * explicit `accessibilityLanguage` from the caller wins (an autonym).
  *
  * 25D1: every style stops at the size iOS gives it at AX5 (`TEXT_STYLE_MAX_SCALE`);
- * an explicit `maxFontSizeMultiplier` still wins. */
+ * an explicit `maxFontSizeMultiplier` still wins.
+ *
+ * 25O1: `ref` reaches the native text (React 19 passes it with the props), so a screen that changes in place (the first
+ * opening's steps) can move VoiceOver to its new title. */
 export function AppText({ children, style, secondary = false, tertiary = false, variant = 'body', ...props }: TextProps & {
-  secondary?: boolean; tertiary?: boolean; variant?: keyof typeof type;
+  secondary?: boolean; tertiary?: boolean; variant?: keyof typeof type; ref?: Ref<Text>;
 }) {
   const p = usePalette();
   const { speechLanguage } = useI18n();
@@ -277,9 +280,12 @@ type Caret = { start: number; end: number };
  * left-aligned like the hero amounts of Inicio and the detail screens. No
  * negative tracking: on iOS it draws the last glyph past the measured width,
  * under the caret. */
-export function AmountField({ label, currency, tone, value = '', onChangeText, stored, ...props }: TextInputProps & { label?: string; currency: Currency; tone?: Tone;
+export function AmountField({ label, currency, tone, value = '', onChangeText, stored, bare = false, ...props }: TextInputProps & { label?: string; currency: Currency; tone?: Tone;
   /** The stored amount an edit form prefilled the field from: while the text is exactly that prefill in its own currency, it always fits (a stored amount may exceed the entry bound). */
-  stored?: StoredDraft }) {
+  stored?: StoredDraft;
+  /** 25O1: the amount alone, without its caption, where what surrounds it already says what it is and in which currency
+   * (the first opening's question and currency chip). VoiceOver still hears the label and the currency. */
+  bare?: boolean }) {
   const p = usePalette();
   const { t, amountFormat, currencySymbol, currencyUnit, speechLanguage } = useI18n();
   const accessoryId = useId();
@@ -349,7 +355,7 @@ export function AmountField({ label, currency, tone, value = '', onChangeText, s
   };
   return <View style={{ gap: 6, paddingVertical: 8 }}>
     {/* Said by the field itself (`amount.accessibility`: the label and the currency in words), never twice. */}
-    <AppText accessible={false} secondary variant="footnote" style={{ fontWeight: '500' }}>{title} · {currency}</AppText>
+    {!bare && <AppText accessible={false} secondary variant="footnote" style={{ fontWeight: '500' }}>{title} · {currency}</AppText>}
     <View style={styles.amountRow} onLayout={event => setRowWidth(event.nativeEvent.layout.width)}>
       <AppText accessible={false} maxFontSizeMultiplier={HERO_MAX_SCALE}
         style={{ fontSize: symbolSize, lineHeight: Math.round(symbolSize * 1.25), color: p.secondary, fontWeight: '500' }}>{symbol}</AppText>

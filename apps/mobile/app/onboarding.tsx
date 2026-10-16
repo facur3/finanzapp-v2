@@ -1,48 +1,76 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { BackHandler, Keyboard, Platform, ScrollView, View } from 'react-native';
-import { router, Stack } from 'expo-router';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { AccessibilityInfo, BackHandler, Keyboard, Platform, ScrollView, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent,
+  type Text } from 'react-native';
+import Animated from 'react-native-reanimated';
+import { router, Stack, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as SplashScreen from 'expo-splash-screen';
+import { setStatusBarStyle } from 'expo-status-bar';
 import { randomUUID } from 'expo-crypto';
 import { LEDGER_CURRENCIES, draftFitsCurrency, makeAccountAppearance, minorFromLedgerDraft, validateAccount, validateAccountAppearance,
   type Account, type AccountAppearance, type Currency } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
-import { DEFAULT_LOOK } from '../src/ui/appearance';
-import { ActionButton, AmountField, AppText, ErrorMessage, Field, FieldNote, NavigationRow, PressFeedback, Surface } from '../src/ui/components';
-import { CurrencyField } from '../src/ui/form-controls';
-import { preferenceSummary, showsPreference } from '../src/ui/locale-options';
+import { DEFAULT_LOOK, accountGlyph } from '../src/ui/appearance';
+import { ActionButton, AmountField, AppText, ErrorMessage, Field, GlyphTile, IconButton, NavigationRow, PressFeedback, Surface } from '../src/ui/components';
+import { CurrencyChip } from '../src/ui/currency-chip';
+import { InlineFlag } from '../src/ui/marks';
+import { languageName, regionName, showsPreference } from '../src/ui/locale-options';
 import { useDisplayCurrency } from '../src/ui/display-currency-provider';
-import { ValueTransition, errorHaptic, successHaptic, warningHaptic } from '../src/ui/motion';
-import { markOnboardingDone, nextStep, onboardingDecision, previousStep, suggestedCurrency, type OnboardingStep } from '../src/ui/onboarding-flow';
-import { space, usePalette } from '../src/ui/theme';
+import { TEXT_STYLE_MAX_SCALE, WEIGHT_WIDTH, titleFit, widestWordEm } from '../src/ui/geometry';
+import { ValueTransition, duration, errorHaptic, successHaptic, warningHaptic } from '../src/ui/motion';
+import { AccountCard, AvailableArt, CommitmentsArt, RecordArt } from '../src/ui/onboarding-art';
+import { ACCOUNT_PRESETS, STORY_PAGES, markOnboardingDone, onboardingDecision, previousStep, suggestedCurrency, type AccountPreset,
+  type OnboardingStep } from '../src/ui/onboarding-flow';
+import { radius, space, type, usePalette, useReduceMotion } from '../src/ui/theme';
+import { regionFlag } from '../src/i18n/flags';
 import { defaultPreferenceStore } from '../src/i18n/preference';
 import { useI18n, useLocalePreferences } from '../src/i18n/provider';
 
-/** The first opening (Producto 25B): two stages on one route, no header and no back swipe.
+/** The story's pages: an illustration and a headline each (`lead`, then `emphasis` in the brand colour). */
+const STORY = [
+  { art: RecordArt, lead: 'onboarding.story.record.lead', emphasis: 'onboarding.story.record.emphasis' },
+  { art: CommitmentsArt, lead: 'onboarding.story.commitments.lead', emphasis: 'onboarding.story.commitments.emphasis' },
+  { art: AvailableArt, lead: 'onboarding.story.available.lead', emphasis: 'onboarding.story.available.emphasis' },
+] as const;
+const PRESETS = Object.keys(ACCOUNT_PRESETS) as AccountPreset[];
+/** VoiceOver moves to the new title once the step's fade has settled. */
+const FOCUS_DELAY = 250;
+
+/** The first opening (Producto 25B; 25O1, «Primera impresión»): four steps on one route, no header and no back swipe.
  *
- *   1. Welcome: the title, one sentence, and the language and region the device gave, each a quiet row that opens the
- *      Más chooser (the same screens, pushed over this one; a choice there is saved as in Más and this screen re-titles
- *      itself in the new language when it comes back). Continuar goes on; Omitir, at the top of both stages, skips the
- *      rest of the setup and keeps whatever was already saved.
- *   2. First account, optional: a name, the currency the region suggests (the searchable sheet of every form, so any
- *      of the 146 can be chosen), an optional opening balance. Crear cuenta saves through the same domain rules as the
- *      New account form and seeds the display currency of the totals with the account's currency; Ahora no ends the
- *      setup with empty data.
+ *   1. The story: three pages, swiped or stepped with Siguiente, each a small scene of the app drawn from fixed sample
+ *      figures (`onboarding-art.tsx`) over a short headline; a three-segment progress at the top.
+ *   2. «¿Dónde tenés tu plata?»: three answers (cash, a bank, a digital wallet), each a preset of the first account; under
+ *      them the region and the language as two quiet pills that open the Más choosers (pushed over this screen; a choice
+ *      there is saved as in Más and this screen re-titles itself in the new language), and «Restaurar una copia», which
+ *      opens the import: back here with an account in the ledger, the setup ends and never asks for a duplicate.
+ *   3. The opening balance of that account: the question, the currency chip (the region's suggestion, any of the gate's),
+ *      the amount and the name, prefilled and editable. Crear cuenta saves through the same domain rules as Nueva cuenta
+ *      (a failed write keeps the draft and its operation id) and seeds the display currency of the totals.
+ *   4. The close, on the sapphire field Inicio opens with: the account as a card, «Todo listo.» and Empezar.
  *
- * Shown to a new installation only: `onboardingDecision` decides in `_layout.tsx` before the splash lifts, and again
- * here, so a link into `/onboarding` or a restored navigation on a device with data goes straight to the app and never
- * reaches an existing person's preferences. Both stages scroll (the largest Dynamic Type on a compact iPhone must still
- * reach the buttons); the step change is the same fade as Inicio's number (a plain fade under Reduce Motion). Android's
- * hardware back steps back, never out (`BackHandler`, a no-op on iOS). */
+ * Omitir, at the top of the first three, skips the rest and keeps whatever was already saved. Shown to a new installation
+ * only: `onboardingDecision` decides in `_layout.tsx` before the splash lifts, and again here, so a link into
+ * `/onboarding` or a restored navigation on a device with data goes straight to the app and never reaches an existing
+ * person's preferences. The splash lifts on this screen's first layout, so nothing under it is ever seen. Every step
+ * scrolls (the largest Dynamic Type on a compact iPhone must still reach its buttons); a step change is the same fade as
+ * Inicio's number, after which VoiceOver moves to the new title. Android's hardware back steps back, never out. */
 export default function OnboardingScreen() {
   const { snapshot, gate = LEDGER_CURRENCIES, addAccount } = useLedger();
-  const { t, currencyName, failureMessage } = useI18n();
+  const { t, failureMessage, speechLanguage } = useI18n();
   const preferences = useLocalePreferences();
   const p = usePalette();
+  const reduced = useReduceMotion();
+  const { width, fontScale } = useWindowDimensions();
   const display = useDisplayCurrency([]);
   // The guard: decided once, when this screen mounts, from the same rule as the layout.
   const [eligible] = useState(() => onboardingDecision(defaultPreferenceStore, (snapshot?.accounts.length ?? 0) > 0) === 'new');
-  useEffect(() => { if (!eligible) router.replace('/'); }, [eligible]);
-  const [step, setStep] = useState<OnboardingStep>('welcome');
+  const [step, setStep] = useState<OnboardingStep>('story');
+  const [page, setPage] = useState(0);
+  // The furthest page reached (its scene has played) and whether the story was left and opened again (every scene still).
+  const [reached, setReached] = useState(0);
+  const [returned, setReturned] = useState(false);
+  const [preset, setPreset] = useState<AccountPreset>('cash');
   const region = preferences?.state.region ?? null;
   const suggested = suggestedCurrency(region, gate);
   const [operation] = useState(() => ({ id: randomUUID(), createdAt: new Date().toISOString() }));
@@ -51,17 +79,59 @@ export default function OnboardingScreen() {
   const [opening, setOpening] = useState('');
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<{ account: Account; appearance: AccountAppearance } | null>(null);
+  const [created, setCreated] = useState<Account | null>(null);
   const [error, setError] = useState<string | null>(null);
   const saving = useRef(false);
+  const pager = useRef<ScrollView>(null);
+  const titles = useRef<Partial<Record<string, Text | null>>>({});
+  const lifted = useRef(false);
+  const accounts = useRef(0);
+  accounts.current = snapshot?.accounts.length ?? 0;
   const chosen = currency ?? suggested;
+  const locked = busy || !!pending;
+
   const finish = () => { markOnboardingDone(defaultPreferenceStore); router.replace('/'); };
-  const advance = () => { const next = nextStep(step); if (next) setStep(next); else finish(); };
-  // Android: the hardware back goes to the previous stage, never out of the setup (iOS has no such button; a no-op there).
+  // 25O1: the native splash lifts once this screen has drawn (the layout keeps it up for a new installation), so the tabs
+  // mounted under it are never seen; a screen that redirects lifts it at once.
+  const liftSplash = () => { if (!lifted.current) { lifted.current = true; void SplashScreen.hideAsync().catch(() => {}); } };
+  useEffect(() => { if (!eligible) { liftSplash(); router.replace('/'); } }, [eligible]);
+  // 25O1: back from the import with an account in the ledger (a copy restored), the setup is over: never a duplicate first account.
+  useFocusEffect(useCallback(() => { if (eligible && accounts.current > 0) finish(); }, [eligible]));
+  // The close is the field's own colour under the status bar; every other step the scheme's.
+  useEffect(() => { if (eligible) setStatusBarStyle(step === 'done' ? p.heroStatusBar : p.isDark ? 'light' : 'dark', true); }, [step, p.isDark, p.heroStatusBar]);
+  // 25O1: a step or page changes in place, with no navigation event, so VoiceOver is moved to the new title once it is up.
+  const focusKey = step === 'story' ? 'story' + page : step;
+  const focusArmed = useRef(false);
+  useEffect(() => {
+    if (!focusArmed.current) { focusArmed.current = true; return; }
+    const timer = setTimeout(() => { const title = titles.current[focusKey]; if (title) AccessibilityInfo.sendAccessibilityEvent(title, 'focus'); }, FOCUS_DELAY);
+    return () => clearTimeout(timer);
+  }, [focusKey]);
+  const titleRef = (key: string) => (node: Text | null) => { titles.current[key] = node; };
+
+  const showPage = (next: number) => { setPage(next); setReached(current => Math.max(current, next)); };
+  const goToPage = (next: number) => { pager.current?.scrollTo({ x: next * width, animated: !reduced }); showPage(next); };
+  const forward = () => { if (page < STORY_PAGES - 1) goToPage(page + 1); else setStep('start'); };
+  const settle = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const next = Math.round(event.nativeEvent.contentOffset.x / width);
+    if (next >= 0 && next < STORY_PAGES && next !== page) showPage(next);
+  };
+  const back = () => {
+    if (step === 'story') { if (page > 0) goToPage(page - 1); return; }
+    if (step === 'done') { finish(); return; }
+    // A submission sent with an unknown outcome stays frozen for «Reintentar»: its account cannot be swapped for another.
+    if (step === 'account' && locked) return;
+    const previous = previousStep(step);
+    if (previous === 'story') setReturned(true);
+    if (previous) setStep(previous);
+  };
+  const choose = (next: AccountPreset) => { setPreset(next); setName(t(ACCOUNT_PRESETS[next].name)); setError(null); setStep('account'); };
+  // Android: the hardware back mirrors the back button, page by page in the story, and never leaves the setup (a no-op on iOS).
   useEffect(() => {
     if (Platform.OS !== 'android') return;
-    const subscription = BackHandler.addEventListener('hardwareBackPress', () => { const back = previousStep(step); if (back) setStep(back); return true; });
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => { back(); return true; });
     return () => subscription.remove();
-  }, [step]);
+  }, [step, page, locked]);
 
   async function save() {
     if (saving.current) return;
@@ -73,12 +143,12 @@ export default function OnboardingScreen() {
     let sent = false;
     try {
       // The same validation and the same retry rule as the New account form: a failed write keeps the draft and its
-      // operation id, so retrying can never create the account twice.
+      // operation id, so retrying can never create the account twice. The preset gives the icon; the colour is the default.
       let submission = pending;
       if (!submission) {
         const account: Account = { ...operation, name: name.trim(), currency: chosen, openingMinor: minorFromLedgerDraft(opening.trim() || '0', chosen) };
         validateAccount(account);
-        const appearance = makeAccountAppearance(account.id, DEFAULT_LOOK.icon, DEFAULT_LOOK.color, operation.createdAt);
+        const appearance = makeAccountAppearance(account.id, ACCOUNT_PRESETS[preset].icon, DEFAULT_LOOK.color, operation.createdAt);
         validateAccountAppearance(appearance, [account]);
         submission = { account, appearance };
         setPending(submission);
@@ -90,8 +160,8 @@ export default function OnboardingScreen() {
       // (docs/currency.md §2.9); the person changes it later from the chip. Language and region are untouched.
       display.setCurrency(submission.account.currency);
       display.setMode('consolidated');
-      saving.current = false;
-      finish();
+      setCreated(submission.account);
+      setStep('done');
     } catch (cause) {
       setError(failureMessage(cause, 'accounts.form.saveFailed'));
       if (sent) warningHaptic(); else errorHaptic();
@@ -102,57 +172,140 @@ export default function OnboardingScreen() {
   }
 
   if (!eligible) return null;
-  const locked = busy || !!pending;
   const showsRegion = !!preferences && showsPreference('region', preferences.state);
-  const stage = (children: ReactNode, footer: ReactNode) => <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1, padding: space.xl, paddingTop: space.m, gap: space.xl }}
-    keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" automaticallyAdjustKeyboardInsets contentInsetAdjustmentBehavior="automatic">
-    <View style={{ flex: 1, gap: space.xl }}>{children}</View>
-    <View style={{ gap: space.s, paddingTop: space.m }}>{footer}</View>
-  </ScrollView>;
+  const glyph = accountGlyph(ACCOUNT_PRESETS[preset].icon);
+  // A headline grows with Dynamic Type to the Large Title's 60 pt, or less where its longest word would not fit the page
+  // whole (never below its own 40 pt).
+  const headlineScale = (text: string) => titleFit(fontScale, TEXT_STYLE_MAX_SCALE.display!, widestWordEm([text]), (type.display.fontSize ?? 40) * WEIGHT_WIDTH.bold,
+    width - 2 * space.xxl, width - 2 * space.xxl).maxScale;
+  const padded = { flexGrow: 1, paddingHorizontal: space.xl, paddingTop: space.m, paddingBottom: space.l };
 
-  return <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: p.background }}>
-    <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
-    <View style={{ flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: space.xl, minHeight: 44, alignItems: 'center' }}>
-      <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('onboarding.skipLabel')} accessibilityHint={t('onboarding.skipHint')} hitSlop={8}
-        disabled={busy} onPress={finish} style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 }}>
-        <AppText variant="subhead" style={{ color: p.primary, fontWeight: '600' }}>{t('onboarding.skip')}</AppText>
-      </PressFeedback>
+  const topBar = <View style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: space.xl }}>
+    {step === 'story'
+      // One VoiceOver element the bar's full height, so touch exploration finds it; the segments are 4 pt in its middle.
+      ? <View accessible accessibilityRole="progressbar" accessibilityLabel={t('onboarding.page', { current: page + 1, total: STORY_PAGES })}
+        accessibilityLanguage={speechLanguage} style={{ flex: 1, alignSelf: 'stretch', flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        {STORY.map((item, index) => <Animated.View key={item.lead} style={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: index <= page ? p.text : p.line,
+          transitionProperty: 'backgroundColor', transitionDuration: reduced ? 0 : duration.state }} />)}
+      </View>
+      : <View style={{ flex: 1, alignItems: 'flex-start', marginLeft: -10 }}>
+        <IconButton name="chevron-back" label={t('onboarding.back')} onPress={back} disabled={step === 'account' && locked} color={p.primary} />
+      </View>}
+    <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('onboarding.skipLabel')} accessibilityHint={t('onboarding.skipHint')} hitSlop={8}
+      disabled={busy} onPress={finish} style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 }}>
+      <AppText variant="subhead" style={{ color: p.primary, fontWeight: '600' }}>{t('onboarding.skip')}</AppText>
+    </PressFeedback>
+  </View>;
+
+  const story = <SafeAreaView edges={['bottom']} style={{ flex: 1 }}>
+    <ScrollView ref={pager} horizontal pagingEnabled showsHorizontalScrollIndicator={false} contentOffset={{ x: page * width, y: 0 }}
+      onMomentumScrollEnd={settle} style={{ flex: 1 }}>
+      {STORY.map((item, index) => {
+        const Art = item.art;
+        const scale = headlineScale(t(item.lead) + ' ' + t(item.emphasis));
+        // Only the page in front exists for VoiceOver: the others would be read off screen.
+        return <ScrollView key={item.lead} style={{ width }} contentContainerStyle={{ flexGrow: 1 }} alwaysBounceVertical={false} showsVerticalScrollIndicator={false}
+          accessibilityElementsHidden={index !== page} importantForAccessibility={index === page ? 'auto' : 'no-hide-descendants'}>
+          <Art play={index <= reached} still={returned} currency={suggested} />
+          <AppText ref={titleRef('story' + index)} accessibilityRole="header" variant="display" maxFontSizeMultiplier={scale}
+            style={{ paddingHorizontal: space.xxl, paddingTop: space.m, paddingBottom: space.s }}>
+            {t(item.lead)}{' '}<AppText variant="display" maxFontSizeMultiplier={scale} style={{ color: p.primary }}>{t(item.emphasis)}</AppText>
+          </AppText>
+        </ScrollView>;
+      })}
+    </ScrollView>
+    <View style={{ paddingHorizontal: space.xl, paddingVertical: space.l }}>
+      <ActionButton label={page < STORY_PAGES - 1 ? t('onboarding.next') : t('onboarding.continue')} onPress={forward} />
     </View>
-    <ValueTransition id={step} variant="fade" style={{ flex: 1 }}>
-      {step === 'welcome' && stage(<>
-        <View style={{ gap: 10, paddingTop: space.xxl }}>
-          <AppText accessibilityRole="header" variant="largeTitle">{t('onboarding.welcome.title')}</AppText>
-          <AppText secondary style={{ maxWidth: 360 }}>{t('onboarding.welcome.detail')}</AppText>
-        </View>
-        {preferences && <View style={{ gap: space.s }}>
-          <Surface grouped>
-            <NavigationRow title={t('preferences.language')} subtitle={preferenceSummary('language', preferences.state, t)} icon="language-outline" last={!showsRegion}
-              onPress={() => router.push('/language')} />
-            {showsRegion && <NavigationRow title={t('preferences.region')} subtitle={preferenceSummary('region', preferences.state, t)} icon="globe-outline" last
-              onPress={() => router.push('/region')} />}
-          </Surface>
-          <AppText secondary variant="footnote" style={{ paddingHorizontal: 4 }}>{t('onboarding.welcome.detected')}</AppText>
-        </View>}
-      </>, <ActionButton label={t('onboarding.continue')} onPress={advance} />)}
-      {step === 'account' && stage(<>
-        <View style={{ gap: 6 }}>
-          <AppText accessibilityRole="header" variant="title1">{t('onboarding.account.title')}</AppText>
-          <AppText secondary variant="subhead">{t('onboarding.account.detail')}</AppText>
-        </View>
-        <Field label={t('accounts.form.name')} value={name} onChangeText={setName} maxLength={80} autoCapitalize="words" editable={!locked}
-          placeholder={t('accounts.form.namePlaceholder')} />
-        <CurrencyField value={chosen} onChange={setCurrency} disabled={locked} currencies={gate} />
-        <FieldNote>{currency === null || currency === suggested ? t('onboarding.account.suggested', { name: currencyName(suggested) }) : t('onboarding.account.ownCurrency')}</FieldNote>
-        <AmountField label={t('onboarding.account.opening')} currency={chosen} value={opening} onChangeText={value => { setOpening(value); setError(null); }}
-          keyboardType="numbers-and-punctuation" inputMode={undefined} editable={!locked} />
-        <FieldNote help={{ title: t('accounts.form.openingBalance'), detail: t('accounts.form.openingHelp') }}>{t('accounts.form.openingNote')}</FieldNote>
-        <ErrorMessage message={error} />
-        {pending && error && <AppText secondary style={{ fontSize: 13 }}>{t('accounts.form.retryNote')}</AppText>}
-      </>, <>
-        <ActionButton label={pending && error ? t('common.retrySave') : t('onboarding.account.create')} onPress={save} busy={busy}
-          disabled={!name.trim() || !draftFitsCurrency(opening, chosen).ok} />
-        <ActionButton label={t('onboarding.account.later')} secondary onPress={finish} disabled={busy} />
-      </>)}
-    </ValueTransition>
   </SafeAreaView>;
+
+  const start = <SafeAreaView edges={['bottom']} style={{ flex: 1 }}>
+    <ScrollView contentContainerStyle={padded} alwaysBounceVertical={false}>
+      <View style={{ gap: space.s, paddingHorizontal: space.xs }}>
+        <AppText ref={titleRef('start')} accessibilityRole="header" variant="largeTitle">{t('onboarding.start.title')}</AppText>
+        <AppText secondary>{t('onboarding.start.detail')}</AppText>
+      </View>
+      <Surface grouped style={{ marginTop: space.xxl }}>
+        {PRESETS.map((key, index) => <NavigationRow key={key} title={t(ACCOUNT_PRESETS[key].title)} subtitle={t(ACCOUNT_PRESETS[key].detail)}
+          leading={<GlyphTile icon={accountGlyph(ACCOUNT_PRESETS[key].icon)} size={48} color={p.primary} />} last={index === PRESETS.length - 1}
+          onPress={() => choose(key)} />)}
+      </Surface>
+      <View style={{ flexGrow: 1, minHeight: space.xxl }} />
+      <View style={{ alignItems: 'center', gap: 14 }}>
+        {preferences && <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: space.s }}>
+          {showsRegion && <Pill label={t('onboarding.start.regionLabel', { name: regionName(preferences.state.region, preferences.state.language) })}
+            hint={t('onboarding.start.regionHint')} onPress={() => router.push('/region')}>
+            <InlineFlag flag={regionFlag(preferences.state.region)} size={15} />
+            <AppText variant="subhead" style={{ fontWeight: '500' }}>{regionName(preferences.state.region, preferences.state.language)}</AppText>
+          </Pill>}
+          {/* A language never shows a flag: its own name says it. */}
+          <Pill label={t('onboarding.start.languageLabel', { name: languageName(preferences.state.language) })} hint={t('onboarding.start.languageHint')}
+            onPress={() => router.push('/language')}>
+            <AppText variant="subhead" style={{ fontWeight: '500' }}>{languageName(preferences.state.language)}</AppText>
+          </Pill>
+        </View>}
+        <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('onboarding.start.restore')} accessibilityHint={t('onboarding.start.restoreHint')}
+          onPress={() => router.push('/backup-import')} style={{ paddingHorizontal: space.s }}>
+          <AppText variant="subhead" style={{ textAlign: 'center' }}>
+            <AppText variant="subhead" secondary>{t('onboarding.start.restoreQuestion')}</AppText>{' '}
+            <AppText variant="subhead" style={{ color: p.primary, fontWeight: '600' }}>{t('onboarding.start.restore')}</AppText>
+          </AppText>
+        </PressFeedback>
+      </View>
+    </ScrollView>
+  </SafeAreaView>;
+
+  const account = <SafeAreaView edges={['bottom']} style={{ flex: 1 }}>
+    <ScrollView contentContainerStyle={padded} alwaysBounceVertical={false} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive"
+      automaticallyAdjustKeyboardInsets>
+      <View style={{ gap: space.s, paddingHorizontal: space.xs }}>
+        <View style={{ marginBottom: space.s }}><GlyphTile icon={glyph} large color={p.primary} /></View>
+        <AppText ref={titleRef('account')} accessibilityRole="header" variant="largeTitle">{t(ACCOUNT_PRESETS[preset].question)}</AppText>
+        <AppText secondary>{t('onboarding.account.zero')}</AppText>
+      </View>
+      <View style={{ gap: space.m, marginTop: space.xxl }}>
+        <View style={{ gap: space.xs, padding: space.l, borderRadius: radius.group, backgroundColor: p.surface }}>
+          <CurrencyChip value={chosen} onChange={setCurrency} currencies={gate} disabled={locked} />
+          <AmountField bare label={t('accounts.form.openingBalance')} currency={chosen} value={opening} onChangeText={value => { setOpening(value); setError(null); }}
+            keyboardType="numbers-and-punctuation" inputMode={undefined} editable={!locked} />
+        </View>
+        <Field label={t('onboarding.account.name')} value={name} onChangeText={setName} maxLength={80} autoCapitalize="words" editable={!locked} />
+        <ErrorMessage message={error} />
+        {pending && error && <AppText secondary variant="footnote">{t('accounts.form.retryNote')}</AppText>}
+      </View>
+      <View style={{ flexGrow: 1, minHeight: space.xxl }} />
+      <ActionButton label={pending && error ? t('common.retrySave') : t('onboarding.account.create')} onPress={save} busy={busy}
+        disabled={!name.trim() || !draftFitsCurrency(opening, chosen).ok} />
+    </ScrollView>
+  </SafeAreaView>;
+
+  // The close fills the screen, the status bar's strip included, with the field Inicio opens with.
+  const done = created && <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: p.hero }}>
+    <ScrollView contentContainerStyle={{ flexGrow: 1, paddingHorizontal: space.xl, paddingBottom: space.l }} alwaysBounceVertical={false}>
+      {/* The card's check stands 42 pt above it. */}
+      <View style={{ flexGrow: 1, justifyContent: 'center', paddingTop: 42 + space.xxl, paddingBottom: space.xxl }}>
+        <AccountCard name={created.name} glyph={glyph} minor={created.openingMinor} currency={created.currency} />
+      </View>
+      <View style={{ gap: space.s, paddingHorizontal: space.xs }}>
+        <AppText ref={titleRef('done')} accessibilityRole="header" variant="largeTitle" style={{ color: p.heroInk }}>{t('onboarding.done.title')}</AppText>
+        <AppText style={{ color: p.heroSecondary }}>{t('onboarding.done.detail')}</AppText>
+      </View>
+      <View style={{ paddingTop: space.xxl }}><ActionButton onField label={t('onboarding.done.start')} onPress={finish} /></View>
+    </ScrollView>
+  </SafeAreaView>;
+
+  return <View style={{ flex: 1, backgroundColor: p.background }} onLayout={liftSplash}>
+    <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
+    {step !== 'done' && <SafeAreaView edges={['top']}>{topBar}</SafeAreaView>}
+    <ValueTransition id={step} variant="fade" style={{ flex: 1 }}>
+      {step === 'story' ? story : step === 'start' ? start : step === 'account' ? account : done}
+    </ValueTransition>
+  </View>;
+}
+
+/** A quiet preference pill: 36 pt drawn, 44 pt to the finger, on the inset fill. */
+function Pill({ label, hint, onPress, children }: { label: string; hint: string; onPress: () => void; children: ReactNode }) {
+  const p = usePalette();
+  return <PressFeedback accessibilityRole="button" accessibilityLabel={label} accessibilityHint={hint} onPress={onPress} hitSlop={{ top: 4, bottom: 4 }}
+    style={{ minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, borderRadius: 18, backgroundColor: p.inset }}>{children}</PressFeedback>;
 }

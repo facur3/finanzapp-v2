@@ -123,9 +123,10 @@ export const ROW_STACK_SCALE = 1.2;
  * pt, a 22 pt Title 2 79, a 17 pt Body 61); these ceilings land each style on Apple's AX5 size and keep the order iOS
  * keeps there (Title 3 55 pt above Body 53 above Caption 43). Below AX5 a style grows as React Native scales it; where a
  * layout cannot hold that, the layout adapts (it stacks or wraps), the text is not capped lower. The eyebrow is a
- * Caption 1. `hero` has none: amounts use `amountMaxScale`. */
+ * Caption 1. `hero` has none: amounts use `amountMaxScale`. 25O1: `display` (the first opening's headlines) stops where the
+ * Large Title does, 60 pt. */
 export const TEXT_STYLE_MAX_SCALE: Readonly<Partial<Record<string, number>>> = {
-  largeTitle: 60 / 34, title1: 58 / 28, title2: 56 / 22, title3: 55 / 20, headline: 53 / 17, body: 53 / 17, subhead: 49 / 15,
+  display: 60 / 40, largeTitle: 60 / 34, title1: 58 / 28, title2: 56 / 22, title3: 55 / 20, headline: 53 / 17, body: 53 / 17, subhead: 49 / 15,
   footnote: 44 / 13, caption: 43 / 12, eyebrow: 43 / 12,
 };
 /** 25D1: an amount is never smaller than body text can be. A row amount (under 28 pt) grows to Body's AX5 size, 53 pt, and
