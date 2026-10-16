@@ -53,8 +53,8 @@ export const backup: Pick<Messages, 'backup'> = {
       availableCaption: 'Money accounts only. Cards and debts aren’t counted.',
       now: 'Now',
       catchUp: {
-        one: 'Importing also records {count} recurring or installment due date from after the backup, so your balances may differ from this review.',
-        other: 'Importing also records {count} recurring and installment due dates from after the backup, so your balances may differ from this review.',
+        one: 'Importing also records {count} transaction from a recurring item or installment that fell due after the backup, so your balances may differ from this review.',
+        other: 'Importing also records {count} transactions from recurring items or installments that fell due after the backup, so your balances may differ from this review.',
       },
       noAccounts: 'It contains no accounts.',
       onlyMissing: 'Only what is missing is added. Nothing is replaced or deleted.',

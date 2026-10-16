@@ -64,10 +64,11 @@ export const backup = {
       /** Label above the current balance, under the balance after import. */
       now: 'Ahora',
       /** 25Q4: the movements the restore's catch-up also records for the copy's rules and plans (what fell due since the copy
-       * was made); they are not in «Disponible después». `one` is singular, `other` plural. */
+       * was made); they are not in «Disponible después». `one` is singular, `other` plural. 25Q4 review: it counts movements,
+       * never due dates (a financed instalment records one per part). */
       catchUp: {
-        one: 'Al importar también se registra {count} vencimiento de un recurrente o una cuota posterior a la copia, así que tus saldos pueden diferir de esta revisión.',
-        other: 'Al importar también se registran {count} vencimientos de recurrentes y cuotas posteriores a la copia, así que tus saldos pueden diferir de esta revisión.',
+        one: 'Al importar también se registra {count} movimiento de un recurrente o una cuota que venció después de la copia, así que tus saldos pueden diferir de esta revisión.',
+        other: 'Al importar también se registran {count} movimientos de recurrentes o cuotas que vencieron después de la copia, así que tus saldos pueden diferir de esta revisión.',
       },
       noAccounts: 'No contiene cuentas.',
       onlyMissing: 'Solo se agrega lo que falta. No se reemplaza ni se borra nada.',

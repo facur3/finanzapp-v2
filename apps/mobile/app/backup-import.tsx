@@ -107,7 +107,8 @@ export default function BackupImportScreen() {
   const hiddenIncoming = new Set([...plan?.cards ?? [], ...plan?.debts ?? []].map(item => item.accountId));
   // A count is grouped on screen ("1.234", "1,234"); VoiceOver gets the plain digits, which every voice reads as one number.
   const count = (value: number) => ({ value: formatCount(value), spokenValue: String(value) });
-  // 25Q4: what tells two copies apart before importing: the date the header carries and the newest live movement inside it.
+  // 25Q4: what tells two copies apart before importing: the date the header carries and the newest live movement inside it,
+  // whose date VoiceOver hears written out («5 de marzo de 2026», never «5 mar»; 25Q4 review).
   const latest = review ? [...review.backup.archive.records.filter(record => !record.voided).map(record => record.entry.dateISO),
     ...(review.backup.archive.transfers ?? []).filter(record => !record.voided).map(record => record.transfer.dateISO)]
     .reduce<string | null>((max, date) => max === null || date > max ? date : max, null) : null;
@@ -122,7 +123,8 @@ export default function BackupImportScreen() {
         <View style={{ gap: 6 }}><SectionTitle>{t('backup.import.reviewTitle')}</SectionTitle>
           <AppText secondary numberOfLines={2} style={{ fontSize: 14 }}>{review.name}</AppText>
           <AppText secondary style={{ fontSize: 13 }}>{t('backup.import.exportedAt', { date: formatDateTime(review.backup.exportedAt) })}</AppText>
-          {latest && <AppText secondary style={{ fontSize: 13 }}>{t('backup.import.latestMovement', { date: formatDate(latest, 'dayYear') })}</AppText>}
+          {latest && <AppText secondary style={{ fontSize: 13 }} accessibilityLabel={t('backup.import.latestMovement', { date: formatDate(latest, 'long') })}>
+            {t('backup.import.latestMovement', { date: formatDate(latest, 'dayYear') })}</AppText>}
         </View>
         <Surface grouped>
           <DetailRow label={t('backup.import.rows.accounts')} {...count(plan.accounts.filter(account => !hiddenIncoming.has(account.id)).length)} />

@@ -41,8 +41,9 @@ export const activity = {
     cardAfterDebt: '{account} quedará con un saldo pendiente de {amount}.',
     cardAfterCredit: '{account} quedará con {amount} a favor.',
     cardAfterClear: '{account} quedará sin saldo pendiente.',
-    restoreEffect: 'Volverá a aparecer en tus movimientos y reportes.',
-    voidEffect: 'Dejará de contar en tus saldos y reportes. Podés recuperarlo después desde Movimientos deshechos, en Más.',
+    /** 25Q4 review: these name the movement, so after a card's sentence they never read as the card stopping or coming back. */
+    restoreEffect: 'Este movimiento volverá a contar en tus saldos y reportes.',
+    voidEffect: 'Este movimiento dejará de contar en tus saldos y reportes. Podés recuperarlo después desde Movimientos deshechos, en Más.',
     restore: 'Recuperar',
     void: 'Deshacer',
     statusVoided: 'Deshecho · no cuenta en saldos ni reportes',
@@ -104,8 +105,8 @@ export const activity = {
     debtAfterReceivableSettled: 'Lo que te debe {name} quedará saldado.',
     /** Ends every transfer undo or restore. */
     recordOnly: 'Solo cambia el registro en esta app, no mueve dinero en el banco.',
-    /** An undo only («la transferencia»). */
-    voidRecovery: 'Podés recuperarla después desde Movimientos deshechos, en Más.',
+    /** An undo only. 25Q4 review: it names the transfer, so it never reads as the card or debt named before it. */
+    voidRecovery: 'Podés recuperar la transferencia después desde Movimientos deshechos, en Más.',
     /** 25Q4: a restored debt payment or collection may settle at most what is pending now; said before any confirmation, in
      * the debt screens' words. */
     restoreBlockedTitle: 'No se puede recuperar ahora',

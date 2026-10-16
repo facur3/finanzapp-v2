@@ -467,7 +467,7 @@ test('transfer undo requires confirmation, affects both sides, and updates detai
   find(view.render(), 'ActionButton', 'Deshacer transferencia').props.onPress();
   // 25Q4: a plain transfer keeps its sentence, then the record-only note and where an undo is restored from.
   assert.equal(view.alerts[0].message, '10,00 ARS: se descontarán de Destino y se sumarán a Prueba ARS. Solo cambia el registro en esta app, no mueve dinero en el banco. '
-    + 'Podés recuperarla después desde Movimientos deshechos, en Más.');
+    + 'Podés recuperar la transferencia después desde Movimientos deshechos, en Más.');
   view.alerts[0].buttons[0].onPress();
   assert.equal(view.transferChanges.length, 0);
   find(view.render(), 'ActionButton', 'Deshacer transferencia').props.onPress();
@@ -787,7 +787,7 @@ test('English movement detail and transfer form: titles, rows, confirmation and 
   assert.deepEqual(rows, ['Category=Salud', 'Account=Prueba ARS', 'Currency=Argentine pesos'], 'the stored name and the account name are not translated');
   find(root, 'ActionButton', 'Undo transaction').props.onPress();
   assert.equal(detail.alerts[0].title, 'Undo transaction?');
-  assert.equal(detail.alerts[0].message, '123,45 ARS will be added to Prueba ARS. It will stop counting in your balances and reports. You can restore it later from Undone transactions, in More.');
+  assert.equal(detail.alerts[0].message, '123,45 ARS will be added to Prueba ARS. This transaction will stop counting in your balances and reports. You can restore it later from Undone transactions, in More.');
   assert.equal(detail.alerts[0].buttons.map((button: any) => button.text).join(','), 'Cancel,Undo');
   assert.equal(detail.updates.length, 0, 'asking never writes');
 
@@ -1637,16 +1637,21 @@ const appTexts = (root: Node) => nodes(root).filter(node => node.type === 'AppTe
 
 // The restore's catch-ups record what fell due since the copy was made (installments.node.ts checks the count against a
 // real restore); the review says how many, under «Disponible después», which stays the copy's own total.
-test('25Q4: a copy whose rules fell due since it was made says how many dates the import also records; «Disponible después» is unchanged; a paused or not-yet-due rule says nothing', async () => {
+test('25Q4: a copy whose rules fell due since it was made says how many movements the import also records; «Disponible después» is unchanged; a paused or not-yet-due rule says nothing', async () => {
   const rent: domain.RecurringRule = { id: 'rent', accountId: 'a', kind: 'expense', amountMinor: 50000, merchant: 'Alquiler', category: 'Hogar', frequency: 'monthly',
     anchorDateISO: '2026-07-01', nextDateISO: '2026-07-01', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
-  // The harness's day is 2026-09-20: 1 jul, 1 ago and 1 sep fell due.
+  // The harness's day is 2026-09-20: 1 jul, 1 ago and 1 sep fell due. 25Q4 review: the count is movements (a financed
+  // instalment records one per part), so the sentence names movements, never «vencimientos».
   let root = (await reviewCopy({ ...archive, recurring: [rent] })).render();
-  assert.ok(appTexts(root).includes('Al importar también se registran 3 vencimientos de recurrentes y cuotas posteriores a la copia, así que tus saldos pueden diferir de esta revisión.'),
+  assert.ok(appTexts(root).includes('Al importar también se registran 3 movimientos de recurrentes o cuotas que vencieron después de la copia, así que tus saldos pueden diferir de esta revisión.'),
     JSON.stringify(appTexts(root)));
   assert.equal(find(root, 'Money').props.minor, 87655, 'the total stays what the copy holds');
   root = (await reviewCopy({ ...archive, recurring: [{ ...rent, nextDateISO: '2026-09-01' }] })).render();
-  assert.ok(appTexts(root).includes('Al importar también se registra 1 vencimiento de un recurrente o una cuota posterior a la copia, así que tus saldos pueden diferir de esta revisión.'));
+  assert.ok(appTexts(root).includes('Al importar también se registra 1 movimiento de un recurrente o una cuota que venció después de la copia, así que tus saldos pueden diferir de esta revisión.'));
+  const english = bindLocale('en-US');
+  assert.deepEqual([english.t('backup.import.catchUp', { count: 1 }), english.t('backup.import.catchUp', { count: 3 })], [
+    'Importing also records 1 transaction from a recurring item or installment that fell due after the backup, so your balances may differ from this review.',
+    'Importing also records 3 transactions from recurring items or installments that fell due after the backup, so your balances may differ from this review.']);
   for (const quiet of [{ ...rent, active: false }, { ...rent, nextDateISO: '2026-10-01' }]) {
     root = (await reviewCopy({ ...archive, recurring: [quiet] })).render();
     assert.equal(appTexts(root).some(text => text.startsWith('Al importar también')), false, JSON.stringify(quiet));
@@ -1665,7 +1670,9 @@ test('25Q4: the review names the copy by its date and its newest live movement, 
       domain.makeTransferChange('undo', domain.initialTransferRecord({ ...transfer, id: 't2', dateISO: '2026-05-01' }), 'void', createdAt).after] }, new Date(exportedAt));
   const root = view.render();
   assert.ok(appTexts(root).includes('Copia del ' + when), JSON.stringify(appTexts(root)));
-  assert.ok(appTexts(root).includes('Último movimiento: 5 mar 2026'));
+  const latest = nodes(root).find(node => node.type === 'AppText' && node.props.children === 'Último movimiento: 5 mar 2026');
+  assert.ok(latest);
+  assert.equal(latest.props.accessibilityLabel, 'Último movimiento: 5 de marzo de 2026', '25Q4 review: VoiceOver hears the date written out, never «5 mar»');
   find(root, 'ActionButton', 'Confirmar importación').props.onPress();
   assert.equal(view.alerts[0].title, '¿Importar la copia del ' + when + '?');
   assert.equal(view.alerts[0].message, 'Se agregan solo los registros que faltan; no se reemplaza nada. Lo importado no se puede quitar de una sola vez: se deshace o se elimina de a uno.');
@@ -2193,11 +2200,11 @@ test('25Q4: undoing or restoring a card purchase says how the card will read, in
   };
   // Visa owes 173,45: 50,00 before the purchase.
   const view = undo({ ...liabilityData, records: [purchase] });
-  assert.equal(view.alerts[0].message, 'Visa quedará con un saldo pendiente de 50,00 ARS. Dejará de contar en tus saldos y reportes. Podés recuperarlo después desde Movimientos deshechos, en Más.');
+  assert.equal(view.alerts[0].message, 'Visa quedará con un saldo pendiente de 50,00 ARS. Este movimiento dejará de contar en tus saldos y reportes. Podés recuperarlo después desde Movimientos deshechos, en Más.');
   view.alerts[0].buttons[1].onPress(); await flush();
   view.setData({ ...liabilityData, records: [view.updates[0].after] });
   find(view.render(), 'ActionButton', 'Recuperar movimiento').props.onPress();
-  assert.equal(view.alerts[1].message, 'Visa quedará con un saldo pendiente de 173,45 ARS. Volverá a aparecer en tus movimientos y reportes.');
+  assert.equal(view.alerts[1].message, 'Visa quedará con un saldo pendiente de 173,45 ARS. Este movimiento volverá a contar en tus saldos y reportes.');
   // A card that starts at zero: paid off by a transfer, the undo leaves it in credit; with only the purchase, owing nothing.
   const fresh = { ...liabilityData, accounts: liabilityData.accounts.map(item => item.id === 'card-acc' ? { ...item, openingMinor: 0 } : item), records: [purchase] };
   const paid = undo({ ...fresh, transfers: [storedTransfer('pay', 'a', 'card-acc', 12345)] });
@@ -2205,7 +2212,12 @@ test('25Q4: undoing or restoring a card purchase says how the card will read, in
   const only = undo(fresh);
   assert.ok(only.alerts[0].message.startsWith('Visa quedará sin saldo pendiente. '), only.alerts[0].message);
   const english = undo({ ...liabilityData, records: [purchase] }, 'en-AR');
-  assert.equal(english.alerts[0].message, 'Visa will have an outstanding balance of 50,00 ARS. It will stop counting in your balances and reports. You can restore it later from Undone transactions, in More.');
+  assert.equal(english.alerts[0].message, 'Visa will have an outstanding balance of 50,00 ARS. This transaction will stop counting in your balances and reports. You can restore it later from Undone transactions, in More.');
+  english.alerts[0].buttons[1].onPress(); await flush();
+  english.setData({ ...liabilityData, records: [english.updates[0].after] });
+  find(english.render(), 'ActionButton', 'Restore transaction').props.onPress();
+  // 25Q4 review: the sentence after the card's names the transaction, so it never reads as the card coming back.
+  assert.equal(english.alerts[1].message, 'Visa will have an outstanding balance of 173,45 ARS. This transaction will count again in your balances and reports.');
   for (const message of [...view.alerts, paid.alerts[0], only.alerts[0]].map(alert => alert.message)) assert.doesNotMatch(message, /se sumarán|se descontarán|deuda/i);
 });
 
@@ -2218,15 +2230,15 @@ test('25Q4: undoing or restoring a card payment, a debt payment or a collection 
   };
   const payment = storedTransfer('pay', 'a', 'card-acc', 5000);
   assert.equal(ask(payment), 'Se sumarán 50,00 ARS a Prueba ARS. Visa quedará con un saldo pendiente de 50,00 ARS. Solo cambia el registro en esta app, no mueve dinero en el banco. '
-    + 'Podés recuperarla después desde Movimientos deshechos, en Más.');
+    + 'Podés recuperar la transferencia después desde Movimientos deshechos, en Más.');
   assert.equal(ask(domain.makeTransferChange('undo', payment, 'void', createdAt).after),
     'Se descontarán 50,00 ARS de Prueba ARS. Visa quedará sin saldo pendiente. Solo cambia el registro en esta app, no mueve dinero en el banco.');
   assert.equal(ask(storedTransfer('pay', 'a', 'debt-acc', 3000)), 'Se sumarán 30,00 ARS a Prueba ARS. Le vas a deber 70,00 ARS a Juan. '
-    + 'Solo cambia el registro en esta app, no mueve dinero en el banco. Podés recuperarla después desde Movimientos deshechos, en Más.');
+    + 'Solo cambia el registro en esta app, no mueve dinero en el banco. Podés recuperar la transferencia después desde Movimientos deshechos, en Más.');
   assert.equal(ask(storedTransfer('collect', 'rec-acc', 'a', 1000)), 'Se descontarán 10,00 ARS de Prueba ARS. Ana te va a deber 40,00 ARS. '
-    + 'Solo cambia el registro en esta app, no mueve dinero en el banco. Podés recuperarla después desde Movimientos deshechos, en Más.');
+    + 'Solo cambia el registro en esta app, no mueve dinero en el banco. Podés recuperar la transferencia después desde Movimientos deshechos, en Más.');
   assert.equal(ask(payment, 'en-AR'), '50,00 ARS will be added to Prueba ARS. Visa will have an outstanding balance of 50,00 ARS. '
-    + 'This only changes the record in this app; it moves no money at the bank. You can restore it later from Undone transactions, in More.');
+    + 'This only changes the record in this app; it moves no money at the bank. You can restore the transfer later from Undone transactions, in More.');
   // 25Q4 review: a restore that settles a debt says so by its direction; «la deuda con» is only money the person owes.
   const undone = (record: domain.TransferRecord) => domain.makeTransferChange('undo', record, 'void', createdAt).after;
   const collected = undone(storedTransfer('collect', 'rec-acc', 'a', 4000)), paid = undone(storedTransfer('pay', 'a', 'debt-acc', 7000));
