@@ -255,7 +255,7 @@ test('the root layout sends a new installation to the setup before the splash li
   const layout = readFileSync(new URL('../app/_layout.tsx', import.meta.url), 'utf8');
   assert.match(layout, /onboardingDecision\(defaultPreferenceStore, snapshot\.accounts\.length > 0\)/);
   assert.match(layout, /if \(decision === 'existing'\) markOnboardingDone\(defaultPreferenceStore\)/);
-  assert.match(layout, /if \(onboarding === 'new'\) router\.replace\('\/onboarding'\)/);
+  assert.ok(layout.includes("useEffect(() => { if (onboarding === 'new' && fontsLoaded) router.replace('/onboarding'); }, [onboarding, fontsLoaded]);"), '25Q4: once, with the stack');
   assert.match(layout, /fontsLoaded && snapshot && onboarding !== null\)\) void SplashScreen\.hideAsync/, 'the splash waits for the decision');
   assert.match(layout, /<Stack\.Screen name="onboarding" options=\{\{ headerShown: false, gestureEnabled: false, animation: 'fade' \}\} \/>/);
 });
@@ -329,4 +329,27 @@ test('25Q4: at launch a ledger from a newer build is said as itself with no «Vo
   assert.equal(view.retries(), 1);
   view.ledger.error = es.errors.storage.migrationReferences;
   assert.ok(find(view.render(), 'ActionButton', 'Volver a intentar'), 'a migration rolled back whole may pass on another try');
+});
+
+test('25Q4: the root layout sends a new installation to the setup exactly once, after the stack exists; a banner later in that session never sends it again', () => {
+  const view = rootLayout();
+  view.ledger.snapshot = { accounts: [], entries: [] };
+  view.render();
+  view.render();
+  assert.deepEqual(view.routes, [], 'decided, but the fonts still hold the stack back: nothing to replace yet');
+  view.fonts.loaded = true;
+  view.render();
+  assert.deepEqual(view.routes, ['/onboarding']);
+  for (const error of [es.errors.storage.refreshFailed, null, es.errors.storage.installmentsFailed]) {
+    view.ledger.error = error;
+    view.render();
+  }
+  assert.deepEqual(view.routes, ['/onboarding'], 'a banner never replaces the setup or a form over it');
+  const existing = rootLayout();
+  existing.ledger.snapshot = { accounts: [{ id: 'a', name: 'Pesos', currency: 'ARS', openingMinor: 0, createdAt }], entries: [] };
+  existing.fonts.loaded = true;
+  existing.render();
+  existing.render();
+  assert.deepEqual(existing.routes, []);
+  assert.equal(existing.prefs.rows.get(ONBOARDING_KEY), 'done');
 });

@@ -67,10 +67,12 @@ function Navigation() {
     if (decision === 'existing') markOnboardingDone(defaultPreferenceStore);
     setOnboarding(decision);
   }, [snapshot !== null]);
+  // 25Q4: the redirect fires once: when the decision is 'new' and the stack exists (the fonts gate it, below). It never
+  // depends on the ledger's error, so a banner during that first session never replaces the screen on top.
+  useEffect(() => { if (onboarding === 'new' && fontsLoaded) router.replace('/onboarding'); }, [onboarding, fontsLoaded]);
   useEffect(() => {
     // Show a recoverable error as well as the successful app; never hold the
     // native splash forever when font or database initialization fails.
-    if (onboarding === 'new') router.replace('/onboarding');
     if (error || fontError || (fontsLoaded && snapshot && onboarding !== null)) void SplashScreen.hideAsync().catch(() => {});
   }, [error, fontError, fontsLoaded, snapshot !== null, onboarding]);
 
