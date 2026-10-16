@@ -11,8 +11,8 @@ import { localeChooser, recentWithCurrent, type LocalePreferenceKind } from './l
 /** Más → Idioma and Más → Región (Producto 24R2A): `ChoiceScreen` over the
  * released languages or regions, iOS Settings style. "Según el dispositivo" is
  * pinned first and says what the device gives now; a short list (the two
- * released languages, the two released regions) is one card; the preview's
- * 257 regions get the search field (name, ISO codes, currency), the recent
+ * released languages) is one card; the 234 released regions (257 in a preview)
+ * get the search field (name, ISO codes, currency), the recent
  * choices and the alphabetical sections. A language row is its autonym,
  * spoken in its own language. A tap saves first and applies second: when the
  * key-value store refuses the write the checkmark stays and the screen says

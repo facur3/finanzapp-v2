@@ -1,7 +1,7 @@
 /** What the Idioma and Región choosers list, and what Más says about each.
- * Only released values are listed (Español and English, Argentina and the
- * United States since Producto 23.1C2; every catalogue region in a development
- * preview, 24R2A): a catalogue still being translated or a region still waiting
+ * Only released values are listed (Español and English since Producto 23.1C2;
+ * 234 regions since 24R2B; every catalogue region in a development preview):
+ * a catalogue still being translated or a region still waiting
  * for its device QA is never offered, not even greyed out. The one exception is
  * a region the person already chose in a preview: it stays saved and is shown,
  * marked, with the formats that stand in for it. "Follow the device" is always
