@@ -7,7 +7,7 @@ import { CATEGORY_PRESETS, categoryKey, labelFromISO, newCategoryDefinition, edi
 import { es } from '../src/i18n/messages/es/index.ts';
 import { en } from '../src/i18n/messages/en/index.ts';
 import { messageKeys, translate } from '../src/i18n/messages.ts';
-import { localizeError } from '../src/i18n/errors.ts';
+import { failureMessage, localizeError } from '../src/i18n/errors.ts';
 import { relativeDate } from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 import { RELEASED_LANGUAGES } from '../src/i18n/locale.ts';
@@ -163,6 +163,19 @@ test('25Q4: every sentence the domain and the storage layer throw is catalogued,
     if (!internal.has(text)) assert.notEqual(localizeError('en', text), text, `${file} throws a sentence the catalogue lacks: ${text}`);
   }
   assert.ok(scanned > 300, 'the scan found the thrown sentences (' + scanned + ')');
+});
+
+test('25Q4: a failed action keeps a catalogued message as itself and anything else as the action\'s own sentence, never an engine\'s text', () => {
+  for (const message of ['Elegí dos cuentas distintas.', 'entryForm.futureDate', 'Ya existe una categoría llamada «Gym (2)».']) {
+    assert.equal(failureMessage(new Error(message), 'entryForm.saveUnverified'), message, 'kept: ' + message);
+  }
+  for (const cause of [new Error("Call to function 'NativeDatabase.execAsync' has been rejected"), new Error('database is locked'), new Error(''), new Error('no.such.key'),
+    'offline', undefined, null, { message: 42 }]) {
+    const stored = failureMessage(cause, 'entryForm.saveUnverified');
+    assert.equal(stored, 'entryForm.saveUnverified', 'the action\'s own sentence for ' + String((cause as { message?: unknown } | null)?.message ?? cause));
+    assert.equal(localizeError('en', stored), en.entryForm.saveUnverified);
+  }
+  assert.equal(bindLocale('es-AR').failureMessage, failureMessage);
 });
 
 test('built-in categories: localized names, unchanged identities, stored strings, budgets and history', () => {

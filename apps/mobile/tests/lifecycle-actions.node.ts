@@ -110,7 +110,7 @@ test('a failed deletion keeps the account as it was and says so; in English the 
   failing.render('useAccountManagement').remove(cash);
   failing.alerts[0].buttons[1].onPress!();
   await settle();
-  assert.equal(failing.render('useAccountManagement').error, 'disk full');
+  assert.equal(failing.render('useAccountManagement').error, 'accounts.manage.deleteFailed', '25Q4: the action\'s own sentence, never the engine\'s text');
   assert.deepEqual(failing.removed, []);
   const english = harness({ language: 'en-US' as never });
   english.render('useAccountManagement').remove(cash);
@@ -158,7 +158,7 @@ test('a card without debt asks first and says purchases and payments stay; Elimi
   failing.render('useCardManagement').remove(card);
   failing.alerts[0].buttons[1].onPress!();
   await settle();
-  assert.equal(failing.render('useCardManagement').error, 'disk full');
+  assert.equal(failing.render('useCardManagement').error, 'cards.form.deleteFailed');
   assert.equal(failing.removedCards.length, 0);
 });
 
@@ -241,7 +241,7 @@ test('25B2 close: a settled debt or receivable asks first, names what stays and 
   failing.render('useDebtManagement').remove(owed);
   failing.alerts[0].buttons[1].onPress!();
   await settle();
-  assert.equal(failing.render('useDebtManagement').error, 'disk full');
+  assert.equal(failing.render('useDebtManagement').error, 'debts.manage.deleteFailed');
   assert.equal(failing.removedDebts.length, 0);
 });
 

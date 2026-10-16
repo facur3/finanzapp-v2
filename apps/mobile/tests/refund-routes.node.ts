@@ -385,7 +385,7 @@ test('24T3: an undo whose outcome is unknown keeps the change for «Reintentar c
   view.alerts[0].buttons[1].onPress?.();
   await flush();
   const root = view.render();
-  assert.equal(find(root, 'ErrorMessage').props.message, 'Refresh failed after commit');
+  assert.equal(find(root, 'ErrorMessage').props.message, 'operations.change.failed', '25Q4: the action\'s own sentence, never the engine\'s text');
   find(root, 'ActionButton', 'Reintentar cambio').props.onPress();
   await flush();
   assert.equal(view.alerts.length, 1, 'no second confirmation');

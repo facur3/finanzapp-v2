@@ -224,7 +224,7 @@ test('"Ahora no" on the account stage ends the setup with empty data; a failed s
   find(root, 'ActionButton', 'Crear cuenta').props.onPress();
   await settle();
   root = view.render();
-  assert.equal(find(root, 'ErrorMessage').props.message, 'disk full');
+  assert.equal(find(root, 'ErrorMessage').props.message, 'accounts.form.saveFailed', '25Q4: the form\'s own sentence, never the engine\'s text');
   assert.equal(find(root, 'ActionButton', 'Reintentar guardado').props.label, 'Reintentar guardado');
   assert.equal(find(root, 'Field').props.editable, false, 'the draft is locked to the pending submission');
   assert.equal(view.prefs.rows.has(ONBOARDING_KEY), false, 'not done: nothing was saved');

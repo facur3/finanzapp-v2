@@ -32,7 +32,7 @@ export default function EntryScreen() {
 function EntryDetail({ record, account }: { record: EntryRecord; account: Account }) {
   const { updateEntry, archive, snapshot } = useLedger();
   const p = usePalette();
-  const { t, formatDate, currencyName, formatMoneyAmount, spokenMoney, moneyText, errorText } = useI18n();
+  const { t, formatDate, currencyName, formatMoneyAmount, spokenMoney, moneyText, errorText, failureMessage } = useI18n();
   const { entry } = record;
   const card = archive?.cards?.find(item => item.accountId === account.id);
   // 24T2: a movement an instalment plan recorded (a share of one instalment: its principal, or its interest, fee or tax).
@@ -59,7 +59,7 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
       setPending(null);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'entryDetail.changeUnverified');
+      setError(failureMessage(cause, 'entryDetail.changeUnverified'));
       // A13: a refusal storage decided before writing (an instalment a devolución's credit stands on, …) releases the change:
       // Editar unlocks and the next tap asks again from the current ledger. Only an unknown outcome stays frozen for a retry.
       if (cause instanceof Error && releasesDraft(cause.message)) setPending(null);

@@ -14,6 +14,7 @@ import * as entryPrefill from '../src/ui/entry-prefill.ts';
 import * as appearance from '../src/ui/appearance.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
+import { en } from '../src/i18n/messages/en/index.ts';
 import type { AppLocale } from '../src/i18n/locale.ts';
 import { realModule } from './real-module.ts';
 // 24T2 (stream B): the entry form's «Pago» section derivation (pure, real in the harness).
@@ -202,6 +203,10 @@ test('refresh failure keeps a frozen exact submission for retry, even after the 
   find(view.render(), 'AmountField').props.onChangeText('1');
   await find(view.render(), 'ActionButton').props.onPress();
   assert.equal(view.backs(), 0);
+  // 25Q4: the form's own sentence, in the reader's language; never the engine's text.
+  const message = find(view.render(), 'ErrorMessage').props.message;
+  assert.equal(message, 'entryForm.saveUnverified');
+  assert.equal(bindLocale('en-AR').errorText(message), en.entryForm.saveUnverified);
   assert.equal(find(view.render(), 'AmountField').props.editable, false);
   view.setData({ ...archive, records: [view.updates[0].after] });
   await find(view.render(), 'ActionButton', 'Reintentar guardado').props.onPress();
@@ -281,6 +286,28 @@ test('25Q2: after an import, a file that fails leaves «Copia incorporada» for 
   const message = find(failing.render(), 'ErrorMessage').props.message;
   assert.equal(message, 'backup.import.readFailed', 'never the platform\'s text');
   assert.equal(bindLocale('es-AR').errorText(message), 'No pudimos leer la copia. Tus datos y el archivo siguen intactos.');
+});
+test('25Q4: an import that fails with an engine\'s error says the import\'s own sentence; a storage refusal keeps its reason', async () => {
+  const json = JSON.stringify(domain.createRecoveryBackup(archive));
+  const failures = [new Error('disk I/O error'), new Error('La copia contradice cambios locales. No se importó nada. Conservá ambas versiones.')];
+  const view = harness('app/backup-import.tsx', {}, { data: { accounts: [], records: [] },
+    picker: async () => ({ canceled: false, result: { size: json.length, name: 'copia.json', text: async () => json } }),
+    restore: async () => { throw failures.shift(); } });
+  await find(view.render(), 'ActionButton', 'Elegir copia').props.onPress();
+  find(view.render(), 'ActionButton', 'Confirmar importación').props.onPress();
+  view.alerts[0].buttons[1].onPress();
+  await flush();
+  let message = find(view.render(), 'ErrorMessage').props.message;
+  assert.equal(message, 'backup.import.verifyFailed', 'never the engine\'s text');
+  assert.equal(bindLocale('es-AR').errorText(message), 'No pudimos verificar la importación. Reintentá con la misma copia para comprobarla sin duplicar datos.');
+  find(view.render(), 'ActionButton', 'Confirmar importación').props.onPress();
+  view.alerts[1].buttons[1].onPress();
+  await flush();
+  message = find(view.render(), 'ErrorMessage').props.message;
+  assert.equal(message, 'La copia contradice cambios locales. No se importó nada. Conservá ambas versiones.', 'a storage refusal keeps its own reason');
+  assert.notEqual(bindLocale('en-US').errorText(message), message);
+  assert.equal(view.restores.length, 2);
+  assert.equal(nodes(view.render()).some(node => node.props.title === 'Copia incorporada'), false);
 });
 test('oversized files are rejected before reading their content', async () => {
   let reads = 0;
@@ -1642,6 +1669,7 @@ test('25VIS2 (V1): the transfer form reports the same lock; a failed write stays
   fillTransfer(view);
   await find(view.render(), 'ActionButton').props.onPress();
   assert.equal(reports.splice(0).join(','), 'true,true');
+  assert.equal(find(view.render(), 'ErrorMessage').props.message, 'transferForm.saveUnverified', '25Q4: the form\'s own sentence, never the engine\'s text');
   await find(view.render(), 'ActionButton', 'Reintentar guardado').props.onPress();
   assert.equal(reports.splice(0).join(','), 'true,true');
   assert.equal(view.haptics.splice(0).join(','), 'Warning,Warning', '25VIS2 (V4): an outcome that may have been written taps Warning, each time');

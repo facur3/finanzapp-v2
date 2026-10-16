@@ -20,7 +20,7 @@ import { useI18n } from '../src/i18n/provider';
 export default function NewAccountScreen() {
   const params = useLocalSearchParams<{ currency?: string }>();
   const { addAccount, gate = LEDGER_CURRENCIES } = useLedger();
-  const { t } = useI18n();
+  const { t, failureMessage } = useI18n();
   const [operation] = useState(() => ({ id: randomUUID(), createdAt: new Date().toISOString() }));
   const [name, setName] = useState('');
   const [icon, setIcon] = useState<string>(DEFAULT_LOOK.icon);
@@ -56,7 +56,7 @@ export default function NewAccountScreen() {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       saving.current = false; close();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'accounts.form.saveFailed');
+      setError(failureMessage(cause, 'accounts.form.saveFailed'));
     } finally {
       saving.current = false;
       setBusy(false);

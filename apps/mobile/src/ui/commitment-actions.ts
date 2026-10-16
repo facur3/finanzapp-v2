@@ -6,6 +6,7 @@ import { accountBalanceMinor, assertCardDeletable, assertOpenAccount, cardCredit
   reopenPersonalDebt, resumeRecurringRule, todayKey, type Account, type CreditCardProfile, type PersonalDebtProfile, type RecurringRule } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { useI18n } from '../i18n/provider';
+import type { MessageKey } from '../i18n/messages';
 import type { SwipeAction } from './swipe-actions';
 
 /** Producto 24UX4: managing commitments from a list row (trailing swipe) and from the detail screen, with one set of
@@ -15,12 +16,12 @@ import type { SwipeAction } from './swipe-actions';
  * (a detail screen closes itself there). */
 export function useRecurringManagement() {
   const { saveRecurring, snapshot, archive } = useLedger();
-  const { t } = useI18n();
+  const { t, failureMessage } = useI18n();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const writing = useRef(false);
 
-  async function commit(next: RecurringRule, failure: string, feedback: 'selection' | 'success', done?: () => void) {
+  async function commit(next: RecurringRule, failure: MessageKey, feedback: 'selection' | 'success', done?: () => void) {
     if (writing.current) return;
     writing.current = true;
     setBusyId(next.id);
@@ -30,7 +31,7 @@ export function useRecurringManagement() {
       void (feedback === 'success' ? Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) : Haptics.selectionAsync()).catch(() => {});
       done?.();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : failure);
+      setError(failureMessage(cause, failure));
     } finally {
       writing.current = false;
       setBusyId(null);
@@ -69,13 +70,13 @@ export function useRecurringManagement() {
 
 export function useDebtManagement() {
   const { saveDebt, removeDebt, snapshot } = useLedger();
-  const { t, moneyText } = useI18n();
+  const { t, moneyText, failureMessage } = useI18n();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const writing = useRef(false);
 
   /** `next` is a revision saved as it is; a string is the id of a tracker to delete through its own storage path. */
-  async function commit(next: PersonalDebtProfile | string, failure: string, feedback: 'selection' | 'success', done?: () => void) {
+  async function commit(next: PersonalDebtProfile | string, failure: MessageKey, feedback: 'selection' | 'success', done?: () => void) {
     if (writing.current) return;
     writing.current = true;
     setBusyId(typeof next === 'string' ? next : next.id);
@@ -85,7 +86,7 @@ export function useDebtManagement() {
       void (feedback === 'success' ? Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) : Haptics.selectionAsync()).catch(() => {});
       done?.();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : failure);
+      setError(failureMessage(cause, failure));
     } finally {
       writing.current = false;
       setBusyId(null);
@@ -162,7 +163,7 @@ export function useDebtManagement() {
  * keeps the account as it was and says so. A card's or a debt's account is never offered here. */
 export function useAccountManagement() {
   const { removeAccount, snapshot, archive } = useLedger();
-  const { t, moneyText } = useI18n();
+  const { t, moneyText, failureMessage } = useI18n();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const writing = useRef(false);
@@ -177,7 +178,7 @@ export function useAccountManagement() {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       done?.();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'accounts.manage.deleteFailed');
+      setError(failureMessage(cause, 'accounts.manage.deleteFailed'));
     } finally {
       writing.current = false;
       setBusyId(null);
@@ -220,12 +221,12 @@ export function useAccountManagement() {
  * also stops the card's active rules, in the same commit). */
 export function useCardManagement() {
   const { saveCard, removeCard, snapshot, archive: ledger } = useLedger();
-  const { t, moneyText, errorText } = useI18n();
+  const { t, moneyText, errorText, failureMessage } = useI18n();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const writing = useRef(false);
 
-  async function commit(id: string, write: () => Promise<void>, failure: string, done?: () => void) { // i18n-ignore: a type, not copy
+  async function commit(id: string, write: () => Promise<void>, failure: MessageKey, done?: () => void) { // i18n-ignore: a type, not copy
     if (writing.current) return;
     writing.current = true;
     setBusyId(id);
@@ -235,7 +236,7 @@ export function useCardManagement() {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       done?.();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : failure);
+      setError(failureMessage(cause, failure));
     } finally {
       writing.current = false;
       setBusyId(null);
@@ -272,7 +273,7 @@ export function useCardManagement() {
     // never after it.
     if (snapshot) {
       try { assertCardDeletable(card, snapshot, ledger?.installmentPlans ?? [], ledger?.records ?? [], ledger?.purchaseOperations ?? []); } catch (cause) {
-        Alert.alert(t('cards.form.blockedTitle'), errorText(cause instanceof Error ? cause.message : 'cards.form.deleteFailed'), [{ text: t('common.cancel'), style: 'cancel' }]);
+        Alert.alert(t('cards.form.blockedTitle'), errorText(failureMessage(cause, 'cards.form.deleteFailed')), [{ text: t('common.cancel'), style: 'cancel' }]);
         return;
       }
     }

@@ -229,7 +229,7 @@ test('a failed save keeps the same submission for retry and the shortcut cannot 
   find(view.render(), 'AccountField', 'Hacia').props.onChange('b');
   await find(view.render(), 'ActionButton', 'Registrar transferencia\u00A0·\u00A0$\u00A0190.162,00').props.onPress();
   let root = view.render();
-  assert.equal(find(root, 'ErrorMessage').props.message, 'disco lleno');
+  assert.equal(find(root, 'ErrorMessage').props.message, 'transferForm.saveUnverified', '25Q4: the form\'s own sentence, never the engine\'s text');
   assert.equal(shortcut(root).disabled, true, 'locked until the same command is retried');
   assert.equal(amount(root).editable, false);
   await find(root, 'ActionButton', 'Reintentar guardado').props.onPress();

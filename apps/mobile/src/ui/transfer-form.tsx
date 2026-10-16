@@ -31,7 +31,7 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
 }) {
   const { snapshot, archive, addTransfer, updateTransfer } = useLedger();
   const p = usePalette();
-  const { t, formatMoneyAmount, moneyText, spokenMinor, spokenMoney } = useI18n();
+  const { t, formatMoneyAmount, moneyText, spokenMinor, spokenMoney, failureMessage } = useI18n();
   // A debt's hidden account is named from the debt, in the interface language (see accountDisplayName).
   const nameOf = (account: Account) => accountDisplayName(account, archive?.debts ?? [], t);
   const accounts = snapshot?.accounts ?? [];
@@ -176,7 +176,7 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       saving.current = false; close();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'transferForm.saveUnverified');
+      setError(failureMessage(cause, 'transferForm.saveUnverified'));
       // 25VIS2 (V4): a refusal (before the submission froze, or one storage decided before writing) taps Error; an outcome
       // that may have been written taps Warning. Either way a frozen submission stays frozen here, for the exact retry.
       const refused = !frozen || (cause instanceof Error && releasesDraft(cause.message));

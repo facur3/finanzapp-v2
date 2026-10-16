@@ -4,6 +4,7 @@ import * as Haptics from 'expo-haptics';
 import { useLedger } from '../storage/LedgerProvider';
 import type { ReviewItem } from '../storage/review-database';
 import { useI18n } from '../i18n/provider';
+import type { MessageKey } from '../i18n/messages';
 
 /** The shape of a store call `run` takes (an async step). */
 const idle = async () => {};
@@ -22,13 +23,13 @@ const idle = async () => {};
  *   comes here: it leaves the item pending. */
 export function useReviewActions(item: ReviewItem, options: { leaving: MutableRefObject<boolean>; reload: () => void; leave: () => void }) {
   const { confirmReview, dismissReview } = useLedger();
-  const { t } = useI18n();
+  const { t, failureMessage } = useI18n();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const working = useRef(false);
   const { leaving, reload, leave } = options;
 
-  async function run(work: typeof idle) {
+  async function run(work: typeof idle, failed: MessageKey) {
     if (working.current) return;
     working.current = true;
     leaving.current = true;
@@ -37,7 +38,7 @@ export function useReviewActions(item: ReviewItem, options: { leaving: MutableRe
     try { await work(); } catch (cause) {
       leaving.current = false;
       reload(); // A refused change re-reads the item, so the next tap acts on what is stored now.
-      setError(cause instanceof Error ? cause.message : 'review.unavailable');
+      setError(failureMessage(cause, failed));
     } finally {
       // Done: the surface is leaving and its actions stay held. Refused: everything is offered again.
       if (!leaving.current) { working.current = false; setBusy(false); }
@@ -47,7 +48,7 @@ export function useReviewActions(item: ReviewItem, options: { leaving: MutableRe
     await confirmReview(item.id, item.revision);
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     leave();
-  });
+  }, 'review.detail.confirmFailed');
   const dismiss = () => {
     if (working.current) return;
     Alert.alert(t('review.detail.dismissQuestion'), t('review.detail.dismissDetail'), [
@@ -55,7 +56,7 @@ export function useReviewActions(item: ReviewItem, options: { leaving: MutableRe
       { text: t('review.detail.dismiss'), style: 'destructive', onPress: () => void run(async () => {
         await dismissReview(item.id, item.revision);
         leave();
-      }) },
+      }, 'review.detail.dismissFailed') },
     ], { cancelable: true });
   };
   return { busy, error, confirm, dismiss };

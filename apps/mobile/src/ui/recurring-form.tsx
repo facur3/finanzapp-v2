@@ -19,7 +19,7 @@ import { useI18n } from '../i18n/provider';
  * like a movement's undo or a debt's close live on theirs. */
 export function RecurringForm({ original, accountId: requestedAccount }: { original?: RecurringRule; accountId?: string }) {
   const { snapshot, archive, saveRecurring } = useLedger();
-  const { t } = useI18n();
+  const { t, failureMessage } = useI18n();
   const [before] = useState(original);
   const accounts = postingAccounts(snapshot?.accounts ?? [], archive?.debts, before?.accountId);
   const [operation] = useState(() => ({ id: randomUUID(), createdAt: new Date().toISOString() }));
@@ -122,7 +122,7 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
       saving.current = false;
       close();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'recurring.form.saveFailed');
+      setError(failureMessage(cause, 'recurring.form.saveFailed'));
     } finally {
       saving.current = false;
       setBusy(false);

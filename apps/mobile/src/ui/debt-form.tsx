@@ -22,7 +22,7 @@ type PendingCreate = { account: Account; debt: PersonalDebtProfile };
  * Closing, reopening and deleting live on the debt's detail and its row (24UX4). */
 export function DebtForm({ original }: { original?: PersonalDebtProfile }) {
   const { snapshot, addDebt, saveDebt, gate = LEDGER_CURRENCIES } = useLedger();
-  const { t, locale } = useI18n();
+  const { t, locale, failureMessage } = useI18n();
   // 146 currencies since 24M: ordered and named once per gate and language, not on every keystroke.
   const offered = useMemo(() => offeredCurrencies(gate, locale), [gate, locale]);
   const account = snapshot?.accounts.find(item => item.id === original?.accountId);
@@ -97,7 +97,7 @@ export function DebtForm({ original }: { original?: PersonalDebtProfile }) {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       saving.current = false; close();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'debts.form.saveFailed');
+      setError(failureMessage(cause, 'debts.form.saveFailed'));
     } finally { saving.current = false; setBusy(false); }
   }
 

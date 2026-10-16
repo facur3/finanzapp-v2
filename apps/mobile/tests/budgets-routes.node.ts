@@ -143,7 +143,7 @@ test('a failed write, a zero amount and a negative one keep the draft, and archi
   await find(failed.render(), 'ActionButton', 'Crear presupuesto').props.onPress();
   let root = failed.render();
   assert.equal(failed.saved.length, 1, 'the write was attempted');
-  assert.match(find(root, 'ErrorMessage').props.message, /database is locked/);
+  assert.equal(find(root, 'ErrorMessage').props.message, 'budgets.form.saveFailed', '25Q4: the form\'s own sentence, never the engine\'s text');
   assert.equal(find(root, 'AmountField').props.editable, false, 'the same submission stays frozen for retry');
   assert.equal(find(root, 'ActionButton', 'Reintentar guardado').props.label, 'Reintentar guardado');
   const zero = harness({ monthISO: '2026-09', currency: 'ARS', scope: 'total' }, { ...archive, budgets: [] });

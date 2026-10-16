@@ -36,7 +36,7 @@ import { useI18n, useLocalePreferences } from '../src/i18n/provider';
  * hardware back steps back, never out (`BackHandler`, a no-op on iOS). */
 export default function OnboardingScreen() {
   const { snapshot, gate = LEDGER_CURRENCIES, addAccount } = useLedger();
-  const { t, currencyName } = useI18n();
+  const { t, currencyName, failureMessage } = useI18n();
   const preferences = useLocalePreferences();
   const p = usePalette();
   const display = useDisplayCurrency([]);
@@ -91,7 +91,7 @@ export default function OnboardingScreen() {
       saving.current = false;
       finish();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'accounts.form.saveFailed');
+      setError(failureMessage(cause, 'accounts.form.saveFailed'));
     } finally {
       saving.current = false;
       setBusy(false);

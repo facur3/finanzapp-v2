@@ -12,7 +12,7 @@ type Review = { backup: ParsedBackup; preview: ImportPreview; name: string };
 
 export default function BackupImportScreen() {
   const { archive, restoreBackup } = useLedger();
-  const { t, formatDateTime, formatCount } = useI18n();
+  const { t, formatDateTime, formatCount, failureMessage } = useI18n();
   const [review, setReview] = useState<Review | null>(null);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
@@ -41,7 +41,7 @@ export default function BackupImportScreen() {
       setReview(null);
       // 25Q2: after an import, a file that fails leaves «Copia incorporada» for the choice and its sentence (it said nothing).
       setDone(false);
-      setError(cause instanceof Error ? cause.message : 'backup.import.readFailed');
+      setError(failureMessage(cause, 'backup.import.readFailed'));
     } finally { working.current = false; setBusy(false); }
   }
 
@@ -50,7 +50,7 @@ export default function BackupImportScreen() {
     try {
       setReview({ ...review, preview: previewBackupImport(archive, review.backup.archive) });
       setError(null);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'backup.import.reviewFailed'); }
+    } catch (cause) { setError(failureMessage(cause, 'backup.import.reviewFailed')); }
   }
 
   async function apply(selected: Review) {
@@ -63,7 +63,7 @@ export default function BackupImportScreen() {
       setDone(true);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'backup.import.verifyFailed');
+      setError(failureMessage(cause, 'backup.import.verifyFailed'));
     } finally { working.current = false; setBusy(false); }
   }
   function confirm() {

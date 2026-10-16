@@ -34,7 +34,7 @@ export default function NewRefundScreen() {
 
 function RefundForm({ target }: { target: RefundTarget | null }) {
   const { archive, addRefund } = useLedger();
-  const { t, moneyText, spokenMoney, formatMoneyAmount, spokenMinor, formatDate, formatMonth, errorText } = useI18n();
+  const { t, moneyText, spokenMoney, formatMoneyAmount, spokenMinor, formatDate, formatMonth, errorText, failureMessage } = useI18n();
   const accountName = useAccountNameOf();
   const categoryLook = useCategoryLookOf('expense');
   const [operation] = useState(() => ({ id: randomUUID(), createdAt: new Date().toISOString() }));
@@ -94,7 +94,7 @@ function RefundForm({ target }: { target: RefundTarget | null }) {
       saving.current = false;
       close();
     } catch (cause) {
-      setError(cause instanceof Error && cause.message ? cause.message : 'operations.refund.saveUnverified');
+      setError(failureMessage(cause, 'operations.refund.saveUnverified'));
       if (cause instanceof Error && releasesDraft(cause.message)) setPending(null);
     } finally {
       saving.current = false;

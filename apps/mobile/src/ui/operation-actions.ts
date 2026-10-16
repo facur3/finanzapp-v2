@@ -20,7 +20,7 @@ import { releasesDraft } from './presentation';
  * writing (the dry run passed on a stale view) releases it; the screen then shows the reason the next dry run gives. */
 export function useOperationChange() {
   const { archive, voidOperation, restoreOperation } = useLedger();
-  const { t, moneyText, formatDate } = useI18n();
+  const { t, moneyText, formatDate, failureMessage } = useI18n();
   const accountName = useAccountNameOf();
   const categoryLook = useCategoryLookOf('expense');
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -77,7 +77,7 @@ export function useOperationChange() {
       setPending(null);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     } catch (cause) {
-      const message = cause instanceof Error && cause.message ? cause.message : 'operations.change.failed';
+      const message = failureMessage(cause, 'operations.change.failed');
       setError({ id: change.after.id, message });
       // Storage refused before writing (the view was stale): nothing to resend; the next dry run says why.
       if (cause instanceof Error && releasesDraft(cause.message)) setPending(null);

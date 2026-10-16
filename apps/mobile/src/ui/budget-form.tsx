@@ -23,7 +23,7 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency, sc
   original?: MonthlyBudget; monthISO: string; currency?: string; scope?: string;
 }) {
   const { archive: ledgerArchive, snapshot, saveBudget, gate = LEDGER_CURRENCIES } = useLedger();
-  const { t, locale, formatMonthTitle } = useI18n();
+  const { t, locale, formatMonthTitle, failureMessage } = useI18n();
   // 146 currencies since 24M: ordered and named once per gate and language, not on every keystroke.
   const offered = useMemo(() => offeredCurrencies(gate, locale), [gate, locale]);
   const [before] = useState(original);
@@ -83,7 +83,7 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency, sc
       saving.current = false;
       close();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'budgets.form.saveFailed');
+      setError(failureMessage(cause, 'budgets.form.saveFailed'));
     } finally {
       saving.current = false;
       setBusy(false);
@@ -102,7 +102,7 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency, sc
       saving.current = false;
       close();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'budgets.form.deleteFailed');
+      setError(failureMessage(cause, 'budgets.form.deleteFailed'));
     } finally {
       saving.current = false;
       setBusy(false);

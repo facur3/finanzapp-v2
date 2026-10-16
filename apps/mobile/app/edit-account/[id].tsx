@@ -41,7 +41,7 @@ type Submission = { change: AccountChange | null; appearance: AccountAppearance 
  * Everything is saved in one commit. Currency stays immutable. */
 function AccountEditor({ account, snapshot, current }: { account: Account; snapshot: LedgerSnapshot; current?: AccountAppearance }) {
   const { updateAccount, saveAppearance, archive } = useLedger();
-  const { t, formatMoneyAmount } = useI18n();
+  const { t, formatMoneyAmount, failureMessage } = useI18n();
   const manage = useAccountManagement();
   // A card's or a debt's internal account is edited from its own screen and never deleted here.
   const deletable = !archive?.cards?.some(card => card.accountId === account.id) && !archive?.debts?.some(debt => debt.accountId === account.id);
@@ -67,7 +67,7 @@ function AccountEditor({ account, snapshot, current }: { account: Account; snaps
       else if (submission.appearance) await saveAppearance(submission.appearance);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       working.current = false; close();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'accounts.edit.saveUnverified'); }
+    } catch (cause) { setError(failureMessage(cause, 'accounts.edit.saveUnverified')); }
     finally { working.current = false; setBusy(false); }
   }
   function save() {
@@ -91,7 +91,7 @@ function AccountEditor({ account, snapshot, current }: { account: Account; snaps
         { text: t('common.cancel'), style: 'cancel', onPress: () => { confirming.current = false; } },
         { text: t('accounts.edit.correctConfirm'), onPress: () => { confirming.current = false; void apply(submission); } },
       ], { cancelable: true, onDismiss: () => { confirming.current = false; } });
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'accounts.edit.invalid'); }
+    } catch (cause) { setError(failureMessage(cause, 'accounts.edit.invalid')); }
   }
   const locked = busy || pending !== null;
   return <Screen>

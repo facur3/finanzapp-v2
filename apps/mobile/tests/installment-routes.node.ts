@@ -553,7 +553,7 @@ test('plan detail: a failed deletion keeps the plan and the error; Reintentar se
   view.alerts[0].buttons[1].onPress();
   await settle();
   const failed = view.render();
-  assert.equal(find(failed, 'ErrorMessage').props.message, 'No pudimos guardar: disco lleno.');
+  assert.equal(find(failed, 'ErrorMessage').props.message, 'installments.detail.deleteFailed', '25Q4: the action\'s own sentence, never the engine\'s text');
   const retry = find(failed, 'ActionButton', 'Reintentar cambio');
   assert.equal(view.backs(), 0, 'nothing was deleted: the screen stays');
   retry.props.onPress();
@@ -798,7 +798,7 @@ test('24T3: «Dejar de seguir el plan» says what stops, what stays and what it 
   assert.deepEqual(view.writes.map(item => [item.action, JSON.stringify(item.arg)]), [['stop', JSON.stringify({ planId: 'tv', expectedRevision: 0 })]]);
   await settle();
   const failed = view.render();
-  assert.equal(find(failed, 'ErrorMessage').props.message, 'No pudimos guardar: disco lleno.');
+  assert.equal(find(failed, 'ErrorMessage').props.message, 'installments.detail.stopFailed');
   assert.equal(find(failed, 'ActionButton', 'Registrar devolución').props.disabled, true, 'nothing else starts while the outcome is unknown');
   find(failed, 'ActionButton', 'Reintentar cambio').props.onPress();
   assert.equal(view.alerts.length, 1, 'the retry asks nothing new');
@@ -939,7 +939,7 @@ test('24T3 adelanto: a write with an unknown outcome is retried unchanged; recor
   find(view.render(), 'ActionButton').props.onPress();
   await settle();
   let root = view.render();
-  assert.equal(find(root, 'ErrorMessage').props.message, 'No pudimos guardar: disco lleno.');
+  assert.equal(find(root, 'ErrorMessage').props.message, 'installments.payoff.saveFailed');
   assert.ok(texts(root).includes('Conservamos el envío: Reintentar nunca registra el adelanto dos veces. Para cambiarlo, cerrá y revisá primero el plan.'));
   assert.equal(find(root, 'DateField').props.disabled, true, 'frozen: nothing changes under the retry');
   find(root, 'ActionButton', 'Reintentar guardado').props.onPress();

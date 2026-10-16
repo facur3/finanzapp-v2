@@ -41,7 +41,7 @@ const atStart = (dateISO: string) => new Date(dateISO + 'T00:00:00');
  * form showed and is planned locally first (`planCardCycle`, the same plan storage computes again), so a form left open
  * past a closing, or an impossible date, is refused before anything is sent. */
 export function CardForm({ original }: { original?: CreditCardProfile }) {
-  const { t, locale, formatDate } = useI18n();
+  const { t, locale, formatDate, failureMessage } = useI18n();
   const { snapshot, archive: ledger, addCard, saveCard, gate = LEDGER_CURRENCIES } = useLedger();
   const today = useCurrentDay();
   // 146 currencies since 24M: ordered and named once per gate and language, not on every keystroke.
@@ -139,7 +139,7 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       saving.current = false; close();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'cards.form.saveFailed');
+      setError(failureMessage(cause, 'cards.form.saveFailed'));
     } finally { saving.current = false; setBusy(false); }
   }
 
@@ -152,7 +152,7 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       saving.current = false; close();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'cards.form.archiveFailed');
+      setError(failureMessage(cause, 'cards.form.archiveFailed'));
     } finally { saving.current = false; setBusy(false); }
   }
   function archive() {

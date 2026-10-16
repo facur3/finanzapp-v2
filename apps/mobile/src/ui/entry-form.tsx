@@ -43,7 +43,7 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
   onLockedChange?: (locked: boolean) => void;
 }) {
   const { snapshot, archive, addEntry, updateEntry, addInstallmentPlan } = useLedger();
-  const { t, moneyText, formatMoneyAmount, spokenMoney, formatDate } = useI18n();
+  const { t, moneyText, formatMoneyAmount, spokenMoney, formatDate, failureMessage } = useI18n();
   // Cash accounts and cards can carry an expense or income; a personal debt only changes through payments.
   const [before] = useState(original);
   // 24T2: an instalment's movement (its id names the plan): the plan fixes its amount, date, card and kind.
@@ -209,7 +209,7 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
       saving.current = false;
       close();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'entryForm.saveUnverified');
+      setError(failureMessage(cause, 'entryForm.saveUnverified'));
       // A plan built from a calendar the card no longer has is refused before anything is written: the submission is released
       // so the section shows the card's current statements again, and saving builds the plan anew (with the same id). 24T3
       // (A13): the same for every refusal storage decides before writing (a purchase with devoluciones edited below them, a

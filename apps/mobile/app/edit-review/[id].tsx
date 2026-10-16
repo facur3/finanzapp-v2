@@ -39,7 +39,7 @@ function countChoiceOf(count: number | null): { choice: CountChoice | null; type
 
 function ReviewEditor({ item }: { item: ReviewItem }) {
   const { archive, snapshot, updateReview } = useLedger();
-  const { t, formatDate } = useI18n();
+  const { t, formatDate, failureMessage } = useI18n();
   // The revision this editor opened: a proposal changed since (another edit, a reconciliation) is refused, never overwritten.
   const [opened] = useState(item);
   const draft = opened.draft;
@@ -93,7 +93,7 @@ function ReviewEditor({ item }: { item: ReviewItem }) {
       saving.current = false;
       close();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'review.unavailable');
+      setError(failureMessage(cause, 'review.edit.saveFailed'));
     } finally {
       saving.current = false;
       setBusy(false);

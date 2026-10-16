@@ -23,7 +23,7 @@ export default function TransferScreen() {
 function TransferDetail({ record, accounts }: { record: TransferRecord; accounts: Account[] }) {
   const { updateTransfer, archive, snapshot } = useLedger();
   const p = usePalette();
-  const { t: tr, formatDate, formatMoneyAmount } = useI18n();
+  const { t: tr, formatDate, formatMoneyAmount, failureMessage } = useI18n();
   const nameOf = useAccountNameOf();
   const t = record.transfer;
   const from = accounts.find(a => a.id === t.fromAccountId)!, to = accounts.find(a => a.id === t.toAccountId)!;
@@ -51,7 +51,7 @@ function TransferDetail({ record, accounts }: { record: TransferRecord; accounts
     try {
       await updateTransfer(change); setPending(null);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'transferDetail.changeUnverified'); }
+    } catch (cause) { setError(failureMessage(cause, 'transferDetail.changeUnverified')); }
     finally { working.current = false; setBusy(false); }
   }
   /** 25Q4: a restored debt payment or collection may settle at most what is pending now, the ceiling a new one has (the

@@ -33,7 +33,7 @@ function prefillIcon(identity: CategoryIdentity | undefined): CategoryDefinition
  * a name the person actually typed becomes one. */
 export function CategoryForm({ original, kind: requestedKind }: { original?: CategoryIdentity; kind?: string }) {
   const { archive, saveCategory } = useLedger();
-  const { t, language } = useI18n();
+  const { t, language, failureMessage } = useI18n();
   const definitions = archive?.categories ?? [];
   const [before] = useState(original);
   // The name this identity shows now, and the one the field was prefilled with (the language may change while the form is open).
@@ -64,7 +64,7 @@ export function CategoryForm({ original, kind: requestedKind }: { original?: Cat
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       saving.current = false; close();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'categoryManager.form.saveUnverified');
+      setError(failureMessage(cause, 'categoryManager.form.saveUnverified'));
     } finally { saving.current = false; setBusy(false); }
   }
   /** 24UX6E: the two name rules storage applies (saveCategoryDefinition), checked here first so a clash is an editable
@@ -94,7 +94,7 @@ export function CategoryForm({ original, kind: requestedKind }: { original?: Cat
       validateCategoryDefinition(definition);
       checkStorageRules(definition);
       void apply(definition);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'categoryManager.form.checkName'); }
+    } catch (cause) { setError(failureMessage(cause, 'categoryManager.form.checkName')); }
   }
   function toggleArchive() {
     if (!before || saving.current || confirming.current) return;
@@ -105,7 +105,7 @@ export function CategoryForm({ original, kind: requestedKind }: { original?: Cat
     setError(null);
     try { checkStorageRules(definition); } catch (cause) {
       confirming.current = false;
-      setError(cause instanceof Error ? cause.message : 'categoryManager.form.checkName');
+      setError(failureMessage(cause, 'categoryManager.form.checkName'));
       return;
     }
     Alert.alert(t(archiving ? 'categoryManager.form.archiveTitle' : 'categoryManager.form.unarchiveTitle'),

@@ -53,6 +53,7 @@ interface Ledger {
   calls: unknown[][];
   confirmResult?: () => Promise<{ recorded: boolean }>;
   updateResult?: () => Promise<unknown>;
+  dismissResult?: () => Promise<void>;
   /** 25A-04: the store's own read of one item (default: the tray's, else none) and the tray reload it may ask for. */
   getReviewItem?: (id: string) => Promise<ReviewItem | null>;
   refreshes?: number;
@@ -79,7 +80,7 @@ function harness(file: string, ledger: Ledger, params: Record<string, string> = 
     archive, snapshot: domain.snapshotFromArchive(archive), review: ledger.review, reviewVersion: ledger.reviewVersion ?? 0,
     confirmReview: (...args: unknown[]) => { ledger.calls.push(['confirm', ...args]); return ledger.confirmResult?.() ?? Promise.resolve({ recorded: true }); },
     updateReview: (...args: unknown[]) => { ledger.calls.push(['update', ...args]); return ledger.updateResult?.() ?? Promise.resolve(args[2]); },
-    dismissReview: (...args: unknown[]) => { ledger.calls.push(['dismiss', ...args]); return Promise.resolve(); },
+    dismissReview: (...args: unknown[]) => { ledger.calls.push(['dismiss', ...args]); return ledger.dismissResult?.() ?? Promise.resolve(); },
     getReviewItem: (id: string) => ledger.getReviewItem?.(id)
       ?? Promise.resolve(ledger.review && ledger.review !== 'unavailable' ? ledger.review.items.find(item => item.id === id) ?? null : null),
     refreshReview: () => { ledger.refreshes = (ledger.refreshes ?? 0) + 1; return Promise.resolve(); },
@@ -356,6 +357,14 @@ test('a refusal from the store (the proposal changed, or went stale) is shown an
   button(root, 'Confirmar')!.props.onPress();
   await settle();
   assert.equal(ledger.calls.length, 2);
+  // 25Q4: an engine's error is never shown as itself: Confirmar's own sentence (a retry records it once either way).
+  const failing = itemOf(drafted());
+  const engine: Ledger = { review: trayOf([failing]), calls: [], confirmResult: () => Promise.reject(new Error('disk I/O error')) };
+  const second = harness('review/[id].tsx', engine, { id: failing.id });
+  button(second.render(), 'Confirmar')!.props.onPress();
+  await settle();
+  assert.equal(all(second.render(), 'ErrorMessage')[0].props.message, 'review.detail.confirmFailed');
+  assert.equal(second.nav.back, 0);
 });
 
 test('Entry or InstallmentPlan: the detail says which one Confirmar writes, and a card\'s mode is shown, never assumed', () => {
@@ -390,6 +399,17 @@ test('Descartar asks first, then dismisses at the shown revision; cancelling cha
   await settle();
   assert.deepEqual(ledger.calls, [['dismiss', item.id, 2]]);
   assert.equal(view.nav.back, 1);
+});
+
+test('25Q4: a Descartar that fails with an engine\'s error says the proposal is still pending', async () => {
+  const item = itemOf(drafted());
+  const ledger: Ledger = { review: trayOf([item]), calls: [], dismissResult: () => Promise.reject(new Error('disk I/O error')) };
+  const view = harness('review/[id].tsx', ledger, { id: item.id });
+  button(view.render(), 'Descartar')!.props.onPress();
+  view.alerts[0].buttons[1].onPress!();
+  await settle();
+  assert.equal(all(view.render(), 'ErrorMessage')[0].props.message, 'review.detail.dismissFailed');
+  assert.equal(view.nav.back, 0);
 });
 
 test('a confirmed, dismissed or unreadable id is not pending: the detail says so and offers nothing', async () => {
@@ -454,6 +474,13 @@ test('Editar refused because the proposal changed since it opened: the message s
   assert.equal(all(root(), 'ErrorMessage')[0].props.message, REVIEW_ITEM_CHANGED_MESSAGE);
   assert.equal(view.nav.back, 0);
   assert.equal(ledger.calls.length, 1);
+  // 25Q4: an engine's error says Guardar cambios' own sentence; the editor stays open.
+  const engine: Ledger = { review: trayOf([item]), calls: [], updateResult: () => Promise.reject(new Error('disk I/O error')) };
+  const failing = editor(item, engine);
+  button(failing.root(), 'Guardar cambios')!.props.onPress();
+  await settle();
+  assert.equal(all(failing.root(), 'ErrorMessage')[0].props.message, 'review.edit.saveFailed');
+  assert.equal(failing.view.nav.back, 0);
 });
 
 test('nothing is filled in: no kind, destination or amount scale is chosen for the person, and the amount is entered in the destination\'s currency', async () => {
