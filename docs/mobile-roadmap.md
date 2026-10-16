@@ -413,20 +413,20 @@ history file keeps the evidence of when and why.
 
 ## 1. Implemented (current state)
 
-- **25Q3 — calm failures and a dock that never ignores a tap (on its branch, after 25Q2).** «Producto 25Q3». The root
+- **25Q3 — calm failures and a dock that never ignores a tap (PR #116, merged).** «Producto 25Q3». The root
   stack gives every route `ScreenFailure` (expo-router's `unstable_screenErrorBoundary`, pinned by a test on the
   installed package): a drawing error shows «No pudimos mostrar esta pantalla» with «Volver a intentar», never the error
   text, while the header, the back gesture and the dock stay; `app/+not-found.tsx` answers an unknown link in the app's
   language with «Ir a Inicio»; the dock's tabs have no long press, so a slow tap selects.
 
-- **25Q2 — a backup that completes or says why (on its branch, after 25Q1).** «Producto 25Q2». The export is
+- **25Q2 — a backup that completes or says why (PR #115, merged).** «Producto 25Q2». The export is
   `FinanzApp-backup-<date>-<HHmm>.json`, one compact line measured in bytes before anything is written (a copy over 5 MB
   says so in its own words instead of the import's), shared as JSON and always deleted; native failures read «No se pudo
   preparar la copia…» or «No pudimos leer la copia…»; a bad pick after an import returns to the choice with its
   sentence; the Backup screen and its Más row say that deleting the app deletes the records; `check:repo` and
   `.gitignore` recognise a real backup by its old, new or dated name and by its header.
 
-- **25Q1 — money that reads right (on its branch; Metro on the new development build).** «Producto 25Q1». The
+- **25Q1 — money that reads right (PR #114, merged; Metro on the new development build).** «Producto 25Q1». The
   Assistant's category link opens the figure it cites; Reportes keeps budgets while a consolidated total waits for a
   rate; «Neto del día» heads only a whole day's movements; an archived card in credit says so; a budget in a currency no
   account holds stays reachable; a card with only instalments to come says when they are recorded; deleting an account
@@ -967,13 +967,13 @@ item unless a section says a new native build is needed. The checklist sections 
   Same PR (JavaScript only): the checklist's «Same PR — movement composer and accessibility polish» and the dark dock's
   photos on every ground («The dark dock»).
 - **Fix — «Pagar tarjeta» in dark (PR #107, merged; no EAS build):** the checklist's section; nothing device-verified.
-- **25Q3 — calm failures and a dock that never ignores a tap (on its branch; the development build after PR #113):**
+- **25Q3 — calm failures and a dock that never ignores a tap (PR #116, merged; the development build after PR #113):**
   the checklist's «Producto 25Q3»: an unknown link, a probe failure in a tab and in a pushed screen (local, never
   committed), a held dock tab.
-- **25Q2 — a backup that completes or says why (on its branch; the development build after PR #113):** the
+- **25Q2 — a backup that completes or says why (PR #115, merged; the development build after PR #113):** the
   checklist's «Producto 25Q2»: the file's name and one-line content through AirDrop, Mail and Files, the cancelled and
   failed sheet, a bad pick after an import, the new sentences.
-- **25Q1 — money that reads right (on its branch; the development build after PR #113):** the checklist's «Producto
+- **25Q1 — money that reads right (PR #114, merged; the development build after PR #113):** the checklist's «Producto
   25Q1»: the Assistant's category link (fixtures), Reportes without a rate, the day headings under a filter, an archived
   card in credit, a budget in euros with no euro account, a card with only cuotas to come, the account deletion text.
 
@@ -4581,7 +4581,7 @@ nothing of it is on a screen yet.
     date (the live check waits for PR #113 on `master`); `export:ios` OK; bundle secret scan OK; root `npm test` 703
     passed; `check:repo` OK. CI runs the rest once `master` (with #113) is merged in. None of this is iPhone QA.
 
-### Producto 25Q3 — calm failures and a dock that never ignores a tap (this PR, stacked on 25Q2)
+### Producto 25Q3 — calm failures and a dock that never ignores a tap (PR #116, merged)
 
 - **Why.** A drawing error in any screen reached React Native unhandled and ended the app in a release build; an unknown
   link (`finanzapp-dev://nope`) opened Expo Router's black English «Unmatched Route» screen with a Sitemap link; and the
@@ -4614,7 +4614,7 @@ nothing of it is on a screen yet.
   `i18n:extract` clean; `expo install --check` live and offline up to date; `export:ios` (with the new route) and the
   bundle secret scan OK; root `npm test` 704 passed; `check:repo` OK. None of this is iPhone QA.
 
-### Producto 25Q2 — a backup that completes or says why (this PR, stacked on 25Q1)
+### Producto 25Q2 — a backup that completes or says why (PR #115, merged)
 
 - **Why.** The backup is the only recovery of a ledger that lives on the phone (production-plan.md §1.3). The audit found
   the export failing with the import's sentence from about 12 700 movements (the pretty file passed the import's 5 MB
@@ -4660,7 +4660,7 @@ nothing of it is on a screen yet.
   `i18n:extract` no copy outside the catalogue; `expo install --check` live and offline up to date; `export:ios` and the
   bundle secret scan OK; root `npm test` 704 passed (the guard's new test); `check:repo` OK. None of this is iPhone QA.
 
-### Producto 25Q1 — money that reads right (this PR)
+### Producto 25Q1 — money that reads right (PR #114, merged)
 
 - **Why.** The whole-app audit of 2026-10-15 (private record) found screens that print a wrong, zero or missing figure.
   These seven are read-side only and independent of PR #112; the write-side guards for editing or restoring a payment

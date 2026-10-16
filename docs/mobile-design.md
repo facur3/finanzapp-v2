@@ -933,7 +933,7 @@ navegación ni la recuperación de un guardado.
   alcanza en todos los fondos (#4F4D47: 2,33:1 sobre el lienzo, 1,52 sobre filas elevadas, 1,03 sobre el campo zafiro
   oscuro). El filete actual existe solo sin vidrio. Las fotos que hacen falta están en la lista del iPhone.
 
-## Producto 25Q3 — fallas tranquilas y un dock que no ignora un toque (en su rama)
+## Producto 25Q3 — fallas tranquilas y un dock que no ignora un toque (PR #116, mergeada)
 
 - **Una pantalla que no se puede dibujar** muestra, en su lugar, «No pudimos mostrar esta pantalla», «Lo que ya guardaste
   sigue ahí. Podés volver atrás o abrir otra pestaña.» y «Volver a intentar»; la cabecera, el gesto de volver y el dock
@@ -942,7 +942,7 @@ navegación ni la recuperación de un guardado.
   negra en inglés de Expo.
 - **El dock** ya no tiene pulsación larga: una pestaña sostenida más de medio segundo se elige al soltar, como en iOS.
 
-## Producto 25Q2 — una copia que se completa o dice por qué (en su rama)
+## Producto 25Q2 — una copia que se completa o dice por qué (PR #115, mergeada)
 
 - **El archivo** se llama `FinanzApp-backup-<fecha local>-<HHmm>.json` y es una sola línea de JSON (sin cambio de
   formato: toda versión lo lee). Se mide en bytes antes de escribirlo: si supera 5 MB, lo dice con su frase («No borres
@@ -954,7 +954,7 @@ navegación ni la recuperación de un guardado.
 - **Borrar la app**: la pantalla de copia empieza con «Si borrás la app, tus registros se borran con ella.» y la fila de
   Más dice «Antes de borrar la app o cambiar de teléfono».
 
-## Producto 25Q1 — cifras que dicen la verdad (en su rama)
+## Producto 25Q1 — cifras que dicen la verdad (PR #114, mergeada)
 
 Correcciones de lectura, sin cambios de dominio, almacenamiento, esquema (14), backup (v14), navegación ni movimiento.
 
@@ -3200,15 +3200,15 @@ color propio.
   el teclado que baja al completar el monto; las fotos del dock oscuro en cada fondo (docs/mobile-device-checklist.md,
   «Same PR — movement composer and accessibility polish» y «The dark dock»).
 
-- Producto 25Q3 (en su rama; el build de desarrollo posterior a #113): una pestaña sostenida del dock, un enlace
+- Producto 25Q3 (PR #116, mergeada; el build de desarrollo posterior a #113): una pestaña sostenida del dock, un enlace
   desconocido y una falla de prueba local en una pestaña y en una pantalla apilada (docs/mobile-device-checklist.md,
   «Producto 25Q3»).
 
-- Producto 25Q2 (en su rama; el build de desarrollo posterior a #113): el nombre y el contenido de una línea del archivo
+- Producto 25Q2 (PR #115, mergeada; el build de desarrollo posterior a #113): el nombre y el contenido de una línea del archivo
   por AirDrop, Mail y Archivos, la hoja cancelada, una copia mala después de importar y las frases nuevas
   (docs/mobile-device-checklist.md, «Producto 25Q2»).
 
-- Producto 25Q1 (en su rama; el build de desarrollo posterior a #113): el enlace de categoría del Asistente, los
+- Producto 25Q1 (PR #114, mergeada; el build de desarrollo posterior a #113): el enlace de categoría del Asistente, los
   presupuestos de Reportes sin cotización, el neto del día con filtros, la tarjeta archivada a favor, el presupuesto en
   una moneda sin cuentas, la tarjeta con solo cuotas y el texto de eliminar una cuenta (docs/mobile-device-checklist.md,
   «Producto 25Q1»).

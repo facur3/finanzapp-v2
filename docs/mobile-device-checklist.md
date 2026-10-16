@@ -126,9 +126,9 @@ on the same new development build as above (no native change of its own). Light 
   the material); the dock over the canvas, surface rows, inset rows, elevated rows, Inicio's field (a short Inicio at the
   top, then scrolled) and the open capture hub; the «+» beside the pill.
 
-## Producto 25Q3 — calm failures and a dock that never ignores a tap (this PR)
+## Producto 25Q3 — calm failures and a dock that never ignores a tap (PR #116, merged)
 
-JavaScript only; Metro from this branch on the development build cut after PR #113. «FinanzApp 0.1.0 (25Q3)».
+JavaScript only; on the development build cut after PR #113, Metro from `master` or a branch that contains PR #116.
 
 - [ ] **A held dock tab.** Press and hold Movimientos for a full second, then lift: it opens (before: nothing). The same
   with every tab; a quick tap as before. With Larger Accessibility Sizes, holding still shows iOS's Large Content Viewer.
@@ -145,7 +145,7 @@ JavaScript only; Metro from this branch on the development build cut after PR #1
   stay. With VoiceOver: the title is read as a heading, then the text, then «Volver a intentar, botón». Remove the probe.
 
 
-## Producto 25Q2 — a backup that completes or says why (this PR)
+## Producto 25Q2 — a backup that completes or says why (PR #115, merged)
 
 JavaScript only; Metro from this branch on the development build cut after PR #113. The end of Más reads «FinanzApp
 0.1.0 (25Q2)». Keep a private backup first; use small real data.
@@ -168,7 +168,7 @@ JavaScript only; Metro from this branch on the development build cut after PR #1
   a native failure of the picker or the sheet. Covered by the Node tests.
 
 
-## Producto 25Q1 — money that reads right (this PR)
+## Producto 25Q1 — money that reads right (PR #114, merged)
 
 Read-side corrections only; JavaScript only. Metro from this branch on the development build cut after PR #113. The end
 of Más reads «FinanzApp 0.1.0 (25Q1)». Light and dark; Spanish unless a step says English.
