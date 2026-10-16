@@ -302,6 +302,20 @@ test('25D1: with iOS\'s Increase Contrast on, a hero\'s symbol and cents are dra
   assert.deepEqual(quiet({}, { color: '#131411', onField: true, size: 46 }), ['#3A3C3F', '#505255'], 'off: the field\'s solid greys');
 });
 
+test('25O1 review: the close\'s sand-white card draws the light palette\'s symbol and cents in both themes, never its ink at an alpha', () => {
+  const { lightPalette, darkPalette } = paletteModule;
+  const quiet = (palette: Record<string, unknown>) => {
+    const { render } = loadComponents('es-AR', null, [], palette);
+    const [symbol, , cents] = render('Money', { minor: 5_000_000, currency: 'ARS', large: true, size: 44, align: 'center', color: lightPalette.heroThumbInk })
+      .props.children.props.children.props.children;
+    return [symbol.props.style.color, cents.props.style.color];
+  };
+  const light = [lightPalette.secondary, lightPalette.tertiary];
+  assert.deepEqual(quiet({ ...lightPalette, isDark: false }), light);
+  assert.deepEqual(quiet({ ...darkPalette, isDark: true }), light, 'never #19191CB3 / #19191C99, the alphas of a coloured hero');
+  assert.deepEqual(quiet({ ...darkPalette, isDark: true, increaseContrast: true }), [lightPalette.heroThumbInk, lightPalette.heroThumbInk], 'Increase Contrast still comes first');
+});
+
 test('25D1, 25O1: the first opening\'s titles keep every word whole at AX5 on 375 and 393 pt (they drew about 120 pt before)', () => {
   // 25O1: the story's headlines (display, 40 pt) take their own fit: the Large Title's 60 pt, or less where their longest
   // word would not fit the page whole; the other steps' titles are Large Titles under AppText's own cap.

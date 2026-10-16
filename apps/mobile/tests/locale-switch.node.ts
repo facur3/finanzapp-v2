@@ -490,13 +490,15 @@ test('without a store prop the provider builds the runtime store once; a provide
 function loadPreferenceScreen(provider: Record<string, any>, recentStore = memory().store, os: 'ios' | 'android' = 'ios') {
   const host = (name: string) => name;
   let haptics = 0, settingsOpened = 0;
+  const alerts: string[] = [];
   function FlatList(props: any) {
     return h('FlatList', null, props.ListHeaderComponent, ...props.data.map((item: any) => h(React.Fragment, { key: props.keyExtractor(item) }, props.renderItem({ item }))),
       props.ListFooterComponent);
   }
   const components = { AppText: host('AppText'), CheckRow: host('CheckRow'), ErrorMessage: host('ErrorMessage'), Field: host('Field'), PressFeedback: host('PressFeedback'), Screen: host('Screen') };
   const choiceScreen = loadModule('../src/ui/choice-screen.tsx', {
-    react: React, 'react/jsx-runtime': require('react/jsx-runtime'), 'react-native': { FlatList, View: host('View'), StyleSheet: { create: (styles: unknown) => styles } },
+    react: React, 'react/jsx-runtime': require('react/jsx-runtime'), 'react-native': { FlatList, View: host('View'), StyleSheet: { create: (styles: unknown) => styles },
+      Alert: { alert: (title: string) => { alerts.push(title); } } },
     'expo-router': { Stack: { Screen: host('Stack.Screen') } }, '../i18n/provider': provider, './components': components,
     './choice-list': require('../src/ui/choice-list.ts'), './marks': { FlagTile: host('FlagTile'), RegionMark: host('RegionMark') }, './motion': { selectionHaptic: () => { haptics++; } },
     './theme': { radius: { group: 16 }, space: { s: 8, m: 12, l: 16, xl: 20 }, usePalette: () => ({ background: '#F2F2F6', surface: '#FFFFFF' }) },
@@ -511,14 +513,14 @@ function loadPreferenceScreen(provider: Record<string, any>, recentStore = memor
       rememberRecent: (kind: string, value: string, accept: (value: unknown) => boolean) => recentModule.rememberRecent(kind, value, accept, recentStore),
     },
   });
-  return { screen: { LocaleChooser: screen.LocaleChooser, LocalePreferenceScreen: screen.LocaleChooser }, haptics: () => haptics, settingsOpened: () => settingsOpened };
+  return { screen: { LocaleChooser: screen.LocaleChooser, LocalePreferenceScreen: screen.LocaleChooser }, haptics: () => haptics, settingsOpened: () => settingsOpened, alerts };
 }
 
 test('Idioma: a tap saves and applies in place, the checkmark moves, the screen title follows the language, and a failed save keeps the old checkmark', () => {
   const saved = memory();
   const store = createLocaleStore({ devices: () => device('es-AR', 'AR'), store: saved.store });
   const { provider } = loadProvider();
-  const { screen, haptics } = loadPreferenceScreen(provider);
+  const { screen, haptics, alerts } = loadPreferenceScreen(provider);
   let root!: ReturnType<typeof renderer.create>;
   act(() => { root = renderer.create(h(provider.I18nProvider, { store }, h(screen.LocalePreferenceScreen, { kind: 'language' }))); });
   const rows = () => root.root.findAllByType('CheckRow' as never).map(row => row.props);
@@ -534,12 +536,14 @@ test('Idioma: a tap saves and applies in place, the checkmark moves, the screen 
   assert.equal(haptics(), 1, 'choosing the current option again does nothing');
   saved.faults.set = true;
   act(() => rows()[0].onPress());
-  assert.equal(root.root.findByType('ErrorMessage' as never).props.message, 'The preference could not be saved. Your previous choice is still active; please try again.');
+  // 25O1 review: said in an alert, in the interface language, never as a line in the list.
+  assert.deepEqual(alerts, ['The preference could not be saved. Your previous choice is still active; please try again.']);
+  assert.equal(root.root.findAllByType('ErrorMessage' as never).length, 0);
   assert.equal(rows()[2].selected, true, 'the checkmark stays on the saved choice');
   assert.equal(saved.rows.get(LANGUAGE_PREFERENCE_KEY), 'en');
   saved.faults.set = false;
   act(() => rows()[0].onPress());
-  assert.equal(root.root.findAllByType('ErrorMessage' as never).length, 0, 'the error clears on the next successful save');
+  assert.equal(alerts.length, 1, 'the next successful save says nothing');
   assert.equal(saved.rows.has(LANGUAGE_PREFERENCE_KEY), false);
   act(() => root.unmount());
 });

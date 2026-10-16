@@ -112,10 +112,3 @@ export function buildChoiceRows<T extends string>({ pinned, recent = [], options
   }
   return rows;
 }
-
-/** 25O1: the row that closes the group holding the row `key`, where that group's footer goes (an iOS section footer), or
- * -1 when the row is no longer listed (the search moved on). */
-export function groupEndIndex<T extends string>(rows: readonly ChoiceRow<T>[], key: string): number {
-  const start = rows.findIndex(row => row.key === key);
-  return start < 0 ? -1 : rows.findIndex((row, index) => index >= start && row.kind === 'choice' && (row.position === 'last' || row.position === 'only'));
-}

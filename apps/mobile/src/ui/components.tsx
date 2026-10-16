@@ -9,7 +9,7 @@ import { router } from 'expo-router';
 import { radius, space, type, useCurrentDay, usePalette, useReduceMotion, type Palette } from './theme';
 import type { IconName } from './categories';
 import { tintOf } from './category-color';
-import { quietTones } from './palette';
+import { lightPalette, quietTones } from './palette';
 import { useDockInset } from './dock-clearance';
 import { useAccountLook, useAccountNameOf, useCategoryLook } from './category-hues';
 import { AMOUNT_FIELD, HERO_MAX_SCALE, PROMINENT_SEGMENT, ROW_CHEVRON, ROW_STACK_SCALE, SEGMENT_GAP, SEGMENT_PADDING, TEXT_STYLE_MAX_SCALE, amountFieldLayout, amountMaxScale, fitFontSize,
@@ -616,7 +616,10 @@ export function Money({ minor, currency, large = false, color, signed = false, s
   // composition choice, never one a person who asked for contrast pays for.
   const parts = hero && safe ? splitAmount(text, amountFormat) : null;
   const quiet = p.increaseContrast ? { symbol: ink, cents: ink } : onField ? { symbol: p.heroMoneySymbol, cents: p.heroMoneyCents }
-    : ink === p.text ? { symbol: p.secondary, cents: p.tertiary } : quietTones(ink, p.isDark) ?? { symbol: p.secondary, cents: p.tertiary };
+    : ink === p.text ? { symbol: p.secondary, cents: p.tertiary }
+    // 25O1 review: the light palette's ink only sits on a light ground (the close's sand-white card): its quiet pair in both themes.
+    : ink === lightPalette.text ? { symbol: lightPalette.secondary, cents: lightPalette.tertiary }
+    : quietTones(ink, p.isDark) ?? { symbol: p.secondary, cents: p.tertiary };
   const body = <Text accessibilityLabel={label} accessibilityLanguage={speechLanguage} numberOfLines={1} adjustsFontSizeToFit={!hero} minimumFontScale={0.75}
     maxFontSizeMultiplier={scaleCap}
     style={{ color: ink, fontSize, lineHeight: hero ? Math.round(fontSize * 1.18) : undefined, fontWeight: weight ?? (large ? '700' : '600'),
@@ -699,15 +702,18 @@ export function NavigationRow({ title, subtitle, icon, leading, onPress, last = 
  * by a voice of that language, as iOS Settings does. */
 export function CheckRow({ title, subtitle, selected, onPress, last = false, disabled = false, accessibilityLanguage, leading }: {
   title: string; subtitle?: string; selected: boolean; onPress: () => void; last?: boolean; disabled?: boolean; accessibilityLanguage?: string;
-  /** 25O1: a mark before the title (a region's flag), hidden from VoiceOver by its own component. */
+  /** 25O1: a mark before the title (a region's flag), hidden from VoiceOver by its own component. 25O1 review: drawn only
+   * below the stacking threshold; above it the title takes its room («Argentina» at 53 pt no longer fits a 375 pt iPhone
+   * whole beside a 40 pt flag). */
   leading?: ReactNode;
 }) {
   const p = usePalette();
-  const lines = useStacked() ? undefined : 2;
+  const stacked = useStacked();
+  const lines = stacked ? undefined : 2;
   return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={subtitle ? title + ', ' + subtitle : title}
     accessibilityLanguage={accessibilityLanguage} disabled={disabled} accessibilityState={{ disabled, selected }} onPress={onPress}
     style={[styles.navigationRow, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, opacity: disabled ? 0.6 : 1 }]}>
-    {leading}
+    {!stacked && leading}
     <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
       <AppText numberOfLines={lines} style={{ fontWeight: '600' }}>{title}</AppText>
       {!!subtitle && <AppText secondary variant="footnote" numberOfLines={lines}>{subtitle}</AppText>}

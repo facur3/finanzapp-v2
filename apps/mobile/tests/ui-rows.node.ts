@@ -125,6 +125,15 @@ test('25D1: NavigationRow and CheckRow keep two lines up to 1.2× and, from the 
   }
 });
 
+test('25O1 review: a CheckRow\'s leading mark gives its room back to the title from the stacking threshold on, so a region\'s name stays whole', () => {
+  for (const scale of [1, 1.2, 1.235, 2.643, 3.571]) {
+    const row = load('components.tsx', {}, scale).render('CheckRow', { title: 'Argentina', subtitle: '22/9/2026 · 1.234,56', selected: true, onPress: () => {},
+      leading: { type: 'RegionMark', props: { region: 'AR' } } });
+    assert.equal(nodes(row).some(node => is(node, 'RegionMark')), scale <= 1.2, 'at ' + scale);
+    assert.equal(nodes(row).find(node => is(node, 'PressFeedback'))!.props.accessibilityLabel, 'Argentina, 22/9/2026 · 1.234,56', 'VoiceOver hears the same row');
+  }
+});
+
 test('25D1: icon-only controls offer the Large Content Viewer with their VoiceOver name, at the same 44 pt', () => {
   const ui = load('components.tsx');
   for (const disabled of [false, true]) {
