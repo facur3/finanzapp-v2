@@ -288,6 +288,13 @@ test('25O1, a new installation: the story\'s three pages, stepped or swiped, the
   assert.deepEqual(headlines(root).map(node => textOf(node.props.children)), ['Log a purchase in seconds.', 'Cards and installments, month by month.', 'Know what you have left.']);
   assert.deepEqual(headlines(root).map(node => textOf(node.props.children.at(-1))), ['in seconds.', 'month by month.', 'what you have left.'], 'the emphasis is its own run');
   assert.equal(headlines(root)[0].props.children.at(-1).props.style.color, paletteModule.lightPalette.primary);
+  // 25D1: a headline grows with Dynamic Type only as far as its longest word still fits the page (393 pt less 2 × 24) whole.
+  for (const node of headlines(root)) {
+    const scale = node.props.maxFontSizeMultiplier;
+    assert.equal(node.props.children.at(-1).props.maxFontSizeMultiplier, scale, 'the emphasis grows with its line');
+    assert.ok(scale >= 1 && scale <= 1.5 && geometry.widestWordEm([textOf(node.props.children)]) * 40 * geometry.WEIGHT_WIDTH.bold * scale <= 393 - 48);
+  }
+  assert.ok(headlines(root)[1].props.maxFontSizeMultiplier < 1.5, '«installments,» stops short of 60 pt');
   assert.deepEqual(pages(root).map(page => [page.props.accessibilityElementsHidden, page.props.importantForAccessibility]),
     [[false, 'auto'], [true, 'no-hide-descendants'], [true, 'no-hide-descendants']]);
   assert.ok(skip(root), 'Skip from the first page on');
