@@ -63,7 +63,10 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   (components as any).surfaceShadow = () => ({});
   const GATE = options.gate ?? domain.LEDGER_CURRENCIES;
   const defaults = { useDefaultCurrency: ({ accountCurrency, requested }: { accountCurrency?: string | null; requested?: unknown } = {}) => accountCurrency ?? (domain.isLedgerCurrency(requested, GATE) ? requested : 'ARS') };
-  const motion = { selectionHaptic: () => {}, successHaptic: () => {}, errorHaptic: () => {}, warningHaptic: () => {}, timing: () => ({ duration: 0 }) };
+  // 25Q4 review: each notification haptic by its helper's name (tests/motion.node.ts pins the type each one sends).
+  const haptics: string[] = [];
+  const motion = { selectionHaptic: () => {}, successHaptic: () => { haptics.push('Success'); }, errorHaptic: () => { haptics.push('Error'); }, warningHaptic: () => { haptics.push('Warning'); },
+    timing: () => ({ duration: 0 }) };
   const modules: Record<string, unknown> = {
     '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
     react: { useState: (initial: any) => { const i = cursor++; if (!(i in state)) state[i] = typeof initial === 'function' ? initial() : initial;
@@ -110,7 +113,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   return {
     render: (component?: string) => { cursor = 0; refCursor = 0; let node = (component ? module.exports[component] : module.exports.default ?? module.exports.CategoryForm)(props);
       while (typeof node.type === 'function') node = node.type(node.props); return node; },
-    pushed, alerts, added, changed, looks, definitions, removed, dismissed, backs: () => backs, setLocale: (next: AppLocale) => { locale = next; },
+    pushed, alerts, added, changed, looks, definitions, removed, dismissed, haptics, backs: () => backs, setLocale: (next: AppLocale) => { locale = next; },
   };
 }
 function nodes(value: any): Node[] {
@@ -669,6 +672,7 @@ test('24UX6E: a rename into another category\'s name is refused before any write
   await find(view.render(), 'ActionButton', 'Guardar cambios').props.onPress();
   let root = view.render();
   assert.equal(view.definitions.length, 0, 'nothing reached storage');
+  assert.equal(view.haptics.join(','), 'Error', '25Q4 review: refused before anything was sent, so Error');
   assert.equal(bindLocale('es-AR').errorText(find(root, 'ErrorMessage').props.message), '«Supermercado» ya es el nombre de otra categoría.');
   assert.equal(find(root, 'Field').props.editable, true, 'an input error, never a frozen retry');
   assert.equal(find(root, 'IconColorPicker').props.disabled, false);
@@ -695,6 +699,10 @@ test('24UX6E: a rename into another category\'s name is refused before any write
   find(failing.render(), 'ActionButton', 'Guardar cambios').props.onPress(); await flush();
   assert.equal(find(failing.render(), 'Field').props.editable, false);
   assert.ok(find(failing.render(), 'ActionButton', 'Reintentar guardado'));
+  assert.equal(failing.haptics.join(','), 'Warning', '25Q4 review: sent with an unknown outcome, so Warning');
+  find(failing.render(), 'ActionButton', 'Reintentar guardado').props.onPress(); await flush();
+  assert.equal(JSON.stringify(failing.definitions[1]), JSON.stringify(failing.definitions[0]), 'the retry resends the same definition');
+  assert.deepEqual([failing.haptics.join(','), failing.backs()], ['Warning,Success', 1]);
 });
 
 test('24UX6E review: archiving runs the same storage name rules first, so a clash is an editable error, never a frozen retry', async () => {
@@ -708,6 +716,7 @@ test('24UX6E review: archiving runs the same storage name rules first, so a clas
   const root = view.render();
   assert.equal(view.alerts.length, 0, 'no confirmation for a write storage would refuse');
   assert.equal(view.definitions.length, 0, 'nothing reached storage');
+  assert.equal(view.haptics.join(','), 'Error', '25Q4 review: refused before anything was sent, so Error');
   assert.equal(bindLocale('es-AR').errorText(find(root, 'ErrorMessage').props.message), '«Nafta» ya es el nombre de otra categoría.');
   assert.equal(find(root, 'Field').props.editable, true);
   assert.ok(find(root, 'ActionButton', 'Guardar cambios'), 'never «Reintentar guardado»');

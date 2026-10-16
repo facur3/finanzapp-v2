@@ -75,7 +75,8 @@ const createdAt = '2026-09-26T12:00:00Z';
 
 /** The route with its hosts replaced by names. `prefs` is the key-value store (shared with the locale store, like the
  * device's); `accounts` the ledger's accounts; `addAccount` the real path into the ledger mock, so a saved account shows
- * up in the snapshot on the next render. Pass the same `prefs` again to stand for a cold reopen. */
+ * up in the snapshot on the next render. Pass the same `prefs` again to stand for a cold reopen. `failSave` fails the first
+ * save once it was sent; the retry goes through. */
 function harness({ accounts = [] as domain.Account[], reading = device('es-AR', 'AR'), released = HOME_GATE, gate = domain.LEDGER_CURRENCIES, prefs = memory(), failSave = false } = {}) {
   const localeStore = createLocaleStore({ devices: () => reading, store: prefs.store, released });
   const display: { currency: string | null; mode: string | null } = { currency: null, mode: null };
@@ -86,7 +87,7 @@ function harness({ accounts = [] as domain.Account[], reading = device('es-AR', 
   const refs: unknown[] = [];
   const deps: unknown[][] = [];
   const routes: unknown[] = [];
-  const saved: domain.Account[] = [];
+  const saved: domain.Account[] = [], haptics: string[] = [];
   let cursor = 0, refCursor = 0, effectCursor = 0;
   const ledger = { accounts: [...accounts] };
   const modules: Record<string, unknown> = {
@@ -102,14 +103,15 @@ function harness({ accounts = [] as domain.Account[], reading = device('es-AR', 
     'expo-crypto': { randomUUID: () => 'first-account' },
     '@finanzapp/domain': domain,
     '../src/storage/LedgerProvider': { useLedger: () => ({ snapshot: { accounts: ledger.accounts, entries: [] }, gate,
-      addAccount: async (account: domain.Account) => { if (failSave) throw new Error('disk full'); saved.push(account); ledger.accounts = [...ledger.accounts, account]; } }) },
+      addAccount: async (account: domain.Account) => { if (failSave) { failSave = false; throw new Error('disk full'); } saved.push(account); ledger.accounts = [...ledger.accounts, account]; } }) },
     '../src/ui/appearance': { DEFAULT_LOOK },
     '../src/ui/components': Object.fromEntries(['ActionButton', 'AmountField', 'AppText', 'ErrorMessage', 'Field', 'FieldNote', 'NavigationRow', 'PressFeedback', 'Surface'].map(name => [name, name])),
     '../src/ui/form-controls': { CurrencyField: 'CurrencyField' },
     '../src/ui/locale-options': localeOptions,
     '../src/ui/display-currency-provider': { useDisplayCurrency: () => ({ currency: 'ARS', preferred: null, mode: 'consolidated',
       setCurrency: (currency: string) => { display.currency = currency; prefs.rows.set(DISPLAY_CURRENCY_KEY, currency); }, setMode: (mode: string) => { display.mode = mode; } }) },
-    '../src/ui/motion': { ValueTransition: 'ValueTransition', successHaptic() {}, errorHaptic() {}, warningHaptic() {} },
+    // 25Q4 review: each notification haptic by its helper's name (tests/motion.node.ts pins the type each one sends).
+    '../src/ui/motion': { ValueTransition: 'ValueTransition', successHaptic() { haptics.push('Success'); }, errorHaptic() { haptics.push('Error'); }, warningHaptic() { haptics.push('Warning'); } },
     '../src/ui/onboarding-flow': onboardingFlow,
     '../src/ui/theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, usePalette: () => ({ background: '#fff', primary: '#2557D6', text: '#000', secondary: '#666' }) },
     '../src/i18n/preference': { defaultPreferenceStore: prefs.store },
@@ -121,7 +123,7 @@ function harness({ accounts = [] as domain.Account[], reading = device('es-AR', 
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected onboarding dependency: ' + name);
     return modules[name];
   } });
-  return { render: () => { cursor = 0; refCursor = 0; effectCursor = 0; return module.exports.default!(); }, routes, prefs, display, localeStore, saved, ledger };
+  return { render: () => { cursor = 0; refCursor = 0; effectCursor = 0; return module.exports.default!(); }, routes, prefs, display, localeStore, saved, ledger, haptics };
 }
 function nodes(value: any): Node[] {
   if (!value || typeof value !== 'object') return [];
@@ -222,6 +224,12 @@ test('"Ahora no" on the account stage ends the setup with empty data; a failed s
   find(root, 'ActionButton', 'Continuar').props.onPress();
   root = view.render();
   find(root, 'Field').props.onChangeText('Efectivo');
+  // 25Q4 review: an opening balance Crear cuenta lets through but cannot read is refused before anything is sent: Error, still editable.
+  find(view.render(), 'AmountField').props.onChangeText('12abc');
+  find(view.render(), 'ActionButton', 'Crear cuenta').props.onPress();
+  await settle();
+  assert.deepEqual([view.haptics.splice(0).join(','), view.saved.length, find(view.render(), 'Field').props.editable], ['Error', 0, true]);
+  find(view.render(), 'AmountField').props.onChangeText('');
   root = view.render();
   find(root, 'ActionButton', 'Crear cuenta').props.onPress();
   await settle();
@@ -229,11 +237,21 @@ test('"Ahora no" on the account stage ends the setup with empty data; a failed s
   assert.equal(find(root, 'ErrorMessage').props.message, 'accounts.form.saveFailed', '25Q4: the form\'s own sentence, never the engine\'s text');
   assert.equal(find(root, 'ActionButton', 'Reintentar guardado').props.label, 'Reintentar guardado');
   assert.equal(find(root, 'Field').props.editable, false, 'the draft is locked to the pending submission');
+  assert.equal(view.haptics.splice(0).join(','), 'Warning', '25Q4 review: sent with an unknown outcome, so Warning');
   assert.equal(view.prefs.rows.has(ONBOARDING_KEY), false, 'not done: nothing was saved');
   find(root, 'ActionButton', 'Ahora no').props.onPress();
   assert.equal(view.prefs.rows.get(ONBOARDING_KEY), 'done');
   assert.deepEqual(view.display, { currency: null, mode: null });
   assert.equal(JSON.stringify(view.routes.at(-1)), JSON.stringify({ replace: '/' }));
+  // The retry instead: the same account (its operation id) goes through, taps Success and ends the setup.
+  const retry = harness({ failSave: true });
+  find(retry.render(), 'ActionButton', 'Continuar').props.onPress();
+  find(retry.render(), 'Field').props.onChangeText('Efectivo');
+  find(retry.render(), 'ActionButton', 'Crear cuenta').props.onPress();
+  await settle();
+  find(retry.render(), 'ActionButton', 'Reintentar guardado').props.onPress();
+  await settle();
+  assert.deepEqual([retry.haptics.join(','), retry.saved.length, retry.saved[0].id, retry.prefs.rows.get(ONBOARDING_KEY)], ['Warning,Success', 1, 'first-account', 'done']);
 });
 
 test('an existing installation reached through a link or a restored navigation is sent straight to the app: nothing drawn, nothing written', () => {

@@ -38,7 +38,7 @@ const removed: domain.Account[] = [];
 function harness(file: string, props: any = {}, options: { data?: domain.LedgerArchive | null; params?: any;
   add?: (value: domain.Entry) => Promise<void>; update?: (value: domain.EntryChange) => Promise<void>;
   addTransfer?: (value: domain.Transfer) => Promise<void>; updateTransfer?: (value: domain.TransferChange) => Promise<void>;
-  updateAccount?: (value: domain.AccountChange) => Promise<void>; addAccount?: (value: domain.Account) => Promise<void>;
+  updateAccount?: (value: domain.AccountChange) => Promise<void>; addAccount?: (value: domain.Account) => Promise<void>; saveRecurring?: (value: domain.RecurringRule) => Promise<void>;
   restore?: (value: domain.LedgerArchive, baseline: string) => Promise<void>; picker?: () => Promise<any>; locale?: AppLocale } = {}) {
   const source = readFileSync(new URL('../' + file, import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
@@ -55,7 +55,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   const jsx = (type: Node['type'], props: Node['props']) => ({ type, props });
   const ledger = { useLedger: () => ({ archive: data, snapshot: data ? domain.snapshotFromArchive(data) : null,
     addEntry: async (value: domain.Entry) => { additions.push(value); await options.add?.(value); },
-    saveRecurring: async (value: domain.RecurringRule) => { rules.push(value); },
+    saveRecurring: async (value: domain.RecurringRule) => { rules.push(value); await options.saveRecurring?.(value); },
     updateEntry: async (value: domain.EntryChange) => { updates.push(value); await options.update?.(value); },
     addTransfer: async (value: domain.Transfer) => { transfers.push(value); await options.addTransfer?.(value); },
     updateTransfer: async (value: domain.TransferChange) => { transferChanges.push(value); await options.updateTransfer?.(value); },
@@ -502,6 +502,22 @@ test('account rename does not change its balance; unchanged save and close never
   assert.equal(view.alerts.length, 0);
   assert.equal(view.accountChanges[0].expectedBalanceMinor, null);
   assert.equal(view.accountChanges[0].after.openingMinor, account.openingMinor);
+});
+test('25Q4 review: Editar cuenta taps Error for a balance refused before anything is sent, Warning while the same change stays frozen for «Reintentar guardado», then Success', async () => {
+  let attempts = 0;
+  const view = harness('app/edit-account/[id].tsx', {}, { params: { id: 'a' }, updateAccount: async () => { if (++attempts === 1) throw new Error('Refresh failed'); } });
+  // A balance Guardar lets through but cannot read: refused before anything is sent, still editable.
+  find(view.render(), 'AmountField').props.onChangeText('12abc');
+  find(view.render(), 'ActionButton').props.onPress();
+  assert.deepEqual([view.haptics.splice(0).join(','), view.accountChanges.length, find(view.render(), 'Field').props.editable], ['Error', 0, true]);
+  // The balance as it was and a new name: sent at once (no correction to confirm), and the write fails after it.
+  find(view.render(), 'AmountField').props.onChangeText('876,55');
+  find(view.render(), 'Field').props.onChangeText('Renombrada');
+  find(view.render(), 'ActionButton').props.onPress(); await flush();
+  assert.deepEqual([view.alerts.length, view.haptics.splice(0).join(','), find(view.render(), 'Field').props.editable], [0, 'Warning', false], 'sent with an unknown outcome: frozen for the exact retry');
+  find(view.render(), 'ActionButton', 'Reintentar guardado').props.onPress(); await flush();
+  assert.equal(JSON.stringify(view.accountChanges[1]), JSON.stringify(view.accountChanges[0]), 'the retry resends the same change');
+  assert.deepEqual([view.haptics.join(','), view.backs()], ['Success', 1]);
 });
 test('new account retry is frozen and honors requested USD currency', async () => {
   let attempts = 0;
@@ -1202,6 +1218,24 @@ test('25VIS2 (V2, recurring form): editing a rule, flipping its kind asks for th
   find(root, 'AmountField').props.onChangeText('6000');
   await find(view.render(), 'ActionButton').props.onPress();
   assert.deepEqual([view.rules[0].kind, view.rules[0].category, view.rules[0].amountMinor], ['income', 'Sueldo', 600000]);
+});
+
+test('25Q4 review: the recurring form taps Error for a next date refused before anything is sent, Warning while the same rule stays frozen for «Reintentar guardado», then Success', async () => {
+  let attempts = 0;
+  const view = harness('src/ui/recurring-form.tsx', { accountId: 'a' }, { saveRecurring: async () => { if (++attempts === 1) throw new Error('Refresh failed'); } });
+  find(view.render(), 'AmountField').props.onChangeText('100');
+  find(view.render(), 'Field').props.onChangeText('Alquiler');
+  find(view.render(), 'CategoryField').props.onChange('Comida');
+  find(view.render(), 'DateField').props.onChange(new Date('2020-01-05T12:00:00'));
+  await find(view.render(), 'ActionButton').props.onPress();
+  assert.deepEqual([find(view.render(), 'ErrorMessage').props.message, view.haptics.splice(0).join(','), view.rules.length, find(view.render(), 'Field').props.editable],
+    ['recurring.form.pastDate', 'Error', 0, true], 'refused before anything is sent, still editable');
+  find(view.render(), 'DateField').props.onChange(new Date(domain.todayKey() + 'T12:00:00'));
+  await find(view.render(), 'ActionButton').props.onPress();
+  assert.deepEqual([view.haptics.splice(0).join(','), find(view.render(), 'Field').props.editable], ['Warning', false], 'sent with an unknown outcome: frozen for the exact retry');
+  await find(view.render(), 'ActionButton', 'Reintentar guardado').props.onPress();
+  assert.equal(JSON.stringify(view.rules[1]), JSON.stringify(view.rules[0]), 'the retry resends the same rule');
+  assert.deepEqual([view.haptics.join(','), view.backs()], ['Success', 1]);
 });
 
 // ---- 24B6 review: a ledger holding only cards ---------------------------------------------------------------
