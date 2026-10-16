@@ -1,6 +1,13 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-16 (**one iPhone session prepared for #112 and #117 with the merged 25Q1–25Q3**: `master` 42f6e9a
+Updated: 2026-10-16, later (**25Q4 — edits, failures and recovery that keep the money right**, on its branch stacked on
+#117: an edited card or debt payment keeps its card or debt and offers only sides storage accepts; a debt payment or
+collection never settles more than is pending, new, edited or restored; undo and restore say how a card or a debt will
+read; a failed action says its own sentence, never an engine's text, with one Error or Warning tap; a failed catch-up
+stays in the banner until its pass succeeds; the import review says what a restore also records; temporary plaintext
+copies are deleted; «Ver todos» opens the whole list; JavaScript only, no domain, schema 14, backup v14 or navigation
+change; the owner paused the 2026-10-16 iPhone session, and device QA now accumulates per milestone; «Producto 25Q4»,
+§1, §2). Before (2026-10-16, **one iPhone session prepared for #112 and #117 with the merged 25Q1–25Q3**: `master` 42f6e9a
 (after PRs #114–#116) merged into #112 and #117, the only code conflicts the release marker and Presupuestos' window
 and route parameters, both sides kept; every check green on both branches and in CI; the iOS native fingerprint of
 `master`, #112 and #117 is one (`7672beac…`), so one EAS development build from `master` serves the session (the owner's
@@ -425,6 +432,17 @@ history file keeps the evidence of when and why.
   branch and PR per delivery, CI green, the checks recorded in this file at handoff.
 
 ## 1. Implemented (current state)
+
+- **25Q4 — edits, failures and recovery that keep the money right (on its branch, stacked on 25D1).** «Producto 25Q4».
+  Editing a card payment, a debt payment or a collection keeps its card or debt and offers only the sides storage
+  accepts (no choice ends frozen); a debt payment or collection settles at most what is pending, new, edited or
+  restored, said in red while it is typed; undo and restore confirmations say how a card or a debt will read and where
+  an undone movement is recovered; a failed save, deletion, import or review action shows a catalogued refusal or the
+  action's own sentence, never an engine's text, with one Error tap (Warning while a frozen retry waits on an outcome
+  the app cannot verify), every haptic through `motion.tsx`; a failed catch-up stays in the banner until its pass
+  succeeds; a file from a newer build is said as itself at launch with no retry; the first opening's redirect fires
+  once; every edit modal keeps «Cerrar»; the import review names the copy and says what the restore also records;
+  plaintext temporary copies of the ledger are deleted; «Ver todos» and the Assistant's link open the whole list.
 
 - **25Q3 — calm failures and a dock that never ignores a tap (PR #116, merged).** «Producto 25Q3». The root
   stack gives every route `ScreenFailure` (expo-router's `unstable_screenErrorBoundary`, pinned by a test on the
@@ -973,8 +991,15 @@ it was checked in). Metro from `master` (or a delivery's branch) on the installe
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
-- **QA session — 25VIS2, 25D1 and the merged 25Q1–25Q3 together (one new development build from `master` 42f6e9a; the
-  owner's authorisation pending):** the checklist's «QA session»: the order, the acceptance rules and the walk over every
+- **Device QA by milestone (owner, 2026-10-16).** The owner paused the joint session below after the setup and six 25D1
+  checks passed on the development build 5d1453b2 (`master` 42f6e9a, fingerprint `7672beac…`): a coloured hero's
+  symbol and cents on the sand, «Otras», the chosen colour's check, Enviar/Detener, the currency chips and the date
+  sheet. Device QA no longer follows each change: the steps below accumulate for a milestone session over the critical
+  journeys, then a final regression. A test that passes never counts as a device result.
+- **25Q4 — edits, failures and recovery (on its branch, stacked on #117; JavaScript only, the same build):** the
+  checklist's «Producto 25Q4», at the next milestone session.
+- **QA session — 25VIS2, 25D1 and the merged 25Q1–25Q3 together (paused; the owner's development build from `master`
+  42f6e9a):** the checklist's «QA session»: the order, the acceptance rules and the walk over every
   screen; the sections below hold the steps. Its results decide #112 (the Sapphire verdict and its five choices) and #117.
 - **25VIS2 — Sapphire + Sand trial (on its branch, unmerged; one new development build first, cut from `master` after
   PR #113's Expo alignment):** the checklist's «Producto 25VIS2» in light and dark, then the owner's score against
@@ -1245,6 +1270,13 @@ item unless a section says a new native build is needed. The checklist sections 
   TestFlight.
 
 ## 3. Next deliveries
+
+*(2026-10-16, the owner's working mode: deliveries are drawn from the iOS review's private register in the owner's
+order of priorities, each with tests and an independent review, and the iPhone checks accumulate for milestone sessions.
+After 25Q4 (edits, failures and recovery, on its branch): 25D2 VoiceOver and Voice Control, a robustness delivery (the
+details that keep a retry after the ledger already shows the change, a committed change whose view could not refresh),
+the Assistant's interface, then polish and copy. The App Store shell still waits for its inputs. Nothing here reorders a
+feature.)*
 
 *(2026-10-15: after B8 the post-audit quality deliveries run one at a time, each a focused PR with its tests and its
 iPhone steps: #113 (B8 closed, Expo CI), #112's finish line, 25Q1 (money that reads right); next, in the owner's order
@@ -4522,7 +4554,77 @@ nothing of it is on a screen yet.
   passed, 0 failed; `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0 errors, 0 stale; `check` OK;
   `export:ios` OK. No account, handle, ad account or campaign created.
 
-### Producto 25D1 — Legibility and touch (on its branch, stacked on #112; unmerged)
+### Producto 25Q4 — edits, failures and recovery that keep the money right (this PR, stacked on #117)
+
+- **Why.** The first delivery under the owner's working mode of 2026-10-16: the iOS quality review's findings (record
+  private) are the source of work, implemented in coherent deliveries with tests and independent review, and validated on
+  the iPhone by milestone. Money integrity and failure handling first. Editing a card or debt payment offered the card in
+  «Desde», a choice storage refuses, and the form froze; an edited or restored debt payment had no ceiling, so an
+  overpayment was accepted and read «Pendiente»; undoing a card purchase said «Se sumarán … a Visa»; a failed save could
+  show SQLite's own text; any later write cleared a failed catch-up's banner; failure haptics existed only in two forms.
+- **Money.** `transfer-form.tsx`: an edit keeps the stored card or debt fixed (the fixed fact a new payment shows) and
+  offers only the side pairs `assertTransferSides` accepts, as a dry run, so no choice ends in a frozen refusal. A debt
+  payment or collection is capped by what is pending without the transfer being edited, read from the records for new
+  and edited ones (a link's cap stays a further limit; an older overpayment keeps its amount and is never raised). The
+  cap is said in red while the amount is typed, not spoken; Save refuses it with the sentence spoken and one Error tap.
+  A debt at or past zero reads «Saldada». An edit's shortcut figure leaves the edited payment out («Saldo pendiente sin
+  este pago», «Pendiente sin este cobro»), so the screen never shows two «Pendiente». A transfer settles an obligation
+  only in its own direction (cash → card, cash → a debt I owe, a receivable → cash): a link the other way round opens a
+  plain transfer, as a link out of a card already did, and a payment an older build stored the other way round is edited
+  in the plain form, capped like a new payment once turned back there. A new card payment's cap is the larger of the
+  link's and what the records say the card owes now, so a charge a catch-up records while the form is open can be paid
+  in full. `transfer/[id].tsx`: restoring a debt payment or collection over what is
+  pending is refused before any confirmation, with «Ver deuda». Undo and restore say how a card or a debt will read
+  afterwards (`balanceAfterSentence`: «Visa quedará con un saldo pendiente de …», «… a favor», «Le vas a deber …»,
+  «… quedará saldada») and where an undone movement is recovered (Movimientos deshechos, en Más). Card payments keep
+  only their caller's cap (decision 003: a card's credit is modelled). A plan deletion that storage refuses before
+  writing releases the screen, which reads the plan again and offers a live «Dejar de seguir el plan».
+- **Failures.** `failureMessage` (on the i18n binding): a failed action keeps a catalogued refusal, translated, or its
+  own calm sentence, never an engine's or a native module's text; the release rules still read the raw message. The
+  domain's five review refusals and «No encontramos esta cuenta.» are catalogued; a test fails when the domain or storage
+  throws a sentence the catalogue lacks. Every failed write taps once (`errorHaptic` / `warningHaptic` in `motion.tsx`,
+  now the only module that imports expo-haptics, pinned by a scan): Warning only while a frozen «Reintentar» waits on an
+  outcome the app cannot verify, Error otherwise; never with Success, from a disabled button or from a line shown while
+  typing. This also closes #112's same-PR items: the failure haptic, Save waiting for every input (the gating table now
+  has a row for every term) and the fill lowering the keyboard, all verified by tests, none yet on the device.
+- **Storage and launch.** `LedgerProvider` keeps which catch-up last failed apart from a write's outcome: the banner and
+  its retry stay until that pass succeeds; a recurring rule or a restored copy whose catch-up fails after the commit
+  resolves as saved, with the banner. A restore runs `restoreFromBackup` (the same catch-ups as a launch) inside
+  `rereadOnRefusal`. A file from a newer build is said as itself at launch, with no «Volver a intentar». The first
+  opening's redirect fires once, after the fonts load. The movement, transfer, card and proposal editors keep «Cerrar»
+  when there is nothing to edit, like the other five.
+- **Backup and lists.** The import review says «Copia del …», «Último movimiento: …» (its date spoken whole) and how
+  many movements the restore also records for rules and plans that fell due after the copy (a dry run of storage's catch-up rules, cross-checked against a real SQLite restore); the confirmation
+  names the copy's date and that an import is undone one item at a time. An export that a process iOS ended under the
+  share sheet left in the cache is deleted at the next launch, and the picker's own copy right after its text is read
+  (only the app's names, only inside its cache and tmp; an original is never touched). «Ver todos» and the Assistant's
+  «Ver movimientos» open Movimientos whole and from the top; the dock keeps the search, the filter and the scroll.
+- **Not in this delivery.** Storage and the domain still accept a debt payment or collection that crosses zero (a backup
+  import, an older build or a stale screen can still record one, and every read clamps it to «Saldada»): refusing it is
+  a domain change after checkpoint B11, with the owner's call on how older backups that hold one import. The conflict card
+  naming the blocking records lands with the backup comparator after B11.
+- **Tests.** New `tests/ledger-provider.node.ts` (the provider in a hook harness: the catch-up banner, open failures) and
+  a root-layout harness in `onboarding.node.ts` (the redirect once, the boot retry, the cache sweep); extended
+  `recovery-routes` (edits, caps, the restore refusal, confirmations, the Save-gating table, the import review, the
+  picker's copy), `installment-routes`, `installments` (a real SQLite restore and its catch-ups), `backup-file`,
+  `translation`, `motion` (the haptics scan), `review-routes`, `refund-routes`, `activity-route`, `spending-home`,
+  `assistant-routes`, `personalization-routes`, `liabilities-routes` and `onboarding` (the failure tap of every save by
+  behaviour: Error, then Warning while the same submission waits frozen, then Success); pins of engine text moved
+  deliberately to each action's own key. Each central test was checked to fail with its change reverted.
+- **Independent review.** Five lenses (money, copy and VoiceOver, failures, tests, regressions), each finding put to a
+  skeptic: 17 confirmed, none high, all fixed in this branch (the settle direction, the edit captions, the card cap, the
+  movement count, the long date, the proposal editor's Success and close, the undo and restore wording, and the missing
+  test pins); a verifier re-applied the reviewers' mutations and each now fails a test. The one gap that round opened
+  (a turned-back payment without a cap) is closed and pinned too.
+- **Gates.** #112 and #117 merge first; this branch then merges `master` (no force-push). Device steps wait for the next
+  milestone session (the checklist's «Producto 25Q4»).
+- **Checks (local, Linux, worktree, 2026-10-16):** typecheck clean; `test:storage` 1439 tests, 1438 pass,
+  0 fail, 1 skipped (the currency catalogue's existing «no cached sources» skip); `currency:verify` and `regions:verify`
+  OK; `i18n:check -- --strict` 0 errors, 0 stale (21 notes); `check` OK offline and live; `npm ls --all` OK; `export:ios`
+  OK and the bundle names no server secret; root `npm test` 704 passed + 1 todo; `check:repo` OK (461 files). None of
+  this is iPhone QA.
+
+### Producto 25D1 — Legibility and touch (PR #117, stacked on #112; unmerged)
 
 - **Scope.** Branch `feat/25d1-legibility-touch` from #112's head (Sapphire + Sand), so it merges after #112. The
   contrast, touch, pressed-state and large-text items of the owner's iOS quality review of 2026-10-15 (its record stays

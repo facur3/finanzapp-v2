@@ -325,7 +325,12 @@ siguen montadas, así un revelado al montar no se vería).
   volvía un cambio instantáneo).
 - **Hápticos.** Uno por acción del usuario (selección en segmentos, cambio de
   pestaña, flechas de mes, categoría o cuenta elegida, tarjeta elegida en el deck; un
-  impacto leve al tocar el «+» del dock; éxito al guardar) y siempre con una señal visual. Las
+  impacto leve al tocar el «+» del dock; éxito al guardar; si un guardado, una confirmación o un cambio falla, error
+  cuando no se escribió nada o la pantalla vuelve a ofrecer la acción, y aviso cuando conserva el mismo envío para
+  «Reintentar» porque no sabe si se guardó) y siempre con una señal visual. Todos salen de `motion.tsx` (25Q4). El de
+  falla suena una vez, en el manejo de esa escritura, junto con la frase; nunca con el de éxito, desde un botón
+  desactivado ni desde una línea que aparece mientras se escribe. Leer una copia, exportarla, las preguntas al
+  Asistente y los diálogos que explican antes de escribir no tienen háptico de falla. Las
   pestañas cambian al instante, sin deslizamiento ni fundido; el dock de 24UX6A no agrega
   movimiento: la pestaña elegida cambia a su glifo relleno sobre la cápsula clara en el mismo
   cuadro. *(Antes: «la cápsula flotante… cambia de tinta y de lente»; reemplazado por la
@@ -871,6 +876,58 @@ La selección de porciones dentro de la dona (solo visual, dentro del reporte) *
 barras de Día a día y una cabecera fija sólida. Siguen permitidos para una pasada siguiente; no hay ruta de detalle por comercio. El orden
 vinculante del roadmap no cambia: la próxima entrega de producto es 24T3; 24UX6C (Movimientos y Más) y 24UX6D
 (Tarjetas) siguen a 24UX6B en el carril UX, y su lugar frente a 24T3 lo decide el dueño (ver `docs/mobile-roadmap.md`).
+
+## Producto 25Q4 — ediciones, fallas y recuperación (en su rama, sobre #117; sin rediseño)
+
+En la rama `fix/25q4-edits-and-failures`, apilada sobre #117. Solo JavaScript; no cambia dominio, esquema (14), backup
+(v14) ni el modelo de navegación.
+
+- **Editar un pago.** Editar un pago de tarjeta, un pago de deuda o un cobro deja fija su tarjeta o su deuda, como al
+  crearlo: el formulario la muestra como un dato y «Desde» (o «Hacia» en un cobro) solo ofrece cuentas que el
+  almacenamiento acepta para ese par, así que ninguna elección termina congelada. El título sigue siendo «Editar
+  transferencia» y el botón «Guardar cambios»; la etiqueta del monto, la nota y «Pagar total», «Saldar total» o «Cobrar
+  total» siguen a la tarjeta o la deuda guardada. La cifra del atajo dice que deja afuera el pago que se edita («Saldo
+  pendiente sin este pago», «A favor sin este pago», «Pendiente sin este pago», «Pendiente sin este cobro»), así que la
+  pantalla nunca muestra dos «Pendiente» distintos.
+- **Solo salda en su sentido.** Una transferencia salda algo solo de efectivo a una tarjeta, de efectivo a una deuda que
+  debo, o de lo que me deben a efectivo. Un enlace al revés (desde una deuda que debo, hacia lo que me deben, desde una
+  tarjeta) abre una transferencia común, y un pago que una versión anterior guardó al revés se edita en el formulario
+  común; si se lo da vuelta ahí, recibe el techo de un pago nuevo.
+- **El techo de una deuda.** Un pago o un cobro de deuda salda como mucho lo pendiente sin la transferencia que se edita,
+  leído de los registros al crearlo, al editarlo y al recuperarlo; un enlace puede bajar ese techo, nunca subirlo. Una
+  edición de un pago viejo que ya pagaba de más conserva su monto pero no lo sube. Un pago de tarjeta solo tiene el techo
+  de quien lo abre (la tarjeta modela su saldo a favor). Pasarse se dice en rojo mientras se escribe, sin que VoiceOver lo
+  lea; «Guardar» sigue activo y lo rechaza con la frase leída y un toque de error. Una deuda en cero o pasada se lee
+  «Saldada», nunca «Pendiente». La tarjeta dice: «El pago supera el saldo pendiente registrado. Si tu resumen tiene
+  compras, intereses o cargos que faltan, registralos primero como gastos de la tarjeta.»
+- **Deshacer y recuperar.** La confirmación dice cómo queda la tarjeta o la deuda: «Visa quedará con un saldo pendiente
+  de …», «… con … a favor», «… sin saldo pendiente», «Le vas a deber … a Juan», «Ana te va a deber …», «La deuda con …
+  quedará saldada», «Lo que te debe … quedará saldado»; nunca «Se sumarán … a Visa». La cuenta de efectivo conserva «Se
+  sumarán / Se descontarán»; una transferencia termina con «Solo cambia el registro en esta app, no mueve dinero en el
+  banco.». Todo deshacer dice qué se recupera y dónde: «Este movimiento dejará de contar en tus saldos y reportes. Podés
+  recuperarlo después desde Movimientos deshechos, en Más.» o «Podés recuperar la transferencia después desde Movimientos
+  deshechos, en Más.». Recuperar un pago o un cobro de deuda que supera lo pendiente se rechaza antes de confirmar: «No
+  se puede recuperar ahora» («Este pago es mayor que lo que todavía le debés a Juan (…). Recuperarlo pagaría de más.»),
+  con «Ver deuda» (solo Cancelar si la deuda se eliminó).
+- **Fallas.** Una acción fallida muestra un rechazo que el catálogo conoce, en el idioma de quien lee, o su propia frase
+  tranquila; nunca el texto de SQLite ni de un módulo nativo. Las propuestas tienen las suyas: «No pudimos confirmar la
+  propuesta. Podés reintentarlo: se registra una sola vez.», «No pudimos descartar la propuesta. Sigue pendiente.» y «No
+  pudimos guardar los cambios. La propuesta sigue como estaba.». El aviso de una puesta al día que falló (recurrentes o
+  cuotas) y su «Verificar de nuevo» quedan hasta que esa pasada sale bien; un guardado ajeno, una confirmación incluida,
+  ya no lo borra. Una regla o una copia guardadas cuya puesta al día falla después quedan guardadas, con el aviso. Un
+  archivo de una versión más nueva dice «Estos datos requieren una versión más nueva de FinanzApp. No se modificaron.»
+  sin «Volver a intentar». La primera apertura se abre una sola vez. Toda edición modal sin nada para editar conserva
+  «Cerrar» (movimiento, transferencia, tarjeta y propuesta, como ya tenían las otras cinco); la de una propuesta, también
+  mientras se resuelve y antes de que se abra el registro, y su «Guardar cambios» toca éxito.
+- **Copia de seguridad.** La revisión dice «Copia del <fecha y hora>», «Último movimiento: <fecha>» (VoiceOver lee la
+  fecha completa) y cuántos movimientos de recurrentes o cuotas que vencieron después de la copia registra también la
+  importación (no están en «Disponible después»; una cuota financiada cuenta uno por parte). La confirmación es «¿Importar la copia del <fecha y hora>?» y dice que se agregan solo los registros que
+  faltan y que lo importado se deshace de a uno. Una copia que quedó en la caché porque iOS cerró la app con la hoja de
+  compartir abierta se borra en el próximo inicio, y la copia que entrega el selector, apenas se lee su texto; nunca el
+  original.
+- **Movimientos.** «Ver todos» en Inicio y «Ver movimientos» bajo una respuesta del Asistente abren Movimientos entera:
+  sin búsqueda ni filtro, desde arriba, sin anunciar una cantidad. Volver por el dock conserva la búsqueda, el filtro y
+  el desplazamiento.
 
 ## Producto 25D1 — legibilidad y toque (en su rama, sobre #112; sin rediseño)
 
@@ -3254,6 +3311,10 @@ color propio.
 
 ## Pendiente de revisión en iPhone
 
+- Producto 25Q4, en la próxima sesión por hito: editar un pago de tarjeta y de deuda, el techo dicho mientras se
+  escribe, recuperar un pago que pagaría de más, las confirmaciones de deshacer en tarjetas y deudas, el toque de error
+  en un guardado rechazado, «Cerrar» en las ediciones sin nada para editar, la revisión de una copia con vencimientos y
+  «Ver todos» (docs/mobile-device-checklist.md, «Producto 25Q4»).
 - Producto 25VIS2, pulido del registro (misma PR; sin build propia): el control bloqueado durante un guardado, una
   categoría por tipo (también en las reglas recurrentes), el monto en Registrar de transferencias y pagos, la tarjeta o
   deuda fija, los objetivos de 44 pt con el mismo dibujo, VoiceOver y Reduce Motion, el háptico de un guardado fallido y

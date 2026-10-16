@@ -1,6 +1,51 @@
 # Physical iPhone acceptance checklist
 
+## Producto 25Q4 — edits, failures and recovery (on its branch, stacked on #117; next milestone session)
+
+JavaScript only: Metro from this branch on the owner's development build of 2026-10-16 (5d1453b2, `master` 42f6e9a);
+the version line reads «FinanzApp 0.1.0 (25Q4)». Run at the next milestone session, not per change; the Node tests
+already cover what cannot be staged by hand (a file from a newer build, a failed catch-up, an engine error, the plan
+deletion race, the Warning tap, a link naming a debt the other way round, and a payment an older build stored the other
+way round, which opens as a plain transfer and is capped once turned back).
+
+1. **Edit a card payment.** The card shows as a fixed fact, «Desde» lists only cash accounts, the caption reads
+   «Saldo pendiente sin este pago: …» and «Pagar total» fills that figure. A debt payment reads «Pendiente sin este
+   pago», a collection «Pendiente sin este cobro»: one figure, never a second «Pendiente» beside the debt's.
+2. **Edit a debt payment over what is pending** (keyboard up; scroll if needed). The red line shows while typing and
+   VoiceOver stays quiet; «Guardar cambios» gives one Error tap, VoiceOver reads the sentence once, Movimientos is
+   unchanged. The same in Pagar tarjeta over the balance: the line starts «El pago supera el saldo pendiente».
+3. **Restore a payment that would overpay.** Undo a debt payment, record another one, then recover the first: «No se
+   puede recuperar ahora» with «Ver deuda» (opens the debt); Cancelar changes nothing and the next tap asks again.
+4. **Undo a card purchase and a card payment.** Each alert says how the card will read («saldo pendiente», never «Se
+   sumarán … a Visa»). The purchase's says «Este movimiento dejará de contar en tus saldos y reportes. Podés
+   recuperarlo después desde Movimientos deshechos, en Más.»; the payment's names the cash side and ends «Podés
+   recuperar la transferencia después desde Movimientos deshechos, en Más.». Recover both from Más › Movimientos
+   deshechos. Undoing a collection that settled what Ana owed says «Lo que te debe Ana quedará saldado.» when
+   recovered, never «La deuda con Ana».
+5. **A refused save taps once.** Nuevo presupuesto for a month and category that already has one, and Nueva categoría
+   with a name in use: the sentence and one Error tap, nothing saved, the fields editable; the same save done right
+   gives the Success tap. With System Haptics off, no tap at all.
+6. **«Cerrar» with nothing to edit.** Open `finanzapp-dev://edit-entry/<id of an undone movement>`,
+   `edit-card/<id of a deleted card>`, `edit-transfer/<unknown id>` and `edit-review/<unknown id>` (no build
+   produces a proposal yet):
+   «Cerrar» in the header, read by VoiceOver; from a cold link it goes to Inicio, Tarjetas or Para revisar; the swipe
+   down still dismisses.
+7. **Movimientos.** Search «coto», choose Gastos and scroll down; go to Inicio by the dock and tap «Ver todos»:
+   Todos, an empty search, the top of the list, no count spoken. Search again, leave and come back by the dock: kept.
+   From the Assistant, «Ver movimientos» under an answer: the whole list from the top.
+8. **Backup review** (a test device, never the owner's data). Import a copy holding a monthly rule whose next date has
+   passed: «Copia del …», «Último movimiento: …» (VoiceOver reads the date whole) and «Al importar también se registra
+   1 movimiento de un recurrente o una cuota que venció después de la copia…»; the confirmation names the copy's
+   date; afterwards Movimientos holds exactly that many dated movements from the copy.
+9. **Temporary copies** (an inspectable build, the container from Xcode's Devices window): export, force-quit with the
+   share sheet open, relaunch: Library/Caches holds no `FinanzApp-backup-*.json`. Import from Files: once the review
+   shows, `tmp/<bundle id>-Inbox` holds no picked copy and the original is still in Files. Record any other location.
+
 ## QA session — Sapphire (25VIS2) and legibility (25D1) together, with the merged 25Q1–25Q3
+
+**Paused by the owner on 2026-10-16** after the setup (build 5d1453b2 installed, the backup kept, Metro from #117, the
+version line) and the first six 25D1 items passed. The remaining steps move to the next milestone session; nothing
+else here is device-verified.
 
 Nothing here is device-verified yet. #112 and #117 stay drafts until the owner approves each on the iPhone; this
 session is the evidence for both, and for 25Q1–25Q3 (merged as PRs #114–#116).
