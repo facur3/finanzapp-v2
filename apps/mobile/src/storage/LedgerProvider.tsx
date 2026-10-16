@@ -260,7 +260,8 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     // 24T3 (A14): the catch-up runs through the device's day (`todayKey()`), never a UTC timestamp's date.
     cancelInstallmentPlan: (planId, expectedRevision) => rereadOnRefusal(db => cancelInstallmentPlan(db, planId, expectedRevision, todayKey(), new Date().toISOString())),
     reactivateInstallmentPlan: (planId, expectedRevision) => rereadOnRefusal(db => reactivateInstallmentPlan(db, planId, expectedRevision, todayKey(), new Date().toISOString())),
-    removeInstallmentPlan: planId => mutate(db => deleteInstallmentPlan(db, planId, new Date().toISOString())),
+    // 25Q4: a refused deletion (an instalment or an operation recorded since the screen was drawn) re-reads the plan too.
+    removeInstallmentPlan: planId => rereadOnRefusal(db => deleteInstallmentPlan(db, planId, new Date().toISOString())),
     addRefund: refund => rereadOnRefusal(db => savePurchaseOperation(db, refund, todayKey())),
     addPayoff: payoff => rereadOnRefusal(db => savePurchaseOperation(db, payoff, todayKey())),
     voidOperation: change => changeOperation(change, 'void'),

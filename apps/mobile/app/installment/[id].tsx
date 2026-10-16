@@ -93,9 +93,11 @@ export default function InstallmentPlanScreen() {
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : failure[next.action];
       setError(message);
-      // Refused before anything was written (the plan changed, nothing left to stop…): the screen reads the plan again and
-      // the next tap asks again. The deletion keeps its 24T2 rule: frozen until it goes through.
-      if (next.action !== 'delete' && isPlanWriteRefusal(message)) setPending(null);
+      // Refused before anything was written (the plan changed, an instalment or an operation was recorded since the screen was
+      // drawn, nothing is left to stop…): the screen has read the plan again and the next tap asks again. 25Q4: a deletion too.
+      // Only an unknown outcome stays frozen; for a deletion Reintentar sends the same deletion (24T2).
+      const refused = isPlanWriteRefusal(message);
+      if (refused) setPending(null);
     } finally { writing.current = false; setBusy(false); }
   }
   const money = (minor: number) => moneyText(minor, plan.currency);

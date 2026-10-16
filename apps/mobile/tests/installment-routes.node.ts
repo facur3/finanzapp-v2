@@ -562,6 +562,28 @@ test('plan detail: a failed deletion keeps the plan and the error; Reintentar se
   assert.equal(JSON.stringify([attempts, view.removals.join(','), view.backs()]), JSON.stringify([2, 'nb,nb', 1]));
 });
 
+test('25Q4: a deletion storage refuses before writing (an instalment or an operation recorded since the screen was drawn) releases it; the plan is read again and offers «Dejar de seguir el plan», never «Eliminar plan» or «Reintentar cambio»', async () => {
+  // Oct 29: the first instalment billed on Oct 28 and the foreground has not recorded it, so the screen still offers the deletion.
+  for (const refusal of [domain.PLAN_HISTORY_MESSAGE, domain.PLAN_OPERATION_HISTORY_MESSAGE]) {
+    const view = harness('installment/[id].tsx', { params: { id: 'nb' }, data: withPlans, day: '2026-10-29',
+      // Storage refuses before writing and re-reads (rereadOnRefusal): the instalment is in the view before the refusal arrives.
+      remove: async () => { view.setData({ ...withPlans, records: [...withPlans.records, ...recognised(nb, [1])] }); throw new Error(refusal); } });
+    find(view.render(), 'ActionButton', 'Eliminar plan').props.onPress();
+    view.alerts[0].buttons[1].onPress();
+    await settle();
+    const root = view.render();
+    assert.equal(find(root, 'ErrorMessage').props.message, refusal);
+    assert.equal(nodes(root).some(node => node.type === 'ActionButton' && ['Eliminar plan', 'Reintentar cambio'].includes(node.props.label)), false, refusal);
+    const stop = find(root, 'ActionButton', 'Dejar de seguir el plan');
+    assert.equal(stop.props.disabled, false, 'the error says «Dejá de seguirlo»: that button is live');
+    stop.props.onPress();
+    assert.equal(view.alerts[1].title, '¿Dejar de seguir este plan?');
+    assert.equal(JSON.stringify(view.removals), JSON.stringify(['nb']));
+  }
+  // The live provider re-reads the plan after a refused deletion, as it does for a stop or a reactivation.
+  assert.ok(readFileSync(new URL('../src/storage/LedgerProvider.tsx', import.meta.url), 'utf8').includes('removeInstallmentPlan: planId => rereadOnRefusal(db => deleteInstallmentPlan('));
+});
+
 test('plan detail in English: the same figures and calendar words', () => {
   const root = harness('installment/[id].tsx', { params: { id: 'tv' }, data: withPlans, locale: 'en-US' }).render();
   assert.ok(texts(root).includes('Purchase in installments' + NBSP + '·' + NBSP + 'ARS'));
