@@ -566,6 +566,21 @@ test('the editor only opens a pending item of a writable store', async () => {
   }
 });
 
+test('25Q4: Editar keeps a close button while the proposal resolves and when it is no longer pending; with nothing behind, it goes to Para revisar', async () => {
+  const ledgers = (): Ledger[] => [{ review: null, calls: [] }, { review: trayOf([]), calls: [], getReviewItem: async () => null }];
+  for (const [index, canGoBack] of [[0, true], [1, true], [0, false], [1, false]] as const) {
+    const view = harness('edit-review/[id].tsx', ledgers()[index], { id: 'gone' }, { canGoBack });
+    view.render();
+    await settle();
+    const root = view.render();
+    assert.equal(all(root, 'EmptyState')[0]?.props.title, index ? 'Esta propuesta ya no está pendiente' : undefined, 'resolving says nothing yet');
+    const close = all(root, 'Stack.Screen')[0].props.options.headerLeft();
+    assert.deepEqual([close.type, close.props.name, close.props.label], ['IconButton', 'close', 'Cerrar']);
+    close.props.onPress();
+    assert.deepEqual([view.nav.back, view.nav.replaced], canGoBack ? [1, []] : [0, ['/review']]);
+  }
+});
+
 // ---- the pure derivation ------------------------------------------------------------------------------------------------
 
 test('canConfirm follows the domain and the store: gaps, a stale basis, a conflict or a read-only file each withhold it; an interrupted write keeps it', () => {

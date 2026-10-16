@@ -26,8 +26,11 @@ export default function EditReviewScreen() {
   const { t } = useI18n();
   const { item: found, tray, resolving } = useReviewItem(id);
   const item = tray?.writable ? found : undefined;
-  if (!item && resolving) return <Screen>{null}</Screen>;
-  if (!item) return <Screen><EmptyState icon="file-tray-outline" title={t('review.detail.notFoundTitle')} detail={t('review.detail.notFoundDetail')} /></Screen>;
+  // 25Q4: the modal keeps a close button while the proposal resolves and when it is no longer pending (the editor's close).
+  const closeButton = <Stack.Screen options={{ headerLeft: () => <IconButton name="close" label={t('common.close')}
+    onPress={() => { if (router.canGoBack()) router.back(); else router.replace('/review'); }} /> }} />;
+  if (!item && resolving) return <Screen>{closeButton}</Screen>;
+  if (!item) return <Screen>{closeButton}<EmptyState icon="file-tray-outline" title={t('review.detail.notFoundTitle')} detail={t('review.detail.notFoundDetail')} /></Screen>;
   return <ReviewEditor key={item.id} item={item} />;
 }
 

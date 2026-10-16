@@ -92,6 +92,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     './categories': categories, '../src/ui/category-form': { CategoryForm: 'CategoryForm' },
     // 24UX6E: the edit modals' not-found branches (their forms are tested in their own suites).
     '../../src/ui/budget-form': { BudgetForm: 'BudgetForm' }, '../../src/ui/debt-form': { DebtForm: 'DebtForm' }, '../../src/ui/recurring-form': { RecurringForm: 'RecurringForm' },
+    '../../src/ui/entry-form': { EntryForm: 'EntryForm' }, '../../src/ui/transfer-form': { TransferForm: 'TransferForm' }, '../../src/ui/card-form': { CardForm: 'CardForm' },
     './currencies': currencies, '../src/ui/currencies': currencies, '../../src/ui/currencies': currencies,
     '../src/ui/form-controls': { CurrencyField: 'CurrencyField' }, '../../src/ui/form-controls': { CurrencyField: 'CurrencyField' },
     // 25B2: the one default-currency rule (its branches are tested in currency-defaults.node.ts; here it answers ARS) and the account lifecycle hook.
@@ -742,18 +743,23 @@ test('24UX6E: an archived category\'s editor opens with the lifecycle note; an a
 });
 
 test('24UX6E: every edit modal keeps a close button when there is nothing to edit, with its form\'s own fallback', () => {
-  const routes: [string, string][] = [['app/edit-category.tsx', '/categories'], ['app/edit-budget/[id].tsx', '/budgets'], ['app/edit-debt/[id].tsx', '/debts'],
-    ['app/edit-recurring/[id].tsx', '/recurring']];
-  for (const [file, fallback] of routes) {
-    const params = { id: 'nunca', kind: 'expense', key: 'nunca' };
-    const view = harness(file, {}, { params });
+  // 25Q4: the movement, transfer and card editors too, for an undone movement and a deleted card as for an unknown id.
+  const undone = { ...archive, records: archive.records.map(record => ({ ...record, voided: true })) };
+  const deleted = { ...archive, cards: [{ ...card, deleted: true }] };
+  const routes: [string, string, { data?: domain.LedgerArchive; params?: Record<string, string> }?][] = [['app/edit-category.tsx', '/categories'],
+    ['app/edit-budget/[id].tsx', '/budgets'], ['app/edit-debt/[id].tsx', '/debts'], ['app/edit-recurring/[id].tsx', '/recurring'], ['app/edit-entry/[id].tsx', '/'],
+    ['app/edit-transfer/[id].tsx', '/'], ['app/edit-card/[id].tsx', '/cards'], ['app/edit-entry/[id].tsx', '/', { data: undone, params: { id: entry.id } }],
+    ['app/edit-card/[id].tsx', '/cards', { data: deleted, params: { id: card.id } }]];
+  for (const [file, fallback, given] of routes) {
+    const options = { params: { id: 'nunca', kind: 'expense', key: 'nunca' }, ...given };
+    const view = harness(file, {}, options);
     const root = view.render();
     assert.ok(find(root, 'EmptyState'), file);
     const close = nodes(root).find(node => node.type === 'Stack.Screen')!.props.options.headerLeft();
     assert.deepEqual([close.type, close.props.name, close.props.label], ['IconButton', 'close', 'Cerrar'], file);
     close.props.onPress();
     assert.equal(view.backs(), 1, file);
-    const alone = harness(file, {}, { params, root: true });
+    const alone = harness(file, {}, { ...options, root: true });
     nodes(alone.render()).find(node => node.type === 'Stack.Screen')!.props.options.headerLeft().props.onPress();
     assert.deepEqual([alone.backs(), alone.pushed], [0, [fallback]], file + ': nothing behind it');
   }
