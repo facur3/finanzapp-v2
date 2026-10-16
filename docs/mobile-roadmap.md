@@ -1,6 +1,13 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-15 (**25D1 legibility and touch**, on its branch stacked on draft PR #112, unmerged until #112 is
+Updated: 2026-10-16 (**one iPhone session prepared for #112 and #117 with the merged 25Q1–25Q3**: `master` 42f6e9a
+(after PRs #114–#116) merged into #112 and #117, the only code conflicts the release marker and Presupuestos' window
+and route parameters, both sides kept; every check green on both branches and in CI; the iOS native fingerprint of
+`master`, #112 and #117 is one (`7672beac…`), so one EAS development build from `master` serves the session (the owner's
+authorisation pending; the 2026-10-14 build predates PR #113's native change); the checklist's «QA session» holds the
+order, the acceptance rules and a walk over every screen; staging untouched: its Production deployment serves 42f6e9a,
+`COMPATIBLE`, server code identical to B8's `S`, no variable edited since B8, the database switch last read off at B8's
+close; §2). Before (2026-10-15, **25D1 legibility and touch**, on its branch stacked on draft PR #112, unmerged until #112 is
 approved and merged: contrast floors for a coloured hero's symbol and cents, «Otras» and the colour check; 44 pt
 Enviar/Detener and currency chips; no grabber on the date sheet; pressed states for Tarjetas' deck under Reduce Motion
 and for every segment; large text under one rule: no style past the size iOS gives it at AX5, layouts that adapt
@@ -966,6 +973,9 @@ it was checked in). Metro from `master` (or a delivery's branch) on the installe
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
+- **QA session — 25VIS2, 25D1 and the merged 25Q1–25Q3 together (one new development build from `master` 42f6e9a; the
+  owner's authorisation pending):** the checklist's «QA session»: the order, the acceptance rules and the walk over every
+  screen; the sections below hold the steps. Its results decide #112 (the Sapphire verdict and its five choices) and #117.
 - **25VIS2 — Sapphire + Sand trial (on its branch, unmerged; one new development build first, cut from `master` after
   PR #113's Expo alignment):** the checklist's «Producto 25VIS2» in light and dark, then the owner's score against
   Electric Lime and the five choices of its sheet (the transfer tone, two or three dark brand fills, the cobalt account

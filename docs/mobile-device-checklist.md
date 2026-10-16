@@ -1,5 +1,85 @@
 # Physical iPhone acceptance checklist
 
+## QA session — Sapphire (25VIS2) and legibility (25D1) together, with the merged 25Q1–25Q3
+
+Nothing here is device-verified yet. #112 and #117 stay drafts until the owner approves each on the iPhone; this
+session is the evidence for both, and for 25Q1–25Q3 (merged as PRs #114–#116).
+
+**Before the session (once).**
+1. **The build.** One EAS development build from `master` at 42f6e9a, authorised by the owner (profile `development`:
+   FinanzApp Dev, `com.facur3.finanzapp.dev`). Its iOS native fingerprint (`@expo/fingerprint`, `APP_VARIANT=development`)
+   is `7672beac…`, the same as #112's and #117's heads, so Metro from either branch runs on it. The build of 2026-10-14
+   (from 173ce76) differs in `expo`, `expo-constants` and `expo-modules-core` (PR #113): it is not evidence for this tree.
+2. **Install** it from its EAS page on the iPhone (QR or link). It replaces the older FinanzApp Dev and keeps its data
+   (same identifier, schema 14 throughout).
+3. **A private backup first:** Más → Copia de seguridad → Compartir copia, kept outside this repository.
+4. **Metro from this branch:** `cd apps/mobile`, `npm ci`, then
+   `EXPO_PUBLIC_ASSISTANT_FIXTURES=1 npm run start:dev-client -- --clear`; the iPhone on the same Wi-Fi opens
+   FinanzApp Dev and picks the server (or scan the QR with the Camera). Without that variable the Assistant is the
+   disconnected one, itself a state to see once. `EXPO_PUBLIC_MOBILE_API_ORIGIN` stays unset: nothing reaches a server.
+5. **The version line:** Más ends «FinanzApp 0.1.0 (25D1)», and the line under it names the material actually drawn;
+   «sin módulo nativo» means a stale binary: stop.
+6. **Comparisons on the same build and data:** Metro from `master` shows Electric Lime («(25Q3)»), from #112 alone
+   Sapphire without 25D1 («(25VIS2)»). Stop Metro, start it in the other checkout, reload the app.
+
+**Order** (two sittings of about two hours; record the iPhone model, iOS version, theme, language, text size and the
+accessibility settings with each result):
+1. Light, default text size, Spanish: the screen walk below, with the 25Q1–25Q3 steps where they fall.
+2. Dark, default size: the walk again for the palette, the five owner choices of «Producto 25VIS2», the dark dock's
+   photos.
+3. Large text: AX3, then AX5 (Control Center's Text Size can apply to FinanzApp Dev alone), over the text-heavy screens;
+   English at AX5 once.
+4. Settings: Increase Contrast, Reduce Transparency, Reduce Motion, Bold Text and Smart Invert; VoiceOver over Inicio, a
+   form and a sheet.
+5. Optional, a narrower screen: Display Zoom (Settings → Display & Brightness → Display Zoom → Larger Text) over Inicio,
+   Reportes, Presupuestos, a form and Deudas.
+6. Last: the first opening on a clean install (delete FinanzApp Dev, reinstall from the same EAS page; «Producto 25B»
+   and 25D1's AX5 step). Then delete and reinstall once more, tap **Omitir** (never Crear cuenta: importing after a
+   first account duplicates it, a known open issue) and import the backup from step 3: your data is back.
+
+**Acceptance.**
+- **Blocks the PR under test:** a wrong figure; lost or changed data; a crash or a frozen screen; a text or control that
+  cannot be read or reached in some theme or text size (a palette legibility failure blocks #112; a large-text, contrast
+  or touch failure of 25D1 blocks #117). A failure in a merged 25Q step becomes a fix in the next delivery.
+- **Scored, not failed:** taste (Sapphire against Electric Lime, brand-brief.md §4.5), the five owner choices and the dark
+  dock's photos.
+- **On every screen and state of the walk, light and dark:**
+  1. Every text and amount reads in full: nothing cut or ended in «…» where it carries meaning; no amount split; a word
+     breaks inside itself only in the cases the 25D1 steps name.
+  2. One obvious primary action per screen, the rest quieter; the screen's figure or title first.
+  3. Every control answers the first tap, also at its edge; disabled looks disabled; a press shows (a dim, not a shrink,
+     under Reduce Motion).
+  4. Every figure matches what you recorded; a card reads «Saldo pendiente», never «Deuda».
+  5. Empty, error and refusal states say what happened and what to do in the app's words, never a raw error.
+  6. VoiceOver reads each control by the words it shows, in reading order. Outcomes after a write (undo, restore, pause)
+     are still silent for VoiceOver on iOS: known and planned, noted, not failed here.
+  7. From the default size up to Extra Large every screen looks as before, except «Día a día» and the pressed segments.
+
+**The screen walk** (every route of the app; the detailed steps live in the sections named):
+
+| Area | Screens and states | Steps |
+|---|---|---|
+| First opening | welcome; first account (Crear cuenta, Ahora no, Omitir); an existing person sent past it | «Producto 25B»; 25D1 «The first opening at AX5» |
+| Inicio | the field (month, amount, Gastado / Disponible, scope chip, accounts button); the Assistant entry; the movement pills; budget attention; no account («Empezar»); an account with no movement; a month with movements | 25VIS2 «Inicio's field», «Gastado \| Disponible»; 25D1 «Inicio's month» |
+| Registrar | the «+» hub; Gasto, Ingreso, Transferencia; Una vez \| En cuotas; the date sheet; account, category and currency pickers; a devolución; a refused save | 25VIS2 «Same PR» (V1–V4, V7, V15, 44 pt, VoiceOver, Reduce Motion); 25D1 «The date sheet», «Sheet bars», «Segmented controls» |
+| Movimientos | Todos and filtered; search; day headings with and without «Neto del día»; a movement, a transfer and an operation; edit; undo and restore; Movimientos deshechos; empty | 25Q1 «Neto del día»; 25D1 «Amounts in rows» |
+| Reportes | month and arrows; the total with and without a rate; Evolución; the donut and «Otras»; Categorías \| Día a día; a category, a day, the comparison, Gastos del período | 25Q1; 25D1 «Reportes and Más › Presupuestos», «Reportes › Evolución», «Día a día», «Otras» |
+| Cuentas | the list and its swipe actions; an account and its three pills; Nueva and Editar cuenta (icon and colour); deleting one with and without a balance | 25Q1 «Deleting an account»; 25D1 «The chosen colour's check» |
+| Tarjetas | the deck (Reduce Motion on and off); a card and its statement; Pagar tarjeta; a purchase en cuotas and its plan; an adelanto; Archivadas; Nueva and Editar tarjeta | 25Q1 «An archived card in credit», «A card with only cuotas»; 25D1 «Tarjetas with Reduce Motion»; 25VIS2 V3, V7, V15 |
+| Deudas | the list and its totals; «Debo» and «Me deben»; a debt; Saldar; Nueva and Editar deuda | 25VIS2 V3; 25D1 «Amounts in rows» |
+| Presupuestos | month and arrows; general and category budgets; a budget in a currency with no account; Nuevo and Editar presupuesto | 25Q1 «A budget in a currency with no account»; 25D1 «Reportes and Más › Presupuestos» |
+| Categorías | the list; Nueva and Editar categoría (Gasto \| Ingreso, icon, colour) | 25VIS2 «Shared controls» |
+| Recurrentes | the list with Pausar / Reanudar; a rule; Nueva and Editar regla (one category per kind) | 25VIS2 V2 |
+| Para revisar | the empty tray («Nada pendiente»). An item, its review sheet and Confirmar / Descartar cannot be produced on the iPhone yet (no producer; synthetic items never reach the real tray): automated suite now, release gate later | «Producto 25A-03», «Producto 25A-04» |
+| Asistente | disconnected (no fixtures); the fixture conversations: an answer with evidence, the category link, a clarification with chips, Enviar / Detener | 25Q1 «The Assistant's category link»; 25D1 «Enviar and Detener», «An Assistant answer's evidence»; «Producto 25A-04» (fixture view) |
+| Más | Finanzas and Datos; the version line; Idioma, Región, Apariencia | 25VIS2 «Más, the choosers and the first frame»; 25D1 «Más at AX3 and AX5» |
+| Copia de seguridad | export (the file's name, one line); import (already incorporated, a bad file, a cancelled pick) | 25Q2 |
+| Failures | an unknown link; a screen that fails (a local probe, never committed) | 25Q3 |
+| Not built yet | the privacy policy and help in Más, hidden amounts, the Face ID lock, the financial calendar, notifications, widgets, Wallet capture: nothing to check in this build | roadmap §3 |
+
+**Record.** One line per step: pass, fail (what you saw) or not run, with its settings. Photos only of the dark dock and
+of failures, kept privately. Answer the five owner choices and the Sapphire verdict in #112.
+
 ## Producto 25D1 — legibility and touch (on its branch, stacked on #112; JavaScript only)
 
 Branch `feat/25d1-legibility-touch`, built on #112 (Sapphire + Sand), so it merges only after #112. **The same new
@@ -58,8 +138,9 @@ except the two noted («Día a día», the pressed segments).
 - [ ] **Amounts in rows at AX2 to AX5** (Movimientos, Cuentas, a budget's categories, Día a día, Deudas and Recurrentes
   totals, the total under Reportes' donut): the amount sits under the name and reads about as large as the name, at most
   about 53 pt (it stopped at about 31 pt before), shrinking only when it would not fit its line; never cut or split.
-- [ ] **«Para revisar» and an Assistant answer's evidence at AX3:** the amount sits under the merchant or the label,
-  and both read whole (before, the amount beside them took the whole row).
+- [ ] **An Assistant answer's evidence at AX3** (fixtures): the amount sits under the label, and both read whole (before,
+  the amount beside it took the whole row). «Para revisar» rows stack the same way, but no item can be produced on the
+  iPhone yet (no producer; synthetic items never reach the real tray): `tests/review-routes.node.ts` pins them.
 - [ ] **Increase Contrast** (Settings › Accessibility › Display & Text Size › Increase Contrast), light and dark: the
   symbol and cents of Inicio's amount, of an income or transfer detail and of an account in debt are drawn at the same
   strength as the whole units; off again, they step back as before.
@@ -103,9 +184,10 @@ form's per-kind category.
 - [ ] **Accounts:** an account using the cobalt preset (#2557D6) next to the sapphire brand in light (close in colour:
   an owner call whether it reads as a separate identity).
 - [ ] **The quiet zero hero** (an empty month) and the first opening (onboarding) on the sand canvas.
-- [ ] **Accessibility:** VoiceOver order unchanged; the largest Dynamic Type size on Inicio (run from 25D1's branch, whose
-  month heading stops at 1.4×: from this branch alone the month breaks inside the word, a defect the palette did not
-  cause); Increase Contrast (not handled by the app, before or after); Smart Invert.
+- [ ] **Accessibility:** VoiceOver order unchanged; the largest Dynamic Type size on Inicio (from 25D1's branch the month
+  takes its own line instead; from #112 alone it breaks inside the word, a defect the palette did not cause); Increase
+  Contrast (from 25D1's branch a hero's symbol and cents respond to it; the rest of the palette does not yet); Smart
+  Invert.
 - [ ] **Más, the choosers and the first frame.** Más → Finanzas and Datos on sand: tiles, rows, links and the version
   line; Idioma, Región and Apariencia in both themes (the selected row in sapphire / periwinkle); Apariencia Sistema →
   Oscuro switches without a flash. A cold launch in light and in dark: the native splash keeps its old colours
