@@ -130,7 +130,8 @@ const transpile = (path: string) => ts.transpileModule(readFileSync(new URL(path
 const names = (...list: string[]) => Object.fromEntries(list.map(name => [name, name]));
 
 /** One component instance's hooks, in call order: state and refs by index, an effect when its dependencies change (its
- * previous cleanup first), a shared value kept across renders. */
+ * previous cleanup first), a callback kept until its dependencies change (25O1 review: as React does, so a stale closure
+ * or a callback renewed every render shows), a shared value kept across renders. */
 function hookRuntime() {
   const cells: unknown[] = [];
   const shared: { value: unknown }[] = [];
@@ -149,6 +150,11 @@ function hookRuntime() {
       slot.cleanup?.();
       slot.deps = deps;
       slot.cleanup = fn();
+    },
+    useCallback(fn: unknown, deps: unknown[]) {
+      const { value: slot } = cell(() => ({ fn, deps }));
+      if (deps.length !== slot.deps.length || deps.some((item, i) => !Object.is(item, slot.deps[i]))) { slot.fn = fn; slot.deps = deps; }
+      return slot.fn;
     },
     useShared(initial: unknown) { return cell(() => { const value = { value: initial }; shared.push(value); return value; }).value; },
     /** The shared values, in the order the component created them. */
@@ -199,8 +205,11 @@ const createdAt = '2026-09-26T12:00:00Z';
 /** The route with its hosts replaced by names. `prefs` is the key-value store (shared with the locale store, like the
  * device's); `accounts` the ledger's accounts; `addAccount` the real path into the ledger mock, so a saved account shows
  * up in the snapshot on the next render. Pass the same `prefs` again to stand for a cold reopen. `failSave` fails the first
- * save once it was sent; the retry goes through. `focused()` stands for the screen gaining focus (back from a pushed
- * screen); `hardwareBack()` for Android's back button. */
+ * save once it was sent; the retry goes through. 25O1 review: focus is modelled on expo-router's `useFocusEffect`: the
+ * screen is focused at mount (the layout replaces into it); `blurred()` stands for a screen pushed over it (each focus
+ * effect's cleanup runs), `focused()` for coming back (each runs again), and a render that hands a focus effect a new
+ * callback runs it at once while focused. `hardwareBack()` is Android's back button: the newest handler first, as
+ * React Native asks them; true when one handled it. */
 function harness({ accounts = [] as domain.Account[], reading = device('es-AR', 'AR'), released = HOME_GATE, gate = domain.LEDGER_CURRENCIES, prefs = memory(), failSave = false,
   reduced = false, os = 'ios' } = {}) {
   const localeStore = createLocaleStore({ devices: () => reading, store: prefs.store, released });
@@ -211,17 +220,26 @@ function harness({ accounts = [] as domain.Account[], reading = device('es-AR', 
   const saved: domain.Account[] = [], looks: domain.AccountAppearance[] = [], haptics: string[] = [];
   const splash = { hides: 0 };
   const ledger = { accounts: [...accounts] };
-  let focusEffect: (() => void) | null = null;
-  let hardwareBack: (() => boolean) | null = null;
+  const focusEffects: { effect: () => void | (() => void); cleanup: void | (() => void) }[] = [];
+  let focusCursor = 0, isFocused = true;
+  const backHandlers: (() => boolean)[] = [];
   const modules: Record<string, unknown> = {
-    react: { useState: hooks.useState, useRef: hooks.useRef, useEffect: hooks.useEffect, useCallback: (fn: unknown) => fn },
+    react: { useState: hooks.useState, useRef: hooks.useRef, useEffect: hooks.useEffect, useCallback: hooks.useCallback },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': { ...names('View', 'ScrollView'), Platform: { OS: os }, Keyboard: { dismiss() {} },
-      BackHandler: { addEventListener: (_: string, handler: () => boolean) => { hardwareBack = handler; return { remove() {} }; } },
+      BackHandler: { addEventListener: (_: string, handler: () => boolean) => {
+        backHandlers.push(handler);
+        return { remove() { if (backHandlers.includes(handler)) backHandlers.splice(backHandlers.indexOf(handler), 1); } };
+      } },
       AccessibilityInfo: { sendAccessibilityEvent: (node: unknown, type: string) => focus.push([node, type]) },
       useWindowDimensions: () => ({ width: 393, height: 852, fontScale: 1 }) },
     'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View' } },
-    'expo-router': { Stack: { Screen: 'Stack.Screen' }, useFocusEffect: (effect: () => void) => { focusEffect = effect; },
+    'expo-router': { Stack: { Screen: 'Stack.Screen' }, useFocusEffect: (effect: () => void | (() => void)) => {
+        const index = focusCursor++, slot = focusEffects[index];
+        if (slot?.effect === effect) return;
+        slot?.cleanup?.();
+        focusEffects[index] = { effect, cleanup: isFocused ? effect() : undefined };
+      },
       router: { replace: (to: unknown) => routes.push({ replace: to }), push: (to: unknown) => routes.push({ push: to }) } },
     'react-native-safe-area-context': names('SafeAreaView'),
     'expo-splash-screen': { hideAsync: async () => { splash.hides++; } },
@@ -258,8 +276,11 @@ function harness({ accounts = [] as domain.Account[], reading = device('es-AR', 
       if (!Object.hasOwn(modules, name)) throw new Error('Unexpected onboarding dependency: ' + name);
       return modules[name];
     } });
-  return { render: () => { hooks.reset(); return module.exports.default!() as Node; }, routes, prefs, display, localeStore, saved, looks, ledger, haptics, focus, scrolls, bars,
-    splash, timers, focused: () => focusEffect?.(), hardwareBack: () => hardwareBack?.() };
+  return { render: () => { hooks.reset(); focusCursor = 0; return module.exports.default!() as Node; }, routes, prefs, display, localeStore, saved, looks, ledger, haptics,
+    focus, scrolls, bars, splash, timers,
+    focused: () => { if (isFocused) return; isFocused = true; for (const slot of focusEffects) slot.cleanup = slot.effect(); },
+    blurred: () => { if (!isFocused) return; isFocused = false; for (const slot of focusEffects) { slot.cleanup?.(); slot.cleanup = undefined; } },
+    hardwareBack: () => [...backHandlers].reverse().some(handler => handler()) };
 }
 type View = ReturnType<typeof harness>;
 
@@ -275,6 +296,9 @@ const pages = (root: Node) => nodes(root).filter(n => n.type === 'ScrollView' &&
 const headlines = (root: Node) => nodes(root).filter(n => n.type === 'AppText' && n.props.variant === 'display' && n.props.accessibilityRole === 'header');
 const pill = (root: Node, label: string) => nodes(root).find(n => typeof n.type === 'function' && n.type.name === 'Pill' && n.props.label === label);
 const skip = (root: Node) => nodes(root).find(n => n.type === 'PressFeedback' && [es.onboarding.skipLabel, 'Skip the rest of the setup'].includes(n.props.accessibilityLabel));
+/** 25O1 review: whether `node` sits inside a vertical ScrollView: every step scrolls, so the largest Dynamic Type on a
+ * compact iPhone still reaches its buttons. */
+const scrolls = (root: Node, node: Node | undefined) => !!node && nodes(root).filter(n => n.type === 'ScrollView' && !n.props.horizontal).some(s => nodes(s).includes(node));
 /** Through the story to «¿Dónde tenés tu plata?». */
 function toStart(view: View, language: 'es' | 'en' = 'es') {
   for (const label of language === 'es' ? ['Siguiente', 'Siguiente', 'Continuar'] : ['Next', 'Next', 'Continue']) find(view.render(), 'ActionButton', label).props.onPress();
@@ -326,6 +350,9 @@ test('25O1, a new installation: the story\'s three pages, stepped or swiped, the
   assert.deepEqual([region.props.hint, language.props.hint], ['Opens the list of regions', 'Opens the list of languages']);
   assert.equal(find(region, 'InlineFlag').props.flag, flags.regionFlag('US'), 'the region carries its flag');
   assert.equal(nodes(language).some(n => n.type === 'InlineFlag'), false, 'a language never does');
+  const restoreLink = nodes(root).find(n => n.type === 'PressFeedback' && n.props.accessibilityLabel === 'Restore a backup');
+  assert.deepEqual([find(root, 'NavigationRow', 'Digital wallet'), region, language, restoreLink].map(node => scrolls(root, node)), [true, true, true, true],
+    '25O1 review: the rows, the pills and the way to restore a copy scroll into reach');
   region.props.onPress();
   language.props.onPress();
   assert.deepEqual(view.routes, [{ push: '/region' }, { push: '/language' }], 'the pills open the Más choosers, pushed over the setup');
@@ -338,6 +365,17 @@ test('25O1, a new installation: the story\'s three pages, stepped or swiped, the
   assert.deepEqual([find(root, 'CurrencyChip').props.value, find(root, 'CurrencyChip').props.currencies], ['USD', domain.LEDGER_CURRENCIES], 'the United States suggests dollars; any of the gate\'s can be chosen');
   assert.deepEqual([find(root, 'AmountField').props.bare, find(root, 'AmountField').props.currency, find(root, 'AmountField').props.label], [true, 'USD', 'Opening balance']);
   assert.deepEqual([find(root, 'Field').props.label, find(root, 'Field').props.value, find(root, 'Field').props.maxLength], ['Name', 'Bank', 80]);
+  // 25O1 review: the step scrolls, and the keyboard's insets keep Create account reachable over the number pad.
+  const form = nodes(root).find(n => n.type === 'ScrollView' && !n.props.horizontal);
+  assert.ok(form, 'the step scrolls');
+  assert.deepEqual([form.props.automaticallyAdjustKeyboardInsets, form.props.keyboardShouldPersistTaps, form.props.keyboardDismissMode], [true, 'handled', 'interactive']);
+  assert.equal(scrolls(root, find(root, 'ActionButton', 'Create account')), true);
+  // A name is needed: blank, spaces included, disables Create account until it has words again.
+  find(root, 'Field').props.onChangeText('   ');
+  root = view.render();
+  assert.equal(find(root, 'ActionButton', 'Create account').props.disabled, true, 'a name is needed');
+  find(root, 'Field').props.onChangeText('Bank');
+  root = view.render();
   find(root, 'AmountField').props.onChangeText('1.000,50');
   root = view.render();
   assert.equal(find(root, 'ActionButton', 'Create account').props.disabled, false);
@@ -351,6 +389,7 @@ test('25O1, a new installation: the story\'s three pages, stepped or swiped, the
   // The close: the account as a card on the field, no way back, Get started opens the app.
   root = view.render();
   assert.deepEqual(headers(root), ['You’re all set.']);
+  assert.equal(scrolls(root, find(root, 'ActionButton', 'Get started')), true, '25O1 review: the close scrolls too');
   assert.ok(texts(root).includes('You can log your first purchase now.'));
   assert.deepEqual(plain(find(root, 'AccountCard').props), { name: 'Bank', glyph: 'business-outline', minor: 100050, currency: 'USD' });
   assert.equal(find(root, 'SafeAreaView', undefined).props.edges.length, 2);
@@ -501,13 +540,17 @@ test('«Restaurar una copia» opens the import; back with an account in the ledg
   assert.equal(restore.props.accessibilityHint, 'Trae tus datos desde una copia guardada');
   assert.equal(textOf(restore.props.children), '¿Venís de otro teléfono? Restaurar una copia');
   restore.props.onPress();
+  view.blurred();
   assert.deepEqual(view.routes, [{ push: '/backup-import' }]);
   // Back with nothing imported: the setup goes on.
   view.focused();
   assert.deepEqual([view.routes.length, view.prefs.rows.has(ONBOARDING_KEY)], [1, false]);
-  // The import added the copy's accounts while it was in front.
+  // Again, and the import adds the copy's accounts while it is in front: its own success stays there until back.
+  restore.props.onPress();
+  view.blurred();
   view.ledger.accounts = [{ id: 'from-copy', name: 'Efectivo', currency: 'ARS', openingMinor: 0, createdAt }];
   view.render();
+  assert.deepEqual([view.routes.length, view.prefs.rows.has(ONBOARDING_KEY)], [2, false], 'nothing replaces the import in front');
   view.focused();
   assert.deepEqual([view.prefs.rows.get(ONBOARDING_KEY), JSON.stringify(view.routes.at(-1)), view.saved.length], ['done', JSON.stringify({ replace: '/' }), 0]);
 });
@@ -570,6 +613,7 @@ test('an existing installation reached through a link or a restored navigation i
   const account: domain.Account = { id: 'a', name: 'Pesos', currency: 'ARS', openingMinor: 0, createdAt };
   const withData = harness({ accounts: [account] });
   assert.equal(withData.render(), null);
+  withData.blurred();
   withData.focused();
   assert.equal(JSON.stringify(withData.routes), JSON.stringify([{ replace: '/' }]), 'focus never finishes for someone the screen refused');
   assert.equal(withData.prefs.rows.size, 0, 'the route never marks or writes anything; the layout does the silent mark');
