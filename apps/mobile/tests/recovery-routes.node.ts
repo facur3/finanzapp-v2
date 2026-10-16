@@ -1727,6 +1727,72 @@ test('25VIS2 (V8): Save waits for every required input of a movement and of a tr
     if (missing === 'none') await save.props.onPress();
     assert.equal(view.transfers.length, missing === 'none' ? 1 : 0, 'transfer without its ' + missing);
   }
+  // 25Q4: one row per remaining term of the two gating expressions. The rows other suites own are not copied here:
+  // refund-routes.node.ts (nothing typed, over what is left, before the purchase), installment-purchase.node.ts (counts
+  // 1 and 121, an empty «Total financiado», a price too small for the count), and the longer 24B2 and 24B6 tests above,
+  // which the first row and the no-account row summarize.
+  const filled = (view: ReturnType<typeof harness>, amount = '10') => {
+    find(view.render(), 'AmountField').props.onChangeText(amount);
+    find(view.render(), 'Field').props.onChangeText('Kiosco');
+    find(view.render(), 'CategoryField').props.onChange('Comida');
+  };
+  const yen: domain.Account = { ...account, id: 'jpy', name: 'Yen', currency: 'JPY' };
+  const rows: [string, () => ReturnType<typeof harness>][] = [
+    ['a draft yen cannot hold', () => {
+      const view = harness('src/ui/entry-form.tsx', { kind: 'expense', accountId: 'a', onKindChange: () => {} }, { data: { ...archive, accounts: [...archive.accounts, yen] } });
+      filled(view, '12,50');
+      find(view.render(), 'AccountField').props.onChange('jpy');
+      return view;
+    }],
+    ['«En cuotas» with a count outside 2 to 120', () => {
+      const view = harness('src/ui/entry-form.tsx', { kind: 'expense', accountId: 'card-acc', onKindChange: () => {} }, { data: liabilityData });
+      filled(view);
+      find(view.render(), 'InstallmentPurchase').props.onChange({ mode: 'installments', count: 'other', typedCount: '1' });
+      return view;
+    }],
+    ['the same account on both sides', () => {
+      const view = harness('src/ui/transfer-form.tsx', { fromAccountId: 'a', toAccountId: 'a' }, { data: transferData });
+      find(view.render(), 'AmountField').props.onChangeText('12');
+      return view;
+    }],
+    ['two currencies', () => {
+      const view = harness('src/ui/transfer-form.tsx', { fromAccountId: 'a', toAccountId: 'u' }, { data: transferData });
+      find(view.render(), 'AmountField').props.onChangeText('12');
+      return view;
+    }],
+    ['a transfer draft yen cannot hold', () => {
+      const view = harness('src/ui/transfer-form.tsx', { accountId: 'a' }, { data: { ...transferData, accounts: [...transferData.accounts, yen, { ...yen, id: 'jpy2', name: 'Yen 2' }] } });
+      find(view.render(), 'AmountField').props.onChangeText('12,50');
+      find(view.render(), 'AccountField', 'Desde').props.onChange('jpy');
+      find(view.render(), 'AccountField', 'Hacia').props.onChange('jpy2');
+      return view;
+    }],
+  ];
+  for (const [label, open] of rows) {
+    const view = open();
+    assert.equal(find(view.render(), 'ActionButton').props.disabled, true, label);
+    assert.equal(view.additions.length + view.transfers.length, 0, label);
+  }
+  // No account this kind may post to: the empty state's «Agregar cuenta» is the only button, never a disabled Save.
+  const none = harness('src/ui/entry-form.tsx', { kind: 'income', accountId: 'card-acc', onKindChange: () => {} }, { data: cardOnly });
+  assert.deepEqual(nodes(none.render()).filter(node => node.type === 'ActionButton').map(node => node.props.label), ['Agregar cuenta']);
+  // A characterization, not an endorsement: a zero amount keeps Save enabled, and the press writes nothing, shows the
+  // domain's sentence and taps Error. Gating a zero draft needs new copy, which was not approved.
+  const zero = harness('src/ui/entry-form.tsx', { kind: 'expense', accountId: 'a', onKindChange: () => {} }, { data: liabilityData });
+  filled(zero, '0');
+  assert.equal(find(zero.render(), 'ActionButton').props.disabled, false);
+  await find(zero.render(), 'ActionButton').props.onPress();
+  assert.equal(zero.additions.length, 0);
+  assert.ok(find(zero.render(), 'ErrorMessage').props.message);
+  assert.equal(zero.haptics.join(','), 'Error');
+  // A complete income saves once, as an income.
+  const income = harness('src/ui/entry-form.tsx', { kind: 'income', accountId: 'a', onKindChange: () => {} }, { data: liabilityData });
+  find(income.render(), 'AmountField').props.onChangeText('10');
+  find(income.render(), 'Field').props.onChangeText('Empresa');
+  find(income.render(), 'CategoryField').props.onChange('Sueldo');
+  assert.equal(find(income.render(), 'ActionButton').props.disabled, false);
+  await find(income.render(), 'ActionButton').props.onPress();
+  assert.deepEqual(income.additions.map(item => item.kind), ['income']);
 });
 
 test('25VIS2 (V3): a new transfer, card payment and collection echo the amount they record, on screen and for VoiceOver; editing, retrying, zero and unreadable text do not', async () => {
