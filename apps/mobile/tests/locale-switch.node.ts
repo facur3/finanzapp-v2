@@ -590,7 +590,7 @@ test('Idioma and Región on the default gate: Según el dispositivo, Español an
   assert.deepEqual(rows().map(row => [row.title, row.subtitle ?? '', row.selected]), [['Según el dispositivo', 'Ahora: Español', true], ['Español', '', false], ['English', '', false]]);
   assert.deepEqual(rows().map(row => row.accessibilityLanguage ?? ''), ['', 'es', 'en'], 'each language is spoken in its own language, as in iOS Settings');
   assert.doesNotMatch(note(), /Por ahora/, 'English is released: the note no longer says the app is Spanish-only');
-  assert.match(note(), /Para que iOS también use este idioma en sus menús, elegilo en Ajustes\./, '25O1: the one fact, not a disclaimer');
+  assert.match(note(), /Para que iOS también use este idioma en sus menús, elegilo en Configuración\./, '25O1: the one fact, not a disclaimer');
   assert.doesNotMatch(note(), /no modifica tus movimientos/);
   act(() => root.update(h(provider.I18nProvider, { store }, h(screen.LocalePreferenceScreen, { kind: 'region' }))));
   assert.equal(root.root.findByType('Stack.Screen' as never).props.options.title, 'Región');
@@ -609,7 +609,7 @@ test('Idioma with a narrower gate lists no unfinished language; Región lists on
   let root!: ReturnType<typeof renderer.create>;
   act(() => { root = renderer.create(h(provider.I18nProvider, { store }, h(screen.LocalePreferenceScreen, { kind: 'language' }))); });
   assert.deepEqual(root.root.findAllByType('CheckRow' as never).map(row => [row.props.title, row.props.subtitle ?? '']), [['Según el dispositivo', 'Ahora: Español'], ['Español', '']]);
-  assert.match(root.root.findAllByType('AppText' as never).map(node => String(node.props.children)).join(' '), /elegilo en Ajustes/);
+  assert.match(root.root.findAllByType('AppText' as never).map(node => String(node.props.children)).join(' '), /elegilo en Configuración/);
   act(() => root.update(h(provider.I18nProvider, { store }, h(screen.LocalePreferenceScreen, { kind: 'region' }))));
   // 24R1: the device's Region (US) is one the catalogue names but this gate does not honour: the subtitle says whose formats stand in.
   assert.deepEqual(root.root.findAllByType('CheckRow' as never).map(row => [row.props.title, row.props.subtitle]), [['Según el dispositivo', 'Ahora: Estados Unidos (formatos de Argentina)'], ['Argentina', '22/9/2026 · 1.234,56']]);
@@ -628,8 +628,8 @@ test('25O1: Idioma\'s note opens FinanzApp\'s page in iOS Settings; Android, wit
     const footnotes = () => root.root.findAllByType('AppText' as never).filter(node => node.props.variant === 'footnote').map(node => String(node.props.children));
     const buttons = () => root.root.findAllByType('PressFeedback' as never);
     if (os === 'ios') {
-      assert.deepEqual(footnotes(), ['Para que iOS también use este idioma en sus menús, elegilo en Ajustes.', 'Abrir Ajustes']);
-      assert.deepEqual([buttons().length, buttons()[0].props.accessibilityRole, buttons()[0].props.accessibilityLabel], [1, 'button', 'Abrir Ajustes']);
+      assert.deepEqual(footnotes(), ['Para que iOS también use este idioma en sus menús, elegilo en Configuración.', 'Abrir Configuración']);
+      assert.deepEqual([buttons().length, buttons()[0].props.accessibilityRole, buttons()[0].props.accessibilityLabel], [1, 'button', 'Abrir Configuración']);
       act(() => buttons()[0].props.onPress());
       assert.equal(settingsOpened(), 1, 'Linking.openSettings: the app\'s own page, where iOS keeps its Idioma row');
     } else {

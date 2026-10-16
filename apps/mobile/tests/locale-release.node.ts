@@ -216,7 +216,7 @@ test('the release bundle\'s Idioma lists Español and English, each spoken in it
     [['Según el dispositivo', 'Ahora: Español', ''], ['Español', '', 'es'], ['English', '', 'en']],
     '"English" is spoken by an English voice and "Español" by a Spanish one, as iOS Settings does; the device row keeps the interface voice');
   // 25O1: the one thing Idioma cannot change (iOS's own menus follow the app's language in Settings), and the way there.
-  assert.equal(note(), 'Para que iOS también use este idioma en sus menús, elegilo en Ajustes. Abrir Ajustes');
+  assert.equal(note(), 'Para que iOS también use este idioma en sus menús, elegilo en Configuración. Abrir Configuración');
   assert.deepEqual(rows().map(row => row.leading), [undefined, undefined, undefined], 'a language never shows a flag');
   React.act(() => rows()[2].onPress());
   assert.equal(mounted.root.findByType('Stack.Screen' as never).props.options.title, 'Language', 'English chosen in a release bundle applies in place');

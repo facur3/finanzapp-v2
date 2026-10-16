@@ -5,7 +5,7 @@ export const accounts: Pick<Messages, 'accounts'> = {
   accounts: {
     list: {
       emptyTitle: 'Start with an account',
-      emptyDetail: 'Choose an account to group your transactions. Entering an opening balance is optional.',
+      emptyDetail: 'Create an account to group your transactions. The opening balance is optional.',
       /** 24UX6E: what VoiceOver reads for a currency's section header: its name and its recorded total, spoken. */
       sectionLabel: '{currency}, recorded balance {amount}',
     },

@@ -37,7 +37,7 @@ export function ChoiceScreen<T extends string>({ title, options, pinned, recent,
   onConfirm?: (value: T) => void;
   /** The one fact worth saying about the choice, as a footnote outside every card. */
   note?: string;
-  /** 25O1: a text button under the note (Idioma: «Abrir Ajustes»). */
+  /** 25O1: a text button under the note (Idioma: «Abrir Configuración»). */
   noteAction?: { label: string; onPress: () => void };
   searchableFrom?: number;
 }) {

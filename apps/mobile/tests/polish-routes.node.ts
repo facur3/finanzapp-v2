@@ -244,6 +244,16 @@ test('accounts list shows liquid totals per currency and hides card accounts', (
   assert.equal(find(list.props.renderSectionHeader({ section: list.props.sections[1] }), 'Money').props.minor, 300);
 });
 
+test('25O1 review: Cuentas with no account asks to create one, never to choose from an empty list, in one supporting line of 12 words at most', () => {
+  const empty = { ...archive, accounts: [], records: [], cards: [], recurring: [], budgets: [] };
+  for (const [locale, detail, button] of [['es-AR', 'Creá una cuenta para agrupar tus movimientos. El saldo inicial es opcional.', 'Agregar cuenta'],
+    ['en-US', 'Create an account to group your transactions. The opening balance is optional.', 'Add account']] as const) {
+    const state = find(harness('accounts.tsx', {}, empty, locale).render(), 'SectionList').props.ListEmptyComponent;
+    assert.deepEqual([state.type, state.props.detail, state.props.action.props.label], ['EmptyState', detail, button], locale);
+    assert.ok(detail.split(' ').length <= 12, locale);
+  }
+});
+
 test('account detail shows this month in and out, three actions and redirects obligations to their own screens', () => {
   const view = harness('account/[id].tsx', { id: 'cash' });
   const root = view.render();

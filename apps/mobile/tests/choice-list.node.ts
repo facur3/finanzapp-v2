@@ -271,13 +271,13 @@ test('25O1: the long list says its note under the pinned card (gone while a sear
   assert.equal(list(root).props.ListFooterComponent, null);
 
   const few = screen({ title: 'Idioma', options: [{ value: 'es', title: 'Español', language: 'es' }, { value: 'en', title: 'English', language: 'en' }], pinned, selected: 'es', onChoose: () => true,
-    note: 'Para que iOS también use este idioma en sus menús, elegilo en Ajustes.', noteAction: { label: 'Abrir Ajustes', onPress: () => opened.push('settings') } });
+    note: 'Para que iOS también use este idioma en sus menús, elegilo en Configuración.', noteAction: { label: 'Abrir Configuración', onPress: () => opened.push('settings') } });
   root = few.render();
   assert.deepEqual(rendered(root).flatMap((row: Node) => textsOf(nodes(row))), [], 'a short list draws no footer under its rows');
   const footer = nodes(list(root).props.ListFooterComponent);
-  assert.deepEqual(textsOf(footer), ['Para que iOS también use este idioma en sus menús, elegilo en Ajustes.', 'Abrir Ajustes']);
+  assert.deepEqual(textsOf(footer), ['Para que iOS también use este idioma en sus menús, elegilo en Configuración.', 'Abrir Configuración']);
   const button = footer.find(node => node.type === 'PressFeedback')!;
-  assert.deepEqual([button.props.accessibilityRole, button.props.accessibilityLabel, button.props.feedback, button.props.containerStyle.alignSelf], ['button', 'Abrir Ajustes', 'opacity', 'flex-start'],
+  assert.deepEqual([button.props.accessibilityRole, button.props.accessibilityLabel, button.props.feedback, button.props.containerStyle.alignSelf], ['button', 'Abrir Configuración', 'opacity', 'flex-start'],
     'a text button (PressFeedback keeps its 44 pt), as wide as its words');
   button.props.onPress();
   assert.deepEqual(opened, ['settings']);
