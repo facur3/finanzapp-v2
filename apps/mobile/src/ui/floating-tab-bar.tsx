@@ -55,8 +55,9 @@ export function FloatingTabBar({ state, descriptors, navigation, insets }: Botto
             if (!focused && !event.defaultPrevented) navigation.navigate(route.name, route.params);
           };
           const badge = typeof options.tabBarBadge === 'number' && options.tabBarBadge > 0 ? options.tabBarBadge : null;
+          // 25Q3: no long press. With one, React Native cancels the tap of a touch held past half a second, so a slow tap
+          // selected nothing; nothing listened to `tabLongPress`, and iOS's tab bar selects on release however long the touch.
           return <TabItem key={route.key} label={label} index={index} count={state.routes.length} focused={focused} onPress={press} badge={badge}
-            onLongPress={() => navigation.emit({ type: 'tabLongPress', target: route.key })}
             icon={options.tabBarIcon?.({ focused, color: focused ? p.dockActiveInk : p.dockInk, size: 24 })} />;
         })}
       </View>
@@ -66,8 +67,8 @@ export function FloatingTabBar({ state, descriptors, navigation, insets }: Botto
   </View>;
 }
 
-function TabItem({ label, index, count, focused, icon, onPress, onLongPress, badge = null }: {
-  label: string; index: number; count: number; focused: boolean; icon: ReactNode; onPress: () => void; onLongPress: () => void;
+function TabItem({ label, index, count, focused, icon, onPress, badge = null }: {
+  label: string; index: number; count: number; focused: boolean; icon: ReactNode; onPress: () => void;
   /** 25A-03: proposals waiting in «Para revisar» (Más only): a small white count on the glyph, said after the tab's name. */
   badge?: number | null;
 }) {
@@ -77,7 +78,7 @@ function TabItem({ label, index, count, focused, icon, onPress, onLongPress, bad
   const name = ios ? t('nav.tabPosition', { name: label, index: index + 1, count }) : label;
   return <PressFeedback accessibilityRole={ios ? 'button' : 'tab'} accessibilityLabel={badge ? name + ', ' + t('review.badge', { count: badge }) : name}
     accessibilityState={{ selected: focused }} accessibilityLanguage={speechLanguage} accessibilityShowsLargeContentViewer accessibilityLargeContentTitle={label}
-    onPress={onPress} onLongPress={onLongPress} containerStyle={styles.itemContainer} style={styles.item}>
+    onPress={onPress} containerStyle={styles.itemContainer} style={styles.item}>
     <View accessible={false} importantForAccessibility="no-hide-descendants" style={[styles.capsule, focused ? { backgroundColor: p.dockActive } : null]}>
       {icon}
       {/* Neutral, not lime (lime is the «+» beside it) and not red (nothing failed): the dock's white with its graphite. */}

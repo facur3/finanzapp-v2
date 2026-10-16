@@ -57,6 +57,19 @@ export const navigation = {
       editDebt: 'Editar deuda',
       editTransfer: 'Editar transferencia',
       transfer: 'Transferencia',
+      /** 25Q3: the screen an unknown link opens (the framework's fallback, not a destination). */
+      notFound: 'Pantalla no encontrada',
+    },
+    /** 25Q3: an unknown link: never Expo's English developer screen. */
+    notFound: {
+      title: 'No encontramos esa pantalla',
+      detail: 'El enlace no lleva a ninguna pantalla de FinanzApp.',
+      action: 'Ir a Inicio',
+    },
+    /** 25Q3: a screen that failed to draw. It promises only what a drawing error cannot touch: what was already saved. */
+    screenFailure: {
+      title: 'No pudimos mostrar esta pantalla',
+      detail: 'Lo que ya guardaste sigue ahí. Podés volver atrás o abrir otra pestaña.',
     },
   },
   /** The screen shown while the ledger and the fonts open, or when they cannot. */

@@ -1,6 +1,9 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-15, latest (**25Q2 — a backup that completes or says why**, on its branch, stacked on 25Q1: the export
+Updated: 2026-10-15, latest (**25Q3 — calm failures and a dock that never ignores a tap**, on its branch, stacked on
+25Q2: a screen that fails to draw shows a card in the app's words instead of ending the app; an unknown link opens a
+localised screen instead of Expo's English developer one; a dock tab held past half a second selects on release; no
+domain, storage, schema, navigation model or motion change; «Producto 25Q3», §1, §2). Before (2026-10-15, latest, **25Q2 — a backup that completes or says why**, on its branch, stacked on 25Q1: the export
 is one dated compact file measured before it is written; native failures say so in the app's words; a failed pick after an
 import is no longer silent; the uninstall consequence is said where the person backs up; the repository guard knows a real
 backup by name or header; no domain, schema 14, backup v14 or format change; «Producto 25Q2», §1, §2). Before (2026-10-15, later, **25Q1 — money that reads right**, on its branch: the first delivery after the post-B8 audit,
@@ -398,6 +401,12 @@ history file keeps the evidence of when and why.
   branch and PR per delivery, CI green, the checks recorded in this file at handoff.
 
 ## 1. Implemented (current state)
+
+- **25Q3 — calm failures and a dock that never ignores a tap (on its branch, after 25Q2).** «Producto 25Q3». The root
+  stack gives every route `ScreenFailure` (expo-router's `unstable_screenErrorBoundary`, pinned by a test on the
+  installed package): a drawing error shows «No pudimos mostrar esta pantalla» with «Volver a intentar», never the error
+  text, while the header, the back gesture and the dock stay; `app/+not-found.tsx` answers an unknown link in the app's
+  language with «Ir a Inicio»; the dock's tabs have no long press, so a slow tap selects.
 
 - **25Q2 — a backup that completes or says why (on its branch, after 25Q1).** «Producto 25Q2». The export is
   `FinanzApp-backup-<date>-<HHmm>.json`, one compact line measured in bytes before anything is written (a copy over 5 MB
@@ -940,6 +949,9 @@ it was checked in). Metro from `master` (or a delivery's branch) on the installe
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
+- **25Q3 — calm failures and a dock that never ignores a tap (on its branch; the development build after PR #113):**
+  the checklist's «Producto 25Q3»: an unknown link, a probe failure in a tab and in a pushed screen (local, never
+  committed), a held dock tab.
 - **25Q2 — a backup that completes or says why (on its branch; the development build after PR #113):** the
   checklist's «Producto 25Q2»: the file's name and one-line content through AirDrop, Mail and Files, the cancelled and
   failed sheet, a bad pick after an import, the new sentences.
@@ -4472,6 +4484,39 @@ nothing of it is on a screen yet.
   local, Linux, same results: root `npm test` 590 passed, 1 todo; `check:repo` OK; `typecheck` OK; `test:storage` 1247
   passed, 0 failed; `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0 errors, 0 stale; `check` OK;
   `export:ios` OK. No account, handle, ad account or campaign created.
+
+### Producto 25Q3 — calm failures and a dock that never ignores a tap (this PR, stacked on 25Q2)
+
+- **Why.** A drawing error in any screen reached React Native unhandled and ended the app in a release build; an unknown
+  link (`finanzapp-dev://nope`) opened Expo Router's black English «Unmatched Route» screen with a Sitemap link; and the
+  most used control failed silently: a dock tab held past half a second selected nothing (React Native cancels the tap of
+  a touch held past its long-press delay when an `onLongPress` exists, `Pressability.js` «isPressCanceledByLongPress»;
+  nothing listened to the `tabLongPress` it emitted).
+- **What.**
+  - `src/ui/screen-failure.tsx`: `ScreenFailure`, given to every route by the root stack's
+    `unstable_screenErrorBoundary` (typed in the installed expo-router; a test reads the installed package so an upgrade
+    that renames it fails instead of dropping the fallback). «No pudimos mostrar esta pantalla» / «Lo que ya guardaste
+    sigue ahí. Podés volver atrás o abrir otra pestaña.» and «Volver a intentar», which draws that screen again. It never
+    shows the error (no names or amounts from it) and never touches storage (AGENTS rule 9). Drawing errors only: a
+    handler, an effect or a promise is not caught, so no crash-free claim is made. The tabs layout hands the same
+    fallback to its own four screens (Codex, PR #116): expo-router wraps each leaf route inside its navigator and never a
+    layout, so a tab that fails is replaced inside the tabs layout and the dock stays; the explicit prop keeps that true
+    without relying on the root stack's context, a render test with expo-router's own `Try` shows the dock staying (and
+    lost if the boundary wrapped the layout), and the library's wrapping rule is pinned. A throw in the tabs layout
+    itself (the dock) is still not caught.
+  - `app/+not-found.tsx`: «Pantalla no encontrada», «No encontramos esa pantalla», «El enlace no lleva a ninguna
+    pantalla de FinanzApp.» and «Ir a Inicio» (`router.replace('/')`; a cold start has no back stack). The framework's
+    fallback, not a destination: decision 005 holds.
+  - `src/ui/floating-tab-bar.tsx`: the tabs carry no `onLongPress`; a held tab selects on release, as iOS's tab bar
+    does; the Large Content Viewer is iOS's own and unchanged.
+- **Owner decisions recorded for review:** the `unstable_` API (recommended: the stable alternative is an exported
+  ErrorBoundary in each of about 60 route files) and the copy of the two cards.
+- **Tests.** `failure-screens.node.ts` (the card, retry once, no error text, the not-found screen and its replace, the
+  layout's prop and the installed package), `floating-tab-bar.node.ts` (no tab has a long press; a press navigates).
+- **Checks** (local, Linux, 2026-10-15): `typecheck` OK; `test:storage` 1385 passed, 0 failed, 1 skipped (3 new);
+  `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0 errors, 0 stale (English accepted after review);
+  `i18n:extract` clean; `expo install --check` live and offline up to date; `export:ios` (with the new route) and the
+  bundle secret scan OK; root `npm test` 704 passed; `check:repo` OK. None of this is iPhone QA.
 
 ### Producto 25Q2 — a backup that completes or says why (this PR, stacked on 25Q1)
 
