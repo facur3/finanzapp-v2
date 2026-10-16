@@ -8,6 +8,7 @@ import * as bind from '../src/i18n/bind.ts';
 import * as locale from '../src/i18n/locale.ts';
 import * as preference from '../src/i18n/preference.ts';
 import * as storeModule from '../src/i18n/store.ts';
+import * as paletteModule from '../src/ui/palette.ts';
 import * as localeOptions from '../src/ui/locale-options.ts';
 import { LANGUAGE_PREFERENCE_KEY, REGION_PREFERENCE_KEY, type PreferenceStore } from '../src/i18n/preference.ts';
 import { activeLanguageChoice, activeRegionChoice, createLocaleStore, type DeviceReading, type LocaleStore } from '../src/i18n/store.ts';
@@ -628,7 +629,7 @@ function loadAmountField(provider: Record<string, any>, announcements: string[])
     '@finanzapp/domain': require('@finanzapp/domain'),
     './theme': { radius: {}, space: { s: 8 }, type: { body: {}, footnote: {} }, useCurrentDay: () => '2026-09-22', useReduceMotion: () => true,
       usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', primary: '#25D', surface: '#FFF', warning: '#A60', isDark: false }) },
-    './dock-clearance': { useDockInset: () => ({ extraPadding: 0, indicator: undefined }) }, './category-color': { tintOf: (color: string) => color }, './category-hues': { useAccountLook: () => ({}), useAccountNameOf: () => () => '', useCategoryLook: () => ({}) },
+    './palette': paletteModule, './dock-clearance': { useDockInset: () => ({ extraPadding: 0, indicator: undefined }) }, './category-color': { tintOf: (color: string) => color }, './category-hues': { useAccountLook: () => ({}), useAccountNameOf: () => () => '', useCategoryLook: () => ({}) },
     './geometry': require('../src/ui/geometry.ts'), './motion': { duration: {}, easeOut: {}, selectionHaptic: () => {}, timing: () => ({}) },
     './money-input': require('../src/ui/money-input.ts'), './merchant-mark': require('../src/ui/merchant-mark.ts'), './movement-amount': require('../src/ui/movement-amount.ts'),
     '../i18n/provider': provider, '../i18n/format': i18nFormat, '../i18n/locale': locale,

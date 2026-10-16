@@ -81,7 +81,6 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
       Alert: { alert: (title: string, message: string, buttons: any[]) => alerts.push({ title, message, buttons }) } },
     'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View' }, useSharedValue: (value: number) => ({ value }),
       withTiming: (value: number) => value, useAnimatedStyle: (fn: () => unknown) => fn() },
-    'expo-haptics': { selectionAsync: async () => {}, notificationAsync: async () => {}, NotificationFeedbackType: { Success: 'Success' } },
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, Redirect: 'Redirect', useLocalSearchParams: () => params,
       router: { push: (to: unknown) => pushed.push(to), replace: (to: unknown) => pushed.push(to), canGoBack: () => true, back: () => { backs++; } } },
     '@finanzapp/domain': domain,
@@ -94,7 +93,7 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
     '../src/ui/entry-list': { EntryList: 'EntryList' }, '../../src/ui/entry-list': { EntryList: 'EntryList' },
     '../src/ui/currency-switch': { CurrencySwitch: 'CurrencySwitch' }, '../../src/ui/currency-switch': { CurrencySwitch: 'CurrencySwitch' },
     '../src/ui/quick-actions': { QuickActions: 'QuickActions', AssistantEntry: 'AssistantEntry' }, '../../src/ui/quick-actions': { QuickActions: 'QuickActions', AssistantEntry: 'AssistantEntry' },
-    '../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, duration: { press: 100, release: 160, state: 200, data: 260, enter: 200, exit: 100, reveal: 480 }, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) }, '../../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, duration: { press: 100, release: 160, state: 200, data: 260, enter: 200, exit: 100, reveal: 480 }, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
+    '../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, successHaptic: () => {}, errorHaptic: () => {}, warningHaptic: () => {}, duration: { press: 100, release: 160, state: 200, data: 260, enter: 200, exit: 100, reveal: 480 }, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) }, '../../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, successHaptic: () => {}, errorHaptic: () => {}, warningHaptic: () => {}, duration: { press: 100, release: 160, state: 200, data: 260, enter: 200, exit: 100, reveal: 480 }, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
     './presentation': presentation, '../src/ui/presentation': presentation, '../../src/ui/presentation': presentation, '../src/ui/report-presentation': reportPresentation,
     '../src/ui/budget-presentation': budgetPresentation, '../../src/ui/budget-presentation': budgetPresentation,
     './theme': theme, '../src/ui/theme': theme, '../../src/ui/theme': theme,
@@ -107,6 +106,7 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
   };
   // 24UX4: the management hooks run for real (their Alert, save and haptic are the mocks above); 25B3: so does the
   // rule detail's history (its rows are the EntryRow descriptor).
+  modules['./motion'] = modules['../src/ui/motion'];
   modules['../src/ui/commitment-actions'] = modules['../../src/ui/commitment-actions'] = realModule('src/ui/commitment-actions.ts', require);
   modules['../../src/ui/recurring-history'] = realModule('src/ui/recurring-history.tsx', require);
   const module = { exports: {} as { default?: () => Node } };
@@ -705,7 +705,7 @@ test('24UX4: a failed pause keeps the rule as it was and says so; a retry writes
   await swipe(view.render(), 'pause').onPress();
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(view.saved.length, 0);
-  assert.equal(find(view.render(), 'ErrorMessage').props.message, 'Disk full');
+  assert.equal(find(view.render(), 'ErrorMessage').props.message, 'recurring.manage.failed', '25Q4: the action\'s own sentence, never the engine\'s text');
   await swipe(view.render(), 'pause').onPress();
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(view.saved.length, 1);
@@ -964,7 +964,7 @@ test('25B3: Eliminar recurrente asks first with the row\'s confirmation, Cancela
   await find(failing.render(), 'ActionButton', 'Pausar recurrente').props.onPress();
   await settle();
   assert.equal(failing.saved.length, 0);
-  assert.equal(find(failing.render(), 'ErrorMessage').props.message, 'Disk full');
+  assert.equal(find(failing.render(), 'ErrorMessage').props.message, 'recurring.manage.failed');
 });
 
 test('25B3: in English the detail reads in English and keeps the merchant, category and account names; a card rule names its card and opens it; an income is positive', () => {
@@ -1047,7 +1047,7 @@ test('25B3 review: while a pause, a resume or a confirmed deletion is being writ
   assert.deepEqual(nav(failing.render()), [false, false, true]);
   release(); await failPress; await settle();
   assert.deepEqual(nav(failing.render()), [true, true, false]);
-  assert.equal(find(failing.render(), 'ErrorMessage').props.message, 'Disk full');
+  assert.equal(find(failing.render(), 'ErrorMessage').props.message, 'recurring.manage.failed');
   assert.equal(failing.backs() + failing.saved.length, 0);
   // A failed deletion neither pops nor unmounts.
   const failingDelete = harness('recurring/[id].tsx', { id: 'rent' });
@@ -1055,7 +1055,7 @@ test('25B3 review: while a pause, a resume or a confirmed deletion is being writ
   find(failingDelete.render(), 'ActionButton', 'Eliminar recurrente').props.onPress();
   await failingDelete.alerts[0].buttons[1].onPress(); await settle();
   assert.deepEqual(nav(failingDelete.render()), [true, true, false]);
-  assert.equal(find(failingDelete.render(), 'ErrorMessage').props.message, 'Disk full');
+  assert.equal(find(failingDelete.render(), 'ErrorMessage').props.message, 'recurring.manage.deleteFailed');
   assert.equal(failingDelete.backs(), 0);
   // Editar still opens the form at rest, and the recovery path of a rule on a deleted account is untouched.
   find(pausing.render(), 'Stack.Screen').props.options.headerRight().props.onPress();
@@ -1191,7 +1191,7 @@ test('24UX6E: in review a failed Pausar says so once, under «Continuar desde ho
   const after = nodes(view.render());
   const errors = after.filter(node => node.type === 'ErrorMessage');
   assert.equal(errors.length, 1);
-  assert.equal(errors[0].props.message, 'Disk full');
+  assert.equal(errors[0].props.message, 'recurring.manage.failed');
   const at = (node: Node | undefined) => { assert.ok(node); return after.indexOf(node); };
   assert.ok(at(after.find(node => node.type === 'ActionButton' && node.props.label === 'Continuar desde hoy')) < at(errors[0]) && at(errors[0]) < at(after.find(node => node.type === 'DetailRow')),
     'the error line sits under «Continuar desde hoy», above the facts');

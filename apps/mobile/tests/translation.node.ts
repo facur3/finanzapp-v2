@@ -7,7 +7,7 @@ import { CATEGORY_PRESETS, categoryKey, labelFromISO, newCategoryDefinition, edi
 import { es } from '../src/i18n/messages/es/index.ts';
 import { en } from '../src/i18n/messages/en/index.ts';
 import { messageKeys, translate } from '../src/i18n/messages.ts';
-import { localizeError } from '../src/i18n/errors.ts';
+import { failureMessage, localizeError } from '../src/i18n/errors.ts';
 import { relativeDate } from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 import { RELEASED_LANGUAGES } from '../src/i18n/locale.ts';
@@ -145,6 +145,37 @@ test('every catalogued error is still thrown verbatim by the domain, the storage
   }
   assert.equal(localizeError('en', 'Ya existe una categoría llamada «Gym (2)».'), 'A category named “Gym (2)” already exists.', 'a template keeps its value');
   assert.equal(localizeError('es', '«Kiosco» ya es el nombre de otra categoría.'), '«Kiosco» ya es el nombre de otra categoría.');
+});
+
+test('25Q4: every sentence the domain and the storage layer throw is catalogued, so a failure\'s own sentence never hides a specific refusal', () => {
+  for (const [name, value] of Object.entries(domain)) {
+    if (name.endsWith('_MESSAGE') && typeof value === 'string') assert.notEqual(localizeError('en', value), value, name + ' is not catalogued');
+  }
+  assert.equal(localizeError('en', domain.REVIEW_STALE_MESSAGE), 'The account, card or category changed since the proposal. Review it again.');
+  // Internal guards no person reaches: rate parsing (the rates layer turns it into a status), a batch-limit guard and the provider's own check.
+  const internal = new Set(['Cotización inválida.', 'Denominador inválido.', 'Límite de vencimientos inválido.', 'LedgerProvider is required']);
+  const files = [...readdirSync(join(root, '../../packages/domain')).filter(name => name.endsWith('.ts') && !name.endsWith('.test.ts')).map(name => '../../packages/domain/' + name),
+    ...sourceFiles('src/storage')];
+  let scanned = 0;
+  for (const file of files) for (const [, thrown, constant] of read(file).matchAll(/new Error\('([^']+)'\)|_MESSAGE = '([^']+)'/g)) {
+    const text = thrown ?? constant;
+    scanned++;
+    if (!internal.has(text)) assert.notEqual(localizeError('en', text), text, `${file} throws a sentence the catalogue lacks: ${text}`);
+  }
+  assert.ok(scanned > 300, 'the scan found the thrown sentences (' + scanned + ')');
+});
+
+test('25Q4: a failed action keeps a catalogued message as itself and anything else as the action\'s own sentence, never an engine\'s text', () => {
+  for (const message of ['Elegí dos cuentas distintas.', 'entryForm.futureDate', 'Ya existe una categoría llamada «Gym (2)».']) {
+    assert.equal(failureMessage(new Error(message), 'entryForm.saveUnverified'), message, 'kept: ' + message);
+  }
+  for (const cause of [new Error("Call to function 'NativeDatabase.execAsync' has been rejected"), new Error('database is locked'), new Error(''), new Error('no.such.key'),
+    'offline', undefined, null, { message: 42 }]) {
+    const stored = failureMessage(cause, 'entryForm.saveUnverified');
+    assert.equal(stored, 'entryForm.saveUnverified', 'the action\'s own sentence for ' + String((cause as { message?: unknown } | null)?.message ?? cause));
+    assert.equal(localizeError('en', stored), en.entryForm.saveUnverified);
+  }
+  assert.equal(bindLocale('es-AR').failureMessage, failureMessage);
 });
 
 test('built-in categories: localized names, unchanged identities, stored strings, budgets and history', () => {

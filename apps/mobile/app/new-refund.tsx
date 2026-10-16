@@ -2,12 +2,12 @@ import { useRef, useState } from 'react';
 import { Keyboard, View } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
-import * as Haptics from 'expo-haptics';
 import { REFUND_AMOUNT_MESSAGE, isPlanRefund, minorFromEditedDraft, todayKey, type Account, type LedgerArchive } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { ActionButton, AmountField, AmountShortcut, AppText, DetailRow, EmptyState, ErrorMessage, FieldNote, IconButton, Money, Screen, SectionTitle, Surface } from '../src/ui/components';
 import { DateField } from '../src/ui/form-controls';
 import { amountFromMinor } from '../src/ui/money-input';
+import { errorHaptic, successHaptic, warningHaptic } from '../src/ui/motion';
 import { previewRefund, refundBounds, type RefundPreview, type RefundTarget } from '../src/ui/operation-presentation';
 import { releasesDraft } from '../src/ui/presentation';
 import { useAccountNameOf, useCategoryLookOf } from '../src/ui/category-hues';
@@ -34,7 +34,7 @@ export default function NewRefundScreen() {
 
 function RefundForm({ target }: { target: RefundTarget | null }) {
   const { archive, addRefund } = useLedger();
-  const { t, moneyText, spokenMoney, formatMoneyAmount, spokenMinor, formatDate, formatMonth, errorText } = useI18n();
+  const { t, moneyText, spokenMoney, formatMoneyAmount, spokenMinor, formatDate, formatMonth, errorText, failureMessage } = useI18n();
   const accountName = useAccountNameOf();
   const categoryLook = useCategoryLookOf('expense');
   const [operation] = useState(() => ({ id: randomUUID(), createdAt: new Date().toISOString() }));
@@ -90,12 +90,16 @@ function RefundForm({ target }: { target: RefundTarget | null }) {
       // The submission carries the allocation the person read (A13): storage recomputes it after its catch-up and refuses a
       // different one; a retry with the same id and inputs is a no-op.
       await addRefund(submission.refund);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      successHaptic();
       saving.current = false;
       close();
     } catch (cause) {
-      setError(cause instanceof Error && cause.message ? cause.message : 'operations.refund.saveUnverified');
-      if (cause instanceof Error && releasesDraft(cause.message)) setPending(null);
+      setError(failureMessage(cause, 'operations.refund.saveUnverified'));
+      const released = cause instanceof Error && releasesDraft(cause.message);
+      if (released) setPending(null);
+      // 25Q4: Warning while the sent devolución stays frozen for the exact retry; Error when nothing was sent (a submission
+      // exists only once the checks above passed) or storage refused it before writing.
+      if (submission && !released) warningHaptic(); else errorHaptic();
     } finally {
       saving.current = false;
       setBusy(false);
@@ -161,7 +165,9 @@ function RefundForm({ target }: { target: RefundTarget | null }) {
       {shown.map((sentence, index) => <AppText key={index} variant="subhead" accessibilityLabel={spoken[index]}>{sentence}</AppText>)}
     </View>}
     {/* The domain's refusal of the draft, live (over what is left, a date out of range); an amount it cannot read says so too. */}
-    <ErrorMessage message={error ?? (!amount.trim() ? null : parsed === null && !pending ? REFUND_AMOUNT_MESSAGE : preview.status === 'invalid' ? preview.message : null)} />
+    {/* The live line (a half-typed «12,», an amount over what is left) is shown, not spoken: VoiceOver hears what Save refused. */}
+    <ErrorMessage message={error ?? (!amount.trim() ? null : parsed === null && !pending ? REFUND_AMOUNT_MESSAGE : preview.status === 'invalid' ? preview.message : null)}
+      announce={error !== null} />
     {pending && !busy && error && <AppText secondary variant="footnote">{t('operations.refund.retryNote')}</AppText>}
     <ActionButton label={submit.text} spokenLabel={submit.spoken} onPress={save} busy={busy} disabled={!pending && preview.status !== 'ready'} />
   </Screen>;

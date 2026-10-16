@@ -41,8 +41,9 @@ const archive: domain.LedgerArchive = { accounts: [cash, cardAccount, usdCardAcc
   transfers: [domain.initialTransferRecord(payment)], cards: [card, usdCard], debts: [debt] };
 const empty: domain.LedgerArchive = { accounts: [cash], records: [] };
 
-// `file` is a route under app/, or a component module under src/ (its exports are returned too).
-function harness(file: string, params: Record<string, unknown> = {}, initial: domain.LedgerArchive | null = archive, gate?: domain.CurrencyGate) {
+// `file` is a route under app/, or a component module under src/ (its exports are returned too). `fail` runs after
+// addDebt records the write (25Q4 review: a storage fault once it was sent).
+function harness(file: string, params: Record<string, unknown> = {}, initial: domain.LedgerArchive | null = archive, gate?: domain.CurrencyGate, fail?: () => void) {
   // null: the ledger has not hydrated yet (LedgerProvider reads SQLite asynchronously); setData moves it on.
   let data = initial as domain.LedgerArchive;
   const source = readFileSync(new URL((file.startsWith('src/') ? '../' : '../app/') + file, import.meta.url), 'utf8');
@@ -56,7 +57,7 @@ function harness(file: string, params: Record<string, unknown> = {}, initial: do
   let backs = 0;
   const ledger = { useLedger: () => ({ archive: data, snapshot: data ? domain.snapshotFromArchive(data) : null, ...(gate ? { gate } : {}),
     addCard: async (account: domain.Account, card: domain.CreditCardProfile) => { cards.push({ account, card }); }, saveCard: async () => {},
-    addDebt: async (account: domain.Account, debt: domain.PersonalDebtProfile) => { debts.push({ account, debt }); },
+    addDebt: async (account: domain.Account, debt: domain.PersonalDebtProfile) => { debts.push({ account, debt }); fail?.(); },
     saveDebt: async (debt: domain.PersonalDebtProfile) => { savedDebts.push(debt); },
     // 25B2 close: what storage's `deletePersonalDebt` writes (the rule checked again, then the deletion record).
     removeDebt: async (id: string) => {
@@ -73,8 +74,11 @@ function harness(file: string, params: Record<string, unknown> = {}, initial: do
   const cardVisual = { CardDeck: 'CardDeck', CardFace: 'CardFace', cardFaceWidth: (windowWidth: number) => Math.min(windowWidth - 40, 420), cardFaceHeight: (width: number) => Math.round(width / 1.586) };
   const GATE = (typeof gate !== 'undefined' && gate) || domain.LEDGER_CURRENCIES;
   const defaults = { useDefaultCurrency: ({ accountCurrency, requested }: { accountCurrency?: string | null; requested?: unknown } = {}) => accountCurrency ?? (domain.isLedgerCurrency(requested, GATE) ? requested : 'ARS') };
+  // 25Q4 review: each notification haptic by its helper's name (tests/motion.node.ts pins the type each one sends).
+  const haptics: string[] = [];
+  const motion = { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, successHaptic: () => { haptics.push('Success'); },
+    errorHaptic: () => { haptics.push('Error'); }, warningHaptic: () => { haptics.push('Warning'); }, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) };
   const modules: Record<string, unknown> = {
-    'expo-haptics': { NotificationFeedbackType: { Success: 'Success' }, notificationAsync: async () => {}, selectionAsync: async () => {} },
     'expo-crypto': { randomUUID: () => 'id-' + Math.random().toString(36).slice(2, 8) },
     '../i18n/messages': {},
     './form-controls': { DateField: 'DateField' },
@@ -107,7 +111,7 @@ function harness(file: string, params: Record<string, unknown> = {}, initial: do
     '../src/ui/liability-rows': { DebtRow: 'DebtRow' }, '../../src/ui/liability-rows': { DebtRow: 'DebtRow' },
     './swipe-actions': swipeActionsMock,
     '../src/ui/quick-actions': { QuickActions: 'QuickActions', AssistantEntry: 'AssistantEntry' }, '../../src/ui/quick-actions': { QuickActions: 'QuickActions', AssistantEntry: 'AssistantEntry' },
-    '../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) }, '../../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
+    '../src/ui/motion': motion, '../../src/ui/motion': motion,
     // 24T2 (stream B): the card form's statement dates (real) and its «Usar estos días todos los meses» switch (a descriptor).
     './card-cycle-form': cardCycleForm, './switch-row': { SwitchRow: 'SwitchRow' },
   };
@@ -129,7 +133,7 @@ function harness(file: string, params: Record<string, unknown> = {}, initial: do
   const module = { exports: {} as { default?: () => Node } & Record<string, (props: any) => Node> };
   runInNewContext(code, { module, exports: module.exports, require, Error });
   return { render: () => { cursor = 0; return module.exports.default!(); }, renderExport: (name: string, props: any = {}) => { cursor = 0; return module.exports[name](props); },
-    pushed, cards, debts, savedDebts, removedDebts, alerts, backs: () => backs, exports: module.exports,
+    pushed, cards, debts, savedDebts, removedDebts, alerts, haptics, backs: () => backs, exports: module.exports,
     setData: (next: domain.LedgerArchive | null) => { data = next as domain.LedgerArchive; } };
 }
 
@@ -778,4 +782,21 @@ test('24UX6E: the edit form summarises what cannot change (the kind and the curr
     const english = harness('src/ui/debt-form.tsx', {}, data).renderExport('DebtForm', { original: receivable6E });
     assert.equal(nodes(english).filter(node => node.type === 'DetailRow').map(node => [node.props.label, node.props.value].join('=')).join(','), 'Type=Owed to me,Currency=ARS');
   } finally { activeLocale = 'es-AR'; }
+});
+
+test('25Q4 review: a new debt taps Error for an amount refused before anything is sent, Warning while the same debt stays frozen for «Reintentar guardado», then Success', async () => {
+  let attempts = 0;
+  const view = harness('src/ui/debt-form.tsx', {}, empty, undefined, () => { if (++attempts === 1) throw new Error('Refresh failed'); });
+  const render = () => view.renderExport('DebtForm', {});
+  find(render(), 'Field', 'Persona o entidad').props.onChangeText('Ana');
+  find(render(), 'AmountField').props.onChangeText('0');
+  await find(render(), 'ActionButton', 'Crear deuda').props.onPress();
+  assert.deepEqual([view.haptics.splice(0).join(','), view.debts.length, find(render(), 'Field', 'Persona o entidad').props.editable], ['Error', 0, true],
+    'refused before anything is sent, still editable');
+  find(render(), 'AmountField').props.onChangeText('100');
+  await find(render(), 'ActionButton', 'Crear deuda').props.onPress();
+  assert.deepEqual([view.haptics.splice(0).join(','), find(render(), 'Field', 'Persona o entidad').props.editable], ['Warning', false], 'sent with an unknown outcome: frozen for the exact retry');
+  await find(render(), 'ActionButton', 'Reintentar guardado').props.onPress();
+  assert.equal(JSON.stringify(view.debts[1]), JSON.stringify(view.debts[0]), 'the retry resends the same debt and account');
+  assert.deepEqual([view.haptics.join(','), view.backs()], ['Success', 1]);
 });

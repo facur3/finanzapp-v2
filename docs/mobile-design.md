@@ -19,6 +19,9 @@ visual y gestual en iPhone sigue pendiente. [Alcance del producto](decisions/002
 > «Reemplazado por la decisión 005». La parte de navegación de la decisión 003 (cinco pestañas) también queda
 > reemplazada por la 005; sus reglas de tarjetas siguen.
 >
+> **25VIS2 (prueba, sin mergear).** Sapphire + Sand reemplaza a Electric Lime token por token solo si el dueño la
+> aprueba en el iPhone; mientras tanto vale «Producto 25VIS1». Ver «Producto 25VIS2».
+>
 > **Desde 25VIS1 (2026-10-03, aceptada por el dueño en el iPhone).** Los colores de Forest se reemplazan por **Electric Lime** con los mismos
 > nombres de tokens (`src/ui/palette.ts`); la estructura de la decisión 005 no cambia. Lo vigente de color está en
 > «Producto 25VIS1»; donde abajo se lee «pino», «salvia» o un hex de Forest, vale como registro.
@@ -130,10 +133,15 @@ caja de línea cuando un estilo cambia solo el tamaño.
 **Tipografía.** Fuente del sistema. Héroe 44/700 tabular con tracking negativo,
 título grande 34, título 22, encabezado 17/600, cuerpo 17, subtítulo 15, nota 13,
 etiqueta 12. Números siempre tabulares. **Importes responsivos:** un importe es
-siempre una sola línea; uno corto queda grande y uno largo se reduce hasta la
-mitad (héroe) o tres cuartos (fila) para caber, nunca se corta ni se parte. Dynamic
-Type aplica con un tope de 1,4× en héroes. El campo de importe baja de 46 a 32 y 24 pt
-según la cantidad de cifras.
+siempre una sola línea; uno corto queda grande y uno largo se achica para caber,
+nunca se corta ni se parte. El héroe calcula su tamaño en JavaScript, con un piso de
+la mitad; una fila deja el ajuste a iOS, que achica hasta 4 pt (el piso nativo de
+React Native: `minimumFontScale` solo se lee en Android), por eso una fila se apila
+antes de achicarse (`rowStacks`). Dynamic Type: un importe de fila hasta 53 pt (el cuerpo
+en AX5); un héroe hasta 1,4× o 53 pt, lo que sea mayor, ajustado al ancho, así que desde
+AX3 un importe largo puede verse tan grande como el mes de Inicio; todo otro texto hasta
+el tamaño que iOS da a su estilo en AX5 (25D1, `geometry.ts`). El campo
+de importe baja de 46 a 32 y 24 pt según la cantidad de cifras.
 
 **Espacio y forma.** Margen de pantalla 20, tarjeta 16, escala 4–32. Radios: chip
 14, tile 12, grupo 16, tarjeta 20, hoja 24, tarjeta de crédito 18. Elevación clara
@@ -269,7 +277,10 @@ siguen montadas, así un revelado al montar no se vería).
 - **Presión.** El control responde al apoyar el dedo, antes de que termine el
   toque. Botones, tarjetas y chips escalan a 0,97; las filas a ancho completo se
   tiñen como una celda de tabla y nunca se achican; los botones de texto o ícono
-  se atenúan al 40 %.
+  se atenúan al 40 %. Con Reduce Motion no hay escala: botones, tarjetas y chips se
+  atenúan al 70 % mientras se presionan (25VIS2; antes no mostraban nada); lo que envuelve
+  vidrio (las píldoras del detalle de una cuenta, mientras son de vidrio) no cambia, porque la opacidad rompe el
+  material; sólidas, se atenúan como un botón.
 - **Control segmentado.** Un solo pulgar se desliza al segmento elegido
   (interrumpible), las etiquetas cambian de color en transición y un háptico de
   selección marca el cambio. Tocar el valor actual no hace nada.
@@ -295,7 +306,10 @@ siguen montadas, así un revelado al montar no se vería).
   de fecha que sube desde el borde: reemplazada por la decisión 005.)* (El lavado animado de
   «En qué gastaste» se retiró con la lista de categorías de Inicio.)
 - **Formularios.** Gasto / Ingreso / Transferencia es un solo control sobre un
-  solo modal: cambiar es estado, no navegación, y el formulario de abajo se funde.
+  solo modal: cambiar es estado, no navegación. Al cruzar a Transferencia o volver de
+  ella el formulario de abajo se funde; Gasto ↔ Ingreso cambia en su lugar y conserva el
+  borrador, con una categoría propia para cada tipo. Mientras un guardado está en curso o
+  congelado para reintentar, el control queda deshabilitado (25VIS2).
 - **Deck de tarjetas (24T2; reemplaza al carrusel horizontal).** Las tarjetas no elegidas
   quedan apiladas arriba en su orden guardado, cada una mostrando solo su franja superior
   (nombre y «•••• 4009», 50 pt como mínimo); la elegida queda al frente, abajo y entera, junto
@@ -311,7 +325,12 @@ siguen montadas, así un revelado al montar no se vería).
   volvía un cambio instantáneo).
 - **Hápticos.** Uno por acción del usuario (selección en segmentos, cambio de
   pestaña, flechas de mes, categoría o cuenta elegida, tarjeta elegida en el deck; un
-  impacto leve al tocar el «+» del dock; éxito al guardar) y siempre con una señal visual. Las
+  impacto leve al tocar el «+» del dock; éxito al guardar; si un guardado, una confirmación o un cambio falla, error
+  cuando no se escribió nada o la pantalla vuelve a ofrecer la acción, y aviso cuando conserva el mismo envío para
+  «Reintentar» porque no sabe si se guardó) y siempre con una señal visual. Todos salen de `motion.tsx` (25Q4). El de
+  falla suena una vez, en el manejo de esa escritura, junto con la frase; nunca con el de éxito, desde un botón
+  desactivado ni desde una línea que aparece mientras se escribe. Leer una copia, exportarla, las preguntas al
+  Asistente y los diálogos que explican antes de escribir no tienen háptico de falla. Las
   pestañas cambian al instante, sin deslizamiento ni fundido; el dock de 24UX6A no agrega
   movimiento: la pestaña elegida cambia a su glifo relleno sobre la cápsula clara en el mismo
   cuadro. *(Antes: «la cápsula flotante… cambia de tinta y de lente»; reemplazado por la
@@ -858,7 +877,180 @@ barras de Día a día y una cabecera fija sólida. Siguen permitidos para una pa
 vinculante del roadmap no cambia: la próxima entrega de producto es 24T3; 24UX6C (Movimientos y Más) y 24UX6D
 (Tarjetas) siguen a 24UX6B en el carril UX, y su lugar frente a 24T3 lo decide el dueño (ver `docs/mobile-roadmap.md`).
 
-## Producto 25Q3 — fallas tranquilas y un dock que no ignora un toque (en su rama)
+## Producto 25Q4 — ediciones, fallas y recuperación (en su rama, sobre #117; sin rediseño)
+
+En la rama `fix/25q4-edits-and-failures`, apilada sobre #117. Solo JavaScript; no cambia dominio, esquema (14), backup
+(v14) ni el modelo de navegación.
+
+- **Editar un pago.** Editar un pago de tarjeta, un pago de deuda o un cobro deja fija su tarjeta o su deuda, como al
+  crearlo: el formulario la muestra como un dato y «Desde» (o «Hacia» en un cobro) solo ofrece cuentas que el
+  almacenamiento acepta para ese par, así que ninguna elección termina congelada. El título sigue siendo «Editar
+  transferencia» y el botón «Guardar cambios»; la etiqueta del monto, la nota y «Pagar total», «Saldar total» o «Cobrar
+  total» siguen a la tarjeta o la deuda guardada. La cifra del atajo dice que deja afuera el pago que se edita («Saldo
+  pendiente sin este pago», «A favor sin este pago», «Pendiente sin este pago», «Pendiente sin este cobro»), así que la
+  pantalla nunca muestra dos «Pendiente» distintos.
+- **Solo salda en su sentido.** Una transferencia salda algo solo de efectivo a una tarjeta, de efectivo a una deuda que
+  debo, o de lo que me deben a efectivo. Un enlace al revés (desde una deuda que debo, hacia lo que me deben, desde una
+  tarjeta) abre una transferencia común, y un pago que una versión anterior guardó al revés se edita en el formulario
+  común; si se lo da vuelta ahí, recibe el techo de un pago nuevo.
+- **El techo de una deuda.** Un pago o un cobro de deuda salda como mucho lo pendiente sin la transferencia que se edita,
+  leído de los registros al crearlo, al editarlo y al recuperarlo; un enlace puede bajar ese techo, nunca subirlo. Una
+  edición de un pago viejo que ya pagaba de más conserva su monto pero no lo sube. Un pago de tarjeta solo tiene el techo
+  de quien lo abre (la tarjeta modela su saldo a favor). Pasarse se dice en rojo mientras se escribe, sin que VoiceOver lo
+  lea; «Guardar» sigue activo y lo rechaza con la frase leída y un toque de error. Una deuda en cero o pasada se lee
+  «Saldada», nunca «Pendiente». La tarjeta dice: «El pago supera el saldo pendiente registrado. Si tu resumen tiene
+  compras, intereses o cargos que faltan, registralos primero como gastos de la tarjeta.»
+- **Deshacer y recuperar.** La confirmación dice cómo queda la tarjeta o la deuda: «Visa quedará con un saldo pendiente
+  de …», «… con … a favor», «… sin saldo pendiente», «Le vas a deber … a Juan», «Ana te va a deber …», «La deuda con …
+  quedará saldada», «Lo que te debe … quedará saldado»; nunca «Se sumarán … a Visa». La cuenta de efectivo conserva «Se
+  sumarán / Se descontarán»; una transferencia termina con «Solo cambia el registro en esta app, no mueve dinero en el
+  banco.». Todo deshacer dice qué se recupera y dónde: «Este movimiento dejará de contar en tus saldos y reportes. Podés
+  recuperarlo después desde Movimientos deshechos, en Más.» o «Podés recuperar la transferencia después desde Movimientos
+  deshechos, en Más.». Recuperar un pago o un cobro de deuda que supera lo pendiente se rechaza antes de confirmar: «No
+  se puede recuperar ahora» («Este pago es mayor que lo que todavía le debés a Juan (…). Recuperarlo pagaría de más.»),
+  con «Ver deuda» (solo Cancelar si la deuda se eliminó).
+- **Fallas.** Una acción fallida muestra un rechazo que el catálogo conoce, en el idioma de quien lee, o su propia frase
+  tranquila; nunca el texto de SQLite ni de un módulo nativo. Las propuestas tienen las suyas: «No pudimos confirmar la
+  propuesta. Podés reintentarlo: se registra una sola vez.», «No pudimos descartar la propuesta. Sigue pendiente.» y «No
+  pudimos guardar los cambios. La propuesta sigue como estaba.». El aviso de una puesta al día que falló (recurrentes o
+  cuotas) y su «Verificar de nuevo» quedan hasta que esa pasada sale bien; un guardado ajeno, una confirmación incluida,
+  ya no lo borra. Una regla o una copia guardadas cuya puesta al día falla después quedan guardadas, con el aviso. Un
+  archivo de una versión más nueva dice «Estos datos requieren una versión más nueva de FinanzApp. No se modificaron.»
+  sin «Volver a intentar». La primera apertura se abre una sola vez. Toda edición modal sin nada para editar conserva
+  «Cerrar» (movimiento, transferencia, tarjeta y propuesta, como ya tenían las otras cinco); la de una propuesta, también
+  mientras se resuelve y antes de que se abra el registro, y su «Guardar cambios» toca éxito.
+- **Copia de seguridad.** La revisión dice «Copia del <fecha y hora>», «Último movimiento: <fecha>» (VoiceOver lee la
+  fecha completa) y cuántos movimientos de recurrentes o cuotas que vencieron después de la copia registra también la
+  importación (no están en «Disponible después»; una cuota financiada cuenta uno por parte). La confirmación es «¿Importar la copia del <fecha y hora>?» y dice que se agregan solo los registros que
+  faltan y que lo importado se deshace de a uno. Una copia que quedó en la caché porque iOS cerró la app con la hoja de
+  compartir abierta se borra en el próximo inicio, y la copia que entrega el selector, apenas se lee su texto; nunca el
+  original.
+- **Movimientos.** «Ver todos» en Inicio y «Ver movimientos» bajo una respuesta del Asistente abren Movimientos entera:
+  sin búsqueda ni filtro, desde arriba, sin anunciar una cantidad. Volver por el dock conserva la búsqueda, el filtro y
+  el desplazamiento.
+
+## Producto 25D1 — legibilidad y toque (en su rama, sobre #112; sin rediseño)
+
+En la rama `feat/25d1-legibility-touch`, apilada sobre #112 (Sapphire + Sand): se mergea después de #112 y de su
+revisión en el iPhone. Solo JavaScript; no cambia navegación, dominio, almacenamiento, esquema (14), backup (v14),
+textos ni claves del catálogo. Los valores son juicio con cifras medidas (WCAG sobre los tokens reales; anchos
+estimados con los multiplicadores de React Native y `labelWidthEm`); cómo se ven lo decide el iPhone. Revisión del
+2026-10-15: los topes fijos del primer pase (1,4× en los meses y el eje, 2× en las leyendas) quedaban por debajo de lo que
+iOS dibuja en AX1; se reemplazaron por la regla de abajo.
+
+- **Contraste.** El símbolo y los centavos de un héroe de color (un ingreso, una transferencia, un saldo negativo)
+  conservan su tono con menos alfa, solo hasta donde permite 3:1 (`QUIET_ALPHA`: claro E6 / CC, oscuro B3 / 99): en
+  claro los centavos estaban en 2,16–2,43:1 sobre la arena, ahora 3,29 o más (oscuro 3,35 o más); las cifras enteras
+  siguen llevando el número. «Otras» en la dona pasa a un neutro cálido (#7C786E claro, #7A766C oscuro): 3,44:1 o más
+  sobre el lienzo, la tarjeta y el anillo (era 1,54: un hueco, no una porción). La tilde del color elegido toma
+  `onSemantic`: blanca en claro, tinta en oscuro (el blanco caía a 1,97:1 en los puntos claros; ahora 5,31 o más).
+- **Toque.** Enviar y Detener del Asistente son un objetivo de 44 pt que sigue ocupando 40 en el diseño (2 pt dentro del
+  relleno de la barra, que no se mueve). Los chips de moneda normales suman 4 pt arriba y abajo (44). La hoja de fecha ya
+  no dibuja un asa que no se puede arrastrar (HIG: solo una hoja redimensionable la muestra); la tarjeta queda 5 pt más corta.
+- **Estados presionados.** Con Reducir movimiento, una tarjeta del mazo de Tarjetas se oscurece bajo el dedo (un velo
+  negro al 12 %, sin escala) en vez de no mostrar nada; el texto blanco queda en 6:1 o más y el emisor en AA. Sin
+  Reducir movimiento sigue la escala de 0,97. Un segmento de un control segmentado se atenúa al 60 % mientras se lo toca
+  (solo color: no hace falta otra variante); el elegido nunca, porque tocarlo no hace nada.
+- **Contraste con Aumentar contraste.** Con el ajuste de iOS activado (Accesibilidad › Pantalla y tamaño de texto), el
+  símbolo y los centavos de cualquier héroe, de color, de tinta o sobre el campo de Inicio, se dibujan con la fuerza de
+  las cifras enteras: el paso atrás es una decisión de composición y no la paga quien pidió más contraste.
+- **Texto grande: la regla.** Ningún texto crece más allá del tamaño que iOS le da a su estilo en AX5 (la tabla del HIG:
+  título grande 60 pt, título 1 58, título 2 56, título 3 55, cuerpo 53, subtítulo 49, nota 44, leyenda 43;
+  `TEXT_STYLE_MAX_SCALE`, aplicado por `AppText`). React Native multiplica todos los estilos por un mismo factor (3,571
+  en AX5: un título grande de 34 pt llegaba a 121 pt, un cuerpo a 61), así que estos techos devuelven el orden que iOS
+  mantiene en cada ajuste. Por debajo de AX5 cada estilo crece como lo pide la persona; donde el diseño no lo sostiene,
+  **cambia el diseño, no se achica el texto**: el título pasa a su propia línea o las etiquetas se abrevian. El único
+  piso es que una palabra entre entera en su renglón. Lo que no puede crecer (las barras de las hojas, los botones de
+  ícono) ofrece el Large Content Viewer, como las barras del sistema.
+
+  | Elemento | Antes | Ahora |
+  | --- | --- | --- |
+  | Mes de Inicio (título 2) | sin tope: «Septiembre» se partía desde AX3 | hasta 56 pt; junto al botón de cuentas mientras entra (en un iPhone de 393 pt hasta AX2; antes en pantallas más chicas), si no en su propia línea con el botón debajo, a la derecha |
+  | Mes de Reportes y Presupuestos (título 3, entre flechas) | sin tope | hasta 55 pt; entre las flechas mientras entra, si no arriba con las flechas debajo; nunca corta «Septiembre» |
+  | Leyenda bajo ese mes (período o estado, «Este mes») | sin tope | su propio techo (43 pt): siempre debajo del mes |
+  | Filas de «Para revisar» y la evidencia de una respuesta del Asistente | el importe al lado ocupaba la fila: el nombre quedaba en cero | como las demás filas: desde 1,2× el importe pasa debajo y el texto se ve entero |
+  | Título grande / título 1 (primera apertura, detalle de categoría) | × 3,571 en AX5 (34 → 121 pt) | 60 y 58 pt en AX5 |
+  | Importes (`Money`) | fila 1,8× (30,6 pt) bajo nombres de 53 pt; un total de 28 pt llegaba a 39 | una fila hasta 53 pt (el cuerpo en AX5), cualquiera sea su tamaño; un héroe hasta 1,4× o 53 pt, lo que sea mayor (Inicio: 64 pt); los dos se ajustan a su ancho |
+  | Filas de Más y de los selectores (`NavigationRow`, `CheckRow`) | dos líneas y «…» a cualquier tamaño | dos líneas hasta 1,2×; enteras desde el umbral de apilado |
+  | Barra de las hojas (Cancelar · título · Listo) | crecía hasta sacar Listo de la pantalla | 1,2× como una barra del sistema, con Large Content Viewer |
+  | Eje de meses de Evolución | seis paradas de VoiceOver repetidas | oculto para VoiceOver (cada barra dice mes, año e importe); al tamaño de la persona: «sep» mientras entra en su columna, si no la inicial («S»), como los gráficos de Apple |
+  | Día a día | una fila en línea y otra apilada según su largo | todas apiladas: fecha y cantidad sobre el importe |
+  | `IconButton`, `InfoButton`, la ⓘ de Disponible | sin ayuda al no poder crecer | Large Content Viewer con su nombre de VoiceOver |
+
+- **No incluido:** un piso `minimumFontSize` para los importes de fila, que iOS achica hasta 4 pt si no entran (se
+  decide en el dispositivo; hoy las filas se apilan antes de achicarse); la tarjeta del borrador del Asistente y sus
+  filas a texto grande, los segmentos en pantallas de 320 pt y los totales de Deudas (siguiente pase); Aumentar
+  contraste para el resto de la paleta (separadores, texto terciario).
+- **Pendiente en el iPhone:** todo lo anterior, en claro y oscuro, al tamaño normal, AX3 y AX5, en español e inglés
+  (la lista «Producto 25D1» de [mobile-device-checklist.md](mobile-device-checklist.md)).
+
+## Producto 25VIS2 — Sapphire + Sand, prueba (sin mergear; sin rediseño)
+
+En su rama `feat/25vis2-sapphire-sand` desde master 6611376. **No se mergea hasta la revisión en el iPhone físico y la
+aprobación explícita del dueño**; hasta entonces Electric Lime («Producto 25VIS1») sigue siendo la paleta del producto.
+Implementa la hoja B de [brand-brief.md](brand-brief.md) §4.9 token por token, con los mismos nombres: la paleta no
+cambia ninguna pantalla, layout, navegación (las cuatro pestañas y el «+» aparte), dominio, almacenamiento, esquema (14)
+ni backup (v14); el pulido del registro de abajo cambia el rótulo de Registrar en transferencias y quita una clave del
+catálogo. La tipografía sigue siendo la del sistema (SF Pro): la app no carga otra fuente. Sin itálicas
+decorativas; ningún logo elegido.
+
+- **Marca.** Un zafiro real (≈225°, ni violeta ni azul marino): #2148C0 como campo de Inicio, botón principal y «+» en
+  claro; en oscuro el campo #2446AE, el botón #3D60D4, el interruptor #4568DA y el texto de marca y el «+» #7E9BF7
+  (periwinkle, con tinta encima). Sobre el campo, blanco; el símbolo y los centavos del monto, grises sólidos
+  (#E2E2E5, #C9C9CD; 5,9 y 4,6:1); la barra de estado clara sobre el campo en los dos temas.
+- **Arena.** Lienzo #F3EFE6, superficies #FFFCF6, tinta #19191C; en oscuro, casi negro cálido #0C0B0A. Todo lo que no
+  es marca es un neutro cálido (30–60°), nunca verde ni azul.
+- **Significados.** Ingreso, gasto y aviso sin cambios. La transferencia sigue pizarra: queda cerca del tono del zafiro
+  y se separa por saturación (croma ≤ 15 contra ≥ 40; ΔE ≥ 40), decisión del dueño pendiente (§4.9, punto 2).
+- **Pruebas.** `tests/theme.node.ts` conserva las aserciones de accesibilidad en WCAG AA o más (tres umbrales de 7:1 propios de
+  Lime bajan: el texto del botón y del «+» a 4,5; la tinta AAA solo en las cifras del campo; el «+» contra el lienzo, 3:1) y
+  reescribe las de identidad de Lime: la ventana de 218–232° (sin azul marino: luminosidad ≥ 0,40), la jerarquía del monto por contraste contra el campo, los neutros cálidos, la transferencia por
+  croma y distancia de color, el «+» contra el lienzo (≥ 3:1) y el texto de marca sobre el inset. Las de Inicio y la
+  fila de Gastado | Disponible leen el token, no el literal de Lime.
+
+### Pulido del registro y accesibilidad (misma PR, 2026-10-14)
+
+Lo aprobado por el dueño de la revisión de UX (registro de decisiones privado del 2026-10-14). Se mantiene la pantalla
+única del registro y su control Gasto / Ingreso / Transferencia; no cambian los campos, las reglas de cuentas, las
+cuotas, las monedas ni la precisión, la edición, los borradores del Asistente, la revisión antes de escribir, la
+navegación ni la recuperación de un guardado.
+
+- **El control se bloquea durante un guardado (V1).** Mientras se guarda, y mientras un guardado de resultado incierto
+  queda congelado para reintentar exactamente lo mismo, Gasto / Ingreso / Transferencia está deshabilitado y atenuado:
+  Reintentar no puede mandar un gasto con la pantalla de ingreso, ni pasar a Transferencia tirar el envío congelado. El
+  formulario lo informa desde su guardado (`onLockedChange`), igual que `busy || pending !== null`; tras un guardado
+  correcto sigue bloqueado mientras el modal se cierra. Un rechazo de validación previo al congelado nunca llega a
+  bloquearlo; en un gasto o un ingreso, el rechazo que decide el almacenamiento antes de escribir (`releasesDraft`)
+  también lo libera; en una transferencia ese rechazo, como antes, deja el envío congelado hasta cerrar.
+- **Una categoría por tipo (V2).** La categoría elegida para Gasto no pasa a Ingreso (donde podía guardarse en un
+  ingreso); al volver a Gasto vuelve a estar. Monto, comercio, cuenta y fecha siguen pasando entre los dos. Lo mismo en
+  la regla recurrente (Más → Recurrentes → «+», desde el 2026-10-15), que antes guardaba una regla de ingreso con la
+  categoría de un gasto y la copiaba a cada movimiento que registraba; en una regla ya guardada, cambiar de tipo pide la
+  categoría del tipo nuevo, y volver devuelve la guardada.
+- **El monto en Guardar de una transferencia (V3).** «Registrar transferencia · $ 1.234,50», también para un pago de
+  tarjeta, un pago o un cobro de deuda, y VoiceOver lo oye en su forma hablada, como ya pasaba con un gasto o un
+  ingreso. Se lee igual que al guardar; una edición o un reintento conservan sus palabras.
+- **Lo que se paga es un dato, no un botón apagado (V7).** La tarjeta o la deuda de un pago se dibujan enteras, sin
+  chevrón, y VoiceOver las lee como texto (antes: «botón atenuado» al 60 %).
+- **Objetivos de 44 pt sin dibujar nada más grande.** Los segmentos por defecto (32 pt) llegan a 44 con 6 pt de margen
+  táctil vertical; el registro deja 4 pt libres bajo el control para que el formulario no se lleve esos toques. La
+  acción simple de un encabezado de sección suma 4 pt arriba y abajo, como la discreta.
+- **VoiceOver.** El rótulo de un campo ya no es una parada aparte (el campo lo dice una vez); «Listo» del teclado del
+  monto se llama «Listo» (Control por voz); el gesto de escape cierra la hoja de fecha sin cambiarla; un error que
+  aparece se anuncia en iOS (la región viva es solo de Android): lo que Guardar rechazó, no la línea que una devolución
+  muestra mientras se escribe. En Android no se anuncia: TalkBack ya lee la región viva, y se oiría dos veces.
+- **Un guardado fallido se siente una vez (V4, 2026-10-15).** Un rechazo (antes de congelar el envío, o uno que el
+  almacenamiento decide antes de escribir) da el háptico de error; un resultado incierto, que pudo haberse escrito y
+  queda congelado para reintentar exactamente lo mismo, da el de aviso. Siempre con su frase en pantalla y en VoiceOver:
+  el háptico nunca es la única señal.
+- **Completar el monto baja el teclado (V15, 2026-10-15).** «Usar todo», «Pagar total» y «Total disponible» de una
+  devolución bajan el teclado al completar, así Registrar y su eco del monto quedan a la vista; tocar el monto lo vuelve
+  a subir con el valor completado.
+- **El dock oscuro, revisado y sin cambios.** Sin fotos del iPhone no se agrega borde: un solo color de anillo no
+  alcanza en todos los fondos (#4F4D47: 2,33:1 sobre el lienzo, 1,52 sobre filas elevadas, 1,03 sobre el campo zafiro
+  oscuro). El filete actual existe solo sin vidrio. Las fotos que hacen falta están en la lista del iPhone.
+
+## Producto 25Q3 — fallas tranquilas y un dock que no ignora un toque (PR #116, mergeada)
 
 - **Una pantalla que no se puede dibujar** muestra, en su lugar, «No pudimos mostrar esta pantalla», «Lo que ya guardaste
   sigue ahí. Podés volver atrás o abrir otra pestaña.» y «Volver a intentar»; la cabecera, el gesto de volver y el dock
@@ -867,7 +1059,7 @@ vinculante del roadmap no cambia: la próxima entrega de producto es 24T3; 24UX6
   negra en inglés de Expo.
 - **El dock** ya no tiene pulsación larga: una pestaña sostenida más de medio segundo se elige al soltar, como en iOS.
 
-## Producto 25Q2 — una copia que se completa o dice por qué (en su rama)
+## Producto 25Q2 — una copia que se completa o dice por qué (PR #115, mergeada)
 
 - **El archivo** se llama `FinanzApp-backup-<fecha local>-<HHmm>.json` y es una sola línea de JSON (sin cambio de
   formato: toda versión lo lee). Se mide en bytes antes de escribirlo: si supera 5 MB, lo dice con su frase («No borres
@@ -879,7 +1071,7 @@ vinculante del roadmap no cambia: la próxima entrega de producto es 24T3; 24UX6
 - **Borrar la app**: la pantalla de copia empieza con «Si borrás la app, tus registros se borran con ella.» y la fila de
   Más dice «Antes de borrar la app o cambiar de teléfono».
 
-## Producto 25Q1 — cifras que dicen la verdad (en su rama)
+## Producto 25Q1 — cifras que dicen la verdad (PR #114, mergeada)
 
 Correcciones de lectura, sin cambios de dominio, almacenamiento, esquema (14), backup (v14), navegación ni movimiento.
 
@@ -1689,7 +1881,7 @@ que tiene son, **como máximo, dos filas contextuales de atención**; todo lo de
   «Producto 25UX1».)* Con cualquier tarjeta activa hay una al frente; una selección que ya no existe (archivada
   o eliminada) le pasa el frente a la primera. Tocar una franja la elige (háptica de selección); tocar la del frente
   abre su detalle. Solo la elegida alimenta el resumen.
-- **Por qué (vinculante; refinamiento del dueño, 2026-10-01).** Tarjetas es una pantalla de estado financiero: con una
+- *(Reemplazado el 2026-10-02 por 25UX1: Tarjetas abre en reposo, sin tarjeta elegida, aunque haya una sola; el argumento queda como registro.)* **Por qué (vinculante; refinamiento del dueño, 2026-10-01).** Tarjetas es una pantalla de estado financiero: con una
   sola tarjeta, un toque más para ver su resumen sería pura fricción; con varias, la del frente ya comunica cuál está
   elegida. Si el resumen se siente denso, se refina su jerarquía; no se esconde información detrás de un toque.
 - **La regla de franjas** (`deckExposure(escala, cantidad)`, `DECK_FULL_STRIP_CARDS = 4`): hasta cuatro tarjetas las
@@ -2959,7 +3151,7 @@ botones al final del detalle. Nada nuevo en Inicio, Movimientos ni Reportes.
 - **Una fila abierta a la vez**: abrir otra cierra la anterior. Tocar una acción cierra la fila y
   después actúa.
 - **Botones sólidos de 76 pt** con glifo y etiqueta blanca en una línea (crecen con el texto
-  grande): gris para lo reversible (Pausar, Cerrar), azul transferencia para lo que avanza (Reanudar,
+  grande): gris para lo reversible (Pausar, Cerrar), el color de acento de deslizar (`swipeAccent`, el de la marca) para lo que avanza (Reanudar,
   Saldar, Reabrir), rojo para Eliminar, siempre el último, en el borde. Tres tonos nuevos en la
   paleta (`swipeDestructive`, `swipeNeutral`, `swipeAccent`), más profundos en oscuro para que el
   blanco mantenga 4,5:1 (el rojo y el azul de texto quedaban en 3:1).
@@ -3119,15 +3311,25 @@ color propio.
 
 ## Pendiente de revisión en iPhone
 
-- Producto 25Q3 (en su rama; el build de desarrollo posterior a #113): una pestaña sostenida del dock, un enlace
+- Producto 25Q4, en la próxima sesión por hito: editar un pago de tarjeta y de deuda, el techo dicho mientras se
+  escribe, recuperar un pago que pagaría de más, las confirmaciones de deshacer en tarjetas y deudas, el toque de error
+  en un guardado rechazado, «Cerrar» en las ediciones sin nada para editar, la revisión de una copia con vencimientos y
+  «Ver todos» (docs/mobile-device-checklist.md, «Producto 25Q4»).
+- Producto 25VIS2, pulido del registro (misma PR; sin build propia): el control bloqueado durante un guardado, una
+  categoría por tipo (también en las reglas recurrentes), el monto en Registrar de transferencias y pagos, la tarjeta o
+  deuda fija, los objetivos de 44 pt con el mismo dibujo, VoiceOver y Reduce Motion, el háptico de un guardado fallido y
+  el teclado que baja al completar el monto; las fotos del dock oscuro en cada fondo (docs/mobile-device-checklist.md,
+  «Same PR — movement composer and accessibility polish» y «The dark dock»).
+
+- Producto 25Q3 (PR #116, mergeada; el build de desarrollo posterior a #113): una pestaña sostenida del dock, un enlace
   desconocido y una falla de prueba local en una pestaña y en una pantalla apilada (docs/mobile-device-checklist.md,
   «Producto 25Q3»).
 
-- Producto 25Q2 (en su rama; el build de desarrollo posterior a #113): el nombre y el contenido de una línea del archivo
+- Producto 25Q2 (PR #115, mergeada; el build de desarrollo posterior a #113): el nombre y el contenido de una línea del archivo
   por AirDrop, Mail y Archivos, la hoja cancelada, una copia mala después de importar y las frases nuevas
   (docs/mobile-device-checklist.md, «Producto 25Q2»).
 
-- Producto 25Q1 (en su rama; el build de desarrollo posterior a #113): el enlace de categoría del Asistente, los
+- Producto 25Q1 (PR #114, mergeada; el build de desarrollo posterior a #113): el enlace de categoría del Asistente, los
   presupuestos de Reportes sin cotización, el neto del día con filtros, la tarjeta archivada a favor, el presupuesto en
   una moneda sin cuentas, la tarjeta con solo cuotas y el texto de eliminar una cuenta (docs/mobile-device-checklist.md,
   «Producto 25Q1»).

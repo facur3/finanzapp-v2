@@ -37,8 +37,13 @@ export const activity = {
     voidQuestion: '¿Deshacer movimiento?',
     willAdd: 'Se sumarán {amount} a {account}.',
     willSubtract: 'Se descontarán {amount} de {account}.',
-    restoreEffect: 'Volverá a aparecer en tus movimientos y reportes.',
-    voidEffect: 'Dejará de contar en tus saldos y reportes. Podés recuperarlo después.',
+    /** 25Q4: how a card reads after an undo or a restore, in the card's words (never «deuda»); the transfer detail uses them too. */
+    cardAfterDebt: '{account} quedará con un saldo pendiente de {amount}.',
+    cardAfterCredit: '{account} quedará con {amount} a favor.',
+    cardAfterClear: '{account} quedará sin saldo pendiente.',
+    /** 25Q4 review: these name the movement, so after a card's sentence they never read as the card stopping or coming back. */
+    restoreEffect: 'Este movimiento volverá a contar en tus saldos y reportes.',
+    voidEffect: 'Este movimiento dejará de contar en tus saldos y reportes. Podés recuperarlo después desde Movimientos deshechos, en Más.',
     restore: 'Recuperar',
     void: 'Deshacer',
     statusVoided: 'Deshecho · no cuenta en saldos ni reportes',
@@ -91,7 +96,23 @@ export const activity = {
     changeUnverified: 'No pudimos verificar el cambio. Reintentá sin duplicarlo.',
     restoreQuestion: '¿Recuperar transferencia?',
     voidQuestion: '¿Deshacer transferencia?',
-    effect: '{amount}: se descontarán de {from} y se sumarán a {to}. Solo cambia el registro en esta app, no mueve dinero en el banco.',
+    /** A transfer between two cash accounts (or an older shape between two obligations); a payment or a collection says each side in its own words. */
+    effect: '{amount}: se descontarán de {from} y se sumarán a {to}.',
+    /** 25Q4: how a debt reads after an undo or a restore. «Deuda» is only what the person owes (25Q4 review: a receivable is «lo que te debe»). */
+    debtAfterOwed: 'Le vas a deber {amount} a {name}.',
+    debtAfterReceivable: '{name} te va a deber {amount}.',
+    debtAfterSettled: 'La deuda con {name} quedará saldada.',
+    debtAfterReceivableSettled: 'Lo que te debe {name} quedará saldado.',
+    /** Ends every transfer undo or restore. */
+    recordOnly: 'Solo cambia el registro en esta app, no mueve dinero en el banco.',
+    /** An undo only. 25Q4 review: it names the transfer, so it never reads as the card or debt named before it. */
+    voidRecovery: 'Podés recuperar la transferencia después desde Movimientos deshechos, en Más.',
+    /** 25Q4: a restored debt payment or collection may settle at most what is pending now; said before any confirmation, in
+     * the debt screens' words. */
+    restoreBlockedTitle: 'No se puede recuperar ahora',
+    restoreOverPayment: 'Este pago es mayor que lo que todavía le debés a {name} ({amount}). Recuperarlo pagaría de más.',
+    restoreOverCollection: 'Este cobro es mayor que lo que {name} todavía te debe ({amount}). Recuperarlo cobraría de más.',
+    viewDebt: 'Ver deuda',
     statusVoided: 'Deshecha · no afecta los saldos',
     statusBetween: 'Entre tus cuentas · no es gasto ni ingreso',
     /** Status of a card payment, a debt payment and a collection: the balance moves either way (a collection brings it into the account). */

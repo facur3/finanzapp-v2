@@ -157,7 +157,7 @@ test('24UX6A: the Assistant first and largest on the brand field, then Gasto, In
   assert.equal(tile.props.accessibilityHint, undefined);
   assert.equal(tile.props.style[1].backgroundColor, palette.hero, 'visually primary: the hero\'s field');
   assert.equal(texts(tile).join(' | '), 'Asistente | Decilo con tus palabras o preguntá lo que quieras');
-  // 25VIS1: the field is lime, so the circle is the field's ink with a lime glyph; an accent circle would vanish on it.
+  // The circle is the field's ink with a field-coloured glyph (white with a sapphire glyph since 25VIS2); an accent circle would vanish on the field.
   const spark = flatten(tile).find(node => node.type === 'View' && node.props.style?.[1]?.backgroundColor === palette.heroInk);
   assert.ok(spark, 'an ink circle on the field');
   assert.deepEqual([spark.props.children.props.name, spark.props.children.props.color], ['sparkles', palette.hero]);

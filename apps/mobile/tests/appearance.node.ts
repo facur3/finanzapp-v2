@@ -5,7 +5,7 @@ import { ACCOUNT_ICONS, APPEARANCE_COLORS, CATEGORY_ICONS, CATEGORY_PRESETS } fr
 import { ACCOUNT_ICON_CHOICES, CATEGORY_ICON_CHOICES, COLOR_CHOICES, FINANCE_ROW_LOOKS, accountGlyph, appearanceHex, appearanceName, categoryGlyph } from '../src/ui/appearance.ts';
 import { lightPalette, darkPalette } from '../src/ui/palette.ts';
 import { tintOf } from '../src/ui/category-color.ts';
-import { contrast } from './theme.node.ts';
+import { contrast } from './contrast.ts';
 
 // The real glyph map of the installed Ionicons font: every curated id must draw.
 const glyphs = JSON.parse(readFileSync(new URL('../node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/glyphmaps/Ionicons.json', import.meta.url), 'utf8'));

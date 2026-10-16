@@ -95,7 +95,8 @@ export const forms = {
   transferForm: {
     title: 'Entre mis cuentas',
     editTitle: 'Editar transferencia',
-    overCardDebt: 'El pago supera el saldo pendiente de la tarjeta. Si pagaste de más, registrá primero el resumen real.',
+    /** 25Q4: shown while the amount is typed and on Save; it names what the person can do (a card expense, from «+» → Gasto or the card's «Registrar compra»). */
+    overCardDebt: 'El pago supera el saldo pendiente registrado. Si tu resumen tiene compras, intereses o cargos que faltan, registralos primero como gastos de la tarjeta.',
     overObligation: 'El monto supera el saldo pendiente de esta obligación.',
     futureDate: 'Elegí hoy o una fecha anterior.',
     saveUnverified: 'No pudimos verificar el guardado. Reintentá este mismo envío.',
@@ -116,6 +117,13 @@ export const forms = {
     figureDebt: 'Saldo pendiente',
     figurePending: 'Pendiente',
     figureBalance: 'Saldo registrado',
+    /** 25Q4 review: on an edit, the figure leaves out the payment or collection being edited (the card or debt below counts it). */
+    figureWithout: {
+      debt: 'Saldo pendiente sin este pago',
+      credit: 'A favor sin este pago',
+      payment: 'Pendiente sin este pago',
+      collection: 'Pendiente sin este cobro',
+    },
     /** Caption of the amount shortcut: "Saldo registrado: ARS 1.234,56". */
     figure: '{label}: {currency} {amount}',
     needAccountOut: 'Necesitás una cuenta en {currency} desde donde sale el dinero.',

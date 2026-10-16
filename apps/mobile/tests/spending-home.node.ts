@@ -62,6 +62,8 @@ function displayStore(initial: Record<string, string> = {}) {
   return displayCurrency.createDisplayCurrencyStore(() => ({ getItemSync: (key: string) => rows.get(key) ?? null, setItemSync: (key: string, value: string) => { rows.set(key, value); }, removeItemSync: (key: string) => rows.delete(key) }));
 }
 
+/** The window Inicio is drawn in (25D1: a test may set a width or a text size, and restores it). */
+let homeWindow = { width: 393, height: 852, fontScale: 1, scale: 3 };
 function routeHarness(file: string, params: Record<string, unknown>, initialData = snapshot, extra: Partial<domain.LedgerArchive> = {}, display = displayStore(),
   rates: { book: domain.RateBook; activity?: ratesStore.RatesActivity; ensured?: { months: readonly string[]; quotes: readonly string[] }[] } = { book: domain.rateBook([]) }) {
   // The ledger as the provider hands it; `setData` stands for a write landing while the screen stays mounted.
@@ -108,7 +110,7 @@ function routeHarness(file: string, params: Record<string, unknown>, initialData
       return [state[index], (value: unknown) => { state[index] = typeof value === 'function' ? (value as (current: unknown) => unknown)(state[index]) : value; }];
     } },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
-    'react-native': { View: 'View', ScrollView: 'ScrollView', FlatList: 'FlatList', StyleSheet: { hairlineWidth: 1, create: <T,>(styles: T) => styles, absoluteFill: {} }, useWindowDimensions: () => ({ width: 393, height: 852, fontScale: 1, scale: 3 }) },
+    'react-native': { View: 'View', ScrollView: 'ScrollView', FlatList: 'FlatList', StyleSheet: { hairlineWidth: 1, create: <T,>(styles: T) => styles, absoluteFill: {} }, useWindowDimensions: () => homeWindow },
     'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View', FlatList: 'FlatList' },
       useSharedValue: (value: number) => ({ value }), withTiming: (value: number) => value,
       useAnimatedStyle: (fn: () => unknown) => fn() },
@@ -127,7 +129,7 @@ function routeHarness(file: string, params: Record<string, unknown>, initialData
     '../src/ui/report-presentation': reportPresentation,
     '../src/ui/spending-chart': { CategorySpendingRow: 'CategorySpendingRow', CategoryLegendRow: 'CategoryLegendRow' },
     '../src/ui/geometry': geometry,
-    '../src/ui/charts': { DonutChart: 'DonutChart', MonthBars: 'MonthBars', OTHERS_KEY: ' others', MONEY_MAX_SCALE: 1.8,
+    '../src/ui/charts': { DonutChart: 'DonutChart', MonthBars: 'MonthBars', OTHERS_KEY: ' others',
       donutSlices: (items: { key: string; label: string; value: number }[]) => items.slice(0, 5).map((item, index) => ({ ...item, color: 'c' + index })) },
     '../src/ui/budget-presentation': budgetPresentation,
     '@expo/vector-icons/Ionicons': 'Ionicons',
@@ -271,6 +273,9 @@ test('24UX6A: the month is the current one, a header label, never a control: no 
   assert.equal(month.props.color ?? month.props.style?.color, lightPalette.heroInk);
   for (const prop of ['onPress', 'onLongPress', 'onPressIn', 'accessibilityHint', 'accessibilityActions']) assert.equal(prop in month.props, false, 'the month has no ' + prop);
   assert.equal(month.props.accessibilityRole, 'header', 'a header, not a button');
+  // 25D1: at the default size it sits beside the accounts button, free to grow as far as Title 2 does while it fits there.
+  assert.equal(month.props.style.flex, 1);
+  assert.ok(month.props.maxFontSizeMultiplier >= 1 && month.props.maxFontSizeMultiplier <= 56 / 22, String(month.props.maxFontSizeMultiplier));
   // No ancestor turns it into a control.
   const pressable = nodes(root).filter(n => typeof n.props.onPress === 'function' || typeof n.props.onLongPress === 'function');
   assert.equal(pressable.some(n => nodes(n).includes(month)), false, 'no pressable wraps the month');
@@ -401,7 +406,7 @@ test('24UX6C: the hero numbers are byte-identical to the domain figures: Gastado
 test('24UX6A: the number is the field\'s ink at 46 pt, and the secondary ink when it is exactly zero; dark keeps the dark field', () => {
   let root = routeHarness('(tabs)/index.tsx', {}, homeData).render();
   assert.deepEqual([find(root, 'Money').props.size, find(root, 'Money').props.color], [46, lightPalette.heroInk]);
-  // 25A-03: the hero asks for the field's solid graphite symbol and cents; the whole units keep the ink.
+  // 25A-03: the hero asks for the field's solid quiet symbol and cents; the whole units keep the ink.
   assert.equal(find(root, 'Money').props.onField, true);
   root = routeHarness('(tabs)/index.tsx', {}, snapshot).render();
   assert.deepEqual([find(root, 'Money').props.minor, find(root, 'Money').props.color], [0, lightPalette.heroSecondary], 'a true zero reads quieter');
@@ -414,35 +419,67 @@ test('24UX6A: the number is the field\'s ink at 46 pt, and the secondary ink whe
   } finally { dark = false; }
 });
 
-test('24UX6A: the status bar is the field\'s own over it (dark on the lime since 25VIS1), the scheme\'s own after scrolling past it or when another screen is in front', () => {
+test('25D1: the month grows to Title 2\'s iOS size, in whole words: beside the accounts button while it fits, else on its own line with the button under it', () => {
+  for (const locale of ['es-AR', 'en-US'] as const) {
+    const names = Array.from({ length: 12 }, (_, i) => { const name = i18nFormat.formatDate(`2026-${String(i + 1).padStart(2, '0')}-15`, 'month', locale); return name.charAt(0).toUpperCase() + name.slice(1); });
+    const wordEm = geometry.widestWordEm(names);
+    for (const width of [320, 375, 393, 430]) {
+      for (const scale of [1, 1.353, 1.786, 2.643, 3.571]) {
+        const fit = geometry.titleFit(scale, 56 / 22, wordEm, 22 * 1.08, width - 96, width - 40);
+        const drawn = 22 * Math.min(scale, fit.maxScale);
+        const at = `${locale} ${width} pt ×${scale}`;
+        assert.ok(wordEm * 22 * 1.08 * Math.min(scale, fit.maxScale) <= (fit.stacked ? width - 40 : width - 96) + 1e-9, at + ': the longest name stays whole');
+        if (scale === 1) assert.equal(fit.stacked, false, at);
+        // Never smaller than iOS draws Title 2 at the first accessibility size (34 pt) once the person is past it.
+        if (scale >= 1.786) assert.ok(drawn >= 34, `${at}: ${drawn.toFixed(1)} pt`);
+      }
+    }
+  }
+  // (No size order with the amount is claimed: the hero is fitted to the field's width, so from AX3 a long amount can draw
+  // about as large as the month. It stays right under it, bold and whole.)
+  // Rendered at AX5 on a 393 pt iPhone: the month takes the full line and reaches iOS's own 56 pt; the button wraps under it, on the right.
+  homeWindow = { width: 393, height: 852, fontScale: 3.571, scale: 3 };
+  try {
+    const root = routeHarness('(tabs)/index.tsx', {}, homeData).render();
+    const month = monthOf(root);
+    const row = nodes(fieldOf(root)).find(n => n.type === 'View' && [n.props.children].flat().includes(month))!;
+    assert.deepEqual([row.props.style.flexWrap, row.props.style.justifyContent, month.props.style.flexBasis, month.props.style.flex], ['wrap', 'flex-end', '100%', undefined]);
+    assert.equal(Math.round(22 * Math.min(3.571, month.props.maxFontSizeMultiplier)), 56);
+    assert.equal([row.props.children].flat().filter(Boolean).map((n: Node) => n.type).join('|'), 'AppText|FieldButton', 'the same two elements, the button after the month');
+  } finally { homeWindow = { width: 393, height: 852, fontScale: 1, scale: 3 }; }
+});
+
+test('24UX6A: the status bar is the field\'s own over it (`heroStatusBar`: light over the sapphire since 25VIS2), the scheme\'s own after scrolling past it or when another screen is in front', () => {
+  const field = lightPalette.heroStatusBar, nightField = darkPalette.heroStatusBar;
+  assert.deepEqual([field, nightField], ['light', 'light'], 'the sapphire field is dark in both themes');
   const view = routeHarness('(tabs)/index.tsx', {}, homeData);
   let root = view.render();
-  assert.equal(view.statusBar.join(), 'dark', 'focused at the top: dark content over the lime field');
+  assert.equal(view.statusBar.join(), field, 'focused at the top: the field\'s own');
   fieldOf(root).props.onLayout({ nativeEvent: { layout: { height: 320 } } });
   root.props.onScroll({ nativeEvent: { contentOffset: { y: 100 } } });
-  assert.equal(view.statusBar.join(), 'dark', 'still over the field: nothing changes');
+  assert.equal(view.statusBar.join(), field, 'still over the field: nothing changes');
   root.props.onScroll({ nativeEvent: { contentOffset: { y: 320 - INSETS.top + 1 } } });
   assert.equal(view.statusBar.at(-1), 'dark', 'past the field in light: dark text on the light canvas');
   root = view.render();
   root.props.onScroll({ nativeEvent: { contentOffset: { y: 0 } } });
-  assert.equal(view.statusBar.at(-1), 'dark', 'back over the field');
+  assert.equal(view.statusBar.at(-1), field, 'back over the field');
   view.blur();
   assert.equal(view.statusBar.at(-1), 'dark', 'another screen in front: the light scheme\'s own');
   const count = view.statusBar.length;
   root.props.onScroll({ nativeEvent: { contentOffset: { y: 5 } } });
   assert.equal(view.statusBar.length, count, 'no change while still over the field');
   view.focus();
-  assert.equal(view.statusBar.at(-1), 'dark', 'focused again at the top');
+  assert.equal(view.statusBar.at(-1), field, 'focused again at the top');
   dark = true;
   try {
     const night = routeHarness('(tabs)/index.tsx', {}, homeData);
     const nightRoot = night.render();
-    assert.equal(night.statusBar.at(-1), 'dark', 'dark scheme, at the top: the lime field still wants dark content');
+    assert.equal(night.statusBar.at(-1), nightField, 'dark scheme, at the top: the field\'s own');
     fieldOf(nightRoot).props.onLayout({ nativeEvent: { layout: { height: 320 } } });
     nightRoot.props.onScroll({ nativeEvent: { contentOffset: { y: 600 } } });
     assert.equal(night.statusBar.at(-1), 'light', 'dark scheme past the field: its own light content on the near-black');
     nightRoot.props.onScroll({ nativeEvent: { contentOffset: { y: 0 } } });
-    assert.equal(night.statusBar.at(-1), 'dark', 'back over the field');
+    assert.equal(night.statusBar.at(-1), nightField, 'back over the field');
     night.blur();
     assert.equal(night.statusBar.at(-1), 'light');
   } finally { dark = false; }
@@ -477,7 +514,9 @@ test('24UX6A, 24UX6C2: the month\'s latest expenses, incomes and transfers, newe
   const title = nodes(root).find(n => n.type === 'SectionTitle' && n.props.children === 'Actividad reciente')!;
   assert.equal(title.props.action, 'Ver todos');
   title.props.onAction();
-  assert.deepEqual([alone.navigated.at(-1), alone.pushed.length], ['/activity', 0], 'the tab root is selected, never pushed over Inicio');
+  assert.deepEqual([alone.navigated.at(-1).pathname, alone.pushed.length], ['/activity', 0], 'the tab root is selected, never pushed over Inicio');
+  // 25Q4: with a fresh `reset`: Movimientos opens whole and from the top.
+  assert.match(alone.navigated.at(-1).params.reset, /^\d+$/);
   // A commitment this week: four rows under it, the transfer counted among the four.
   root = routeHarness('(tabs)/index.tsx', {}, data, { recurring: [dueRule()] }).render();
   assert.equal(sectionTitles(root).join('|'), 'Próximos compromisos|Actividad reciente');
@@ -643,7 +682,7 @@ test('24UX6A: commitments without activity show only the commitments; with neith
   const surface = nodes(root).find(n => n.type === 'Surface' && nodes(n).some(child => child.type === 'UpcomingRecurringRow'))!;
   assert.equal(surface.props.grouped, true);
   // 25VIS1 (owner): future content is not brand content. The commitments' surface is the same neutral grouped surface as
-  // Actividad reciente's, with no tint of its own (no lime, no wash); only each row's mark keeps its category identity.
+  // Actividad reciente's, with no tint of its own (no brand tint, no wash); only each row's mark keeps its category identity.
   assert.equal(JSON.stringify(surface.props.style ?? {}).includes('backgroundColor'), false, 'no tinted fill on the commitments');
   nodes(root).find(n => n.type === 'SectionTitle' && n.props.children === 'Próximos compromisos')!.props.onAction();
   assert.equal(view.pushed.at(-1), '/recurring');

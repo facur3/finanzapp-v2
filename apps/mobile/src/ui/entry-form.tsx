@@ -2,7 +2,6 @@ import { useMemo, useRef, useState } from 'react';
 import { Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
-import * as Haptics from 'expo-haptics';
 import { accountBalanceMinor, accountKind, categoryKey, editedDraftFits, entryRefundSummary, installmentOccurrenceOf, interestCategoryLabel, keepsHistoricalCardIncome, makeEntryChange, minorFromEditedDraft, postingAccountsFor, sameEntry, summarizeMonthlyBudgets, todayKey, validateEntry, validateEntryChange, type Account, type Entry, type EntryChange, type EntryKind, type EntryRecord, type InstallmentPlan, type StoredDraft } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { budgetTone } from './budget-presentation';
@@ -13,6 +12,7 @@ export type { EntryPrefill } from './entry-prefill';
 import { AccountField, CategoryField, DateField } from './form-controls';
 import { InstallmentPurchase } from './installment-purchase';
 import { accountKindLabel, postingAccounts } from './liability-presentation';
+import { errorHaptic, successHaptic, warningHaptic } from './motion';
 import { initialAccountId, releasesDraft } from './presentation';
 import { installmentOfEntry } from './installment-presentation';
 import { INITIAL_PURCHASE, buildPurchasePlan, purchaseState, type PurchaseDraft } from './purchase-plan';
@@ -33,15 +33,17 @@ type FormKind = EntryKind | 'transfer';
  * adds the «Pago» section (`InstallmentPurchase`): «En cuotas» saves one plan
  * and no movement. The movement of an instalment is corrected in its merchant
  * and category only; its amount, date and card are the plan's. */
-export function EntryForm({ original, accountId: requestedAccount, currency, kind: requestedKind, onKindChange, onAccountChange, prefill }: {
+export function EntryForm({ original, accountId: requestedAccount, currency, kind: requestedKind, onKindChange, onAccountChange, onLockedChange, prefill }: {
   original?: EntryRecord; accountId?: string; currency?: string; kind?: string; prefill?: EntryPrefill;
   /** When a host owns the Gasto / Ingreso / Transferencia switch it passes `kind` and this callback; the form then renders no switch of its own. */
   onKindChange?: (kind: FormKind) => void;
   /** Lets the host carry the chosen account over when the mode changes. */
   onAccountChange?: (accountId: string) => void;
+  /** 25VIS2: tells the host when a save is in flight or frozen for retry (exactly `busy || pending !== null`), so its switch locks. */
+  onLockedChange?: (locked: boolean) => void;
 }) {
   const { snapshot, archive, addEntry, updateEntry, addInstallmentPlan } = useLedger();
-  const { t, moneyText, formatMoneyAmount, spokenMoney, formatDate } = useI18n();
+  const { t, moneyText, formatMoneyAmount, spokenMoney, formatDate, failureMessage } = useI18n();
   // Cash accounts and cards can carry an expense or income; a personal debt only changes through payments.
   const [before] = useState(original);
   // 24T2: an instalment's movement (its id names the plan): the plan fixes its amount, date, card and kind.
@@ -66,7 +68,12 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
   });
   const [amount, setAmount] = useState(() => before ? stored?.draft ?? '' : prefillDraft(prefill));
   const [merchant, setMerchant] = useState(before?.entry.merchant ?? prefill?.merchant ?? '');
-  const [category, setCategory] = useState(before?.entry.category ?? prefill?.category ?? '');
+  // 25VIS2: one category per kind. Categories belong to a kind, so the one picked for Gasto never rides along into Ingreso
+  // (where it could be saved on an income); switching back to Gasto finds it again.
+  const [categories, setCategories] = useState<Partial<Record<EntryKind, string>>>(() => ({ [before?.entry.kind ?? (requestedKind === 'income' ? 'income' : 'expense')]:
+    before?.entry.category ?? prefill?.category ?? '' }));
+  const category = categories[kind] ?? '';
+  const setCategory = (value: string) => setCategories(current => ({ ...current, [kind]: value }));
   const [date, setDate] = useState(() => before ? new Date(before.entry.dateISO + 'T12:00:00') : prefill?.dateISO ? new Date(prefill.dateISO + 'T12:00:00') : new Date());
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<Submission | null>(null);
@@ -149,6 +156,9 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
     if (saving.current) return;
     saving.current = true;
     setBusy(true);
+    onLockedChange?.(true);
+    // Whether a submission stays frozen once this attempt ends: the host's switch stays locked exactly as long (25VIS2).
+    let frozen = pending !== null;
     setError(null);
     Keyboard.dismiss();
     try {
@@ -190,23 +200,28 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
           }
         }
         setPending(submission);
+        frozen = true;
       }
       if (submission.plan) await addInstallmentPlan(submission.plan);
       else if (submission.change) await updateEntry(submission.change);
       else await addEntry(submission.entry);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      successHaptic();
       saving.current = false;
       close();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'entryForm.saveUnverified');
+      setError(failureMessage(cause, 'entryForm.saveUnverified'));
       // A plan built from a calendar the card no longer has is refused before anything is written: the submission is released
       // so the section shows the card's current statements again, and saving builds the plan anew (with the same id). 24T3
       // (A13): the same for every refusal storage decides before writing (a purchase with devoluciones edited below them, a
       // deleted account…): the fields unlock for review. An unknown outcome keeps the submission frozen for an exact retry.
-      if (cause instanceof Error && releasesDraft(cause.message)) setPending(null);
+      if (cause instanceof Error && releasesDraft(cause.message)) { setPending(null); frozen = false; }
+      // 25VIS2 (V4): a refusal (before the submission froze, or one storage decided before writing) taps Error; an outcome
+      // that may have been written taps Warning, while the frozen draft waits for the exact retry.
+      if (frozen) warningHaptic(); else errorHaptic();
     } finally {
       saving.current = false;
       setBusy(false);
+      onLockedChange?.(frozen);
     }
   }
 

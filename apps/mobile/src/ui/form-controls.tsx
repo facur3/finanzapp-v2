@@ -22,24 +22,42 @@ import { categoryChoices, categoryKey, customCategory } from './categories';
  * The value and the detail may each take two lines: a long account name or
  * a budget sentence with its amount is shown whole, never cut to fit. A
  * detail that carries an amount comes with `spokenDetail`, the same sentence
- * built with the spoken formatters, which VoiceOver reads instead. */
-export function SelectorCard({ label, value, placeholder, detail, spokenDetail, icon, tone = 'neutral', color, disabled = false, onPress, detailTone }: {
-  label: string; value?: string; placeholder: string; detail?: string; spokenDetail?: string; icon: IconName; tone?: Tone; color?: string; disabled?: boolean; onPress: () => void;
-  detailTone?: 'neutral' | 'warning' | 'expense';
+ * built with the spoken formatters, which VoiceOver reads instead. `fixed` (25VIS2) is a side the screen decides, the
+ * card or debt a payment settles: the same card read as a fact, at full strength, with no chevron, and VoiceOver hears
+ * text, not a dimmed button. */
+export function SelectorCard({ label, value, placeholder, detail, spokenDetail, icon, tone = 'neutral', color, disabled = false, fixed = false, onPress, detailTone }: {
+  label: string; value?: string; placeholder: string; detail?: string; spokenDetail?: string; icon: IconName; tone?: Tone; color?: string; disabled?: boolean;
+  fixed?: boolean; onPress?: () => void; detailTone?: 'neutral' | 'warning' | 'expense';
 }) {
   const p = usePalette();
+  const { speechLanguage } = useI18n();
   const detailColor = detailTone === 'expense' ? p.expense : detailTone === 'warning' ? p.warning : p.secondary;
   const spoken = spokenDetail ?? detail;
-  return <PressFeedback accessibilityRole="button" accessibilityLabel={`${label}: ${value ?? placeholder}${spoken ? ', ' + spoken : ''}`}
-    accessibilityState={{ disabled }} disabled={disabled} onPress={onPress}
-    style={[{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14, borderRadius: radius.group, backgroundColor: p.surface, minHeight: 72, opacity: disabled ? 0.6 : 1 }, surfaceShadow(p)]}>
-    <GlyphTile icon={icon} tone={tone} color={color} size={44} />
-    <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-      <AppText secondary variant="caption" style={{ fontWeight: '500' }}>{label}</AppText>
-      <AppText numberOfLines={2} style={{ fontWeight: '600', color: value ? p.text : p.primary }}>{value ?? placeholder}</AppText>
-      {!!detail && <AppText numberOfLines={2} variant="footnote" style={{ color: detailColor }}>{detail}</AppText>}
-    </View>
-    <Ionicons name="chevron-forward" size={18} color={p.tertiary} accessible={false} />
+  const accessibilityLabel = `${label}: ${value ?? placeholder}${spoken ? ', ' + spoken : ''}`;
+  const style = [{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14, borderRadius: radius.group, backgroundColor: p.surface, minHeight: 72,
+    opacity: disabled && !fixed ? 0.6 : 1 } as const, surfaceShadow(p)];
+  const tile = <GlyphTile icon={icon} tone={tone} color={color} size={44} />;
+  const body = <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+    <AppText secondary variant="caption" style={{ fontWeight: '500' }}>{label}</AppText>
+    <AppText numberOfLines={2} style={{ fontWeight: '600', color: value ? p.text : p.primary }}>{value ?? placeholder}</AppText>
+    {!!detail && <AppText numberOfLines={2} variant="footnote" style={{ color: detailColor }}>{detail}</AppText>}
+  </View>;
+  // A plain View is its own VoiceOver element here, so it carries the language as PressFeedback does for a Pressable.
+  if (fixed) return <View accessible accessibilityLabel={accessibilityLabel} accessibilityLanguage={speechLanguage} style={style}>{tile}{body}</View>;
+  return <PressFeedback accessibilityRole="button" accessibilityLabel={accessibilityLabel} accessibilityState={{ disabled }} disabled={disabled} onPress={onPress}
+    style={style}>{tile}{body}<Ionicons name="chevron-forward" size={18} color={p.tertiary} accessible={false} /></PressFeedback>;
+}
+
+/** 25D1: a sheet's bar (Cancelar | title | Listo) stops growing at 1.2×, as a system bar does, so Listo stays on screen
+ * at the accessibility sizes; its buttons offer the Large Content Viewer instead (a long press shows the word large).
+ * Equal to `ROW_STACK_SCALE`, kept here so the harnesses that load this module need no geometry mock. */
+export const SHEET_BAR_MAX_SCALE = 1.2;
+
+function SheetBarButton({ label, onPress, strong = false }: { label: string; onPress: () => void; strong?: boolean }) {
+  const p = usePalette();
+  return <PressFeedback feedback="opacity" accessibilityRole="button" onPress={onPress} hitSlop={8}
+    accessibilityShowsLargeContentViewer accessibilityLargeContentTitle={label}>
+    <AppText maxFontSizeMultiplier={SHEET_BAR_MAX_SCALE} style={[{ color: p.primary, fontSize: 16 }, strong && { fontWeight: '600' }]}>{label}</AppText>
   </PressFeedback>;
 }
 
@@ -55,9 +73,9 @@ function SelectionSheet({ visible, title, onClose, onDone, children }: {
     allowSwipeDismissal onRequestClose={onClose}>
     <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: p.background }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 }}>
-        <PressFeedback feedback="opacity" accessibilityRole="button" onPress={onClose}><AppText style={{ color: p.primary, fontSize: 16 }}>{t('common.cancel')}</AppText></PressFeedback>
-        <AppText accessibilityRole="header" numberOfLines={2} style={{ flex: 1, textAlign: 'center', fontWeight: '600' }}>{title}</AppText>
-        {onDone && <PressFeedback feedback="opacity" accessibilityRole="button" onPress={onDone}><AppText style={{ color: p.primary, fontSize: 16, fontWeight: '600' }}>{t('common.done')}</AppText></PressFeedback>}
+        <SheetBarButton label={t('common.cancel')} onPress={onClose} />
+        <AppText accessibilityRole="header" numberOfLines={2} maxFontSizeMultiplier={SHEET_BAR_MAX_SCALE} style={{ flex: 1, textAlign: 'center', fontWeight: '600' }}>{title}</AppText>
+        {onDone && <SheetBarButton label={t('common.done')} onPress={onDone} strong />}
       </View>
       {children}
     </SafeAreaView>
@@ -344,18 +362,19 @@ export function BottomSheet({ visible, title, onClose, onDone, onDismissed, floa
         {/* The scrim cancels; VoiceOver never lands on it (the card below is modal). */}
         <Pressable accessible={false} importantForAccessibility="no" style={{ flex: 1 }} onPress={onClose} />
       </Animated.View>
-      <Animated.View accessibilityViewIsModal onLayout={event => measuredCard(event.nativeEvent.layout.height)}
+      {/* VoiceOver's escape gesture cancels, as Cancelar does (25VIS2; the hub's card already had it). */}
+      <Animated.View accessibilityViewIsModal onAccessibilityEscape={onClose} onLayout={event => measuredCard(event.nativeEvent.layout.height)}
         style={[{ backgroundColor: p.surface, borderTopLeftRadius: radius.sheet, borderTopRightRadius: radius.sheet, overflow: 'hidden',
-          paddingBottom: Math.max(insets.bottom, space.m) }, cardStyle]}>
-        <View accessible={false} style={{ alignItems: 'center', paddingTop: 8 }}>
-          <View style={{ width: 36, height: 5, borderRadius: 2.5, backgroundColor: p.line }} />
-        </View>
+          paddingTop: 8, paddingBottom: Math.max(insets.bottom, space.m) }, cardStyle]}>
+        {/* 25D1: no grabber. This sheet has no drag (Cancelar, the dimmed backdrop and the escape gesture close it), and a
+            grabber promises one (HIG: only a resizable sheet shows it). */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: space.l, paddingVertical: space.m, minHeight: 52 }}>
-          <PressFeedback feedback="opacity" accessibilityRole="button" onPress={onClose} hitSlop={8}><AppText style={{ color: p.primary, fontSize: 16 }}>{t('common.cancel')}</AppText></PressFeedback>
-          <AppText accessibilityRole="header" numberOfLines={2} style={{ flex: 1, textAlign: 'center', fontWeight: '600' }}>{title}</AppText>
-          {onDone ? <PressFeedback feedback="opacity" accessibilityRole="button" onPress={onDone} hitSlop={8}><AppText style={{ color: p.primary, fontSize: 16, fontWeight: '600' }}>{t('common.done')}</AppText></PressFeedback>
+          <SheetBarButton label={t('common.cancel')} onPress={onClose} />
+          <AppText accessibilityRole="header" numberOfLines={2} maxFontSizeMultiplier={SHEET_BAR_MAX_SCALE} style={{ flex: 1, textAlign: 'center', fontWeight: '600' }}>{title}</AppText>
+          {onDone ? <SheetBarButton label={t('common.done')} onPress={onDone} strong />
             // Without Listo the title stays centred: the right side keeps Cancelar's width, empty.
-            : <View accessible={false} importantForAccessibility="no-hide-descendants" style={{ opacity: 0 }}><AppText style={{ fontSize: 16 }}>{t('common.cancel')}</AppText></View>}
+            : <View accessible={false} importantForAccessibility="no-hide-descendants" style={{ opacity: 0 }}>
+              <AppText maxFontSizeMultiplier={SHEET_BAR_MAX_SCALE} style={{ fontSize: 16 }}>{t('common.cancel')}</AppText></View>}
         </View>
         {/* The wheel sits centred in the card: as wide as the card's content, its columns centred by UIKit. */}
         <View style={{ alignSelf: 'stretch', alignItems: 'center', paddingHorizontal: space.l, paddingBottom: space.s }}>{children}</View>

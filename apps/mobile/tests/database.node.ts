@@ -12,7 +12,8 @@ import { accountBalanceMinor, archiveKey, createRecoveryBackup, initialRecord, m
   DEBT_DELETE_PATH_MESSAGE, DEBT_OUTSTANDING_MESSAGE, closePersonalDebt, deletePersonalDebt, deleteRecurringRule, pauseRecurringRule, reopenPersonalDebt, resumeRecurringRule, recurringHistory } from '@finanzapp/domain';
 import { changeEntry, createAccount, createEntry, importArchive, initializeDatabase, readArchive, readSnapshot, changeAccount,
   createTransfer, changeTransfer, saveRecurringRule, processRecurring, saveMonthlyBudget,
-  createCreditCard, saveCreditCard, createPersonalDebt, savePersonalDebt, deletePersonalDebt as removePersonalDebt, saveAccountAppearance, saveCategoryDefinition, DATABASE_VERSION, SCHEMA_SCRIPTS, type LedgerDatabase } from '../src/storage/database.ts';
+  createCreditCard, saveCreditCard, createPersonalDebt, savePersonalDebt, deletePersonalDebt as removePersonalDebt, saveAccountAppearance, saveCategoryDefinition, DATABASE_VERSION, NEWER_SCHEMA_MESSAGE, SCHEMA_SCRIPTS, type LedgerDatabase } from '../src/storage/database.ts';
+import { openFailureMessage } from '../src/storage/ledger-session.ts';
 import { MIGRATION_REFERENCES_MESSAGE, runExclusiveTransaction, runSchemaMigration, type TransactionConnection } from '../src/storage/transaction.ts';
 
 // Synthetic records in disposable databases only. Nothing seeds a user's app.
@@ -150,7 +151,9 @@ test('newer database schema is refused intact instead of reset or downgraded', a
   await initializeDatabase(db);
   await createAccount(db, account);
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION + 1}`);
-  await assert.rejects(initializeDatabase(db), /versión más nueva/);
+  const refused = await initializeDatabase(db).then(() => null, (cause: Error) => cause);
+  assert.equal(refused?.message, NEWER_SCHEMA_MESSAGE);
+  assert.equal(openFailureMessage(refused), NEWER_SCHEMA_MESSAGE, '25Q4: said as itself at launch');
   assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, DATABASE_VERSION + 1);
   assert.deepEqual((await readSnapshot(db)).accounts, [account]);
 });

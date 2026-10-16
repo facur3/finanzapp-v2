@@ -2,7 +2,6 @@ import { useRef, useState } from 'react';
 import { Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
-import * as Haptics from 'expo-haptics';
 import { accountKind, editedDraftFits, keepsHistoricalCardIncome, minorFromEditedDraft, postingAccountsFor, sameRecurringRule, todayKey, validateRecurringRule, type StoredDraft,
   type EntryKind, type RecurringFrequency, type RecurringRule } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
@@ -10,6 +9,7 @@ import { ActionButton, AmountField, AppText, Choices, EmptyState, ErrorMessage, 
 import { draftFromMinor } from './money-input';
 import { AccountField, CategoryField, DateField } from './form-controls';
 import { accountKindLabel, postingAccounts } from './liability-presentation';
+import { errorHaptic, successHaptic, warningHaptic } from './motion';
 import { initialAccountId } from './presentation';
 import { space } from './theme';
 import { useI18n } from '../i18n/provider';
@@ -19,7 +19,7 @@ import { useI18n } from '../i18n/provider';
  * like a movement's undo or a debt's close live on theirs. */
 export function RecurringForm({ original, accountId: requestedAccount }: { original?: RecurringRule; accountId?: string }) {
   const { snapshot, archive, saveRecurring } = useLedger();
-  const { t } = useI18n();
+  const { t, failureMessage } = useI18n();
   const [before] = useState(original);
   const accounts = postingAccounts(snapshot?.accounts ?? [], archive?.debts, before?.accountId);
   const [operation] = useState(() => ({ id: randomUUID(), createdAt: new Date().toISOString() }));
@@ -32,7 +32,12 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
   });
   const [amount, setAmount] = useState(stored?.draft ?? '');
   const [merchant, setMerchant] = useState(before?.merchant ?? '');
-  const [category, setCategory] = useState(before?.category ?? '');
+  // 25VIS2 (V2, as in EntryForm): one category per kind. A category belongs to a kind, so the one picked for Gasto never
+  // rides along into Ingreso (Save would store it on an income rule and on every movement the rule records); switching
+  // back finds it again.
+  const [categories, setCategories] = useState<Partial<Record<EntryKind, string>>>(() => ({ [before?.kind ?? 'expense']: before?.category ?? '' }));
+  const category = categories[kind] ?? '';
+  const setCategory = (value: string) => setCategories(current => ({ ...current, [kind]: value }));
   const [frequency, setFrequency] = useState<RecurringFrequency>(before?.frequency ?? 'monthly');
   const [date, setDate] = useState(() => new Date((before?.nextDateISO ?? todayKey()) + 'T12:00:00'));
   const [busy, setBusy] = useState(false);
@@ -69,6 +74,8 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
     setBusy(true);
     setError(null);
     Keyboard.dismiss();
+    // 25Q4: true once the write is sent: a failure after it taps Warning (frozen for the retry), before it Error.
+    let sent = false;
     try {
       let submission = pending;
       if (!submission) {
@@ -112,12 +119,14 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
         validateRecurringRule(submission, accounts);
         setPending(submission);
       }
+      sent = true;
       await saveRecurring(submission);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      successHaptic();
       saving.current = false;
       close();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'recurring.form.saveFailed');
+      setError(failureMessage(cause, 'recurring.form.saveFailed'));
+      if (sent) warningHaptic(); else errorHaptic();
     } finally {
       saving.current = false;
       setBusy(false);

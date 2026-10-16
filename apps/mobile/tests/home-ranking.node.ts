@@ -91,6 +91,8 @@ test('the metric help opens a native alert whose button is named in the interfac
       const help = exports.MetricHelp({ title: 'Disponible', detail: 'Es el dinero registrado.' });
       assert.equal(help.props.accessibilityLabel, locale === 'es-AR' ? 'Qué significa Disponible' : 'What Disponible means');
       assert.equal(help.props.accessibilityRole, 'button');
+      // 25D1: the 18 pt glyph cannot grow with the text; a long press at the accessibility sizes shows its name large.
+      assert.deepEqual([help.props.accessibilityShowsLargeContentViewer, help.props.accessibilityLargeContentTitle], [true, help.props.accessibilityLabel], locale);
       assert.deepEqual([help.props.children.type, help.props.children.props.color, help.props.children.props.size], ['Ionicons', '#A0A0A8', 18], '24UX1: the glyph is a control drawn in secondary ink, never tertiary');
       help.props.onPress();
       assert.equal(JSON.stringify(env.alerts), JSON.stringify([['Disponible', 'Es el dinero registrado.', [{ text: 'OK', style: 'cancel' }]]]), locale + ': one explicit button from the catalogue, still the cancel action (Esc and the escape gesture close it)');

@@ -13,6 +13,9 @@ import { DISPLAY_CURRENCY_KEY } from '../src/ui/display-currency.ts';
 import { LANGUAGE_PREFERENCE_KEY, REGION_PREFERENCE_KEY, type PreferenceStore } from '../src/i18n/preference.ts';
 import { createLocaleStore, type DeviceReading } from '../src/i18n/store.ts';
 import { RELEASED, type ReleasedSets } from '../src/i18n/locale.ts';
+import { es } from '../src/i18n/messages/es/index.ts';
+import { NEWER_SCHEMA_MESSAGE } from '../src/storage/database.ts';
+import * as backupFile from '../src/ui/backup-file.ts';
 
 // Producto 25B: the first opening. The pure rules (when it is shown, what it suggests, the two stages) are tested
 // directly; the route runs in the harness with its hosts replaced by names. Not a rendered iPhone screen.
@@ -72,7 +75,8 @@ const createdAt = '2026-09-26T12:00:00Z';
 
 /** The route with its hosts replaced by names. `prefs` is the key-value store (shared with the locale store, like the
  * device's); `accounts` the ledger's accounts; `addAccount` the real path into the ledger mock, so a saved account shows
- * up in the snapshot on the next render. Pass the same `prefs` again to stand for a cold reopen. */
+ * up in the snapshot on the next render. Pass the same `prefs` again to stand for a cold reopen. `failSave` fails the first
+ * save once it was sent; the retry goes through. */
 function harness({ accounts = [] as domain.Account[], reading = device('es-AR', 'AR'), released = HOME_GATE, gate = domain.LEDGER_CURRENCIES, prefs = memory(), failSave = false } = {}) {
   const localeStore = createLocaleStore({ devices: () => reading, store: prefs.store, released });
   const display: { currency: string | null; mode: string | null } = { currency: null, mode: null };
@@ -83,7 +87,7 @@ function harness({ accounts = [] as domain.Account[], reading = device('es-AR', 
   const refs: unknown[] = [];
   const deps: unknown[][] = [];
   const routes: unknown[] = [];
-  const saved: domain.Account[] = [];
+  const saved: domain.Account[] = [], haptics: string[] = [];
   let cursor = 0, refCursor = 0, effectCursor = 0;
   const ledger = { accounts: [...accounts] };
   const modules: Record<string, unknown> = {
@@ -97,17 +101,17 @@ function harness({ accounts = [] as domain.Account[], reading = device('es-AR', 
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, router: { replace: (to: unknown) => routes.push({ replace: to }), push: (to: unknown) => routes.push({ push: to }) } },
     'expo-crypto': { randomUUID: () => 'first-account' },
-    'expo-haptics': { NotificationFeedbackType: { Success: 'Success' }, notificationAsync: async () => {} },
     '@finanzapp/domain': domain,
     '../src/storage/LedgerProvider': { useLedger: () => ({ snapshot: { accounts: ledger.accounts, entries: [] }, gate,
-      addAccount: async (account: domain.Account) => { if (failSave) throw new Error('disk full'); saved.push(account); ledger.accounts = [...ledger.accounts, account]; } }) },
+      addAccount: async (account: domain.Account) => { if (failSave) { failSave = false; throw new Error('disk full'); } saved.push(account); ledger.accounts = [...ledger.accounts, account]; } }) },
     '../src/ui/appearance': { DEFAULT_LOOK },
     '../src/ui/components': Object.fromEntries(['ActionButton', 'AmountField', 'AppText', 'ErrorMessage', 'Field', 'FieldNote', 'NavigationRow', 'PressFeedback', 'Surface'].map(name => [name, name])),
     '../src/ui/form-controls': { CurrencyField: 'CurrencyField' },
     '../src/ui/locale-options': localeOptions,
     '../src/ui/display-currency-provider': { useDisplayCurrency: () => ({ currency: 'ARS', preferred: null, mode: 'consolidated',
       setCurrency: (currency: string) => { display.currency = currency; prefs.rows.set(DISPLAY_CURRENCY_KEY, currency); }, setMode: (mode: string) => { display.mode = mode; } }) },
-    '../src/ui/motion': { ValueTransition: 'ValueTransition' },
+    // 25Q4 review: each notification haptic by its helper's name (tests/motion.node.ts pins the type each one sends).
+    '../src/ui/motion': { ValueTransition: 'ValueTransition', successHaptic() { haptics.push('Success'); }, errorHaptic() { haptics.push('Error'); }, warningHaptic() { haptics.push('Warning'); } },
     '../src/ui/onboarding-flow': onboardingFlow,
     '../src/ui/theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, usePalette: () => ({ background: '#fff', primary: '#2557D6', text: '#000', secondary: '#666' }) },
     '../src/i18n/preference': { defaultPreferenceStore: prefs.store },
@@ -119,7 +123,7 @@ function harness({ accounts = [] as domain.Account[], reading = device('es-AR', 
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected onboarding dependency: ' + name);
     return modules[name];
   } });
-  return { render: () => { cursor = 0; refCursor = 0; effectCursor = 0; return module.exports.default!(); }, routes, prefs, display, localeStore, saved, ledger };
+  return { render: () => { cursor = 0; refCursor = 0; effectCursor = 0; return module.exports.default!(); }, routes, prefs, display, localeStore, saved, ledger, haptics };
 }
 function nodes(value: any): Node[] {
   if (!value || typeof value !== 'object') return [];
@@ -220,18 +224,34 @@ test('"Ahora no" on the account stage ends the setup with empty data; a failed s
   find(root, 'ActionButton', 'Continuar').props.onPress();
   root = view.render();
   find(root, 'Field').props.onChangeText('Efectivo');
+  // 25Q4 review: an opening balance Crear cuenta lets through but cannot read is refused before anything is sent: Error, still editable.
+  find(view.render(), 'AmountField').props.onChangeText('12abc');
+  find(view.render(), 'ActionButton', 'Crear cuenta').props.onPress();
+  await settle();
+  assert.deepEqual([view.haptics.splice(0).join(','), view.saved.length, find(view.render(), 'Field').props.editable], ['Error', 0, true]);
+  find(view.render(), 'AmountField').props.onChangeText('');
   root = view.render();
   find(root, 'ActionButton', 'Crear cuenta').props.onPress();
   await settle();
   root = view.render();
-  assert.equal(find(root, 'ErrorMessage').props.message, 'disk full');
+  assert.equal(find(root, 'ErrorMessage').props.message, 'accounts.form.saveFailed', '25Q4: the form\'s own sentence, never the engine\'s text');
   assert.equal(find(root, 'ActionButton', 'Reintentar guardado').props.label, 'Reintentar guardado');
   assert.equal(find(root, 'Field').props.editable, false, 'the draft is locked to the pending submission');
+  assert.equal(view.haptics.splice(0).join(','), 'Warning', '25Q4 review: sent with an unknown outcome, so Warning');
   assert.equal(view.prefs.rows.has(ONBOARDING_KEY), false, 'not done: nothing was saved');
   find(root, 'ActionButton', 'Ahora no').props.onPress();
   assert.equal(view.prefs.rows.get(ONBOARDING_KEY), 'done');
   assert.deepEqual(view.display, { currency: null, mode: null });
   assert.equal(JSON.stringify(view.routes.at(-1)), JSON.stringify({ replace: '/' }));
+  // The retry instead: the same account (its operation id) goes through, taps Success and ends the setup.
+  const retry = harness({ failSave: true });
+  find(retry.render(), 'ActionButton', 'Continuar').props.onPress();
+  find(retry.render(), 'Field').props.onChangeText('Efectivo');
+  find(retry.render(), 'ActionButton', 'Crear cuenta').props.onPress();
+  await settle();
+  find(retry.render(), 'ActionButton', 'Reintentar guardado').props.onPress();
+  await settle();
+  assert.deepEqual([retry.haptics.join(','), retry.saved.length, retry.saved[0].id, retry.prefs.rows.get(ONBOARDING_KEY)], ['Warning,Success', 1, 'first-account', 'done']);
 });
 
 test('an existing installation reached through a link or a restored navigation is sent straight to the app: nothing drawn, nothing written', () => {
@@ -253,7 +273,138 @@ test('the root layout sends a new installation to the setup before the splash li
   const layout = readFileSync(new URL('../app/_layout.tsx', import.meta.url), 'utf8');
   assert.match(layout, /onboardingDecision\(defaultPreferenceStore, snapshot\.accounts\.length > 0\)/);
   assert.match(layout, /if \(decision === 'existing'\) markOnboardingDone\(defaultPreferenceStore\)/);
-  assert.match(layout, /if \(onboarding === 'new'\) router\.replace\('\/onboarding'\)/);
+  assert.ok(layout.includes("useEffect(() => { if (onboarding === 'new' && fontsLoaded) router.replace('/onboarding'); }, [onboarding, fontsLoaded]);"), '25Q4: once, with the stack');
   assert.match(layout, /fontsLoaded && snapshot && onboarding !== null\)\) void SplashScreen\.hideAsync/, 'the splash waits for the decision');
   assert.match(layout, /<Stack\.Screen name="onboarding" options=\{\{ headerShown: false, gestureEnabled: false, animation: 'fade' \}\} \/>/);
+});
+
+// ---- the root layout ---------------------------------------------------------------------------------------
+
+/** 25Q4: the root layout's Navigation with its hosts replaced by names. `ledger` and `fonts` are what the provider and
+ * expo-font report on the next render; `prefs` is the key-value store the first-opening decision reads; `cache` is what
+ * the app's cache folder lists (files and folders by name) and what was deleted from it. */
+function rootLayout({ prefs = memory() } = {}) {
+  const source = readFileSync(new URL('../app/_layout.tsx', import.meta.url), 'utf8');
+  const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
+  const jsx = (type: unknown, props: Record<string, unknown>) => ({ type, props });
+  const state: unknown[] = [];
+  const deps: unknown[][] = [];
+  const routes: unknown[] = [];
+  let cursor = 0, effectCursor = 0, retries = 0;
+  const ledger: { snapshot: { accounts: domain.Account[]; entries: domain.Entry[] } | null; error: string | null } = { snapshot: null, error: null };
+  const fonts: { loaded: boolean; error: Error | null } = { loaded: false, error: null };
+  const cache = { files: [] as string[], folders: [] as string[], deleted: [] as string[], listed: 0, unreadable: false };
+  class File { name: string; constructor(name: string) { this.name = name; } delete() { cache.deleted.push(this.name); } }
+  const folder = (name: string) => ({ name, delete: () => { cache.deleted.push(name + '/'); } });
+  const names = (...list: string[]) => Object.fromEntries(list.map(name => [name, name]));
+  const modules: Record<string, unknown> = {
+    react: { useState: (initial: unknown) => { const index = cursor++; if (!(index in state)) state[index] = initial;
+      return [state[index], (value: unknown) => { state[index] = value; }]; },
+    useMemo: (fn: () => unknown) => fn(),
+    useEffect: (fn: () => void, next?: unknown[]) => { const index = effectCursor++; const previous = deps[index];
+      if (!previous || !next || next.length !== previous.length || next.some((item, i) => !Object.is(item, previous[i]))) { deps[index] = next ?? []; fn(); } } },
+    'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
+    'react-native': { ...names('ActivityIndicator', 'View'), useWindowDimensions: () => ({ fontScale: 1, height: 852 }) },
+    'react-native-gesture-handler': names('GestureHandlerRootView'),
+    'react-native-safe-area-context': names('SafeAreaProvider', 'SafeAreaView'),
+    'expo-router': { DarkTheme: { colors: {} }, DefaultTheme: { colors: {} }, Stack: { Screen: 'Stack.Screen' }, ThemeProvider: 'ThemeProvider', router: { replace: (to: unknown) => routes.push(to) } },
+    'expo-status-bar': names('StatusBar'),
+    'expo-splash-screen': { preventAutoHideAsync: async () => {}, hideAsync: async () => {} },
+    'expo-system-ui': { setBackgroundColorAsync: async () => {} },
+    'expo-font': { useFonts: () => [fonts.loaded, fonts.error] },
+    'expo-file-system': { File, Paths: { cache: { list: () => {
+      cache.listed++;
+      if (cache.unreadable) throw new Error('ENOENT');
+      return [...cache.folders.map(folder), ...cache.files.map(name => new File(name))];
+    } } } },
+    '@expo/vector-icons/Ionicons': { font: {} },
+    '@finanzapp/domain': domain,
+    '../src/storage/LedgerProvider': { LedgerProvider: 'LedgerProvider', useLedger: () => ({ ...ledger, retry: () => { retries++; } }) },
+    '../src/storage/database': { NEWER_SCHEMA_MESSAGE },
+    '../src/ui/backup-file': backupFile,
+    '../src/ui/category-hues': names('CategoryHuesProvider'),
+    '../src/ui/display-currency-provider': names('DisplayCurrencyProvider'),
+    '../src/fx/rates-provider': names('RatesProvider'),
+    '../src/ui/components': names('ActionButton', 'AppText', 'ErrorMessage'),
+    '../src/ui/geometry': { reviewSheetScrolls: () => false },
+    '../src/ui/screen-failure': names('ScreenFailure'),
+    '../src/ui/theme': { UIProvider: 'UIProvider', themePreferenceStore: () => {}, useReduceMotion: () => false,
+      usePalette: () => ({ isDark: false, background: '#fff', surface: '#fff', primary: '#2557D6', text: '#000', secondary: '#666', line: '#ddd' }) },
+    '../src/i18n/provider': { ...names('HeldCurrenciesProvider', 'I18nProvider'), useI18n: () => bindLocale('es-AR') },
+    '../src/i18n/preference': { defaultPreferenceStore: prefs.store },
+    '../src/ui/onboarding-flow': onboardingFlow,
+  };
+  const module = { exports: {} as { default?: () => Node } };
+  runInNewContext(code, { module, exports: module.exports, Date, Error, require: (name: string) => {
+    if (!Object.hasOwn(modules, name)) throw new Error('Unexpected layout dependency: ' + name);
+    return modules[name];
+  } });
+  // Navigation is not exported: it is the function element inside the providers.
+  const navigation = nodes(module.exports.default!()).find(node => typeof node.type === 'function' && node.type.name === 'Navigation')!.type as (props: object) => Node;
+  return { render: () => { cursor = 0; effectCursor = 0; return navigation({}); }, ledger, fonts, routes, prefs, cache, retries: () => retries };
+}
+
+test('25Q4: at launch a ledger from a newer build is said as itself with no «Volver a intentar»; any other open failure keeps it', () => {
+  const view = rootLayout();
+  view.fonts.loaded = true;
+  view.ledger.error = NEWER_SCHEMA_MESSAGE;
+  let root = view.render();
+  assert.equal(find(root, 'ErrorMessage').props.message, NEWER_SCHEMA_MESSAGE);
+  assert.equal(nodes(root).some(node => node.type === 'ActionButton'), false, 'no retry can open a file a newer build wrote');
+  view.ledger.error = es.errors.storage.openFailed;
+  root = view.render();
+  find(root, 'ActionButton', 'Volver a intentar').props.onPress();
+  assert.equal(view.retries(), 1);
+  view.ledger.error = es.errors.storage.migrationReferences;
+  assert.ok(find(view.render(), 'ActionButton', 'Volver a intentar'), 'a migration rolled back whole may pass on another try');
+});
+
+test('25Q4: the root layout sends a new installation to the setup exactly once, after the stack exists; a banner later in that session never sends it again', () => {
+  const view = rootLayout();
+  view.ledger.snapshot = { accounts: [], entries: [] };
+  view.render();
+  view.render();
+  assert.deepEqual(view.routes, [], 'decided, but the fonts still hold the stack back: nothing to replace yet');
+  view.fonts.loaded = true;
+  view.render();
+  assert.deepEqual(view.routes, ['/onboarding']);
+  for (const error of [es.errors.storage.refreshFailed, null, es.errors.storage.installmentsFailed]) {
+    view.ledger.error = error;
+    view.render();
+  }
+  assert.deepEqual(view.routes, ['/onboarding'], 'a banner never replaces the setup or a form over it');
+  const existing = rootLayout();
+  existing.ledger.snapshot = { accounts: [{ id: 'a', name: 'Pesos', currency: 'ARS', openingMinor: 0, createdAt }], entries: [] };
+  existing.fonts.loaded = true;
+  existing.render();
+  existing.render();
+  assert.deepEqual(existing.routes, []);
+  assert.equal(existing.prefs.rows.get(ONBOARDING_KEY), 'done');
+});
+
+test('25Q4: once the ledger has opened, the launch deletes the exports an ended process left in the cache, once per process; nothing else there, and never before', () => {
+  const view = rootLayout();
+  view.cache.files = ['FinanzApp-backup-2026-10-15-1432.json', 'finanzapp-piloto-1728900000000.json', 'fonts.json', 'ledger.sqlite'];
+  view.cache.folders = ['FinanzApp-backup-2026-10-15-1500.json', 'ExponentExperienceData'];
+  view.render();
+  assert.equal(view.cache.listed, 0, 'not while the ledger opens');
+  view.ledger.snapshot = { accounts: [], entries: [] };
+  view.render();
+  assert.deepEqual(view.cache.deleted, ['FinanzApp-backup-2026-10-15-1432.json', 'finanzapp-piloto-1728900000000.json'], 'only the app\'s own exports, never a folder');
+  // An export started since lives in the same folder: no later render, write (a new snapshot), banner or font load sweeps it.
+  view.cache.files = ['FinanzApp-backup-2026-10-16-0910.json'];
+  view.fonts.loaded = true;
+  view.render();
+  view.ledger.snapshot = { accounts: [], entries: [] };
+  view.ledger.error = es.errors.storage.refreshFailed;
+  view.render();
+  assert.equal(view.cache.listed, 1);
+  assert.equal(view.cache.deleted.length, 2);
+  // A cache that cannot be listed never stops the launch.
+  const unreadable = rootLayout();
+  unreadable.cache.unreadable = true;
+  unreadable.ledger.snapshot = { accounts: [], entries: [] };
+  unreadable.fonts.loaded = true;
+  assert.equal(unreadable.render().type, 'ThemeProvider');
+  assert.equal(unreadable.cache.listed, 1);
 });

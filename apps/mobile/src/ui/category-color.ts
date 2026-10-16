@@ -75,7 +75,8 @@ export function washOf(color: string, p: Pick<Palette, 'isDark'>): string {
   return color + (p.isDark ? '1C' : '14');
 }
 
-/** The grouped tail ("Otras") is not a category: it stays neutral. */
+/** The grouped tail ("Otras") is not a category: it stays neutral. 25D1: a warm neutral at 3:1 or more on the canvas,
+ * the surface and the ring track it shows through (it was 1.54:1 on the light sand, a gap rather than a slice). */
 export function othersColor(p: Pick<Palette, 'isDark'>): string {
-  return p.isDark ? '#5C5C64' : '#C2C2CA';
+  return p.isDark ? '#7A766C' : '#7C786E';
 }

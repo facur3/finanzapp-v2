@@ -2,13 +2,13 @@ import { useRef, useState } from 'react';
 import { Keyboard } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
-import * as Haptics from 'expo-haptics';
 import { LEDGER_CURRENCIES, draftFitsCurrency, makeAccountAppearance, minorFromLedgerDraft, validateAccount, validateAccountAppearance, type AccountAppearance, type Currency, type Account } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { ACCOUNT_ICON_CHOICES, COLOR_CHOICES, DEFAULT_LOOK } from '../src/ui/appearance';
 import { IconColorPicker } from '../src/ui/appearance-picker';
 import { ActionButton, AmountField, AppText, ErrorMessage, Field, FieldNote, IconButton, Screen } from '../src/ui/components';
 import { CurrencyField } from '../src/ui/form-controls';
+import { errorHaptic, successHaptic, warningHaptic } from '../src/ui/motion';
 import { useDefaultCurrency } from '../src/ui/use-default-currency';
 import { useI18n } from '../src/i18n/provider';
 
@@ -20,7 +20,7 @@ import { useI18n } from '../src/i18n/provider';
 export default function NewAccountScreen() {
   const params = useLocalSearchParams<{ currency?: string }>();
   const { addAccount, gate = LEDGER_CURRENCIES } = useLedger();
-  const { t } = useI18n();
+  const { t, failureMessage } = useI18n();
   const [operation] = useState(() => ({ id: randomUUID(), createdAt: new Date().toISOString() }));
   const [name, setName] = useState('');
   const [icon, setIcon] = useState<string>(DEFAULT_LOOK.icon);
@@ -42,6 +42,8 @@ export default function NewAccountScreen() {
     setBusy(true);
     setError(null);
     Keyboard.dismiss();
+    // 25Q4: true once the write is sent: a failure after it taps Warning (frozen for the retry), before it Error.
+    let sent = false;
     try {
       let submission = pending;
       if (!submission) {
@@ -52,11 +54,13 @@ export default function NewAccountScreen() {
         submission = { account, appearance };
         setPending(submission);
       }
+      sent = true;
       await addAccount(submission.account, submission.appearance);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      successHaptic();
       saving.current = false; close();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'accounts.form.saveFailed');
+      setError(failureMessage(cause, 'accounts.form.saveFailed'));
+      if (sent) warningHaptic(); else errorHaptic();
     } finally {
       saving.current = false;
       setBusy(false);
