@@ -81,8 +81,9 @@ export const darkPalette: typeof lightPalette = {
   /** Brand text on the near-black: a periwinkle sapphire (4.8:1 even on the elevated step), far enough from the slate
    * transfer in colourfulness (the lighter #9DB4FF was the slate's own lightness). */
   primary: '#7E9BF7',
-  /** The sapphire fill with white on it (5.5:1). */
-  primaryFill: '#3D60D4', onPrimary: '#FFFFFF',
+  /** The sapphire fill with white on it (4.8:1). 25O1 (owner sheet D03, decided under the design delegation): the same
+   * value as the switch, so the dark theme carries two brand fills instead of three (this one, and the periwinkle «+»). */
+  primaryFill: '#4568DA', onPrimary: '#FFFFFF',
   primarySoft: '#19223F',
   /** Dark: a clear step above the surface track, so the state reads without colour. */
   thumb: '#3C3A35',
@@ -93,8 +94,8 @@ export const darkPalette: typeof lightPalette = {
   expenseSoft: '#34201A', incomeSoft: '#13291D', transferSoft: '#1C252D', warningSoft: '#2F2413',
   /** Dark: the semantic tones are light, so white on them fell to 2.0–2.5:1 («Pagar tarjeta» was 2.1:1); ink holds 7:1 or more. */
   onSemantic: '#19191C',
-  /** Dark: deeper than the text tones so white holds 4.5:1 or more. */
-  swipeDestructive: '#B8412D', swipeNeutral: '#524F48', swipeAccent: '#3D60D4',
+  /** Dark: deeper than the text tones so white holds 4.5:1 or more (the accent is the filled button's sapphire, 25O1). */
+  swipeDestructive: '#B8412D', swipeNeutral: '#524F48', swipeAccent: '#4568DA',
   shadow: 'rgba(0, 0, 0, 0)',
   scrim: 'rgba(0, 0, 0, 0.60)',
   /** A step below the light field's sapphire so a large field does not glare on a dark screen; white on it as in light. */

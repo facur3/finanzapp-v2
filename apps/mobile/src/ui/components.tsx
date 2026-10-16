@@ -184,14 +184,19 @@ export function PressFeedback({ children, style, containerStyle, feedback = 'sca
  * `spokenLabel` is the label for VoiceOver when it carries an amount ("Guardar
  * gasto, 1234,50 pesos", built with the spoken formatters); the button shows
  * `label` unchanged. */
-export function ActionButton({ label, spokenLabel, onPress, disabled = false, busy = false, secondary = false, tone, icon, containerStyle, compact = false }: {
+export function ActionButton({ label, spokenLabel, onPress, disabled = false, busy = false, secondary = false, tone, icon, containerStyle, compact = false, onField = false }: {
   label: string; spokenLabel?: string; onPress: () => void; disabled?: boolean; busy?: boolean; secondary?: boolean; tone?: Exclude<Tone, 'neutral'>;
   icon?: IconName; containerStyle?: StyleProp<ViewStyle>; compact?: boolean;
+  /** 25O1: on the sapphire field (the onboarding's close, like Inicio's chosen segment): the sand-white thumb with ink on
+   * it; secondary, the field's own ink on no fill. */
+  onField?: boolean;
 }) {
   const p = usePalette();
   const semantic = tone ? toneColors(p, tone) : null;
-  const background = semantic ? (secondary ? semantic.soft : semantic.color) : secondary ? p.inset : p.primaryFill;
-  const color = semantic ? (secondary ? semantic.color : p.onSemantic) : secondary ? p.text : p.onPrimary;
+  const background = onField ? (secondary ? 'transparent' : p.heroThumb)
+    : semantic ? (secondary ? semantic.soft : semantic.color) : secondary ? p.inset : p.primaryFill;
+  const color = onField ? (secondary ? p.heroInk : p.heroThumbInk)
+    : semantic ? (secondary ? semantic.color : p.onSemantic) : secondary ? p.text : p.onPrimary;
   return <PressFeedback accessibilityRole="button" accessibilityLabel={spokenLabel ?? label} containerStyle={containerStyle}
     accessibilityState={{ disabled: disabled || busy, busy }} disabled={disabled || busy}
     onPress={onPress} style={[styles.button, compact && styles.buttonCompact, { backgroundColor: background, opacity: disabled || busy ? 0.5 : 1 }]}>
@@ -686,14 +691,17 @@ export function NavigationRow({ title, subtitle, icon, leading, onPress, last = 
  * `accessibilityLanguage` overrides the interface language for that label: a
  * language option named in its own language ("English", "Español") is spoken
  * by a voice of that language, as iOS Settings does. */
-export function CheckRow({ title, subtitle, selected, onPress, last = false, disabled = false, accessibilityLanguage }: {
+export function CheckRow({ title, subtitle, selected, onPress, last = false, disabled = false, accessibilityLanguage, leading }: {
   title: string; subtitle?: string; selected: boolean; onPress: () => void; last?: boolean; disabled?: boolean; accessibilityLanguage?: string;
+  /** 25O1: a mark before the title (a region's flag), hidden from VoiceOver by its own component. */
+  leading?: ReactNode;
 }) {
   const p = usePalette();
   const lines = useStacked() ? undefined : 2;
   return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={subtitle ? title + ', ' + subtitle : title}
     accessibilityLanguage={accessibilityLanguage} disabled={disabled} accessibilityState={{ disabled, selected }} onPress={onPress}
     style={[styles.navigationRow, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, opacity: disabled ? 0.6 : 1 }]}>
+    {leading}
     <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
       <AppText numberOfLines={lines} style={{ fontWeight: '600' }}>{title}</AppText>
       {!!subtitle && <AppText secondary variant="footnote" numberOfLines={lines}>{subtitle}</AppText>}
