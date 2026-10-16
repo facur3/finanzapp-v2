@@ -16,6 +16,7 @@ import * as categoryColor from '../src/ui/category-color.ts';
 import * as homeFocus from '../src/ui/home-focus.ts';
 import { darkPalette, lightPalette } from '../src/ui/palette.ts';
 import { monthlyEvidence } from '../src/integrations/evidence.ts';
+import { answerContent } from '../src/assistant/conversation.ts';
 import { integrationClient } from '../src/integrations/client.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
@@ -698,6 +699,33 @@ test('the spending detail opens this month\'s matching expenses in the chosen cu
   const detail = routeHarness('spending-detail.tsx', params, homeData).render();
   assert.deepEqual(detail.props.entries.map((e: domain.Entry) => e.id), ['now', 'early']);
   assert.equal(find(detail, 'Money').props.minor, 300);
+});
+test('25Q1 (REPORTS-01): the spending detail finds a category by its key whatever spelling the link carries; its headings carry no day net', () => {
+  const params = { currency: 'ARS', startISO: '2026-09-01', endISO: '2026-09-12' };
+  for (const category of ['salud', 'Salud', 'SALUD', ' Salud ']) {
+    const detail = routeHarness('spending-detail.tsx', { ...params, category }, homeData).render();
+    assert.deepEqual(detail.props.entries.map((e: domain.Entry) => e.id), ['now', 'early'], category);
+    assert.equal(find(detail, 'Money').props.minor, 300, category + ': the figure the link cites, never «$ 0,00»');
+    assert.equal(detail.props.dayNet, false, 'one category\'s expenses are not the day\'s movements');
+  }
+  const accented = { ...homeData, entries: [...homeData.entries, { ...homeData.entries[0], id: 'edu', category: 'Educación', amountMinor: 700, dateISO: '2026-09-05' }] };
+  for (const category of ['Educación', 'educacion']) {
+    const detail = routeHarness('spending-detail.tsx', { ...params, category }, accented).render();
+    assert.equal(detail.props.entries.map((e: domain.Entry) => e.id).join() + '|' + find(detail, 'Money').props.minor, 'edu|700', category);
+  }
+  // A category with no line in the period keeps its own name and tile over its true zero (never «Gastos registrados»);
+  // a blank one is an invalid link, not «all expenses».
+  const quiet = routeHarness('spending-detail.tsx', { ...params, category: 'Supermercado' }, homeData).render();
+  assert.equal(quiet.props.entries.length + '|' + find(quiet, 'Money').props.minor, '0|0');
+  assert.equal(nodes(quiet).find((n: any) => n.type === 'AppText' && n.props.accessibilityRole === 'header')!.props.children, 'Supermercado');
+  assert.equal(find(quiet, 'CategoryBadge').props.category, 'Supermercado');
+  assert.equal(find(routeHarness('spending-detail.tsx', { ...params, category: '   ' }, homeData).render(), 'EmptyState').props.title, 'Período no válido');
+  // End to end: the Assistant's evidence link carries the stored spelling («Salud») and opens the figure it cites.
+  const facts = monthlyEvidence(homeData, 'ARS', '2026-09-12');
+  const fact = facts.find(item => item.id.startsWith('current.category.'))!;
+  const link = answerContent({ evidenceIds: [fact.id] }, facts, 'ARS').links.find(item => item.id === 'category')!;
+  const opened = routeHarness('spending-detail.tsx', link.href.params as Record<string, unknown>, homeData).render();
+  assert.equal(find(opened, 'Money').props.minor, 300, 'not 0: the link and the screen agree on the category');
 });
 test('empty and overflow Home never invent a chart, budget line or partial total', () => {
   const empty = routeHarness('(tabs)/index.tsx', {}).render();

@@ -79,7 +79,11 @@ test('deleting an account asks first and names what stays and what stops; Cancel
   view.render('useAccountManagement').remove(cash, () => done++);
   assert.equal(view.alerts.length, 1);
   assert.equal(view.alerts[0].title, '¿Eliminar Banco?');
-  assert.equal(view.alerts[0].message, 'Deja de aparecer en tus cuentas, en Disponible y en los formularios. No borra nada: 2 movimientos y 1 transferencia siguen en Movimientos con su nombre y su moneda. Su 1 recurrente activo se detendrá; lo ya registrado no cambia.');
+  // 25Q1: the recorded balance that leaves Disponible is named, and the last sentence says the deletion is final.
+  const money = (minor: number) => bindLocale('es-AR').moneyText(minor, 'ARS');
+  const final = ' Una cuenta eliminada no se puede volver a activar.';
+  assert.equal(view.alerts[0].message, 'Deja de aparecer en tus cuentas, en Disponible y en los formularios. Sus movimientos y transferencias siguen en Movimientos con su nombre y su moneda: 2 movimientos y 1 transferencia.'
+    + ' Su saldo registrado, ' + money(94400) + ', deja de contar en Disponible. Su 1 recurrente activo se detendrá; lo ya registrado no cambia.' + final);
   assert.equal(JSON.stringify(view.alerts[0].buttons.map(button => [button.text, button.style])), JSON.stringify([['Cancelar', 'cancel'], ['Eliminar', 'destructive']]));
   assert.deepEqual(view.removed, [], 'nothing written before the destructive button');
   view.alerts[0].buttons[1].onPress!();
@@ -88,9 +92,15 @@ test('deleting an account asks first and names what stays and what stops; Cancel
   assert.equal(done, 1);
   // A transfer counts as history too; an account with none says so and lists no rule.
   view.render('useAccountManagement').remove(other);
-  assert.equal(view.alerts[1].message, 'Deja de aparecer en tus cuentas, en Disponible y en los formularios. No borra nada: 0 movimientos y 1 transferencia siguen en Movimientos con su nombre y su moneda.');
+  assert.equal(view.alerts[1].message, 'Deja de aparecer en tus cuentas, en Disponible y en los formularios. Sus movimientos y transferencias siguen en Movimientos con su nombre y su moneda: 0 movimientos y 1 transferencia.'
+    + ' Su saldo registrado, ' + money(5000) + ', deja de contar en Disponible.' + final);
   view.render('useAccountManagement').remove(lonely);
-  assert.equal(view.alerts[2].message, 'Deja de aparecer en tus cuentas y en los formularios. No tiene movimientos.');
+  assert.equal(view.alerts[2].message, 'Deja de aparecer en tus cuentas y en los formularios. No tiene movimientos.' + final, 'a zero balance names no figure');
+  // An opening balance alone, or an overdrawn one, is named too: either sign stops counting in Disponible.
+  view.render('useAccountManagement').remove({ ...lonely, openingMinor: 250000 });
+  assert.equal(view.alerts[3].message, 'Deja de aparecer en tus cuentas y en los formularios. No tiene movimientos. Su saldo registrado, ' + money(250000) + ', deja de contar en Disponible.' + final);
+  view.render('useAccountManagement').remove({ ...lonely, openingMinor: -2500 });
+  assert.ok(view.alerts[4].message.includes('Su saldo registrado, ' + money(-2500) + ', deja de contar en Disponible.'));
   assert.equal(JSON.stringify(view.render('useAccountManagement').actions(cash).map((action: any) => [action.key, action.tone, action.label])), JSON.stringify([['delete', 'destructive', 'Eliminar']]));
   assert.equal(JSON.stringify(view.render('useAccountManagement').consequences(cash)), JSON.stringify({ movements: 2, transfers: 1, recurring: 1 }));
 });
@@ -105,7 +115,8 @@ test('a failed deletion keeps the account as it was and says so; in English the 
   const english = harness({ language: 'en-US' as never });
   english.render('useAccountManagement').remove(cash);
   assert.equal(english.alerts[0].title, 'Delete Banco?');
-  assert.match(english.alerts[0].message, /^It leaves your accounts, Available and the forms\. Nothing is erased: 2 transactions and 1 transfer stay/);
+  assert.match(english.alerts[0].message, /^It leaves your accounts, Available and the forms\. Its transactions and transfers stay in Activity with its name and currency: 2 transactions and 1 transfer\./);
+  assert.match(english.alerts[0].message, /Its recorded balance, .*944\.00, stops counting in Available\..* A deleted account can’t be reactivated\.$/);
 });
 
 test('25B2 review: a card with a recorded debt is not deleted: the dialog names the debt and offers Pagar (the payment form) or Archivar; nothing is written on its own', async () => {

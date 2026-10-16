@@ -269,6 +269,26 @@ test('Tarjetas: archived cards stay reachable under Archivadas with their balanc
   // An archived card with nothing owed says so.
   const clear = harness('cards.tsx', { data: { ...data, accounts: [...archive.accounts, { ...oldAccount, openingMinor: 0 }, goneAccount] } }).render();
   assert.equal(byName(clear, 'ArchivedCardRow')[0].rendered!.props.accessibilityLabel, 'Visa Vieja, Sin saldo pendiente');
+  // 25Q1: one archived in credit says so, never «Sin saldo pendiente».
+  const es = bindLocale('es-AR');
+  const credit = harness('cards.tsx', { data: { ...data, accounts: [...archive.accounts, { ...oldAccount, openingMinor: 5000 }, goneAccount] } }).render();
+  const creditRow = byName(credit, 'ArchivedCardRow')[0].rendered!;
+  assert.equal(creditRow.props.accessibilityLabel, 'Visa Vieja, ' + es.t('cards.panel.credit', { amount: es.spokenMoney(5000, 'ARS') }));
+  assert.ok(texts(creditRow).includes(es.t('cards.panel.credit', { amount: es.moneyText(5000, 'ARS') })));
+  assert.ok(texts(creditRow).includes('Saldo a favor · $' + NBSP + '50,00'));
+});
+
+test('25Q1 (CARDS-01): a card whose only records are instalments still to come says so, on Tarjetas and on its detail; a card with none keeps the old line', () => {
+  // The notebook's three cuotas start on the statement after Sep 28, so on Oct 1 nothing is recorded yet.
+  const data: domain.LedgerArchive = { accounts: [cash, cardAccount, amexAccount], records: [], transfers: [], cards: [card, amex], installmentPlans: [nb] };
+  const sentence = 'Todavía no hay movimientos. Tus cuotas se registran cuando cierra cada resumen.';
+  assert.ok(texts(picked(harness('cards.tsx', { data }))).includes(sentence));
+  assert.equal(texts(picked(harness('cards.tsx', { data }))).includes('Todavía no registraste compras ni pagos en esta tarjeta.'), false);
+  const detail = find(harness('card/[id].tsx', { params: { id: 'card' }, data }).render(), 'EntryList');
+  assert.equal(text(detail.props.empty), sentence, 'beside the Cuotas list, not a contradiction of it');
+  assert.ok(texts(picked(harness('cards.tsx', { data }), 'amex')).includes('Todavía no registraste compras ni pagos en esta tarjeta.'), 'no plan: the old line');
+  const english = find(harness('card/[id].tsx', { params: { id: 'card' }, data, locale: 'en-US' }).render(), 'EntryList');
+  assert.equal(text(english.props.empty), 'No transactions yet. Your installments are recorded as each statement closes.');
 });
 
 test('Tarjetas in English: Due, Closes and Available; availability not calculated with installments; the same archived rows', () => {
