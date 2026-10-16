@@ -43,6 +43,8 @@ export function usePalette(): Palette {
 /** System font (SF Pro on iOS). Numbers are always tabular so amounts align. */
 export const type = {
   hero: { fontSize: 44, lineHeight: 52, fontWeight: '700', letterSpacing: -1.3, fontVariant: ['tabular-nums'] } as TextStyle,
+  /** 25O1: the first opening's story headlines, a step above the Large Title. */
+  display: { fontSize: 40, lineHeight: 46, fontWeight: '700', letterSpacing: -1.1 } as TextStyle,
   largeTitle: { fontSize: 34, lineHeight: 41, fontWeight: '700', letterSpacing: -0.8 } as TextStyle,
   title1: { fontSize: 28, lineHeight: 34, fontWeight: '700', letterSpacing: -0.6 } as TextStyle,
   title2: { fontSize: 22, lineHeight: 28, fontWeight: '700', letterSpacing: -0.4 } as TextStyle,

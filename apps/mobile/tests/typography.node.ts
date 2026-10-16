@@ -127,6 +127,14 @@ test('AmountField anchors the symbol before a left-aligned input that fills the 
   assert.equal(flatten(rowOf(dollars).props.children[1].props.style).color, '#03c', 'the tone colours the digits');
   const untitled = render('AmountField', { currency: 'ARS', value: '', onChangeText: () => {} });
   assert.equal(untitled.props.children[0].props.children.join(''), 'Monto · ARS', 'the default label comes from the catalogue');
+  // 25O1: `bare` (the first opening's opening balance, under its question and beside its currency chip) drops the caption
+  // only: the row, the input and what VoiceOver hears are the same.
+  const captioned = render('AmountField', { label: 'Saldo inicial', currency: 'ARS', value: '', onChangeText: () => {} });
+  const bare = render('AmountField', { label: 'Saldo inicial', currency: 'ARS', value: '', onChangeText: () => {}, bare: true });
+  assert.equal(captioned.props.children[0].props.children.join(''), 'Saldo inicial · ARS');
+  assert.equal(bare.props.children[0], false, 'no caption');
+  assert.equal(rowOf(bare).props.children[1].props.accessibilityLabel, 'Saldo inicial en pesos argentinos');
+  assert.equal(JSON.stringify(rowOf(bare).props.children[1].props.style), JSON.stringify(rowOf(captioned).props.children[1].props.style));
 });
 
 // A row that puts a name beside an amount: the amount gets the whole row
@@ -294,22 +302,35 @@ test('25D1: with iOS\'s Increase Contrast on, a hero\'s symbol and cents are dra
   assert.deepEqual(quiet({}, { color: '#131411', onField: true, size: 46 }), ['#3A3C3F', '#505255'], 'off: the field\'s solid greys');
 });
 
-test('25D1: the first opening\'s titles keep every word whole at AX5 on 375 and 393 pt (they drew about 120 pt before)', () => {
-  // The screen draws them as the two big titles, so AppText's own cap applies to them.
+test('25D1, 25O1: the first opening\'s titles keep every word whole at AX5 on 375 and 393 pt (they drew about 120 pt before)', () => {
+  // 25O1: the story's headlines (display, 40 pt) take their own fit: the Large Title's 60 pt, or less where their longest
+  // word would not fit the page whole; the other steps' titles are Large Titles under AppText's own cap.
   const onboarding = readFileSync(new URL('../app/onboarding.tsx', import.meta.url), 'utf8');
-  assert.match(onboarding, /<AppText accessibilityRole="header" variant="largeTitle">\{t\('onboarding\.welcome\.title'\)\}<\/AppText>/);
-  assert.match(onboarding, /<AppText accessibilityRole="header" variant="title1">\{t\('onboarding\.account\.title'\)\}<\/AppText>/);
+  assert.match(onboarding, /accessibilityRole="header" variant="display" maxFontSizeMultiplier=\{scale\}/);
+  assert.match(onboarding, /titleFit\(fontScale, TEXT_STYLE_MAX_SCALE\.display!, widestWordEm\(\[text\]\), \(type\.display\.fontSize \?\? 40\) \* WEIGHT_WIDTH\.bold,\s+width - 2 \* space\.xxl, width - 2 \* space\.xxl\)\.maxScale/);
+  for (const key of ['start', 'account', 'done']) assert.match(onboarding, new RegExp(`ref=\\{titleRef\\('${key}'\\)\\} accessibilityRole="header" variant="largeTitle"`));
   const { render } = loadComponents();
   const capOf = (variant: string) => render('AppText', { variant, children: 'x' }).props.maxFontSizeMultiplier as number;
-  // The stage is the screen less 2 × 20 pt; a word is bold (+10 %). React Native multiplies every style by 3.571 at AX5.
+  assert.equal(Math.round(40 * capOf('display')), 60, 'the display style stops where the Large Title does');
+  // A headline's page is the screen less 2 × 24 pt, a Large Title's step less 2 × 20; a word is bold (+10 % for the Large
+  // Titles, WEIGHT_WIDTH.bold for the fit the screen computes). React Native multiplies every style by 3.571 at AX5.
   for (const locale of ['es-AR', 'en-US'] as const) {
     const { t } = bindLocale(locale);
-    for (const [key, size, ratio] of [['onboarding.welcome.title', 34, capOf('largeTitle')], ['onboarding.account.title', 28, capOf('title1')]] as const) {
-      const words = t(key).split(' ').map(word => geometry.labelWidthEm(word) * size * 1.1);
-      const screens = locale === 'es-AR' ? [320, 375, 393] : [375, 393]; // English «spending,» at 320 pt is a device check.
-      for (const width of screens) assert.ok(Math.max(...words) * ratio <= width - 40, `${locale} ${key} at ${width} pt`);
-      assert.ok(Math.max(...words) * 3.571 > 393 - 40, `${locale} ${key}: uncapped, its longest word broke`);
+    for (const width of [375, 393]) {
+      for (const page of ['record', 'commitments', 'available'] as const) {
+        const text = t(`onboarding.story.${page}.lead`) + ' ' + t(`onboarding.story.${page}.emphasis`);
+        const wordEm = geometry.widestWordEm([text]), size = 40 * geometry.WEIGHT_WIDTH.bold;
+        const { maxScale } = geometry.titleFit(3.571, capOf('display'), wordEm, size, width - 48, width - 48);
+        assert.ok(maxScale >= 1 && maxScale <= capOf('display'), `${locale} ${page}: between its own size and 60 pt`);
+        assert.ok(wordEm * size * maxScale <= width - 48, `${locale} ${page} at ${width} pt`);
+      }
+      for (const key of ['onboarding.start.title', 'onboarding.presets.cash.question', 'onboarding.presets.bank.question', 'onboarding.presets.digital.question', 'onboarding.done.title'] as const) {
+        const words = t(key).split(' ').map(word => geometry.labelWidthEm(word) * 34 * 1.1);
+        assert.ok(Math.max(...words) * capOf('largeTitle') <= width - 40, `${locale} ${key} at ${width} pt`);
+      }
     }
+    // Uncapped (60 pt), the longest headline word would break on a 375 pt iPhone in English: the fit is what keeps it whole.
+    if (locale === 'en-US') assert.ok(geometry.widestWordEm([t('onboarding.story.commitments.lead')]) * 40 * geometry.WEIGHT_WIDTH.bold * capOf('display') > 375 - 48);
   }
 });
 
