@@ -81,7 +81,7 @@ function TabItem({ label, index, count, focused, icon, onPress, badge = null }: 
     onPress={onPress} containerStyle={styles.itemContainer} style={styles.item}>
     <View accessible={false} importantForAccessibility="no-hide-descendants" style={[styles.capsule, focused ? { backgroundColor: p.dockActive } : null]}>
       {icon}
-      {/* Neutral, not lime (lime is the «+» beside it) and not red (nothing failed): the dock's white with its graphite. */}
+      {/* Neutral, not the brand (the brand is the «+» beside it) and not red (nothing failed): the dock's white with its graphite. */}
       {badge !== null && <View style={[styles.badge, { backgroundColor: p.dockActiveInk, borderColor: p.dock }]}>
         <Text accessibilityLanguage={speechLanguage} maxFontSizeMultiplier={1.2} style={[styles.badgeText, { color: p.dock }]}>{badge > 99 ? '99+' : badge}</Text>
       </View>}

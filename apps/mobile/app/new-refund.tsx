@@ -161,7 +161,9 @@ function RefundForm({ target }: { target: RefundTarget | null }) {
       {shown.map((sentence, index) => <AppText key={index} variant="subhead" accessibilityLabel={spoken[index]}>{sentence}</AppText>)}
     </View>}
     {/* The domain's refusal of the draft, live (over what is left, a date out of range); an amount it cannot read says so too. */}
-    <ErrorMessage message={error ?? (!amount.trim() ? null : parsed === null && !pending ? REFUND_AMOUNT_MESSAGE : preview.status === 'invalid' ? preview.message : null)} />
+    {/* The live line (a half-typed «12,», an amount over what is left) is shown, not spoken: VoiceOver hears what Save refused. */}
+    <ErrorMessage message={error ?? (!amount.trim() ? null : parsed === null && !pending ? REFUND_AMOUNT_MESSAGE : preview.status === 'invalid' ? preview.message : null)}
+      announce={error !== null} />
     {pending && !busy && error && <AppText secondary variant="footnote">{t('operations.refund.retryNote')}</AppText>}
     <ActionButton label={submit.text} spokenLabel={submit.spoken} onPress={save} busy={busy} disabled={!pending && preview.status !== 'ready'} />
   </Screen>;

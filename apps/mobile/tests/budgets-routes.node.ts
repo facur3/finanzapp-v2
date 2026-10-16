@@ -299,7 +299,7 @@ test('24B5: the budget form offers the gate\'s currencies before the amount; wit
 
 // Producto 24T3 (A24): the Presupuestos screen when devoluciones leave the month (or a category) below zero. The actual
 // route with its hosts as descriptors and the real projection (`snapshotFromArchive`) of a purchase operation.
-async function budgetsScreen(data: domain.LedgerArchive, locale: AppLocale = 'es-AR', route: Record<string, string> = { currency: 'ARS', month: '2026-09' }) {
+async function budgetsScreen(data: domain.LedgerArchive, locale: AppLocale = 'es-AR', window = { width: 390, height: 844, scale: 3, fontScale: 1 }, route: Record<string, string> = { currency: 'ARS', month: '2026-09' }) {
   const presentation = await import('../src/ui/presentation.ts');
   const reportPresentation = await import('../src/ui/report-presentation.ts');
   const budgetPresentation = await import('../src/ui/budget-presentation.ts');
@@ -318,7 +318,7 @@ async function budgetsScreen(data: domain.LedgerArchive, locale: AppLocale = 'es
       return [state[index], (value: unknown) => { state[index] = value; }];
     } },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
-    'react-native': { View: 'View', StyleSheet: { hairlineWidth: 0.5 }, useWindowDimensions: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }) },
+    'react-native': { View: 'View', StyleSheet: { hairlineWidth: 0.5 }, useWindowDimensions: () => window },
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, useLocalSearchParams: () => route, router: { push: () => {} } },
     'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View' }, useSharedValue: (value: number) => ({ value }), withTiming: (value: number) => value, useAnimatedStyle: (fn: () => unknown) => fn() },
     '@expo/vector-icons/Ionicons': 'Ionicons',
@@ -367,7 +367,7 @@ test('25Q1 (BUDGETS-02): a budget in a currency no account holds stays reachable
   assert.equal(read.filter(node => node.type === 'AppText').map(textOf).includes(note), false);
   assert.equal(read.filter(node => node.type === 'Stat').map(node => (node.props.children as Node).props.minor)[0], 700, 'Gastado reads the deleted account\'s euros');
   // Codex (#114): Reportes' «Administrar» names the budget's currency; Presupuestos opens on it although no account holds it.
-  const routed = (await budgetsScreen({ ...archive, budgets: [total, food, eur] }, 'es-AR', { currency: 'EUR', month: '2026-09' }))();
+  const routed = (await budgetsScreen({ ...archive, budgets: [total, food, eur] }, 'es-AR', undefined, { currency: 'EUR', month: '2026-09' }))();
   assert.equal(routed.find(node => node.type === 'CurrencySwitch')!.props.value, 'EUR');
   assert.ok(routed.filter(node => node.type === 'AppText').map(textOf).includes(note));
   // In a month with no EUR budget the note does not speak of «este presupuesto».
@@ -393,6 +393,24 @@ test('24T3 (A24): devoluciones above a month\'s purchases leave the whole limit 
   const tree = (await budgetsScreen(data))();
   const textOf = (node: Node) => [node.props.children].flat().join('');
   const shown = tree.filter(node => node.type === 'AppText').map(textOf);
+  const month = tree.find(node => node.type === 'AppText' && node.props.accessibilityRole === 'header' && node.props.variant === 'title3')!;
+  // 25D1: Reportes' rule (Title 3's iOS size; beside the arrows while the year's longest word fits there).
+  const geometry = await import('../src/ui/geometry.ts');
+  const wordEm = geometry.widestWordEm(Array.from({ length: 12 }, (_, i) => bindLocale('es-AR').formatMonthTitle('2026-' + String(i + 1).padStart(2, '0'))));
+  const fit = geometry.titleFit(1, 55 / 20, wordEm, 20 * 1.06, 390 - 144, 390 - 40);
+  assert.equal(fit.stacked, false);
+  assert.deepEqual([textOf(month), month.props.maxFontSizeMultiplier, month.props.numberOfLines], ['Septiembre de 2026', fit.maxScale, 2]);
+  const state = tree.find(node => node.type === 'AppText' && node.props.variant === 'caption' && textOf(node) === 'Mes en curso')!;
+  assert.equal(state.props.maxFontSizeMultiplier, undefined, 'its caption follows Caption 1\'s own ceiling, through AppText');
+  // At AX5 the title takes the screen's width and the arrows move under it.
+  const large = (await budgetsScreen(data, 'es-AR', { width: 390, height: 844, scale: 3, fontScale: 3.571 }))();
+  const largeTitle = large.find(node => node.type === 'AppText' && node.props.accessibilityRole === 'header' && node.props.variant === 'title3')!;
+  const ax5 = geometry.titleFit(3.571, 55 / 20, wordEm, 20 * 1.06, 390 - 144, 390 - 40);
+  assert.deepEqual([ax5.stacked, largeTitle.props.maxFontSizeMultiplier], [true, ax5.maxScale]);
+  const stepper = large.find(node => node.type === 'View' && [node.props.children].flat().some((child: any) => child === largeTitle || [child?.props?.children].flat().includes(largeTitle)))!;
+  const steps = large.filter(node => node.type === 'View' && [node.props.children].flat().filter(Boolean).every((child: any) => child?.type === 'IconButton') && [node.props.children].flat().filter(Boolean).length === 2);
+  assert.equal(steps.length, 1, 'the two arrows share a row of their own');
+  assert.ok(stepper, 'the title is found');
   const hero = tree.find(node => node.type === 'Money' && node.props.large)!;
   assert.equal(hero.props.minor, 500000, 'Disponible is the limit, never above it');
   assert.ok(shown.includes('Las devoluciones superan lo gastado'));
