@@ -30,6 +30,8 @@ void SplashScreen.preventAutoHideAsync().catch(() => {});
 themePreferenceStore();
 
 export const unstable_settings = { initialRouteName: '(tabs)' };
+/** 25O1: the longest a new installation's splash waits for the first opening to draw. */
+const SPLASH_NET = 1500;
 
 export default function RootLayout() {
   const p = usePalette();
@@ -75,7 +77,12 @@ function Navigation() {
   useEffect(() => {
     // Show a recoverable error as well as the successful app; never hold the
     // native splash forever when font or database initialization fails.
-    if (error || fontError || (fontsLoaded && snapshot && onboarding !== null)) void SplashScreen.hideAsync().catch(() => {});
+    if (error || fontError || (fontsLoaded && snapshot && onboarding !== null && onboarding !== 'new')) { void SplashScreen.hideAsync().catch(() => {}); return; }
+    // 25O1: a new installation's splash lifts when the first opening has drawn (its first layout, onboarding.tsx), so the
+    // tabs mounted under it are never seen; this timer only catches a setup that never draws.
+    if (onboarding !== 'new' || !fontsLoaded) return;
+    const net = setTimeout(() => void SplashScreen.hideAsync().catch(() => {}), SPLASH_NET);
+    return () => clearTimeout(net);
   }, [error, fontError, fontsLoaded, snapshot !== null, onboarding]);
   // 25Q4: an export left in the cache by a process iOS ended under the share sheet is deleted once the ledger first opens,
   // before any screen can start an export. Best effort.
@@ -109,8 +116,10 @@ function Navigation() {
       headerTitleStyle: { color: p.text }, headerShadowVisible: false,
       contentStyle: { backgroundColor: p.background }, animation: reduced ? 'fade' : 'default',
       headerBackButtonDisplayMode: 'minimal', gestureEnabled: true }}>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false, animation: 'fade' }} />
+      {/* 25O1: the tabs are only ever replaced into (the first opening's close, a form opened without a stack): a fade, never
+          a push from the side as if Inicio were deeper. The first opening arrives under the splash, so its entrance is a cut. */}
+      <Stack.Screen name="(tabs)" options={{ headerShown: false, animation: 'fade' }} />
+      <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false, animation: 'none' }} />
       {/* 24UX6A (decision 005): the Assistant is a screen of this stack, opened from the capture hub, not a tab. */}
       <Stack.Screen name="assistant" options={{ title: t('assistant.title') }} />
       <Stack.Screen name="account/[id]" options={{ title: t('nav.titles.account') }} />

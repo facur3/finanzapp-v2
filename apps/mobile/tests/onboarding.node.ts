@@ -578,13 +578,13 @@ test('an existing installation reached through a link or a restored navigation i
   assert.equal(fresh.splash.hides, 1);
 });
 
-test('the root layout sends a new installation to the setup before the splash lifts and marks an existing person done; the route has no header and no back swipe', () => {
+test('the root layout sends a new installation to the setup, which arrives as a cut under the splash; the tabs are replaced into with a fade; no back swipe', () => {
   const layout = readFileSync(new URL('../app/_layout.tsx', import.meta.url), 'utf8');
   assert.match(layout, /onboardingDecision\(defaultPreferenceStore, snapshot\.accounts\.length > 0\)/);
   assert.match(layout, /if \(decision === 'existing'\) markOnboardingDone\(defaultPreferenceStore\)/);
   assert.ok(layout.includes("useEffect(() => { if (onboarding === 'new' && fontsLoaded) router.replace('/onboarding'); }, [onboarding, fontsLoaded]);"), '25Q4: once, with the stack');
-  assert.match(layout, /fontsLoaded && snapshot && onboarding !== null\)\) void SplashScreen\.hideAsync/, 'the splash waits for the decision');
-  assert.match(layout, /<Stack\.Screen name="onboarding" options=\{\{ headerShown: false, gestureEnabled: false, animation: 'fade' \}\} \/>/);
+  assert.match(layout, /<Stack\.Screen name="onboarding" options=\{\{ headerShown: false, gestureEnabled: false, animation: 'none' \}\} \/>/);
+  assert.match(layout, /<Stack\.Screen name="\(tabs\)" options=\{\{ headerShown: false, animation: 'fade' \}\} \/>/);
 });
 
 // ---- the root layout ---------------------------------------------------------------------------------------
@@ -689,6 +689,25 @@ test('25Q4: the root layout sends a new installation to the setup exactly once, 
   existing.render();
   assert.deepEqual(existing.routes, []);
   assert.equal(existing.prefs.rows.get(ONBOARDING_KEY), 'done');
+});
+
+test('25O1: a new installation\'s splash waits for the first opening to draw (the timer only catches one that never does); anyone else\'s lifts once the app is ready', () => {
+  const view = rootLayout();
+  view.ledger.snapshot = { accounts: [], entries: [] };
+  view.fonts.loaded = true;
+  view.render();
+  view.render();
+  assert.deepEqual([view.routes, view.splash.hides, view.timers.pending()], [['/onboarding'], 0, [1500]], 'the setup lifts it on its first layout');
+  view.timers.run();
+  assert.equal(view.splash.hides, 1, 'the net, for a setup that never draws');
+  const existing = rootLayout();
+  existing.ledger.snapshot = { accounts: [{ id: 'a', name: 'Pesos', currency: 'ARS', openingMinor: 0, createdAt }], entries: [] };
+  existing.render();
+  assert.equal(existing.splash.hides, 0, 'not before the fonts');
+  existing.fonts.loaded = true;
+  existing.render();
+  existing.render();
+  assert.deepEqual([existing.splash.hides > 0, existing.timers.pending()], [true, []]);
 });
 
 test('25Q4: once the ledger has opened, the launch deletes the exports an ended process left in the cache, once per process; nothing else there, and never before', () => {
