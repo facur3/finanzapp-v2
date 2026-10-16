@@ -66,7 +66,7 @@ export function ChoiceScreen<T extends string>({ title, options, pinned, recent,
   const noteBlock = note ? <View style={{ paddingHorizontal: 4 }}>
     <AppText secondary variant="footnote">{note}</AppText>
     {noteAction && <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={noteAction.label} onPress={noteAction.onPress}
-      style={{ minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' }}>
+      containerStyle={{ alignSelf: 'flex-start' }}>
       <AppText variant="footnote" style={{ color: p.link, fontWeight: '600' }}>{noteAction.label}</AppText>
     </PressFeedback>}
   </View> : null;

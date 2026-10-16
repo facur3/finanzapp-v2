@@ -16,7 +16,7 @@ export const preferences: Pick<Messages, 'preferences'> = {
     languageNote: 'To have iOS use this language in its menus too, choose it in Settings.',
     openSettings: 'Open Settings',
     saveFailed: 'The preference could not be saved. Your previous choice is still active; please try again.',
-    pendingRegion: 'Not available in this version yet · {fallback} formats',
+    pendingRegion: 'Not available yet · {fallback} formats',
     pendingSummary: '{value} · {fallback} formats',
     previewNote: 'Development preview: includes regions not yet verified on an iPhone.',
     regionSample: '{date} · {amount}',

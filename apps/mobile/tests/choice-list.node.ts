@@ -273,7 +273,8 @@ test('25O1: the long list says its note under the pinned card (gone while a sear
   const footer = nodes(list(root).props.ListFooterComponent);
   assert.deepEqual(textsOf(footer), ['Para que iOS también use este idioma en sus menús, elegilo en Ajustes.', 'Abrir Ajustes']);
   const button = footer.find(node => node.type === 'PressFeedback')!;
-  assert.deepEqual([button.props.accessibilityRole, button.props.accessibilityLabel, button.props.style.minHeight], ['button', 'Abrir Ajustes', 44]);
+  assert.deepEqual([button.props.accessibilityRole, button.props.accessibilityLabel, button.props.feedback, button.props.containerStyle.alignSelf], ['button', 'Abrir Ajustes', 'opacity', 'flex-start'],
+    'a text button (PressFeedback keeps its 44 pt), as wide as its words');
   button.props.onPress();
   assert.deepEqual(opened, ['settings']);
   const bare = screen({ title: 'Apariencia', options: [{ value: 'light', title: 'Claro' }, { value: 'dark', title: 'Oscuro' }], pinned, selected: 'light', onChoose: () => true });
@@ -307,6 +308,14 @@ test('25O1: a refused save is said under the group that was tapped (a section, t
   checkRow(rendered(root)[1]).props.onPress();
   root = many.render();
   assert.equal(errorsIn(root).length, 1);
+  // Typing on keeps the same match listed, but the refusal belongs to the tap before: it is not said again unasked.
+  searchField(root).props.onChangeText(searchField(root).props.value + 'u');
+  root = many.render();
+  assert.equal(data()[1].key, 'match:UY', 'the refused match is still listed');
+  assert.deepEqual(errorsIn(root), []);
+  checkRow(rendered(root)[1]).props.onPress();
+  root = many.render();
+  assert.equal(errorsIn(root).length, 1, 'a retry says it again');
   refuse = false;
   checkRow(rendered(root)[1]).props.onPress();
   root = many.render();

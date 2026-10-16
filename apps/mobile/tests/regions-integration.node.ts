@@ -304,7 +304,7 @@ test('a region chosen in a development preview is saved, kept by a release build
   assert.equal(shownRegion(state), 'SA', '25O1: and its flag is the one it names first, not the stand-in\'s');
   const chooser = regionChooser(state, t);
   assert.equal(chooser.options.length, 235, 'the 234 released regions and the kept one');
-  assert.equal(chooser.options.find(option => option.value === 'SA')!.subtitle, 'Todavía no disponible en esta versión · formatos de Estados Unidos');
+  assert.equal(chooser.options.find(option => option.value === 'SA')!.subtitle, 'Aún no disponible · formatos de Estados Unidos');
   assert.equal(chooser.options.find(option => option.value === 'SA')!.region, 'SA', '25O1: a kept preview region shows its own flag');
   assert.equal(chooser.selected, 'SA', 'the checkmark on what the person chose, with the stand-in named');
   assert.equal(chooser.acceptRecent('SA'), false, 'a blocked region is never offered as a recent');
