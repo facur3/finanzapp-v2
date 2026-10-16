@@ -68,7 +68,7 @@ function harness(os: 'ios' | 'android' = 'ios', { reduced = true, systemReduceMo
     '../i18n/provider': { useI18n: () => bindLocale(locale) },
     './components': { AccountBadge: 'AccountBadge', AppText: 'AppText', CategoryBadge: 'CategoryBadge', DetailRow: 'DetailRow', SelectionRow: 'SelectionRow', Field: 'Field',
       GlyphTile: 'GlyphTile', PressFeedback: 'PressFeedback', Surface: 'Surface', surfaceShadow: () => ({}) },
-    './currencies': currencies, './category-hues': {}, './categories': {},
+    './currencies': currencies, './category-hues': {}, './categories': {}, './marks': { CurrencyMark: 'CurrencyMark' },
     // The real motion module (timing, sheetTiming, the curves and the reduce-motion policy), not a stub of its numbers.
     './motion': realMotion(reduced),
     './theme': { radius: { group: 16, sheet: 24 }, space: { xs: 4, s: 8, m: 12, l: 16, xl: 20 },

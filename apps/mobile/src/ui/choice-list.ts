@@ -17,6 +17,7 @@
  * searched, and are one grouped card under the pinned row. Rows carry their position
  * inside their group so a virtualized list can draw grouped corners. */
 import { foldText } from '../i18n/intl-support.ts';
+import type { IconName } from './appearance.ts';
 
 export interface ChoiceOption<T extends string = string> {
   value: T;
@@ -26,6 +27,10 @@ export interface ChoiceOption<T extends string = string> {
   language?: string;
   /** Folded text a search matches; the folded title when absent. */
   searchText?: string;
+  /** 25O1: the row's mark, as data the screen draws: a region's flag (its code), or a neutral glyph on the same tile
+   * (Región's «Según el dispositivo»). Neither: no mark, as for a language, which never shows a flag. */
+  region?: string;
+  glyph?: IconName;
 }
 
 export type GroupPosition = 'only' | 'first' | 'middle' | 'last';
@@ -106,4 +111,11 @@ export function buildChoiceRows<T extends string>({ pinned, recent = [], options
     rows.push(...grouped(members, selected, initial + ':'));
   }
   return rows;
+}
+
+/** 25O1: the row that closes the group holding the row `key`, where that group's footer goes (an iOS section footer), or
+ * -1 when the row is no longer listed (the search moved on). */
+export function groupEndIndex<T extends string>(rows: readonly ChoiceRow<T>[], key: string): number {
+  const start = rows.findIndex(row => row.key === key);
+  return start < 0 ? -1 : rows.findIndex((row, index) => index >= start && row.kind === 'choice' && (row.position === 'last' || row.position === 'only'));
 }

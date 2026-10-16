@@ -96,7 +96,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     // 24UX6E: the edit modals' not-found branches (their forms are tested in their own suites).
     '../../src/ui/budget-form': { BudgetForm: 'BudgetForm' }, '../../src/ui/debt-form': { DebtForm: 'DebtForm' }, '../../src/ui/recurring-form': { RecurringForm: 'RecurringForm' },
     '../../src/ui/entry-form': { EntryForm: 'EntryForm' }, '../../src/ui/transfer-form': { TransferForm: 'TransferForm' }, '../../src/ui/card-form': { CardForm: 'CardForm' },
-    './currencies': currencies, '../src/ui/currencies': currencies, '../../src/ui/currencies': currencies,
+    './currencies': currencies, '../src/ui/currencies': currencies, '../../src/ui/currencies': currencies, './marks': { CurrencyMark: 'CurrencyMark' },
     '../src/ui/form-controls': { CurrencyField: 'CurrencyField' }, '../../src/ui/form-controls': { CurrencyField: 'CurrencyField' },
     // 25B2: the one default-currency rule (its branches are tested in currency-defaults.node.ts; here it answers ARS) and the account lifecycle hook.
     '../src/ui/use-default-currency': defaults, '../../src/ui/use-default-currency': defaults,

@@ -113,7 +113,7 @@ function harness(file: string, data: domain.LedgerArchive = archive, released?: 
     '../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) }, '../../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) },
     '../src/ui/theme': theme, '../../src/ui/theme': theme,
     '../src/ui/material': { useMaterialDecision: () => ({ material: 'opaque', reason: 'expo-go' }) }, '../../src/ui/material': { useMaterialDecision: () => ({ material: 'opaque', reason: 'expo-go' }) },
-    '../../src/ui/locale-options': localeOptions,
+    '../../src/ui/locale-options': localeOptions, '../../src/ui/marks': { RegionMark: 'RegionMark' },
     '../src/ui/material-policy': materialPolicy, '../../src/ui/material-policy': materialPolicy,
     '../src/ui/choice-screen': { ChoiceScreen: 'ChoiceScreen' },
     '../src/ui/entry-list': { EntryList: 'EntryList' },
@@ -176,16 +176,18 @@ test('Más groups permanent navigation into Finanzas and App y datos, with live 
   assert.equal(value('Categorías'), 'Gastos e ingresos');
   // Finanzas rows carry a soft identity tile from the shared palette. 24UX6C: App y datos rows lead with neutral 34 pt tiles
   // (no colour: the component's own neutral fill), so both groups align on one leading edge; no row keeps a bare icon prop.
+  // 25O1: Región's tile is its region's flag (Idioma keeps its glyph: a language has no flag).
   const leading = rows(root).map(row => row.props.leading?.type ?? null);
-  assert.equal(leading.join(','), Array(11).fill('GlyphTile').join(','));
+  assert.equal(leading.join(','), [...Array(9).fill('GlyphTile'), 'RegionMark', 'GlyphTile'].join(','));
   assert.equal(rows(root).every(row => row.props.leading.props.size === 34), true, 'one tile size in both groups');
   assert.equal(new Set(rows(root).slice(0, 6).map(row => row.props.leading.props.color)).size, 6, 'six distinct restrained colours, no row painted');
   assert.equal(rows(root).slice(0, 6).every(row => typeof row.props.leading.props.color === 'string'), true, 'Finanzas keeps its tinted identities');
-  assert.equal(rows(root).slice(6).map(row => row.props.leading.props.icon).join(','), 'save-outline,arrow-undo-outline,language-outline,globe-outline,contrast-outline', 'App y datos keeps its glyphs, now in tiles');
+  assert.equal(rows(root).slice(6).map(row => row.props.leading.props.icon ?? row.props.leading.props.region).join(','), 'save-outline,arrow-undo-outline,language-outline,AR,contrast-outline',
+    'App y datos keeps its glyphs, now in tiles; Región shows Argentina, the region it names');
   assert.equal(rows(root).slice(6).every(row => row.props.leading.props.color === undefined), true, 'App y datos tiles stay neutral');
   assert.equal(rows(root).some(row => 'icon' in row.props), false, 'no row keeps the old icon prop');
   assert.equal(rows(root).some(row => 'value' in row.props || 'label' in row.props), false, 'no leftover label/value props');
-  assert.match(texts, /se guardan solo en este dispositivo y funcionan sin conexión/);
+  assert.doesNotMatch(texts, /se guardan solo en este dispositivo/, '25O1: the local-storage footnote is gone (app-store-launch.md §13.1)');
 });
 
 test('Más → App y datos (23.1C2): Idioma and Región say what is in use and whether it follows the device; Región hides in a single-region build', () => {
@@ -196,8 +198,9 @@ test('Más → App y datos (23.1C2): Idioma and Región say what is in use and w
   assert.equal(rows(root).find(row => row.props.title === 'Idioma')!.props.subtitle, 'Español · según el dispositivo');
   const region = rows(root).find(row => row.props.title === 'Región')!;
   assert.equal(region.props.subtitle, 'Argentina · según el dispositivo');
-  assert.equal(region.props.leading.type, 'GlyphTile');
-  assert.equal(region.props.leading.props.icon, 'globe-outline', '24UX6C: the glyph sits in a neutral tile');
+  assert.deepEqual([region.props.leading.type, region.props.leading.props.region, region.props.leading.props.size], ['RegionMark', 'AR', 34],
+    '25O1: the flag of the region the subtitle names, on the 34 pt tile of its neighbours');
+  assert.equal(rows(root).find(row => row.props.title === 'Idioma')!.props.leading.props.icon, 'language-outline', 'a language has no flag');
   assert.equal(region.props.last, undefined, '24UX6A: Apariencia closes App y datos');
   region.props.onPress();
   assert.deepEqual(view.pushed, ['/region']);
@@ -205,6 +208,7 @@ test('Más → App y datos (23.1C2): Idioma and Región say what is in use and w
   assert.equal(rows(view.render()).find(row => row.props.title === 'Idioma')!.props.subtitle, 'Español', 'an explicit choice reads plainly');
   assert.equal(currentLocaleStore.setRegion('US'), true);
   assert.equal(rows(view.render()).find(row => row.props.title === 'Región')!.props.subtitle, 'Estados Unidos', 'Spanish words, US conventions');
+  assert.equal(rows(view.render()).find(row => row.props.title === 'Región')!.props.leading.props.region, 'US', 'the flag follows the choice');
   assert.equal(currentLocaleStore.setLanguage('en'), true, 'English is released: Más can choose it');
   const english = rows(view.render());
   assert.equal(english.find(row => row.props.title === 'Language')!.props.subtitle, 'English', 'the hub re-renders in English');
@@ -388,7 +392,7 @@ test('23.1B2 English Más: every row, count, note and the diagnostic footer are 
   const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
   assert.match(texts, /FinanzApp 0\.1\.0 \(25Q4\)/);
   assert.match(texts, /Opaque material \(Expo Go\) · Language: default/);
-  assert.match(texts, /saved only on this device and work offline/);
+  assert.doesNotMatch(texts, /saved only on this device/, '25O1: no local-storage footnote in either language');
   assert.doesNotMatch(texts, /Material opaco|Idioma|Región|sincronización/);
   const card: domain.CreditCardProfile = { id: 'card', accountId: cash.id, issuer: 'Visa', last4: '4009', creditLimitMinor: null, closingDay: 28, dueDay: 5, active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
   const cards = harness('(tabs)/settings.tsx', { ...archive, cards: [card, { ...card, id: 'two' }] }, undefined, 'en-AR').render();
@@ -430,13 +434,13 @@ test('24B5: a release names no test currency in Más; a development preview gate
   assert.match(texts(english), /Test currencies enabled: BHD, IQD, JOD, KWD, LYD, OMR, TND\. Only in this development build\./);
 });
 
-test('24UX5: a preview or store build shows the version and the local-storage note, never the diagnostics', () => {
+test('24UX5: a preview or store build shows the version, never the diagnostics (25O1: nor the local-storage footnote, §13.1)', () => {
   for (const locale of [null, 'en-AR'] as const) {
     const root = harness('(tabs)/settings.tsx', archive, undefined, locale, undefined, false).render();
     const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
     assert.match(texts, /FinanzApp 0\.1\.0 \(25Q4\)/);
     assert.doesNotMatch(texts, /Material|material|Idioma:|Language:/, 'no material or locale diagnostics outside a development build');
-    assert.match(texts, locale ? /saved only on this device/ : /se guardan solo en este dispositivo/, 'privacy and storage information stays');
+    assert.doesNotMatch(texts, locale ? /saved only on this device/ : /se guardan solo en este dispositivo/, 'the first opening says where the records live; Más does not repeat it');
   }
 });
 
@@ -453,7 +457,7 @@ test('24UX6A: Más → Apariencia names the choice in use and opens the chooser:
   assert.equal(chooser.props.selected, 'system', 'a new installation follows the device');
   assert.equal(JSON.stringify([chooser.props.pinned.value, chooser.props.pinned.title, chooser.props.pinned.subtitle]), JSON.stringify(['system', 'Sistema', 'Según el dispositivo · ahora claro']));
   assert.equal(JSON.stringify(chooser.props.options), JSON.stringify([{ value: 'light', title: 'Claro' }, { value: 'dark', title: 'Oscuro' }]));
-  assert.match(chooser.props.note, /^Cambia solo cómo se ve FinanzApp en este dispositivo\. No modifica tus movimientos, tus cuentas ni tus copias de seguridad\.$/);
+  assert.equal(chooser.props.note, undefined, '25O1: no note; the pinned row says what Sistema does');
   appearanceState.system = 'dark';
   assert.equal(screen.render().props.pinned.subtitle, 'Según el dispositivo · ahora oscuro', 'the device\'s current look, read live');
   assert.equal(chooser.props.onChoose('dark'), true);

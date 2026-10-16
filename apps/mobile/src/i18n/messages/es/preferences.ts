@@ -14,11 +14,16 @@ export const preferences = {
     noMatches: 'Sin coincidencias',
     /** Más row subtitle when the value follows the device: "Español · según el dispositivo". */
     followingDevice: '{value} · según el dispositivo',
-    regionNote: 'La región define cómo se escriben las fechas, los números y los importes. No cambia la moneda de tus cuentas.',
-    dataUntouched: 'Cambiar el idioma o la región no modifica tus movimientos, tus cuentas ni tus copias de seguridad.',
+    /** 25O1: the one fact of each chooser, not a disclaimer. Región: what it changes and what it never touches. */
+    regionNote: 'Cambia cómo se escriben fechas y números. Tus importes y monedas no cambian.',
+    /** Idioma (iOS only): iOS draws its own text (Copiar, Pegar, compartir) in the language set for the app in Settings. */
+    languageNote: 'Para que iOS también use este idioma en sus menús, elegilo en Ajustes.',
+    /** The text button under that note: opens FinanzApp's page in iOS Settings. */
+    openSettings: 'Abrir Ajustes',
     saveFailed: 'No se pudo guardar la preferencia. Tu elección anterior sigue activa; probá de nuevo.',
-    /** A region chosen in a development preview that this build does not publish: kept, marked, and the formats that stand in for it (24R2A). */
-    pendingRegion: 'Todavía no disponible en esta versión · formatos de {fallback}',
+    /** A region chosen in a development preview that this build does not publish: kept, marked, and the formats that stand in for it (24R2A).
+     * 25O1: short enough for two lines beside the flag tile on a 375 pt iPhone. */
+    pendingRegion: 'Aún no disponible · formatos de {fallback}',
     /** Más row subtitle for that region: "Japón · formatos de Argentina". */
     pendingSummary: '{value} · formatos de {fallback}',
     /** Footnote of the Región chooser in a development preview only (EXPO_PUBLIC_LOCALE_PREVIEW=1), never in a release. */
@@ -34,6 +39,5 @@ export const preferences = {
     appearanceSystemNowLight: 'Según el dispositivo · ahora claro',
     appearanceSystemNowDark: 'Según el dispositivo · ahora oscuro',
     appearanceSystemDetail: 'Según el dispositivo',
-    appearanceNote: 'Cambia solo cómo se ve FinanzApp en este dispositivo. No modifica tus movimientos, tus cuentas ni tus copias de seguridad.',
   },
 } as const;

@@ -9,7 +9,8 @@ import { MATERIAL_LABELS } from '../../src/ui/material-policy';
 import { usePalette, useThemePreference } from '../../src/ui/theme';
 import { useI18n, useLocalePreferences } from '../../src/i18n/provider';
 import { previewOnlyCurrencies } from '../../src/storage/currency-gate';
-import { preferenceSummary, showsPreference } from '../../src/ui/locale-options';
+import { preferenceSummary, shownRegion, showsPreference } from '../../src/ui/locale-options';
+import { RegionMark } from '../../src/ui/marks';
 
 declare const __DEV__: boolean | undefined;
 // Diagnostic: where this launch read the device languages. "módulo nativo" proves the build links expo-localization.
@@ -34,7 +35,11 @@ const DIAGNOSTICS = typeof __DEV__ !== 'undefined' && __DEV__;
  * 24UX6C (Forest): the same two groups and every route, in a calmer rhythm: each group under a small caps label, one
  * spacing scale between groups, every row led by a 34 pt tile (Finanzas keeps its tinted identities; App y datos takes
  * neutral tiles, so the two groups align on one edge), and the local-storage note and the version as a quiet footer.
- * No row was added, removed or renamed; there is no «Ajustes» destination. */
+ * No row was added, removed or renamed; there is no «Ajustes» destination.
+ *
+ * 25O1: Región leads with the flag of the region its subtitle names (Idioma keeps its glyph: a language has no flag), and
+ * the local-storage footnote is gone (owner decision, app-store-launch.md §13.1): the Backup row's subtitle says when a
+ * copy matters, and the first opening says where the records live. */
 export default function MoreScreen() {
   const { archive, gate = LEDGER_CURRENCIES, review } = useLedger();
   const p = usePalette();
@@ -83,13 +88,10 @@ export default function MoreScreen() {
         <NavigationRow title={t('settings.rows.backup')} subtitle={t('settings.rows.backupSubtitle')} leading={neutral('save-outline')} onPress={() => router.push('/backup')} />
         <NavigationRow title={t('settings.rows.undone')} subtitle={undone ? t('settings.rows.undoneCount', { count: undone }) : t('settings.rows.undoneNone')} leading={neutral('arrow-undo-outline')} onPress={() => router.push('/undone-entries')} />
         {locale && <NavigationRow title={t('preferences.language')} subtitle={preferenceSummary('language', locale.state, t)} leading={neutral('language-outline')} onPress={() => router.push('/language')} />}
-        {locale && showsRegion && <NavigationRow title={t('preferences.region')} subtitle={preferenceSummary('region', locale.state, t)} leading={neutral('globe-outline')} onPress={() => router.push('/region')} />}
+        {locale && showsRegion && <NavigationRow title={t('preferences.region')} subtitle={preferenceSummary('region', locale.state, t)} leading={<RegionMark region={shownRegion(locale.state)} size={34} />} onPress={() => router.push('/region')} />}
         {/* 24UX6A: Sistema, Claro or Oscuro; a device setting like the language and the region. */}
         <NavigationRow title={t('preferences.appearance')} subtitle={appearanceLabel} leading={neutral('contrast-outline')} last onPress={() => router.push('/appearance')} />
       </Surface>
-      <AppText secondary variant="footnote" style={{ paddingHorizontal: 4, paddingTop: 4 }}>
-        {t('settings.localNote')}
-      </AppText>
     </View>
     <View style={{ gap: 2 }}>
       <AppText secondary style={{ textAlign: 'center', fontSize: 13 }}>{t('settings.version', { version: VERSION, release: RELEASE })}</AppText>

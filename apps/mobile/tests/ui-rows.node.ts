@@ -16,6 +16,7 @@ import * as moneyInput from '../src/ui/money-input.ts';
 import type { AppLocale } from '../src/i18n/locale.ts';
 import * as movementAmount from '../src/ui/movement-amount.ts';
 import * as presentation from '../src/ui/presentation.ts';
+import * as flags from '../src/i18n/flags.ts';
 import { darkPalette, lightPalette } from '../src/ui/palette.ts';
 
 // Producto 22.1: the row and field components at source level (React Native
@@ -54,7 +55,7 @@ function load(file: string, extra: Record<string, unknown> = {}, fontScale = 1, 
     './geometry': geometry, './merchant-mark': merchantMark, './movement-amount': movementAmount,
     './motion': { duration: { press: 100, release: 160 }, easeOut: 'ease', selectionHaptic: () => haptics.push('selection'), timing: () => ({}) },
     './money-input': moneyInput,
-    './presentation': {}, './currencies': currencies,
+    './presentation': {}, './currencies': currencies, './marks': { CurrencyMark: 'CurrencyMark' },
     './components': { ...Object.fromEntries(['AccountBadge', 'AppText', 'CategoryBadge', 'DetailRow', 'SelectionRow', 'Field', 'GlyphTile', 'PressFeedback', 'Surface'].map(name => [name, name])), surfaceShadow: () => ({}) },
     ...extra,
   };
@@ -190,7 +191,8 @@ test('the currency row stacks label, full name and code so "Dólares estadounide
   assert.equal(row.props.label, 'Moneda');
   assert.equal(row.props.value, 'Dólares estadounidenses', 'the full name is the primary line, on its own');
   assert.equal(row.props.detail, 'USD · US$', 'the code and symbol are the detail line, never appended to the name');
-  assert.equal(row.props.icon, 'cash-outline');
+  // 25O1: the issuer's flag leads the row, in the 30 pt column a selection row's glyph takes; the label is unchanged.
+  assert.deepEqual([row.props.icon, row.props.leading.type, row.props.leading.props.currency, row.props.leading.props.size], [undefined, 'CurrencyMark', 'USD', 30]);
   assert.equal(row.props.last, true);
   assert.equal(typeof row.props.onPress, 'function');
   assert.equal(nodes(field).some(node => node.type === 'DetailRow'), false, 'no label/value pair that could wrap the code alone');
@@ -207,6 +209,8 @@ test('the currency row stacks label, full name and code so "Dólares estadounide
   assert.deepEqual([list.props.initialNumToRender, list.props.windowSize, list.props.automaticallyAdjustKeyboardInsets, list.props.keyboardDismissMode], [14, 7, true, 'interactive']);
   const items = list.props.data.slice(0, 2).map((item: unknown) => list.props.renderItem({ item }));
   assert.deepEqual(items.map((item: Node) => item.props.accessibilityLabel), ['Pesos argentinos, ARS', 'Dólares estadounidenses, USD']);
+  assert.deepEqual(items.map((item: Node) => nodes(item).filter(node => node.type === 'CurrencyMark').map(node => node.props.currency)), [['ARS'], ['USD']], '25O1: each row its own mark');
+  assert.equal(items.some((item: Node) => nodes(item).some(node => node.type === 'GlyphTile')), false, 'no generic cash tile any more');
   assert.deepEqual(items.map((item: Node) => item.props.accessibilityState.selected), [false, true]);
   assert.ok(nodes(items[1]).some(node => is(node, 'Ionicons') && node.props.name === 'checkmark-circle'), 'the current currency carries the checkmark');
   items[0].props.onPress();
@@ -223,6 +227,7 @@ test('the currency row stacks label, full name and code so "Dólares estadounide
   assert.equal(fact.props.value, 'Pesos argentinos');
   assert.equal(fact.props.detail, 'ARS · $');
   assert.equal(fact.props.onPress, undefined, 'no chevron and nothing to press');
+  assert.equal(fact.props.leading.props.currency, 'ARS', 'the stored currency\'s own mark');
   assert.equal(nodes(fixed).some(node => node.type === 'Modal'), false);
 });
 
@@ -636,6 +641,48 @@ test('24B5: the currency field lists the gate\'s currencies with search over cod
   assert.deepEqual([euro.props.value, euro.props.detail, euro.props.onPress], ['Euros', 'EUR · €', undefined]);
   const dinar = nodes(ui.render('CurrencyField', { value: 'KWD' })).find(node => node.type === 'SelectionRow')!;
   assert.deepEqual([dinar.props.value, dinar.props.detail], ['Dinares kuwaitíes', 'KWD · KWD']);
+});
+
+// 25O1: the real marks (src/ui/marks.tsx) under the currency rows: the issuer's flag, the euro's EU flag, a neutral glyph
+// for a supranational code, all on the inset tile and hidden from VoiceOver.
+const loadMarks = () => load('marks.tsx', { '@expo/vector-icons': { Ionicons: 'Ionicons' }, '../i18n/flags': flags });
+/** What a mark draws: its flag's text, or the fallback glyph's name. */
+const markDrawn = (root: Node) => { const all = nodes(root); return all.find(node => node.type === 'Text')?.props.children ?? 'glyph:' + all.find(node => node.type === 'Ionicons')?.props.name; };
+
+test('25O1: a currency\'s mark is its issuer\'s flag (the euro the EU\'s), XOF and the other supranational codes the neutral cash glyph; a region\'s its own; hidden from VoiceOver', () => {
+  const marks = loadMarks();
+  assert.deepEqual(['ARS', 'USD', 'EUR', 'JPY', 'XOF', 'XAF'].map(currency => markDrawn(marks.render('CurrencyMark', { currency }))), ['🇦🇷', '🇺🇸', '🇪🇺', '🇯🇵', 'glyph:cash-outline', 'glyph:cash-outline']);
+  assert.deepEqual(['AR', 'UY', 'CQ'].map(region => markDrawn(marks.render('RegionMark', { region }))), ['🇦🇷', '🇺🇾', 'glyph:globe-outline'], 'Sark: the neutral globe until iOS draws its flag');
+  for (const tile of [marks.render('FlagTile', { flag: '🇦🇷', fallback: 'globe-outline' }), marks.render('FlagTile', { flag: null, fallback: 'phone-portrait-outline', size: 34 })]) {
+    const view = nodes(tile).find(node => node.type === 'View')!;
+    assert.deepEqual([view.props.accessible, view.props.accessibilityElementsHidden, view.props.importantForAccessibility], [false, true, 'no-hide-descendants']);
+    assert.equal(view.props.style.backgroundColor, '#EEEEF3', 'the inset tile a row\'s glyph sits on');
+  }
+  const flagText = nodes(marks.render('FlagTile', { flag: '🇦🇷', fallback: 'globe-outline' })).find(node => node.type === 'Text')!;
+  assert.equal(flagText.props.allowFontScaling, false, 'the tile keeps its side at every text size, like GlyphTile');
+  assert.equal(marks.render('InlineFlag', { flag: null }), null, 'no flag: nothing inline, not an empty box');
+
+  // The same marks inside the sheet: a supranational row shows the neutral glyph; the label stays name and code.
+  const ui = load('form-controls.tsx', { './marks': marks.exports });
+  const options = ['ARS', 'EUR', 'XOF'].map(code => ({ code, name: i18nFormat.currencyName(code as any), symbol: i18nFormat.currencySymbol(code as any) }));
+  const sheet = ui.render('CurrencySheet', { visible: true, title: 'Elegir moneda', options, value: 'ARS', onClose: () => {}, onChange: () => {} });
+  const list = nodes(sheet).find(node => node.type === 'FlatList')!;
+  const rows = list.props.data.map((item: unknown) => list.props.renderItem({ item }));
+  assert.deepEqual(rows.map((row: Node) => markDrawn(row)), ['🇦🇷', '🇪🇺', 'glyph:cash-outline']);
+  assert.deepEqual(rows.map((row: Node) => row.props.accessibilityLabel), ['Pesos argentinos, ARS', 'Euros, EUR', options[2].name + ', XOF']);
+});
+
+test('25O1: the display sheet\'s currency row leads with that currency\'s mark, and its currency step lists each with its own', () => {
+  const ui = load('form-controls.tsx');
+  const options = ['ARS', 'USD', 'EUR'].map(code => ({ code, name: i18nFormat.currencyName(code as any), symbol: i18nFormat.currencySymbol(code as any) }));
+  const props = { visible: true, mode: 'consolidated', currency: 'EUR', consolidatedOptions: options, singleOptions: options.slice(0, 2), onClose: () => {}, onMode: () => {}, onCurrency: () => {} };
+  let sheet = ui.render('DisplaySheet', props);
+  const row = nodes(sheet).find(node => node.type === 'SelectionRow')!;
+  assert.deepEqual([row.props.icon, row.props.leading.type, row.props.leading.props.currency, row.props.leading.props.size], [undefined, 'CurrencyMark', 'EUR', 30]);
+  row.props.onPress();
+  sheet = ui.render('DisplaySheet', props);
+  const list = nodes(sheet).find(node => node.type === 'FlatList')!;
+  assert.deepEqual(list.props.data.map((item: unknown) => nodes(list.props.renderItem({ item })).find(node => node.type === 'CurrencyMark')!.props.currency), ['ARS', 'USD', 'EUR']);
 });
 
 // ---- 24UX2: the merchant mark --------------------------------------------------------------------------------
