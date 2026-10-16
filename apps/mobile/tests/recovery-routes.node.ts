@@ -1977,14 +1977,18 @@ const storedTransfer = (id: string, fromAccountId: string, toAccountId: string, 
 /** The form's error line as ErrorMessage gets it: the message, and whether VoiceOver is told. */
 const lineOf = (root: Node) => { const { message, announce } = find(root, 'ErrorMessage').props; return { message, announce }; };
 
-test('25Q4: editing a card payment, a debt payment or a collection keeps its card or debt fixed and names itself; every side it offers is one storage accepts, and a deleted card keeps its stored source', async () => {
+test('25Q4: editing a card payment, a debt payment or a collection keeps its card or debt fixed and names itself; every side it offers is one storage accepts, and a deleted card, receivable or cash account keeps its stored side', async () => {
   const es = bindLocale('es-AR');
+  // 25Q4 review: the shortcut's figure leaves the edited transfer out while the card or debt below counts it, and says so.
   const cases = [
-    ['a', 'card-acc', 'Tarjeta', 'Visa', 'Desde', 'Pago', 'Pagar total', 'transferForm.explainCard'],
-    ['a', 'debt-acc', 'Deuda', 'Debo · Juan', 'Desde', 'Pago', 'Saldar total', 'transferForm.explainDebt'],
-    ['rec-acc', 'a', 'Deuda', 'Me deben · Ana', 'Hacia', 'Cobro', 'Cobrar total', 'transferForm.explainDebt'],
+    ['a', 'card-acc', 'Tarjeta', 'Visa', 'Desde', 'Pago', 'Pagar total', 'transferForm.explainCard',
+      'Saldo pendiente sin este pago: ARS 50,00', 'Outstanding balance without this payment: ARS 50.00'],
+    ['a', 'debt-acc', 'Deuda', 'Debo · Juan', 'Desde', 'Pago', 'Saldar total', 'transferForm.explainDebt',
+      'Pendiente sin este pago: ARS 70,00', 'Pending without this payment: ARS 70.00'],
+    ['rec-acc', 'a', 'Deuda', 'Me deben · Ana', 'Hacia', 'Cobro', 'Cobrar total', 'transferForm.explainDebt',
+      'Pendiente sin este cobro: ARS 40,00', 'Pending without this collection: ARS 40.00'],
   ] as const;
-  for (const [fromAccountId, toAccountId, kind, name, free, label, shortcut, explain] of cases) {
+  for (const [fromAccountId, toAccountId, kind, name, free, label, shortcut, explain, caption, english] of cases) {
     const original = storedTransfer('edited', fromAccountId, toAccountId, 1000);
     const root = harness('src/ui/transfer-form.tsx', { original }, { data: { ...withAna, transfers: [original] } }).render();
     assert.deepEqual(nodes(root).filter(node => node.type === 'SelectorCard').map(node => [node.props.label, node.props.value, node.props.fixed]), [[kind, name, true]], name);
@@ -1993,6 +1997,8 @@ test('25Q4: editing a card payment, a debt payment or a collection keeps its car
     assert.deepEqual(offered, ['a', 'b'], name);
     assert.equal(find(root, 'AmountField').props.label, label, name);
     assert.equal(find(root, 'AmountShortcut').props.label, shortcut, name);
+    assert.equal(find(root, 'AmountShortcut').props.caption, caption, name);
+    assert.equal(find(harness('src/ui/transfer-form.tsx', { original }, { data: { ...withAna, transfers: [original] }, locale: 'en-US' }).render(), 'AmountShortcut').props.caption, english);
     assert.ok(nodes(root).some(node => node.type === 'AppText' && node.props.children === es.t(explain)), name);
     // What storage runs on changed sides (changeTransfer): every pair the list offers passes it.
     for (const id of offered) {
@@ -2001,6 +2007,11 @@ test('25Q4: editing a card payment, a debt payment or a collection keeps its car
       assert.doesNotThrow(() => domain.assertTransferSides(pair, withAna.cards, withAna.debts, withAna.accounts), JSON.stringify(pair));
     }
   }
+  // A card already in credit without this payment says so, in the same words.
+  const credited = storedTransfer('edited', 'a', 'card-acc', 1000);
+  const inCredit = harness('src/ui/transfer-form.tsx', { original: credited }, { data: { ...withAna, transfers: [credited],
+    accounts: withAna.accounts.map(item => item.id === 'card-acc' ? { ...item, openingMinor: 2500 } : item) } });
+  assert.equal(find(inCredit.render(), 'AmountShortcut').props.caption, 'A favor sin este pago: ARS 25,00');
   // A payment to a card deleted since still opens, on its stored source (the only side storage accepts), and saves there.
   const original = storedTransfer('edited', 'a', 'card-acc', 1000);
   const deleted = harness('src/ui/transfer-form.tsx', { original }, { data: { ...withAna, cards: [{ ...card, deleted: true }], transfers: [original] } });
@@ -2008,6 +2019,63 @@ test('25Q4: editing a card payment, a debt payment or a collection keeps its car
   find(deleted.render(), 'AmountField').props.onChangeText('20');
   await find(deleted.render(), 'ActionButton', 'Guardar cambios').props.onPress();
   assert.deepEqual(deleted.transferChanges.map(change => [change.after.transfer.fromAccountId, change.after.transfer.toAccountId, change.after.transfer.amountMinor]), [['a', 'card-acc', 2000]]);
+  // 25Q4 review: a collection from a receivable deleted since offers only its stored destination («Destino» would be refused
+  // by storage and freeze the form), and saves there.
+  const collection = storedTransfer('c', 'rec-acc', 'a', 1000);
+  const gone = harness('src/ui/transfer-form.tsx', { original: collection }, { data: { ...withAna, debts: [debt, { ...ana, active: false, deleted: true }], transfers: [collection] } });
+  assert.deepEqual(find(gone.render(), 'AccountField', 'Hacia').props.accounts.map((item: domain.Account) => item.id), ['a']);
+  find(gone.render(), 'Field').props.onChangeText('Cobro viejo');
+  await find(gone.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+  assert.deepEqual(gone.transferChanges.map(change => [change.after.transfer.fromAccountId, change.after.transfer.toAccountId]), [['rec-acc', 'a']]);
+  // A card payment whose cash account was deleted since, with no other cash in its currency: the form still opens on the
+  // stored source (only a new payment needs a live one), and a note-only change saves.
+  const payment = storedTransfer('p', 'a', 'card-acc', 1000);
+  const closed = harness('src/ui/transfer-form.tsx', { original: payment }, { data: { ...liabilityData,
+    accounts: liabilityData.accounts.map(item => item.id === 'a' ? { ...item, deletedAt: '2026-09-20T10:00:00.000Z' } : item), transfers: [payment] } });
+  assert.equal(nodes(closed.render()).some(node => node.type === 'EmptyState'), false, 'never «Agregar cuenta» instead of the form');
+  assert.ok(find(closed.render(), 'AmountField'));
+  assert.deepEqual(find(closed.render(), 'AccountField', 'Desde').props.accounts.map((item: domain.Account) => item.id), ['a']);
+  find(closed.render(), 'Field').props.onChangeText('nota');
+  await find(closed.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+  assert.deepEqual(closed.transferChanges.map(change => [change.after.transfer.fromAccountId, change.after.transfer.note]), [['a', 'nota']]);
+});
+
+test('25Q4 review: a payment or a collection stored the other way round (a debt I owe → cash, cash → a receivable) is edited in the generic form, where it is turned back and saved', async () => {
+  const edit = (original: domain.TransferRecord) => harness('src/ui/transfer-form.tsx', { original }, { data: { ...withAna, transfers: [original] } });
+  const sides = (view: ReturnType<typeof harness>) => view.transferChanges.map(change => [change.after.transfer.fromAccountId, change.after.transfer.toAccountId, change.after.transfer.amountMinor]);
+  for (const original of [storedTransfer('inverted', 'debt-acc', 'a', 1000), storedTransfer('inverted', 'a', 'rec-acc', 1000)]) {
+    const root = edit(original).render();
+    const label = JSON.stringify([original.transfer.fromAccountId, original.transfer.toAccountId]);
+    assert.equal(nodes(root).some(node => node.type === 'SelectorCard'), false, label + ': nothing fixed as if it settled the debt');
+    assert.equal(find(root, 'AmountField').props.label, 'Transferencia', label + ': never «Cobro» or «Pago»');
+    assert.doesNotMatch(find(root, 'AmountShortcut').props.caption, /Pendiente/, label);
+  }
+  // Juan's debt grew by this 10,00 (the shape a pre-25Q4 edit could write): «Desde» → a, «Hacia» → the debt makes it a payment.
+  const owed = edit(storedTransfer('inverted', 'debt-acc', 'a', 1000));
+  find(owed.render(), 'AccountField', 'Desde').props.onChange('a');
+  assert.deepEqual(find(owed.render(), 'AccountField', 'Hacia').props.accounts.map((item: domain.Account) => item.id), ['debt-acc', 'b']);
+  find(owed.render(), 'AccountField', 'Hacia').props.onChange('debt-acc');
+  await find(owed.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+  assert.deepEqual(sides(owed), [['a', 'debt-acc', 1000]]);
+  // Ana's receivable grew by this 10,00: another destination first frees the receivable as the source, then cash receives it.
+  const receivable = edit(storedTransfer('inverted', 'a', 'rec-acc', 1000));
+  find(receivable.render(), 'AccountField', 'Hacia').props.onChange('b');
+  find(receivable.render(), 'AccountField', 'Desde').props.onChange('rec-acc');
+  find(receivable.render(), 'AccountField', 'Hacia').props.onChange('a');
+  await find(receivable.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+  assert.deepEqual(sides(receivable), [['rec-acc', 'a', 1000]]);
+});
+
+test('25Q4 review: a link asking to pay out of a debt I owe, or to pay into a receivable, opens a plain transfer, as a link out of a card does', () => {
+  for (const props of [{ fromAccountId: 'debt-acc' }, { toAccountId: 'rec-acc' }, { fromAccountId: 'debt-acc', maxAmountMinor: '7000', amountMinor: '7000' }]) {
+    const root = harness('src/ui/transfer-form.tsx', props, { data: withAna }).render();
+    const label = JSON.stringify(props);
+    assert.equal(nodes(root).some(node => node.type === 'SelectorCard'), false, label + ': the debt is not fixed as a side');
+    assert.equal(find(root, 'Stack.Screen').props.options.title, 'Entre mis cuentas', label + ': a plain transfer, never «Registrar cobro» or «Registrar pago»');
+    assert.deepEqual([find(root, 'AmountField').props.value, find(root, 'Field').props.value], ['', ''], label + ': no settlement prefill, no default note');
+    assert.deepEqual(find(root, 'AccountField', 'Desde').props.accounts.map((item: domain.Account) => item.id), ['a', 'u', 'b'], label);
+    assert.deepEqual(find(root, 'AccountField', 'Hacia').props.accounts.map((item: domain.Account) => item.id), ['b'], label + ': cash only');
+  }
 });
 
 test('25Q4: an edited debt payment or collection keeps the ceiling a new one has: over it the sentence shows while typing, Save refuses it with one Error tap and writes nothing; within it saves; an older overpayment keeps its stored amount, never more', async () => {
@@ -2064,9 +2132,14 @@ test('25Q4: a new debt payment or collection is capped by what is pending now: a
     assert.deepEqual(view.transfers.map(item => item.amountMinor), [7000], JSON.stringify(props));
   }
   const collect = harness('src/ui/transfer-form.tsx', { fromAccountId: 'rec-acc' }, { data: withAna });
+  // 25Q4 review: a receivable reads what is still owed to the person, never «Saldada» while it is owed.
+  assert.equal(find(collect.render(), 'SelectorCard', 'Deuda').props.detail, 'Pendiente ARS 40,00');
+  assert.equal(find(harness('src/ui/transfer-form.tsx', { fromAccountId: 'rec-acc' }, { data: withAna, locale: 'en-US' }).render(), 'SelectorCard', 'Debt').props.detail, 'Pending ARS 40.00');
   find(collect.render(), 'AmountField').props.onChangeText('40,01');
   await find(collect.render(), 'ActionButton', 'Registrar cobro\u00A0·\u00A0$\u00A040,01').props.onPress();
   assert.deepEqual([lineOf(collect.render()).message, collect.transfers.length], ['transferForm.overObligation', 0]);
+  find(collect.render(), 'AmountField').props.onChangeText('40');
+  assert.equal(find(collect.render(), 'DetailRow', 'Me deben · Ana después').props.value, 'Saldada');
   // A card's credit is modelled: only its caller's cap bounds a new payment.
   const payment = harness('src/ui/transfer-form.tsx', { toAccountId: 'card-acc', maxAmountMinor: '9000' }, { data: liabilityData });
   find(payment.render(), 'AmountField').props.onChangeText('60');
@@ -2092,6 +2165,23 @@ test('25Q4: Pagar tarjeta says an over-balance amount while it is typed, in word
   assert.equal(english, 'The payment is more than the recorded outstanding balance. If your statement has purchases, interest or fees that are missing, record them first as expenses on the card.');
   assert.ok(spanish.startsWith('El pago supera el saldo pendiente'), 'the opening the device checklist pins');
   assert.doesNotMatch(spanish + ' ' + english, /resumen real|actual statement/);
+});
+
+test('25Q4 review: Pagar tarjeta follows a charge recorded while the form is open: the link\'s cap never falls below what the card owes now', async () => {
+  const view = harness('src/ui/transfer-form.tsx', { toAccountId: 'card-acc', maxAmountMinor: '5000' }, { data: liabilityData });
+  find(view.render(), 'AmountField').props.onChangeText('60');
+  assert.equal(lineOf(view.render()).message, 'transferForm.overCardDebt', 'the card owes 50,00 when the form opens');
+  // Back from the background, the foreground catch-up records a 10,00 instalment on the card under the open form.
+  view.setData({ ...liabilityData, records: [...liabilityData.records, domain.initialRecord({ ...entry, id: 'charge', accountId: 'card-acc', amountMinor: 1000 })] });
+  assert.equal(find(view.render(), 'SelectorCard', 'Tarjeta').props.detail, 'Saldo pendiente ARS 60,00');
+  assert.equal(lineOf(view.render()).message, null, 'the recorded balance is never «supera el saldo pendiente»');
+  find(view.render(), 'AmountShortcut').props.onPress();
+  assert.equal(find(view.render(), 'AmountField').props.value, '60', '«Pagar total» fills what the card owes now, not the link\'s 50,00');
+  find(view.render(), 'AmountField').props.onChangeText('60,01');
+  assert.equal(lineOf(view.render()).message, 'transferForm.overCardDebt', 'above it stays refused');
+  find(view.render(), 'AmountField').props.onChangeText('60');
+  await find(view.render(), 'ActionButton').props.onPress();
+  assert.deepEqual([view.transfers.map(item => item.amountMinor).join(','), view.haptics.join(',')], ['6000', 'Success']);
 });
 
 test('25Q4: undoing or restoring a card purchase says how the card will read, in its own words, never «Se sumarán … a Visa»', async () => {
@@ -2122,7 +2212,7 @@ test('25Q4: undoing or restoring a card purchase says how the card will read, in
 test('25Q4: undoing or restoring a card payment, a debt payment or a collection says each side in its own words, and only an undo says where it is restored', () => {
   const ask = (original: domain.TransferRecord, locale: AppLocale = 'es-AR') => {
     const view = harness('app/transfer/[id].tsx', {}, { data: { ...withAna, transfers: [original] }, params: { id: original.transfer.id }, locale });
-    const action = locale === 'es-AR' ? (original.voided ? 'Recuperar transferencia' : 'Deshacer transferencia') : 'Undo transfer';
+    const action = locale === 'es-AR' ? (original.voided ? 'Recuperar transferencia' : 'Deshacer transferencia') : original.voided ? 'Restore transfer' : 'Undo transfer';
     find(view.render(), 'ActionButton', action).props.onPress();
     return view.alerts[0].message;
   };
@@ -2137,6 +2227,13 @@ test('25Q4: undoing or restoring a card payment, a debt payment or a collection 
     + 'Solo cambia el registro en esta app, no mueve dinero en el banco. Podés recuperarla después desde Movimientos deshechos, en Más.');
   assert.equal(ask(payment, 'en-AR'), '50,00 ARS will be added to Prueba ARS. Visa will have an outstanding balance of 50,00 ARS. '
     + 'This only changes the record in this app; it moves no money at the bank. You can restore it later from Undone transactions, in More.');
+  // 25Q4 review: a restore that settles a debt says so by its direction; «la deuda con» is only money the person owes.
+  const undone = (record: domain.TransferRecord) => domain.makeTransferChange('undo', record, 'void', createdAt).after;
+  const collected = undone(storedTransfer('collect', 'rec-acc', 'a', 4000)), paid = undone(storedTransfer('pay', 'a', 'debt-acc', 7000));
+  assert.equal(ask(collected), 'Se sumarán 40,00 ARS a Prueba ARS. Lo que te debe Ana quedará saldado. Solo cambia el registro en esta app, no mueve dinero en el banco.');
+  assert.equal(ask(collected, 'en-AR'), '40,00 ARS will be added to Prueba ARS. What Ana owes you will be settled. This only changes the record in this app; it moves no money at the bank.');
+  assert.equal(ask(paid), 'Se descontarán 70,00 ARS de Prueba ARS. La deuda con Juan quedará saldada. Solo cambia el registro en esta app, no mueve dinero en el banco.');
+  assert.equal(ask(paid, 'en-AR'), '70,00 ARS will be taken from Prueba ARS. Your debt to Juan will be settled. This only changes the record in this app; it moves no money at the bank.');
 });
 
 test('25Q4: restoring a debt payment or a collection over what is pending is refused before any confirmation, with the way to the debt; within it restores; a card payment is not capped', async () => {
@@ -2150,12 +2247,21 @@ test('25Q4: restoring a debt payment or a collection over what is pending is ref
   const p1 = undone(storedTransfer('p1', 'a', 'debt-acc', 5000)), p2 = storedTransfer('p2', 'a', 'debt-acc', 5000);
   const view = restore({ ...withAna, transfers: [p1, p2] }, 'p1');
   assert.equal(JSON.stringify([view.alerts[0].title, view.alerts[0].message, view.alerts[0].buttons.map((button: any) => button.text)]),
-    JSON.stringify(['No se puede recuperar ahora', 'Este pago es mayor que lo que queda pendiente con Juan (20,00 ARS). Recuperarlo pagaría de más.', ['Cancelar', 'Ver deuda']]));
+    JSON.stringify(['No se puede recuperar ahora', 'Este pago es mayor que lo que todavía le debés a Juan (20,00 ARS). Recuperarlo pagaría de más.', ['Cancelar', 'Ver deuda']]));
   view.alerts[0].buttons[1].onPress();
   assert.equal(JSON.stringify(view.pushed), JSON.stringify([{ pathname: '/debt/[id]', params: { id: 'debt' } }]));
   assert.equal(view.transferChanges.length, 0, 'nothing built or sent');
   find(view.render(), 'ActionButton', 'Recuperar transferencia').props.onPress();
   assert.equal(view.alerts.length, 2, 'released: the next tap asks again');
+  // 25Q4 review: Cancelar releases it too (on iOS an alert has no dismissal of its own).
+  view.alerts[1].buttons[0].onPress();
+  find(view.render(), 'ActionButton', 'Recuperar transferencia').props.onPress();
+  assert.equal(view.alerts.length, 3, 'Cancelar released it');
+  // An undo is never capped: undoing the 50,00 payment that left 20,00 asks as usual and says what will be owed again.
+  const undo = harness('app/transfer/[id].tsx', {}, { data: { ...liabilityData, transfers: [storedTransfer('pay', 'a', 'debt-acc', 5000)] }, params: { id: 'pay' } });
+  find(undo.render(), 'ActionButton', 'Deshacer transferencia').props.onPress();
+  assert.equal(undo.alerts[0].title, '¿Deshacer transferencia?');
+  assert.ok(undo.alerts[0].message.includes('Le vas a deber 70,00 ARS a Juan'), undo.alerts[0].message);
   // Within what is pending it restores, as before.
   const within = restore({ ...withAna, transfers: [undone(storedTransfer('p3', 'a', 'debt-acc', 2000)), p2] }, 'p3');
   assert.equal(within.alerts[0].title, '¿Recuperar transferencia?');
@@ -2163,10 +2269,22 @@ test('25Q4: restoring a debt payment or a collection over what is pending is ref
   assert.deepEqual(within.transferChanges.map(change => change.action), ['restore']);
   // A collection: Ana owed 40,00 and a second 30,00 leaves 10,00.
   const collection = restore({ ...withAna, transfers: [undone(storedTransfer('c1', 'rec-acc', 'a', 3000)), storedTransfer('c2', 'rec-acc', 'a', 3000)] }, 'c1');
-  assert.equal(collection.alerts[0].message, 'Este cobro es mayor que lo que queda pendiente con Ana (10,00 ARS). Recuperarlo cobraría de más.');
+  assert.equal(collection.alerts[0].message, 'Este cobro es mayor que lo que Ana todavía te debe (10,00 ARS). Recuperarlo cobraría de más.');
+  // 25Q4 review: in the debt screens' words, in English too.
+  const english = (transfers: domain.TransferRecord[], id: string) => {
+    const view = harness('app/transfer/[id].tsx', {}, { data: { ...withAna, transfers }, params: { id }, locale: 'en-AR' });
+    find(view.render(), 'ActionButton', 'Restore transfer').props.onPress();
+    return view.alerts[0].message;
+  };
+  assert.equal(english([p1, p2], 'p1'), 'This payment is more than you still owe Juan (20,00 ARS). Restoring it would overpay.');
+  assert.equal(english([undone(storedTransfer('c1', 'rec-acc', 'a', 3000)), storedTransfer('c2', 'rec-acc', 'a', 3000)], 'c1'),
+    'This collection is more than Ana still owes you (10,00 ARS). Restoring it would collect too much.');
   // A card's credit is modelled: a 60,00 payment on a card that owes 50,00 is asked as usual.
   assert.equal(restore({ ...withAna, transfers: [undone(storedTransfer('k', 'a', 'card-acc', 6000))] }, 'k').alerts[0].title, '¿Recuperar transferencia?');
   // A deleted debt has no screen to open: the refusal offers only Cancelar.
   const gone = restore({ ...withAna, debts: [{ ...debt, active: false, deleted: true }, ana], transfers: [p1, p2] }, 'p1');
   assert.equal(JSON.stringify([gone.alerts[0].title, gone.alerts[0].buttons.map((button: any) => button.text)]), JSON.stringify(['No se puede recuperar ahora', ['Cancelar']]));
+  gone.alerts[0].buttons[0].onPress();
+  find(gone.render(), 'ActionButton', 'Recuperar transferencia').props.onPress();
+  assert.equal(gone.alerts.length, 2, 'Cancelar, its only button, released it');
 });

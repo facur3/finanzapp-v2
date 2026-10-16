@@ -39,20 +39,26 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
   const hidden = hiddenLiabilityAccountIds(cards, debts);
   const [before] = useState(original);
   const [operation] = useState(() => ({ id: randomUUID(), createdAt: new Date().toISOString() }));
+  const typeOf = (id: string) => accountKind(id, cards, debts);
+  // 25Q4 review: a transfer settles an obligation only in its own direction: cash → a card, cash → a debt I owe, or a debt
+  // owed to me → cash. `side` is where the obligation `id` stands; the other side is cash. The other way round (cash → a
+  // receivable, a debt I owe → cash) settles nothing: it only grows what is owed.
+  const settles = (id: string, side: 'from' | 'to') => typeOf(id) === 'card' ? side === 'to'
+    : debts.some(debt => debt.accountId === id && debt.direction === (side === 'to' ? 'owed_by_me' : 'owed_to_me'));
   // 25B2: a link naming a deleted account or card opens a plain transfer instead; the sides of a stored transfer stay selectable while it is edited.
   const open = (a: Account) => isLiveAccount(a) && !cards.some(card => card.deleted && card.accountId === a.id) && !debts.some(debt => debt.deleted && debt.accountId === a.id);
-  const requestedTarget = accounts.find(a => a.id === requestedTo && open(a));
-  // A card is never a source (24B6): a link asking to transfer out of one opens a plain transfer instead.
-  const requestedSource = accounts.find(a => a.id === requestedFrom && accountKind(a.id, cards, debts) !== 'card' && open(a));
-  const typeOf = (id: string) => accountKind(id, cards, debts);
+  // So does a link naming an obligation the other way round: a card is never a source (24B6), and (25Q4 review) neither is
+  // a debt I owe, nor a receivable a destination.
+  const requestedTarget = accounts.find(a => a.id === requestedTo && open(a) && (typeOf(a.id) === 'cash' || settles(a.id, 'to')));
+  const requestedSource = accounts.find(a => a.id === requestedFrom && open(a) && (typeOf(a.id) === 'cash' || settles(a.id, 'from')));
   const storedFrom = accounts.find(a => a.id === before?.transfer.fromAccountId), storedTo = accounts.find(a => a.id === before?.transfer.toAccountId);
-  // A card payment or debt settlement fixes the obligation side. 25Q4: an edit keeps the stored one fixed (cash → card or
-  // debt is a payment, debt → cash a collection), so it stays the same kind of transfer. Any other stored shape (out of a
-  // card, between two obligations) keeps the generic form. A stored side is never checked with `open`: a payment to a
-  // deleted card or debt still opens.
-  const lockedTo = before ? (storedFrom && storedTo && typeOf(storedFrom.id) === 'cash' && typeOf(storedTo.id) !== 'cash' ? storedTo : null)
+  // A card payment or debt settlement fixes the obligation side. 25Q4: an edit keeps the stored one fixed when the stored
+  // pair settles it, so it stays the same kind of transfer. Any other stored shape (out of a card, between two obligations,
+  // a payment or a collection the other way round) keeps the generic form, where the person can turn it back. A stored side
+  // is never checked with `open`: a payment to a deleted card or debt still opens.
+  const lockedTo = before ? (storedFrom && storedTo && typeOf(storedFrom.id) === 'cash' && settles(storedTo.id, 'to') ? storedTo : null)
     : requestedTarget && hidden.has(requestedTarget.id) ? requestedTarget : null;
-  const lockedFrom = before ? (storedFrom && storedTo && typeOf(storedFrom.id) === 'debt' && typeOf(storedTo.id) === 'cash' ? storedFrom : null)
+  const lockedFrom = before ? (storedFrom && storedTo && typeOf(storedTo.id) === 'cash' && settles(storedFrom.id, 'from') ? storedFrom : null)
     : requestedSource && hidden.has(requestedSource.id) ? requestedSource : null;
   // 25B2: a deleted account is never a side of a new transfer.
   const cash = accounts.filter(a => !hidden.has(a.id) && isLiveAccount(a));
@@ -118,15 +124,21 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
   // 25Q4: paying what I owe or collecting what I am owed settles at most what is pending without the transfer being edited.
   // It is read from the records, as «Saldar» and the shortcut read it, for new and edited payments alike, so the cap no
   // longer lives only in a route parameter. An edit of an older overpayment may keep its stored amount but never raise it.
-  // A card keeps only its caller's cap (its credit is modelled).
+  // (A debt is only ever fixed in the direction that settles it: `settles`.)
   const debtCap = (() => {
-    if (!obligation || obligationKind !== 'debt' || !debts.some(debt => debt.accountId === obligation.id && debt.direction === (lockedTo ? 'owed_by_me' : 'owed_to_me'))) return null;
+    if (!obligation || obligationKind !== 'debt') return null;
     try {
       const outstanding = Math.max(0, lockedTo ? -recorded(obligation) : recorded(obligation));
       return before ? Math.max(before.transfer.amountMinor, outstanding) : outstanding;
     } catch { return null; }
   })();
-  const contextualMax = paramCap === null ? debtCap : debtCap === null ? paramCap : Math.min(paramCap, debtCap);
+  // A card keeps its caller's cap (its credit is modelled). 25Q4 review: a new payment's cap never falls below what the
+  // records say the card owes now, so a charge a catch-up records while the form is open can still be paid in full.
+  const cardCap = (() => {
+    if (paramCap === null || before || !obligation || obligationKind !== 'card') return paramCap;
+    try { return Math.max(paramCap, Math.max(0, -recorded(obligation))); } catch { return paramCap; }
+  })();
+  const contextualMax = cardCap === null ? debtCap : debtCap === null ? cardCap : Math.min(cardCap, debtCap);
   // The screen names what it records, so the title follows a language change; a `title` parameter only serves older deep links.
   const obligationTitle = obligationKind === 'card' ? t('cards.payment.title')
     : obligationKind === 'debt' ? t(lockedTo ? 'debts.payment.title' : 'debts.collection.title') : undefined;
@@ -229,8 +241,11 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
       let fill = Math.max(0, context.minor);
       if (contextualMax !== null && Number.isSafeInteger(contextualMax)) fill = Math.min(fill, contextualMax);
       // A card in credit has nothing to pay; an obligation is pending or settled, never negative; cash is shown as recorded.
-      const figure = obligationKind === 'card' ? (context.minor < 0 ? ['transferForm.figureCredit', -context.minor] as const : ['transferForm.figureDebt', context.minor] as const)
-        : obligationKind === 'debt' ? ['transferForm.figurePending', Math.max(0, context.minor)] as const : ['transferForm.figureBalance', context.minor] as const;
+      // 25Q4 review: an edit's figure leaves this payment or collection out while the cards below count it, so it says so.
+      const figure = obligationKind === 'card' ? (context.minor < 0 ? [before ? 'transferForm.figureWithout.credit' : 'transferForm.figureCredit', -context.minor] as const
+        : [before ? 'transferForm.figureWithout.debt' : 'transferForm.figureDebt', context.minor] as const)
+        : obligationKind === 'debt' ? [!before ? 'transferForm.figurePending' : lockedTo ? 'transferForm.figureWithout.payment' : 'transferForm.figureWithout.collection',
+          Math.max(0, context.minor)] as const : ['transferForm.figureBalance', context.minor] as const;
       const caption = (number: (minor: number, currency: Account['currency']) => string) => t('transferForm.figure', { label: t(figure[0]), currency: context.account.currency, amount: number(figure[1], context.account.currency) });
       return { ...context, fill, text: caption(formatMoneyAmount), spoken: caption(spokenMinor) };
     } catch { return null; }

@@ -117,6 +117,13 @@ export const forms = {
     figureDebt: 'Saldo pendiente',
     figurePending: 'Pendiente',
     figureBalance: 'Saldo registrado',
+    /** 25Q4 review: on an edit, the figure leaves out the payment or collection being edited (the card or debt below counts it). */
+    figureWithout: {
+      debt: 'Saldo pendiente sin este pago',
+      credit: 'A favor sin este pago',
+      payment: 'Pendiente sin este pago',
+      collection: 'Pendiente sin este cobro',
+    },
     /** Caption of the amount shortcut: "Saldo registrado: ARS 1.234,56". */
     figure: '{label}: {currency} {amount}',
     needAccountOut: 'Necesitás una cuenta en {currency} desde donde sale el dinero.',

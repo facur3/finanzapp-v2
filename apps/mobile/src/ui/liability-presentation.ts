@@ -191,7 +191,8 @@ export function accountDisplayName(account: Account, debts: PersonalDebtProfile[
 
 /** 25Q4: how a card or a debt reads after an undo or a restore, for its confirmation, in its own words. A card owes a saldo
  * pendiente, holds an amount a favor or has nothing pending (the entry form's words, never «deuda»). A debt has an amount
- * pending by its direction, or is saldada once nothing is (debtOutstandingMinor's clamp, as every debt screen reads it).
+ * pending by its direction, or is saldada once nothing is (debtOutstandingMinor's clamp, as every debt screen reads it);
+ * 25Q4 review: a receivable is never «la deuda con», which is money the person owes (the glossary, the debt screens).
  * `after` is the ledger with the change applied. Null for a cash account; throws as a balance out of range does. */
 export function balanceAfterSentence(account: Account, after: LedgerSnapshot, cards: readonly CreditCardProfile[], debts: readonly PersonalDebtProfile[],
   money: (minor: number) => string, t: Translate): string | null {
@@ -203,7 +204,7 @@ export function balanceAfterSentence(account: Account, after: LedgerSnapshot, ca
   }
   const debt = debts.find(item => item.accountId === account.id);
   if (!debt) return null;
-  const outstanding = debtOutstandingMinor(debt, after);
-  return outstanding === 0 ? t('transferDetail.debtAfterSettled', { name: debt.counterparty })
-    : t(debt.direction === 'owed_by_me' ? 'transferDetail.debtAfterOwed' : 'transferDetail.debtAfterReceivable', { name: debt.counterparty, amount: money(outstanding) });
+  const outstanding = debtOutstandingMinor(debt, after), owed = debt.direction === 'owed_by_me';
+  return outstanding === 0 ? t(owed ? 'transferDetail.debtAfterSettled' : 'transferDetail.debtAfterReceivableSettled', { name: debt.counterparty })
+    : t(owed ? 'transferDetail.debtAfterOwed' : 'transferDetail.debtAfterReceivable', { name: debt.counterparty, amount: money(outstanding) });
 }

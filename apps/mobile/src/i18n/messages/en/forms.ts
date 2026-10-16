@@ -93,6 +93,12 @@ export const forms: Pick<Messages, 'entryForm' | 'transferForm'> = {
     figureDebt: 'Outstanding balance',
     figurePending: 'Pending',
     figureBalance: 'Recorded balance',
+    figureWithout: {
+      debt: 'Outstanding balance without this payment',
+      credit: 'In credit without this payment',
+      payment: 'Pending without this payment',
+      collection: 'Pending without this collection',
+    },
     figure: '{label}: {currency} {amount}',
     needAccountOut: 'You need an account in {currency} to pay from.',
     needAccountIn: 'You need an account in {currency} to receive the money.',

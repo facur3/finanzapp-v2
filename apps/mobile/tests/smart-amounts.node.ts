@@ -163,16 +163,17 @@ test('Pagar total fills the recorded card debt, never more than the registered d
   assert.equal(view.entries.length, 0, 'a card payment never posts a second expense');
 });
 
-test('Pagar total is bounded by both the live recorded debt and the caller cap', () => {
+test('Pagar total is bounded by the live recorded debt; a caller cap below that debt never lowers it', () => {
   // A stale, larger cap cannot raise the fill above the debt recorded right now.
   const stale = harness({ toAccountId: 'card-acc', maxAmountMinor: '9000' });
   let root = stale.render();
   assert.equal(shortcut(root).caption, 'Saldo pendiente: ARS 50,00');
   shortcut(root).onPress();
   assert.equal(amount(stale.render()).value, '50', 'the live debt bounds the fill');
+  // 25Q4 review: every caller passes the debt it showed, so a smaller cap is a stale one (a charge recorded since).
   const capped = harness({ toAccountId: 'card-acc', maxAmountMinor: '3000' });
   shortcut(capped.render()).onPress();
-  assert.equal(amount(capped.render()).value, '30', 'a smaller cap bounds the fill');
+  assert.equal(amount(capped.render()).value, '50', 'the recorded debt stays payable in full');
   // A card in credit (no debt) offers nothing to pay.
   const credit = harness({ toAccountId: 'card-acc' }, { ...archive, accounts: archive.accounts.map(a => a.id === 'card-acc' ? { ...a, openingMinor: 2500 } : a) });
   root = credit.render();

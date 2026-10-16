@@ -97,18 +97,20 @@ export const activity = {
     voidQuestion: '¿Deshacer transferencia?',
     /** A transfer between two cash accounts (or an older shape between two obligations); a payment or a collection says each side in its own words. */
     effect: '{amount}: se descontarán de {from} y se sumarán a {to}.',
-    /** 25Q4: how a debt reads after an undo or a restore. */
+    /** 25Q4: how a debt reads after an undo or a restore. «Deuda» is only what the person owes (25Q4 review: a receivable is «lo que te debe»). */
     debtAfterOwed: 'Le vas a deber {amount} a {name}.',
     debtAfterReceivable: '{name} te va a deber {amount}.',
     debtAfterSettled: 'La deuda con {name} quedará saldada.',
+    debtAfterReceivableSettled: 'Lo que te debe {name} quedará saldado.',
     /** Ends every transfer undo or restore. */
     recordOnly: 'Solo cambia el registro en esta app, no mueve dinero en el banco.',
     /** An undo only («la transferencia»). */
     voidRecovery: 'Podés recuperarla después desde Movimientos deshechos, en Más.',
-    /** 25Q4: a restored debt payment or collection may settle at most what is pending now; said before any confirmation. */
+    /** 25Q4: a restored debt payment or collection may settle at most what is pending now; said before any confirmation, in
+     * the debt screens' words. */
     restoreBlockedTitle: 'No se puede recuperar ahora',
-    restoreOverPayment: 'Este pago es mayor que lo que queda pendiente con {name} ({amount}). Recuperarlo pagaría de más.',
-    restoreOverCollection: 'Este cobro es mayor que lo que queda pendiente con {name} ({amount}). Recuperarlo cobraría de más.',
+    restoreOverPayment: 'Este pago es mayor que lo que todavía le debés a {name} ({amount}). Recuperarlo pagaría de más.',
+    restoreOverCollection: 'Este cobro es mayor que lo que {name} todavía te debe ({amount}). Recuperarlo cobraría de más.',
     viewDebt: 'Ver deuda',
     statusVoided: 'Deshecha · no afecta los saldos',
     statusBetween: 'Entre tus cuentas · no es gasto ni ingreso',
