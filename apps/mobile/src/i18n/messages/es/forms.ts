@@ -95,7 +95,8 @@ export const forms = {
   transferForm: {
     title: 'Entre mis cuentas',
     editTitle: 'Editar transferencia',
-    overCardDebt: 'El pago supera el saldo pendiente de la tarjeta. Si pagaste de más, registrá primero el resumen real.',
+    /** 25Q4: shown while the amount is typed and on Save; it names what the person can do (a card expense, from «+» → Gasto or the card's «Registrar compra»). */
+    overCardDebt: 'El pago supera el saldo pendiente registrado. Si tu resumen tiene compras, intereses o cargos que faltan, registralos primero como gastos de la tarjeta.',
     overObligation: 'El monto supera el saldo pendiente de esta obligación.',
     futureDate: 'Elegí hoy o una fecha anterior.',
     saveUnverified: 'No pudimos verificar el guardado. Reintentá este mismo envío.',

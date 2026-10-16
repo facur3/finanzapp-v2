@@ -74,7 +74,7 @@ export const forms: Pick<Messages, 'entryForm' | 'transferForm'> = {
   transferForm: {
     title: 'Between my accounts',
     editTitle: 'Edit transfer',
-    overCardDebt: 'The payment is more than the card’s outstanding balance. If you overpaid, record the actual statement first.',
+    overCardDebt: 'The payment is more than the recorded outstanding balance. If your statement has purchases, interest or fees that are missing, record them first as expenses on the card.',
     overObligation: 'The amount is more than what is still pending on this obligation.',
     futureDate: 'Choose today or an earlier date.',
     saveUnverified: 'We could not confirm the save. Retry this same submission.',

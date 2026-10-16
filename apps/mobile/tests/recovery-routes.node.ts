@@ -550,13 +550,17 @@ test('a card payment, debt payment and collection name themselves and write the 
   assert.equal(view.additions.length, 0);
 });
 
-test('a plain transfer between accounts never lists cards or debts, while editing one keeps its original accounts', async () => {
+test('a plain transfer between accounts never lists cards or debts; editing a card payment keeps the card fixed and «Desde» lists only cash', async () => {
   const view = harness('src/ui/transfer-form.tsx', { accountId: 'a' }, { data: liabilityData });
   assert.deepEqual(find(view.render(), 'AccountField', 'Desde').props.accounts.map((item: domain.Account) => item.id), ['a', 'u']);
   assert.deepEqual(find(view.render(), 'AccountField', 'Hacia').props.accounts.map((item: domain.Account) => item.id), []);
   const original = domain.initialTransferRecord({ id: 'pay', fromAccountId: 'a', toAccountId: 'card-acc', amountMinor: 100, note: 'Pago', dateISO: entry.dateISO, createdAt });
   const editing = harness('src/ui/transfer-form.tsx', { original }, { data: { ...liabilityData, transfers: [original] } });
-  assert.deepEqual(find(editing.render(), 'AccountField', 'Hacia').props.accounts.map((item: domain.Account) => item.id), ['card-acc']);
+  const root = editing.render();
+  // 25Q4: the card is the fixed fact a new payment shows; before, it was a «Hacia» choice and was offered in «Desde» too.
+  assert.equal(nodes(root).some(node => node.type === 'AccountField' && node.props.label === 'Hacia'), false);
+  assert.deepEqual(nodes(root).filter(node => node.type === 'SelectorCard').map(node => [node.props.label, node.props.value, node.props.fixed]), [['Tarjeta', 'Visa', true]]);
+  assert.deepEqual(find(root, 'AccountField', 'Desde').props.accounts.map((item: domain.Account) => item.id), ['a']);
 });
 
 test('expense form offers cash accounts and cards but never a personal debt account', () => {
@@ -1751,4 +1755,132 @@ test('25VIS2 (V7): the card or debt a payment settles is a fixed fact, not a dis
   assert.equal(card.props.detail, 'Saldo pendiente ARS 50,00');
   const settle = harness('src/ui/transfer-form.tsx', { toAccountId: 'debt-acc', maxAmountMinor: '7000' }, { data: liabilityData }).render();
   assert.equal(nodes(settle).find(node => node.type === 'SelectorCard')!.props.fixed, true);
+});
+
+// Producto 25Q4: edits and confirmations that keep the money right. An edited payment or collection keeps its card or
+// debt fixed and offers only sides storage accepts; a debt payment or collection settles at most what is pending, read
+// from the records for new and edited ones alike; an amount over the cap is said while it is typed.
+const anaAccount: domain.Account = { ...account, id: 'rec-acc', name: 'Me deben · Ana', openingMinor: 4000 };
+const ana: domain.PersonalDebtProfile = { ...debt, id: 'rec', accountId: anaAccount.id, direction: 'owed_to_me', counterparty: 'Ana' };
+const withAna: domain.LedgerArchive = { ...liabilityData, accounts: [...liabilityData.accounts, anaAccount, destination], debts: [debt, ana] };
+const storedTransfer = (id: string, fromAccountId: string, toAccountId: string, amountMinor: number) =>
+  domain.initialTransferRecord({ id, fromAccountId, toAccountId, amountMinor, note: '', dateISO: entry.dateISO, createdAt });
+/** The form's error line as ErrorMessage gets it: the message, and whether VoiceOver is told. */
+const lineOf = (root: Node) => { const { message, announce } = find(root, 'ErrorMessage').props; return { message, announce }; };
+
+test('25Q4: editing a card payment, a debt payment or a collection keeps its card or debt fixed and names itself; every side it offers is one storage accepts, and a deleted card keeps its stored source', async () => {
+  const es = bindLocale('es-AR');
+  const cases = [
+    ['a', 'card-acc', 'Tarjeta', 'Visa', 'Desde', 'Pago', 'Pagar total', 'transferForm.explainCard'],
+    ['a', 'debt-acc', 'Deuda', 'Debo · Juan', 'Desde', 'Pago', 'Saldar total', 'transferForm.explainDebt'],
+    ['rec-acc', 'a', 'Deuda', 'Me deben · Ana', 'Hacia', 'Cobro', 'Cobrar total', 'transferForm.explainDebt'],
+  ] as const;
+  for (const [fromAccountId, toAccountId, kind, name, free, label, shortcut, explain] of cases) {
+    const original = storedTransfer('edited', fromAccountId, toAccountId, 1000);
+    const root = harness('src/ui/transfer-form.tsx', { original }, { data: { ...withAna, transfers: [original] } }).render();
+    assert.deepEqual(nodes(root).filter(node => node.type === 'SelectorCard').map(node => [node.props.label, node.props.value, node.props.fixed]), [[kind, name, true]], name);
+    const field = find(root, 'AccountField', free);
+    const offered: string[] = field.props.accounts.map((item: domain.Account) => item.id);
+    assert.deepEqual(offered, ['a', 'b'], name);
+    assert.equal(find(root, 'AmountField').props.label, label, name);
+    assert.equal(find(root, 'AmountShortcut').props.label, shortcut, name);
+    assert.ok(nodes(root).some(node => node.type === 'AppText' && node.props.children === es.t(explain)), name);
+    // What storage runs on changed sides (changeTransfer): every pair the list offers passes it.
+    for (const id of offered) {
+      const pair = free === 'Desde' ? { fromAccountId: id, toAccountId } : { fromAccountId, toAccountId: id };
+      if (pair.fromAccountId === fromAccountId && pair.toAccountId === toAccountId) continue;
+      assert.doesNotThrow(() => domain.assertTransferSides(pair, withAna.cards, withAna.debts, withAna.accounts), JSON.stringify(pair));
+    }
+  }
+  // A payment to a card deleted since still opens, on its stored source (the only side storage accepts), and saves there.
+  const original = storedTransfer('edited', 'a', 'card-acc', 1000);
+  const deleted = harness('src/ui/transfer-form.tsx', { original }, { data: { ...withAna, cards: [{ ...card, deleted: true }], transfers: [original] } });
+  assert.deepEqual(find(deleted.render(), 'AccountField', 'Desde').props.accounts.map((item: domain.Account) => item.id), ['a']);
+  find(deleted.render(), 'AmountField').props.onChangeText('20');
+  await find(deleted.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+  assert.deepEqual(deleted.transferChanges.map(change => [change.after.transfer.fromAccountId, change.after.transfer.toAccountId, change.after.transfer.amountMinor]), [['a', 'card-acc', 2000]]);
+});
+
+test('25Q4: an edited debt payment or collection keeps the ceiling a new one has: over it the sentence shows while typing, Save refuses it with one Error tap and writes nothing; within it saves; an older overpayment keeps its stored amount, never more', async () => {
+  const edit = (data: domain.LedgerArchive, original: domain.TransferRecord) =>
+    harness('src/ui/transfer-form.tsx', { original }, { data: { ...data, transfers: [...data.transfers ?? [], original] } });
+  // Juan is owed 70,00 without this 30,00 payment: the most the edit may settle.
+  const view = edit(liabilityData, storedTransfer('p', 'a', 'debt-acc', 3000));
+  find(view.render(), 'AmountField').props.onChangeText('70,01');
+  assert.deepEqual(lineOf(view.render()), { message: 'transferForm.overObligation', announce: false }, 'shown while typed, not spoken');
+  assert.equal(nodes(view.render()).some(node => node.type === 'DetailRow' && node.props.label === 'Debo · Juan después'), false);
+  const save = find(view.render(), 'ActionButton', 'Guardar cambios');
+  assert.equal(save.props.disabled, false);
+  await save.props.onPress();
+  assert.deepEqual(lineOf(view.render()), { message: 'transferForm.overObligation', announce: true }, 'what Save refused is spoken');
+  assert.deepEqual([view.haptics.join(','), view.transferChanges.length], ['Error', 0]);
+  const shortcut = find(view.render(), 'AmountShortcut');
+  assert.equal(shortcut.props.label, 'Saldar total');
+  shortcut.props.onPress();
+  assert.equal(find(view.render(), 'AmountField').props.value, '70', 'what is pending, never the cash balance');
+  find(view.render(), 'AmountField').props.onChangeText('70');
+  assert.equal(find(view.render(), 'DetailRow', 'Debo · Juan después').props.value, 'Saldada');
+  await find(view.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+  assert.deepEqual(view.transferChanges.map(change => [change.after.transfer.toAccountId, change.after.transfer.amountMinor]), [['debt-acc', 7000]]);
+  // Ana owes 40,00 without this 10,00 collection.
+  const collect = edit(withAna, storedTransfer('c', 'rec-acc', 'a', 1000));
+  find(collect.render(), 'AmountField').props.onChangeText('40,01');
+  await find(collect.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+  assert.deepEqual([lineOf(collect.render()).message, collect.haptics.join(','), collect.transferChanges.length], ['transferForm.overObligation', 'Error', 0]);
+  find(collect.render(), 'AmountField').props.onChangeText('40');
+  await find(collect.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+  assert.deepEqual(collect.transferChanges.map(change => change.after.transfer.amountMinor), [4000]);
+  // An older overpayment (30,00 and 90,00 on 70,00): the debt reads «Saldada», and the edit keeps 90,00 but never raises it.
+  const older = { ...liabilityData, transfers: [storedTransfer('q1', 'a', 'debt-acc', 3000)] }, q2 = storedTransfer('q2', 'a', 'debt-acc', 9000);
+  const noteOnly = edit(older, q2);
+  assert.equal(find(noteOnly.render(), 'SelectorCard', 'Deuda').props.detail, 'Saldada', 'never «Pendiente ARS 50,00»');
+  find(noteOnly.render(), 'Field').props.onChangeText('Pago viejo');
+  await find(noteOnly.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+  assert.deepEqual(noteOnly.transferChanges.map(change => [change.after.transfer.amountMinor, change.after.transfer.note]), [[9000, 'Pago viejo']]);
+  const raised = edit(older, q2);
+  find(raised.render(), 'AmountField').props.onChangeText('90,01');
+  await find(raised.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+  assert.deepEqual([lineOf(raised.render()).message, raised.transferChanges.length], ['transferForm.overObligation', 0]);
+});
+
+test('25Q4: a new debt payment or collection is capped by what is pending now: a link without a cap or with a stale one cannot overpay; a card keeps its link\'s cap', async () => {
+  for (const props of [{ toAccountId: 'debt-acc' }, { toAccountId: 'debt-acc', maxAmountMinor: '9000' }]) {
+    const view = harness('src/ui/transfer-form.tsx', props, { data: liabilityData });
+    find(view.render(), 'AmountField').props.onChangeText('70,01');
+    assert.deepEqual(lineOf(view.render()), { message: 'transferForm.overObligation', announce: false }, JSON.stringify(props));
+    await find(view.render(), 'ActionButton', 'Registrar pago\u00A0·\u00A0$\u00A070,01').props.onPress();
+    assert.equal(view.transfers.length, 0, JSON.stringify(props));
+    find(view.render(), 'AmountField').props.onChangeText('70');
+    await find(view.render(), 'ActionButton', 'Registrar pago\u00A0·\u00A0$\u00A070,00').props.onPress();
+    assert.deepEqual(view.transfers.map(item => item.amountMinor), [7000], JSON.stringify(props));
+  }
+  const collect = harness('src/ui/transfer-form.tsx', { fromAccountId: 'rec-acc' }, { data: withAna });
+  find(collect.render(), 'AmountField').props.onChangeText('40,01');
+  await find(collect.render(), 'ActionButton', 'Registrar cobro\u00A0·\u00A0$\u00A040,01').props.onPress();
+  assert.deepEqual([lineOf(collect.render()).message, collect.transfers.length], ['transferForm.overObligation', 0]);
+  // A card's credit is modelled: only its caller's cap bounds a new payment.
+  const payment = harness('src/ui/transfer-form.tsx', { toAccountId: 'card-acc', maxAmountMinor: '9000' }, { data: liabilityData });
+  find(payment.render(), 'AmountField').props.onChangeText('60');
+  await find(payment.render(), 'ActionButton', 'Registrar pago\u00A0·\u00A0$\u00A060,00').props.onPress();
+  assert.deepEqual(payment.transfers.map(item => item.amountMinor), [6000]);
+});
+
+test('25Q4: Pagar tarjeta says an over-balance amount while it is typed, in words naming what the app can do; Save stays enabled and refuses it once, spoken; the cap stays', async () => {
+  const view = harness('src/ui/transfer-form.tsx', { toAccountId: 'card-acc', maxAmountMinor: '5000' }, { data: liabilityData });
+  find(view.render(), 'AmountField').props.onChangeText('60');
+  assert.deepEqual(lineOf(view.render()), { message: 'transferForm.overCardDebt', announce: false }, 'shown while typed, not spoken');
+  const save = find(view.render(), 'ActionButton', 'Registrar pago\u00A0·\u00A0$\u00A060,00');
+  assert.deepEqual([save.props.disabled, view.transfers.length], [false, 0]);
+  await save.props.onPress();
+  assert.deepEqual(lineOf(view.render()), { message: 'transferForm.overCardDebt', announce: true });
+  assert.deepEqual([view.haptics.join(','), view.transfers.length], ['Error', 0]);
+  find(view.render(), 'AmountField').props.onChangeText('50');
+  assert.equal(find(view.render(), 'ErrorMessage').props.message, null);
+  await find(view.render(), 'ActionButton', 'Registrar pago\u00A0·\u00A0$\u00A050,00').props.onPress();
+  assert.deepEqual(view.transfers.map(item => item.amountMinor), [5000]);
+  const spanish = bindLocale('es-AR').errorText('transferForm.overCardDebt'), english = bindLocale('en-US').errorText('transferForm.overCardDebt');
+  assert.equal(spanish, 'El pago supera el saldo pendiente registrado. Si tu resumen tiene compras, intereses o cargos que faltan, registralos primero como gastos de la tarjeta.');
+  assert.equal(english, 'The payment is more than the recorded outstanding balance. If your statement has purchases, interest or fees that are missing, record them first as expenses on the card.');
+  assert.ok(spanish.startsWith('El pago supera el saldo pendiente'), 'the opening the device checklist pins');
+  assert.doesNotMatch(spanish + ' ' + english, /resumen real|actual statement/);
 });
