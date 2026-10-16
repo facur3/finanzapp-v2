@@ -508,12 +508,18 @@ test('new account retry is frozen and honors requested USD currency', async () =
   const view = harness('app/new-account.tsx', {}, { params: { currency: 'USD' }, addAccount: async () => { if (++attempts === 1) throw new Error('Refresh failed'); } });
   assert.equal(find(view.render(), 'CurrencyField').props.value, 'USD', 'the requested currency is preselected in the currency row');
   find(view.render(), 'Field').props.onChangeText('Nueva');
+  // 25Q4 review: an amount Save lets through but cannot read is refused before anything is sent: Error, still editable.
+  find(view.render(), 'AmountField').props.onChangeText('12abc');
+  await find(view.render(), 'ActionButton').props.onPress();
+  assert.deepEqual([view.haptics.splice(0).join(','), view.newAccounts.length, find(view.render(), 'Field').props.editable], ['Error', 0, true]);
   find(view.render(), 'AmountField').props.onChangeText('100');
   await find(view.render(), 'ActionButton').props.onPress();
   assert.equal(find(view.render(), 'Field').props.editable, false);
+  assert.equal(view.haptics.splice(0).join(','), 'Warning', 'sent with an unknown outcome: frozen for the exact retry');
   await find(view.render(), 'ActionButton', 'Reintentar guardado').props.onPress();
   assert.deepEqual(view.newAccounts[0], view.newAccounts[1]);
   assert.equal(view.backs(), 1);
+  assert.equal(view.haptics.join(','), 'Success');
 });
 test('a backup containing only a new transfer still offers import with correct counts', async () => {
   const json = JSON.stringify(domain.createRecoveryBackup({ ...transferData, transfers: [domain.initialTransferRecord(transfer)] }));

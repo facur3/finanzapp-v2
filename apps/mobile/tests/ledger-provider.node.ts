@@ -7,6 +7,7 @@ import * as domain from '@finanzapp/domain';
 import { es } from '../src/i18n/messages/es/index.ts';
 import * as ledgerSession from '../src/storage/ledger-session.ts';
 import type { CatchUps, LedgerSession } from '../src/storage/ledger-session.ts';
+import { REVIEW_ITEM_CHANGED_MESSAGE } from '../src/storage/review-database.ts';
 
 // 25Q4: LedgerProvider itself, its React hosts replaced by a minimal hook stub: the banner it shows after an open, a
 // return to the foreground and each kind of write. Storage is scripted here; the passes themselves run on real SQLite
@@ -21,11 +22,13 @@ type Script = {
   recurring: () => Promise<number>;
   plan: () => Promise<string | null>;
   restore: () => Promise<CatchUps>;
+  /** 25Q4 review: the review store's Confirmar (its own transitions run on real SQLite in tests/review-store.node.ts). */
+  confirm: () => Promise<{ recorded: boolean; warning: string | null }>;
 };
 
 function provider(change: Partial<Script> = {}) {
   const script: Script = { open: async () => session(), refresh: async () => session(), read: async () => empty, recurring: async () => 0, plan: async () => null,
-    restore: async () => ({ recurringError: false, installmentError: false }), ...change };
+    restore: async () => ({ recurringError: false, installmentError: false }), confirm: async () => ({ recorded: true, warning: null }), ...change };
   const source = readFileSync(new URL('../src/storage/LedgerProvider.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   // One cell per hook call of each kind, in call order (React's rule: the same hooks in the same order on every render).
@@ -67,9 +70,10 @@ function provider(change: Partial<Script> = {}) {
       createEntry: async () => {}, saveRecurringRule: async () => {} },
     './ledger-session': { ...ledgerSession, openLedger: () => script.open(), refreshLedger: () => script.refresh(), savePurchasePlan: () => script.plan(),
       restoreFromBackup: () => script.restore() },
-    // The review file is out of scope: it never opens, which the ledger tolerates.
-    './nativeDatabase': { openLedgerDatabase: async () => ({}), openReviewDatabase: async () => { throw new Error('no review file'); } },
-    './review-database': {},
+    // 25Q4 review: the review file opens to a scripted store with an empty tray, so Confirmar reaches the provider's rule.
+    './nativeDatabase': { openLedgerDatabase: async () => ({}), openReviewDatabase: async () => ({}) },
+    './review-database': { openReviewStore: async () => ({ confirm: () => script.confirm() }),
+      loadReviewTray: async () => ({ writable: true, items: [], unreadable: [], conflicts: [] }) },
   };
   const module = { exports: {} as { LedgerProvider?: (props: { children: null }) => { props: { value: any } } } };
   runInNewContext(code, { module, exports: module.exports, process: { env: {} }, Error, Promise, require: (name: string) => {
@@ -135,6 +139,22 @@ test('25Q4: a failed catch-up stays in the banner until a pass succeeds: a write
   view.script.refresh = async () => session();
   await view.foreground();
   assert.equal(view.value().error, null);
+});
+
+test('25Q4 review: Confirmar keeps a catch-up banner it did not earn: a movement leaves it, a refusal leaves it, a plan whose recognition failed joins it', async () => {
+  const view = provider({ open: async () => session({ installmentError: true }) });
+  assert.equal((await view.start()).error, storage.installmentsFailed);
+  assert.equal((await view.value().confirmReview('item', 0)).recorded, true);
+  assert.equal(view.value().error, storage.installmentsFailed, 'an expense ran no instalment pass (a null warning): the banner and its retry stay');
+  view.script.confirm = async () => { throw new Error(REVIEW_ITEM_CHANGED_MESSAGE); };
+  await assert.rejects(view.value().confirmReview('item', 0), { message: REVIEW_ITEM_CHANGED_MESSAGE });
+  assert.equal(view.value().error, storage.installmentsFailed, 'a refused Confirmar wrote nothing: the banner is as it was');
+  view.script.refresh = async () => session({ recurringError: true });
+  await view.foreground();
+  assert.equal(view.value().error, storage.verifyFailed);
+  view.script.confirm = async () => ({ recorded: true, warning: storage.installmentsFailed });
+  await view.value().confirmReview('item', 0);
+  assert.equal(view.value().error, storage.catchUpsFailed, 'a plan whose first instalments could not be recognised joins the recurring half');
 });
 
 test('25Q4: an open refused for a newer file or a migration rolled back whole says so; anything else is the calm open sentence, never the engine\'s text', async () => {

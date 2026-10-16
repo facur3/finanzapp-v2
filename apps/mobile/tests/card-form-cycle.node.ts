@@ -36,6 +36,8 @@ function harness(props: { original?: domain.CreditCardProfile } = {}, options: O
   const added: { account: domain.Account; card: domain.CreditCardProfile; rows: readonly domain.CardCycleDates[] | undefined }[] = [];
   const saved: { card: domain.CreditCardProfile; intent: unknown }[] = [];
   const alerts: { title: string; message: string; buttons: { text: string; onPress?: () => void }[] }[] = [];
+  // 25Q4 review: each notification haptic by its helper's name (tests/motion.node.ts pins the type each one sends).
+  const haptics: string[] = [];
   const jsx = (type: unknown, props: Record<string, unknown>) => ({ type, props });
   const ledger = { useLedger: () => ({ archive: data, snapshot: domain.snapshotFromArchive(data),
     addCard: async (account: domain.Account, profile: domain.CreditCardProfile, rows?: readonly domain.CardCycleDates[]) => { added.push({ account, card: profile, rows }); },
@@ -51,7 +53,7 @@ function harness(props: { original?: domain.CreditCardProfile } = {}, options: O
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, router: { canGoBack: () => true, back: () => { backs++; }, push: (to: unknown) => { pushed.push(to); }, replace: (to: unknown) => { replaced.push(to); },
       dismissTo: (to: unknown) => { dismissed.push(to); } } },
     'expo-crypto': { randomUUID: () => 'id-' + (++uuid) },
-    './motion': { successHaptic() {}, errorHaptic() {}, warningHaptic() {}, selectionHaptic() {} },
+    './motion': { successHaptic() { haptics.push('Success'); }, errorHaptic() { haptics.push('Error'); }, warningHaptic() { haptics.push('Warning'); }, selectionHaptic() {} },
     '@finanzapp/domain': domain,
     '../i18n/provider': { useI18n: () => bindLocale(locale) },
     '../storage/LedgerProvider': ledger,
@@ -79,7 +81,7 @@ function harness(props: { original?: domain.CreditCardProfile } = {}, options: O
   return {
     render: () => { cursor = 0; refCursor = 0; return module.exports.CardForm(props); },
     setData: (next: domain.LedgerArchive) => { data = next; }, setDay: (next: string) => { day = next; }, setLocale: (next: AppLocale) => { locale = next; },
-    added, saved, alerts, backs: () => backs, dismissed, replaced, removed: () => removed, removedCards, pushed,
+    added, saved, alerts, backs: () => backs, dismissed, replaced, removed: () => removed, removedCards, pushed, haptics,
   };
 }
 
@@ -192,6 +194,7 @@ test('24T2: a new card refuses a closing before today and a due on or before the
   assert.equal(bindLocale('en-US').errorText(message), 'The next closing date must be today or later.');
   assert.equal(view.added.length, 0);
   assert.equal(find(view.render(), 'Field', 'Nombre de la tarjeta').props.editable, true, 'nothing was sent: still editable');
+  assert.equal(view.haptics.join(','), 'Error', '25Q4 review: refused before sending, so Error');
   for (const dueISO of ['2026-09-28', '2026-09-27']) {
     pick(view, 'Próximo cierre', '2026-09-28');
     pick(view, 'Vencimiento', dueISO);
@@ -204,6 +207,7 @@ test('24T2: a new card refuses a closing before today and a due on or before the
   pick(view, 'Vencimiento', '2026-10-05');
   await saveButton(view.render()).props.onPress();
   assert.equal(view.added.length, 1);
+  assert.equal(view.haptics.join(','), 'Error,Error,Error,Success', 'one tap per attempt');
 });
 
 // ---- an existing card ----------------------------------------------------------------------------------------------
@@ -328,10 +332,12 @@ test('24T2: a failed save keeps the card and its dates frozen; the retry resends
   assert.equal(view.backs(), 0);
   assert.equal(find(root, 'DateField', 'Vencimiento').props.disabled, true, 'locked while frozen');
   assert.equal(saveButton(root).props.label, 'Reintentar guardado');
+  assert.equal(view.haptics.join(','), 'Warning', '25Q4 review: sent with an unknown outcome, so Warning');
   await saveButton(root).props.onPress();
   assert.equal(view.saved.length, 2);
   assert.equal(JSON.stringify(view.saved[1]), JSON.stringify(view.saved[0]), 'the same card and intent');
   assert.equal(view.backs(), 1);
+  assert.equal(view.haptics.join(','), 'Warning,Success');
 
   const archiving = harness({ original: card });
   root = archiving.render();

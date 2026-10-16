@@ -741,6 +741,41 @@ test('24T3 (review): an undo storage refuses before writing releases the change:
   assert.equal(view.failures.join(','), 'Error,Warning', '25Q4: frozen for the retry, so Warning');
 });
 
+test('25Q4 review: the undo of a devolución storage refuses before writing releases the change with one Error tap, and the next tap asks again with a new change', async () => {
+  let failure: Error | null = new Error(domain.OPERATION_CHANGED_MESSAGE);
+  const view = harness('app/operation/[id].tsx', { params: { id: 'r1' }, data: refundOf(base(), 'r1', 20000, '2026-09-20'), change: async () => { if (failure) throw failure; } });
+  find(view.render(), 'ActionButton', 'Deshacer devolución').props.onPress();
+  view.alerts[0].buttons[1].onPress?.();
+  await flush();
+  const root = view.render();
+  assert.equal(has(root, 'ActionButton', 'Reintentar cambio'), false, 'released: never a retry of a change storage always refuses');
+  assert.equal(view.failures.join(','), 'Error', 'nothing was written');
+  failure = null;
+  find(root, 'ActionButton', 'Deshacer devolución').props.onPress();
+  assert.equal(JSON.stringify([view.alerts.length, view.alerts[1].title]), JSON.stringify([2, '¿Deshacer devolución?']), 'asked again');
+  view.alerts[1].buttons[1].onPress?.();
+  await flush();
+  assert.equal(view.changes.length, 2);
+  assert.notEqual(view.changes[1].id, view.changes[0].id, 'a new change, built from the ledger as it is now');
+  assert.equal(JSON.stringify([view.failures.join(','), view.haptics()]), JSON.stringify(['Error', 1]));
+});
+
+test('25Q4 review: a devolución whose undo the dry run refuses on the tap (the ledger changed under the drawn button) taps Error and sends nothing', () => {
+  // On 2 Oct, $ 1.150 = $ 900 back to the card and instalments 12, 11 and half of 10 (closing 20 Oct) reduced.
+  const op = domain.newPlanRefund(withPlan(TODAY), { id: 'pr', planId: tv.id, amountMinor: 115000, dateISO: TODAY, todayISO: TODAY, createdAt: at(TODAY) });
+  assert.ok(op.reductions.some(row => row.number === 10));
+  const data = domain.applyNewOperation(withPlan(TODAY), op, TODAY);
+  const view = harness('app/operation/[id].tsx', { params: { id: 'pr' }, data });
+  const root = view.render();
+  // The dry run undoes before the plan's catch-up, so a later clock alone never changes its answer. Here the ledger the
+  // button was drawn from gains instalment 10, recorded reduced on its closing, before the tap.
+  NOW = new Date('2026-10-21T12:00:00').getTime();
+  data.records.push(...domain.planCatchUpInserts(data, tv.id, '2026-10-21'));
+  find(root, 'ActionButton', 'Deshacer devolución').props.onPress();
+  assert.equal(JSON.stringify([view.failures.join(','), view.alerts.length, view.changes.length]), JSON.stringify(['Error', 0, 0]));
+  assert.equal(find(view.render(), 'ErrorMessage').props.message, domain.operationGuardMessage('refund-recorded', 'void'), 'the dry run\'s reason');
+});
+
 // ---- 24T3 (owner review): a devolución de compra is not a bank reintegro -----------------------------------------------
 
 test('24T3 (owner review): «Registrar devolución» says it is a devolución de compra, and its help sends a bank reintegro or cashback to an income', () => {

@@ -59,6 +59,8 @@ interface Ledger {
   refreshes?: number;
   /** The provider's count of review operations (a stale tray re-reads the store when it changes). */
   reviewVersion?: number;
+  /** 25Q4 review: null while the ledger has not opened (default: the fixture archive). */
+  archive?: domain.LedgerArchive | null;
 }
 function harness(file: string, ledger: Ledger, params: Record<string, string> = {}, options: { locale?: AppLocale; dev?: boolean; canGoBack?: boolean; fontScale?: number; height?: number } = {}) {
   const source = readFileSync(new URL('../app/' + file, import.meta.url), 'utf8');
@@ -79,8 +81,9 @@ function harness(file: string, ledger: Ledger, params: Record<string, string> = 
   const haptics: string[] = [];
   const motion = { successHaptic: () => { haptics.push('Success'); }, errorHaptic: () => { haptics.push('Error'); } };
   const i18n = { useI18n: () => bindLocale(options.locale ?? 'es-AR') };
+  const opened = ledger.archive === undefined ? archive : ledger.archive;
   const useLedger = () => ({
-    archive, snapshot: domain.snapshotFromArchive(archive), review: ledger.review, reviewVersion: ledger.reviewVersion ?? 0,
+    archive: opened, snapshot: opened ? domain.snapshotFromArchive(opened) : null, review: ledger.review, reviewVersion: ledger.reviewVersion ?? 0,
     confirmReview: (...args: unknown[]) => { ledger.calls.push(['confirm', ...args]); return ledger.confirmResult?.() ?? Promise.resolve({ recorded: true }); },
     updateReview: (...args: unknown[]) => { ledger.calls.push(['update', ...args]); return ledger.updateResult?.() ?? Promise.resolve(args[2]); },
     dismissReview: (...args: unknown[]) => { ledger.calls.push(['dismiss', ...args]); return ledger.dismissResult?.() ?? Promise.resolve(); },
@@ -470,6 +473,7 @@ test('Editar keeps the item\'s id, source and capture, saves at the revision it 
   assert.equal(JSON.stringify(draft.basis), JSON.stringify(domain.reviewBasis(draft, archive as domain.ReviewArchive)), 'reviewed against the ledger now');
   assert.equal(domain.isStaleReviewDraft(draft, archive as domain.ReviewArchive), false);
   assert.equal(view.nav.back, 1);
+  assert.equal(view.haptics.join(','), 'Success', '25Q4 review: a saved edit taps Success, as every other «Guardar cambios» does');
 });
 
 test('Editar refused because the proposal changed since it opened: the message shows, the editor stays open, nothing else is written', async () => {
@@ -574,16 +578,19 @@ test('the editor only opens a pending item of a writable store', async () => {
   }
 });
 
-test('25Q4: Editar keeps a close button while the proposal resolves and when it is no longer pending; with nothing behind, it goes to Para revisar', async () => {
-  const ledgers = (): Ledger[] => [{ review: null, calls: [] }, { review: trayOf([]), calls: [], getReviewItem: async () => null }];
-  for (const [index, canGoBack] of [[0, true], [1, true], [0, false], [1, false]] as const) {
-    const view = harness('edit-review/[id].tsx', ledgers()[index], { id: 'gone' }, { canGoBack });
+test('25Q4: Editar keeps a close button while the proposal resolves, when it is no longer pending and before the ledger opens; with nothing behind, it goes to Para revisar', async () => {
+  const pending = itemOf(drafted());
+  // 25Q4 review: the third is a pending proposal whose editor waits for the ledger.
+  const ledgers = (): Ledger[] => [{ review: null, calls: [] }, { review: trayOf([]), calls: [], getReviewItem: async () => null },
+    { review: trayOf([pending]), calls: [], archive: null }];
+  for (const [index, canGoBack] of [[0, true], [1, true], [2, true], [0, false], [1, false], [2, false]] as const) {
+    const view = harness('edit-review/[id].tsx', ledgers()[index], { id: index === 2 ? pending.id : 'gone' }, { canGoBack });
     view.render();
     await settle();
     const root = view.render();
-    assert.equal(all(root, 'EmptyState')[0]?.props.title, index ? 'Esta propuesta ya no está pendiente' : undefined, 'resolving says nothing yet');
+    assert.equal(all(root, 'EmptyState')[0]?.props.title, index === 1 ? 'Esta propuesta ya no está pendiente' : undefined, 'resolving says nothing yet');
     const close = all(root, 'Stack.Screen')[0].props.options.headerLeft();
-    assert.deepEqual([close.type, close.props.name, close.props.label], ['IconButton', 'close', 'Cerrar']);
+    assert.deepEqual([close.type, close.props.name, close.props.label], ['IconButton', 'close', 'Cerrar'], String(index));
     close.props.onPress();
     assert.deepEqual([view.nav.back, view.nav.replaced], canGoBack ? [1, []] : [0, ['/review']]);
   }

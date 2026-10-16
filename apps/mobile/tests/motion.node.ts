@@ -280,6 +280,30 @@ test('25Q4: every haptic comes from motion.tsx, and a write that taps Success al
   const silent = files.filter(file => file !== 'src/ui/motion.tsx' && read(file).includes('successHaptic()')
     && !read(file).includes('errorHaptic()') && !read(file).includes('warningHaptic()'));
   assert.deepEqual(silent, [], 'a write that taps Success taps Error or Warning in its catch');
+  // 25Q4 review: per catch, not per file. Every try that taps Success catches its failure with exactly one Error or Warning
+  // tap on every path: one call, or an if/else whose branches tap once each.
+  const failures = ['errorHaptic', 'warningHaptic'];
+  const calls = (node: ts.Node, names: string[]) => ts.isCallExpression(node) && ts.isIdentifier(node.expression) && names.includes(node.expression.text);
+  const contains = (node: ts.Node, names: string[]): boolean => calls(node, names) || !!ts.forEachChild(node, child => contains(child, names) || undefined);
+  /** The failure taps on every path through `node`; null when two paths differ or a tap is anywhere else. */
+  const taps = (node: ts.Node): number | null => {
+    if (ts.isExpressionStatement(node) && calls(node.expression, failures)) return 1;
+    if (ts.isBlock(node)) return node.statements.reduce<number | null>((sum, statement) => { const own = taps(statement); return sum === null || own === null ? null : sum + own; }, 0);
+    if (ts.isIfStatement(node)) { const then = taps(node.thenStatement), other = node.elseStatement ? taps(node.elseStatement) : 0; return then === other ? then : null; }
+    return contains(node, failures) ? null : 0;
+  };
+  const unpaired: string[] = [];
+  for (const file of files.filter(file => file !== 'src/ui/motion.tsx' && read(file).includes('successHaptic()'))) {
+    const source = ts.createSourceFile(file, read(file), ts.ScriptTarget.Latest, true, file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+    const visit = (node: ts.Node): void => {
+      if (ts.isTryStatement(node) && node.catchClause && contains(node.tryBlock, ['successHaptic']) && taps(node.catchClause.block) !== 1) {
+        unpaired.push(file + ':' + (source.getLineAndCharacterOfPosition(node.catchClause.getStart()).line + 1));
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(source);
+  }
+  assert.deepEqual(unpaired, [], 'each catch of a write that taps Success taps Error or Warning exactly once');
   // The helpers exist and say what their names say.
   const motion = read('src/ui/motion.tsx');
   const body = (name: string) => {
@@ -287,6 +311,8 @@ test('25Q4: every haptic comes from motion.tsx, and a write that taps Success al
     assert.ok(start >= 0, name);
     return motion.slice(start, motion.indexOf('}', start));
   };
+  assert.ok(body('successHaptic').includes('NotificationFeedbackType.Success)'), '25Q4 review: the harnesses record the helper\'s name, so its type is pinned here');
   assert.ok(body('errorHaptic').includes('NotificationFeedbackType.Error)'));
   assert.ok(body('warningHaptic').includes('NotificationFeedbackType.Warning)'));
+  assert.ok(body('selectionHaptic').includes('selectionAsync()'));
 });
