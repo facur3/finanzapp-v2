@@ -514,7 +514,9 @@ test('24UX6A, 24UX6C2: the month\'s latest expenses, incomes and transfers, newe
   const title = nodes(root).find(n => n.type === 'SectionTitle' && n.props.children === 'Actividad reciente')!;
   assert.equal(title.props.action, 'Ver todos');
   title.props.onAction();
-  assert.deepEqual([alone.navigated.at(-1), alone.pushed.length], ['/activity', 0], 'the tab root is selected, never pushed over Inicio');
+  assert.deepEqual([alone.navigated.at(-1).pathname, alone.pushed.length], ['/activity', 0], 'the tab root is selected, never pushed over Inicio');
+  // 25Q4: with a fresh `reset`: Movimientos opens whole and from the top.
+  assert.match(alone.navigated.at(-1).params.reset, /^\d+$/);
   // A commitment this week: four rows under it, the transfer counted among the four.
   root = routeHarness('(tabs)/index.tsx', {}, data, { recurring: [dueRule()] }).render();
   assert.equal(sectionTitles(root).join('|'), 'Próximos compromisos|Actividad reciente');

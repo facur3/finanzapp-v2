@@ -12,7 +12,7 @@ import { bindLocale } from '../src/i18n/bind.ts';
 // count: after a filter change, after a pause while typing, never on the first render, and never once Movimientos has
 // lost focus (Codex, PR #72: the tab stays mounted under other tabs and pushed screens). How VoiceOver actually speaks
 // it on an iPhone is a device item.
-type Node = { type: string; props: Record<string, any> };
+type Node = { type: string; props: Record<string, any>; key?: string };
 const createdAt = '2026-09-12T12:00:00Z';
 const snapshot: domain.LedgerSnapshot = {
   accounts: [{ id: 'a', name: 'Banco', currency: 'ARS', openingMinor: 0, createdAt }],
@@ -26,7 +26,10 @@ const snapshot: domain.LedgerSnapshot = {
 function harness() {
   const source = readFileSync(new URL('../app/(tabs)/activity.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
-  const jsx = (type: string, props: Record<string, unknown>) => ({ type, props });
+  // The automatic runtime passes an element's key as the third argument.
+  const jsx = (type: string, props: Record<string, unknown>, key?: string) => ({ type, props, key });
+  // 25Q4: the route's params, as a link or the dock last sent them.
+  const params: { reset?: string } = {};
   const state: unknown[] = [];
   const deps: (unknown[] | undefined)[] = [];
   const cleanups: (void | (() => void))[] = [];
@@ -59,7 +62,8 @@ function harness() {
     },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': { View: 'View', AccessibilityInfo: { announceForAccessibility: (text: string) => announced.push(text) } },
-    'expo-router': { router: { push: () => {} }, useFocusEffect: (effect: () => void | (() => void)) => { if (!focusEffect) { focusEffect = effect; blur = effect(); } } },
+    'expo-router': { router: { push: () => {} }, useLocalSearchParams: () => params,
+      useFocusEffect: (effect: () => void | (() => void)) => { if (!focusEffect) { focusEffect = effect; blur = effect(); } } },
     '../../src/storage/LedgerProvider': { useLedger: () => ({ snapshot }) },
     '../../src/ui/components': { ActionButton: 'ActionButton', AppText: 'AppText', Choices: 'Choices', EmptyState: 'EmptyState', SearchField: 'SearchField' },
     '../../src/ui/entry-list': { EntryList: 'EntryList' },
@@ -73,7 +77,7 @@ function harness() {
     return modules[name];
   } });
   const render = () => { cursor = 0; effectCursor = 0; return module.exports.default!(); };
-  return { render, announced, clock, blurNow: () => { if (typeof blur === 'function') blur(); }, focusAgain: () => { blur = focusEffect?.(); } };
+  return { render, announced, clock, params, blurNow: () => { if (typeof blur === 'function') blur(); }, focusAgain: () => { blur = focusEffect?.(); } };
 }
 const flat = (value: any): any[] => !value || typeof value !== 'object' ? [] : Array.isArray(value) ? value.flatMap(flat) : [value, ...flat(value.props?.children)];
 const header = (root: Node) => flat(root.props.header);
@@ -143,4 +147,35 @@ test('Codex (PR #72): a pending count announcement is cancelled when Movimientos
   view.render();
   view.clock.advance(800); // the search still holds «coto», so the announcement waits for the typing pause
   assert.deepEqual(view.announced, ['1 movimiento'], 'back in focus, a change is announced again');
+});
+
+test('25Q4: a link into Movimientos (a new `reset`) shows the whole list from the top without announcing it; the dock\'s repeat of the same params keeps what the person does next', () => {
+  const view = harness();
+  const search = (root: Node) => header(root).find(node => node.type === 'SearchField')!;
+  const choices = (root: Node) => header(root).find(node => node.type === 'Choices')!;
+  let root = view.render();
+  choices(root).props.onChange('expense');
+  root = view.render();
+  search(root).props.onChangeText('coto');
+  root = view.render();
+  view.clock.advance(1000);
+  const heard = view.announced.length;
+  // «Ver todos» or the Assistant's evidence: a fresh value, applied while rendering.
+  view.params.reset = '1700000000000';
+  view.render();
+  root = view.render();
+  assert.deepEqual([search(root).props.value, choices(root).props.value, root.props.dayNet], ['', 'all', true], 'the whole list');
+  assert.equal(root.key, '1700000000000', 'a new list, at its own top');
+  view.clock.advance(1000);
+  assert.equal(view.announced.length, heard, 'an arrival is not the person\'s search: nothing is announced');
+  // The dock re-sends the same params: what the person does next stays, in the same list.
+  search(root).props.onChangeText('sueldo');
+  view.render();
+  root = view.render();
+  assert.deepEqual([search(root).props.value, root.key], ['sueldo', '1700000000000']);
+  // Another link resets again.
+  view.params.reset = '1700000000001';
+  view.render();
+  root = view.render();
+  assert.deepEqual([search(root).props.value, root.key], ['', '1700000000001']);
 });

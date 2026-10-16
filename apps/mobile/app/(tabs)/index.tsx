@@ -199,7 +199,9 @@ export default function HomeScreen() {
               showCategory={namesCategory(rule)} account={snapshot.accounts.find(account => account.id === rule.accountId)!} day={day} last={index === upcoming.length - 1} />)}</Surface>
           </Reflow>}
           {recent.length > 0 && <Reflow fade>
-            <SectionTitle quiet action={t('common.seeAll')} onAction={() => router.navigate('/activity')}>{t('home.recent')}</SectionTitle>
+            {/* 25Q4: «Ver todos» asks for the whole list: Movimientos clears its search, filter and scroll on a new `reset`;
+                the dock keeps them. */}
+            <SectionTitle quiet action={t('common.seeAll')} onAction={() => router.navigate({ pathname: '/activity', params: { reset: String(Date.now()) } })}>{t('home.recent')}</SectionTitle>
             {/* A transfer is its own row (origin → destination, its own tone, «Transferencia» for VoiceOver) and opens its
                 detail; it is never spending or income. */}
             <Surface grouped>{recent.map((item, index) => item.type === 'entry'
