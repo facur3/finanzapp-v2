@@ -2077,6 +2077,20 @@ test('25Q4 review: a payment or a collection stored the other way round (a debt 
   find(receivable.render(), 'AccountField', 'Hacia').props.onChange('a');
   await find(receivable.render(), 'ActionButton', 'Guardar cambios').props.onPress();
   assert.deepEqual(sides(receivable), [['rec-acc', 'a', 1000]]);
+  // Turned back, the pair settles the debt, so it has a new payment's ceiling: what is pending without it (70,00 to Juan,
+  // 40,00 from Ana). The stored 90,00 grew the debt, so it allows nothing more.
+  for (const [original, turn, pending] of [
+    [storedTransfer('inverted', 'debt-acc', 'a', 9000), [['Desde', 'a'], ['Hacia', 'debt-acc']], 7000],
+    [storedTransfer('inverted', 'a', 'rec-acc', 9000), [['Hacia', 'b'], ['Desde', 'rec-acc'], ['Hacia', 'a']], 4000],
+  ] as const) {
+    const view = edit(original);
+    for (const [field, id] of turn) find(view.render(), 'AccountField', field).props.onChange(id);
+    await find(view.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+    assert.deepEqual([lineOf(view.render()).message, view.haptics.join(','), view.transferChanges.length], ['transferForm.overObligation', 'Error', 0], original.transfer.toAccountId);
+    find(view.render(), 'AmountField').props.onChangeText(String(pending / 100));
+    await find(view.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+    assert.deepEqual(view.transferChanges.map(change => change.after.transfer.amountMinor), [pending], original.transfer.toAccountId);
+  }
 });
 
 test('25Q4 review: a link asking to pay out of a debt I owe, or to pay into a receivable, opens a plain transfer, as a link out of a card does', () => {

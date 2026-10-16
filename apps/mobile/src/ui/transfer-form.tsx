@@ -124,12 +124,19 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
   // 25Q4: paying what I owe or collecting what I am owed settles at most what is pending without the transfer being edited.
   // It is read from the records, as «Saldar» and the shortcut read it, for new and edited payments alike, so the cap no
   // longer lives only in a route parameter. An edit of an older overpayment may keep its stored amount but never raise it.
-  // (A debt is only ever fixed in the direction that settles it: `settles`.)
+  // (A debt is only ever fixed in the direction that settles it: `settles`.) 25Q4 review: a payment or a collection stored
+  // the other way round and turned back in the generic form settles the debt too, so it gets a new one's cap: its stored
+  // amount grew the debt, so it allows nothing more.
+  const turnedBack = before && !obligation
+    ? typeOf(fromId) === 'cash' && typeOf(toId) === 'debt' && settles(toId, 'to') ? to
+      : typeOf(toId) === 'cash' && typeOf(fromId) === 'debt' && settles(fromId, 'from') ? from : undefined
+    : undefined;
   const debtCap = (() => {
-    if (!obligation || obligationKind !== 'debt') return null;
+    const debt = obligationKind === 'debt' ? obligation : turnedBack;
+    if (!debt) return null;
     try {
-      const outstanding = Math.max(0, lockedTo ? -recorded(obligation) : recorded(obligation));
-      return before ? Math.max(before.transfer.amountMinor, outstanding) : outstanding;
+      const outstanding = Math.max(0, debt.id === toId ? -recorded(debt) : recorded(debt));
+      return before && obligation ? Math.max(before.transfer.amountMinor, outstanding) : outstanding;
     } catch { return null; }
   })();
   // A card keeps its caller's cap (its credit is modelled). 25Q4 review: a new payment's cap never falls below what the
