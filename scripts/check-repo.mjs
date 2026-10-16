@@ -6,10 +6,10 @@
    2. the legacy web/Capacitor frontend retired by Producto 24REP (recover it from the tag
       `web-frontend-final`, never from a copy in the working tree);
    3. an obvious secret, backup or sensitive configuration (private keys, service credentials,
-      provider tokens, a real FinanzApp backup);
+      provider tokens, a real FinanzApp backup by its name or by its header);
    or when a native or backend source file imports from a retired path. */
 import { execSync } from 'node:child_process';
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { closeSync, existsSync, openSync, readFileSync, readSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 export const GENERATED = [
@@ -35,8 +35,17 @@ export const SENSITIVE_FILES = [
   /\.(pem|key|pfx|cer|crt|der|kdbx)$/,
   /(^|\/)(\.npmrc|\.netrc|\.pgpass|id_(rsa|ed25519|ecdsa)(\.pub)?)$/,
   /(^|\/)finanzapp[^/]*(backup|respaldo|copia)[^/]*\.json$/i,
+  /(^|\/)finanzapp-piloto-[^/]*\.json$/i, // the app's exports before 25Q2 («finanzapp-piloto-<ms>.json»)
+  /(^|\/)(backup|copia|respaldo)[-_ ]?\d{4}-\d{2}-\d{2}[^/]*\.json$/i, // a dated backup under a neutral name
   /(^|\/)(backup|respaldo)s?\/.*\.(json|sqlite|csv)$/i,
 ];
+
+/* A real backup by its content, whatever its name, folder or size (a backup may reach 5 MiB, above TEXT_LIMIT): the head
+   of a tracked .json or .txt carries the format's schema id. No folder is exempt (Codex, PR #115: an export copied into a
+   fixtures folder under a generic name is still a real backup). Tests build their backups at run time; a static fixture,
+   if one is ever needed, is reviewed and exempted by its exact path in that change. */
+export const BACKUP_HEADER = /"schema"\s*:\s*"finanzapp\.native-pilot\.v\d+"/;
+const BACKUP_CANDIDATE = /\.(json|txt)$/i;
 
 /* Content patterns of well-known credential shapes. Test fixtures use obviously fake values
    ("fixture-only", short tokens); anything matching these is real enough to fail. */
@@ -105,10 +114,11 @@ export function findSecretOffenders(file, text) {
   return hits;
 }
 
-export function audit(files, read) {
+export function audit(files, read, head = file => (read(file) ?? '').slice(0, 4096)) {
   const generated = files.filter(f => GENERATED.some(re => re.test(f)));
   const legacy = files.filter(f => LEGACY_WEB.some(re => re.test(f)));
   const sensitive = files.filter(f => SENSITIVE_FILES.some(re => re.test(f)));
+  const backups = files.filter(f => BACKUP_CANDIDATE.test(f) && !SKIP_CONTENT.test(f) && BACKUP_HEADER.test(head(f) ?? ''));
   const imports = [];
   const secrets = [];
   for (const file of files) {
@@ -119,7 +129,7 @@ export function audit(files, read) {
     secrets.push(...findSecretOffenders(file, text));
     secrets.push(...findExposureOffenders(file, text));
   }
-  return { generated, legacy, sensitive, imports, secrets };
+  return { generated, legacy, sensitive, backups, imports, secrets };
 }
 
 function readTracked(cwd) {
@@ -134,12 +144,23 @@ function readTracked(cwd) {
   };
 }
 
+/* The first 4 KB of a tracked file, whatever its size: enough for a backup's header. */
+export function readHead(cwd) {
+  return file => {
+    const path = cwd + '/' + file;
+    if (!existsSync(path) || !statSync(path).isFile()) return null;
+    const fd = openSync(path, 'r');
+    try { const buffer = Buffer.alloc(4096); return buffer.subarray(0, readSync(fd, buffer, 0, 4096, 0)).toString('utf8'); } finally { closeSync(fd); }
+  };
+}
+
 export function report(result) {
   const lines = [];
   const section = (title, items, format) => { if (items.length) { lines.push(title); items.forEach(item => lines.push('  - ' + format(item))); } };
   section('generated or local files are tracked (untrack them: git rm -r --cached <path>):', result.generated, f => f);
   section('the retired web/Capacitor frontend is back in the tree (its history is the tag web-frontend-final; do not restore it):', result.legacy, f => f);
   section('a sensitive file is tracked (this repository is public; remove it and rotate anything it held):', result.sensitive, f => f);
+  section('a tracked file is a FinanzApp backup (this repository is public: remove it from the history, not only the tree):', result.backups ?? [], f => f);
   section('a product source file imports from a retired path:', result.imports, h => `${h.file}:${h.line} → ${h.name} (${h.sample})`);
   section('a tracked file contains what looks like a credential:', result.secrets, h => `${h.file}:${h.line} → ${h.name}`);
   return lines;
@@ -149,7 +170,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const cwd = process.cwd();
   let files;
   try { files = trackedFiles(cwd); } catch (e) { console.error('check:repo — unable to run "git ls-files":', e.message); process.exit(1); }
-  const lines = report(audit(files, readTracked(cwd)));
+  const lines = report(audit(files, readTracked(cwd), readHead(cwd)));
   if (lines.length) { console.error('check:repo — FAIL'); lines.forEach(l => console.error(l)); process.exit(1); }
   console.log(`check:repo — OK: ${files.length} tracked files; no generated files, no legacy web tree, no imports from retired paths, no secrets.`);
 }

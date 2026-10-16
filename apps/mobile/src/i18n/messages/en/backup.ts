@@ -5,7 +5,7 @@ export const backup: Pick<Messages, 'backup'> = {
   backup: {
     export: {
       share: 'Share backup',
-      intro: 'Save your accounts, cards, debts, transactions, budgets and recurring items somewhere private before deleting the app or changing phones.',
+      intro: 'If you delete the app, your records are deleted with it. Save your accounts, cards, debts, transactions, budgets and recurring items somewhere private before deleting it or changing phones.',
       note: 'Includes the current state and undone transactions. The file is not encrypted: keep it somewhere private.',
       importTitle: 'Import backup',
       importSubtitle: 'Review the file before adding',

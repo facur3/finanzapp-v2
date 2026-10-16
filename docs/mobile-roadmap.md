@@ -1,6 +1,9 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-15, later (**25Q1 — money that reads right**, on its branch: the first delivery after the post-B8 audit,
+Updated: 2026-10-15, latest (**25Q2 — a backup that completes or says why**, on its branch, stacked on 25Q1: the export
+is one dated compact file measured before it is written; native failures say so in the app's words; a failed pick after an
+import is no longer silent; the uninstall consequence is said where the person backs up; the repository guard knows a real
+backup by name or header; no domain, schema 14, backup v14 or format change; «Producto 25Q2», §1, §2). Before (2026-10-15, later, **25Q1 — money that reads right**, on its branch: the first delivery after the post-B8 audit,
 seven read-side corrections where the app showed a wrong or missing figure, plus an honest account-deletion confirmation;
 no domain, storage, schema 14, backup v14, navigation or animation change; «Producto 25Q1», §1, §2). Before (2026-10-15, 25A-06 **B8 closed**: the owner-led drills ran on 2026-10-14 and 2026-10-15 at `S` 173ce76; the
 record names the evidence that was not kept, accounts for the fourth settled reservation by inference, gives the month total, 2 649
@@ -395,6 +398,13 @@ history file keeps the evidence of when and why.
   branch and PR per delivery, CI green, the checks recorded in this file at handoff.
 
 ## 1. Implemented (current state)
+
+- **25Q2 — a backup that completes or says why (on its branch, after 25Q1).** «Producto 25Q2». The export is
+  `FinanzApp-backup-<date>-<HHmm>.json`, one compact line measured in bytes before anything is written (a copy over 5 MB
+  says so in its own words instead of the import's), shared as JSON and always deleted; native failures read «No se pudo
+  preparar la copia…» or «No pudimos leer la copia…»; a bad pick after an import returns to the choice with its
+  sentence; the Backup screen and its Más row say that deleting the app deletes the records; `check:repo` and
+  `.gitignore` recognise a real backup by its old, new or dated name and by its header.
 
 - **25Q1 — money that reads right (on its branch; Metro on the new development build).** «Producto 25Q1». The
   Assistant's category link opens the figure it cites; Reportes keeps budgets while a consolidated total waits for a
@@ -930,6 +940,9 @@ it was checked in). Metro from `master` (or a delivery's branch) on the installe
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
+- **25Q2 — a backup that completes or says why (on its branch; the development build after PR #113):** the
+  checklist's «Producto 25Q2»: the file's name and one-line content through AirDrop, Mail and Files, the cancelled and
+  failed sheet, a bad pick after an import, the new sentences.
 - **25Q1 — money that reads right (on its branch; the development build after PR #113):** the checklist's «Producto
   25Q1»: the Assistant's category link (fixtures), Reportes without a rate, the day headings under a filter, an archived
   card in credit, a budget in euros with no euro account, a card with only cuotas to come, the account deletion text.
@@ -4459,6 +4472,52 @@ nothing of it is on a screen yet.
   local, Linux, same results: root `npm test` 590 passed, 1 todo; `check:repo` OK; `typecheck` OK; `test:storage` 1247
   passed, 0 failed; `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0 errors, 0 stale; `check` OK;
   `export:ios` OK. No account, handle, ad account or campaign created.
+
+### Producto 25Q2 — a backup that completes or says why (this PR, stacked on 25Q1)
+
+- **Why.** The backup is the only recovery of a ledger that lives on the phone (production-plan.md §1.3). The audit found
+  the export failing with the import's sentence from about 12 700 movements (the pretty file passed the import's 5 MB
+  check before its own size check could run), native file-system and share-sheet errors shown as the platform's English
+  text, a bad pick after an import doing nothing visible, a file named `finanzapp-piloto-<epoch>.json`, and a repository
+  guard that did not recognise that name in a public repository.
+- **What.**
+  - `src/ui/backup-file.ts` (pure): `buildBackupFile` writes compact JSON, measures its UTF-8 bytes against the 5 MB cap
+    before any file exists (`backup.export.tooLarge`, «No borres la app…»), then checks this app can restore it;
+    `backupFileName` gives `FinanzApp-backup-2026-10-15-1432.json` (local day and time, ASCII, one prefix constant for
+    the naming workflow); the format and its identifiers are unchanged and older builds read the compact file.
+  - **Measured** (synthetic movements with 36-character ids): about 283 bytes per movement compact against 412
+    pretty-printed, so the 5 MB cap holds about 18 500 movements instead of 12 700. The cap itself is unchanged (raising
+    it touches the domain and older builds; an owner decision once a large file is measured on the oldest iPhone).
+  - `app/backup.tsx`: a native failure (availability, writing, the sheet) reads `backup.export.prepareFailed`; the
+    temporary file is still deleted in every case.
+  - `app/backup-import.tsx`: after a successful import, a file that fails returns to the choice with its sentence (it
+    left «Copia incorporada» on screen and said nothing); a file iOS cannot read reads `backup.import.readFailed`. (The
+    picker itself never rejects: expo-file-system 57 reports its own failures as a cancel, so they stay silent.)
+  - An independent review found nothing high or medium; its follow-ups are in: the dead picker branch removed, and tests
+    that fail if the cap counted characters instead of bytes, if a same-minute leftover blocked the export, if the
+    availability check's failure leaked, and for the guard's own head reader on a file above 2 MiB. Not done (known, as
+    before 25Q2): a plaintext copy left in Caches when iOS ends the app while the sheet is open; a sweep belongs to the
+    file-protection evaluation (25D), which needs a device observation.
+  - Copy: the Backup screen opens with «Si borrás la app, tus registros se borran con ella.»; Más' row subtitle reads «Antes
+    de borrar la app o cambiar de teléfono». *Owner decisions recorded here for review:* compact JSON (recommended: smaller,
+    no format change), the file name, and this placement of the uninstall sentence (production-plan §12 leaves the
+    placement to the owner; nothing is claimed about iCloud, which is unverified).
+  - `scripts/check-repo.mjs` and `.gitignore`: a tracked `finanzapp-piloto-*.json`, `FinanzApp-backup-*.json` or neutral
+    dated backup name fails, and so does any tracked `.json` or `.txt` whose first 4 KB carry a backup's schema id,
+    whatever its size or folder (no folder is exempt: Codex on PR #115; tests build their backups at run time).
+- **Not in this PR** (next): the import review that predicts the write (the recurring dates a restore records right
+  after, the export date, the conflicting records by name, same-name accounts), the guarded catch-up after a restore, a
+  newer-schema file told as such at launch, «Importar copia» on an empty Inicio (owner decision) and undone rows that
+  look undone.
+- **Tests.** `backup-file.node.ts` (name, bytes, compact round trip, the cap's own sentence, the measured sizes),
+  `more-routes` (the export: one dated file in the cache, JSON mime and UTI, deleted afterwards, a failed sheet, a
+  failed write, over the cap with no file created, no sheet; the new copy in es and en), `recovery-routes` (a failed pick
+  after an import, native picker and read failures), `check-repo.test.js` (names and headers). Each new route assertion
+  fails on the source before the change.
+- **Checks** (local, Linux, 2026-10-15): `typecheck` OK; `test:storage` 1382 passed, 0 failed, 1 skipped (7 new);
+  `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0 errors, 0 stale (English accepted after review);
+  `i18n:extract` no copy outside the catalogue; `expo install --check` live and offline up to date; `export:ios` and the
+  bundle secret scan OK; root `npm test` 704 passed (the guard's new test); `check:repo` OK. None of this is iPhone QA.
 
 ### Producto 25Q1 — money that reads right (this PR)
 

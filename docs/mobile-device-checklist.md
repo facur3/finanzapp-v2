@@ -1,5 +1,28 @@
 # Physical iPhone acceptance checklist
 
+## Producto 25Q2 — a backup that completes or says why (this PR)
+
+JavaScript only; Metro from this branch on the development build cut after PR #113. The end of Más reads «FinanzApp
+0.1.0 (25Q2)». Keep a private backup first; use small real data.
+
+- [ ] **Más.** The Copia de seguridad row reads «Antes de borrar la app o cambiar de teléfono»; VoiceOver «Copia de
+  seguridad, Antes de borrar la app o cambiar de teléfono, botón». The Backup screen starts «Si borrás la app, tus
+  registros se borran con ella. Guardá tus cuentas, …». English: «If you delete the app, your records are deleted with it.».
+- [ ] **Compartir copia.** The sheet offers a file named `FinanzApp-backup-<today as YYYY-MM-DD>-<HHmm of your clock>.json`
+  (no «piloto», no long number); the button is busy until the sheet appears and normal again after it closes.
+- [ ] **Where it lands.** Send it by AirDrop to a computer, by Mail and with Save to Files (once with Low Power Mode on).
+  **Expect:** each received file opens as ONE line of JSON starting `{"app":"FinanzApp","schema":"finanzapp.native-pilot.v`
+  and its size equals what the sheet or Files showed. If a received file is empty or cut, stop and report it (the
+  temporary file is deleted when the sheet closes). Cancelling the sheet shows nothing red and claims no success.
+- [ ] **Round trip.** Importar copia → the file just exported: «Esta copia ya está incorporada. No hay nada nuevo para
+  agregar.» The compact file imports as the old one did.
+- [ ] **A failed pick after an import.** On «Copia incorporada» tap «Elegir otra copia» and pick a text file that only says
+  `hola`: the screen returns to «Recuperá tus registros» with «El archivo no es una copia JSON válida.», spoken once by
+  VoiceOver. Cancelling the picker keeps «Copia incorporada».
+- [ ] **Not checkable by hand:** a ledger near the cap (about 18 500 movements) and «La copia supera el límite de 5 MB…»;
+  a native failure of the picker or the sheet. Covered by the Node tests.
+
+
 ## Producto 25Q1 — money that reads right (this PR)
 
 Read-side corrections only; JavaScript only. Metro from this branch on the development build cut after PR #113. The end

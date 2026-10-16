@@ -42,3 +42,9 @@ apps/mobile/android/
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
+
+# FinanzApp backups exported from the app (financial data; this repository is public). Any depth; bracket classes
+# because git's matching is case-sensitive on Linux. check:repo also refuses any tracked file carrying a backup's header,
+# in any folder; tests build their backups at run time.
+[Ff]inanz[Aa]pp-backup-*.json
+[Ff]inanz[Aa]pp-piloto-*.json

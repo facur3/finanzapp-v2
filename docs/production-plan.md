@@ -52,7 +52,7 @@ on the device before success is shown, and never dependent on a connection, an a
 | Review store | `finanzapp-review-v1.sqlite`, version 1 (`apps/mobile/src/storage/review-database.ts`) | Review items (pending, confirmed, dismissed) with a frozen write id. Opened by `LedgerProvider` since 25A-03; «Para revisar» and the Assistant's review sheet (25A-04) read it. | No, by design |
 | Rate cache | `finanzapp-rates-v1.sqlite`, version 1 (`apps/mobile/src/storage/rates-database.ts`) | Reference exchange rates per day, base USD. Reference data anyone can download again. | No |
 | Preferences | expo-sqlite's key-value store | Language, region, recent choices, appearance, display currency and mode, the first-opening mark. | No |
-| Backup files | A JSON document built on demand (`apps/mobile/app/backup.tsx`, `packages/domain/recovery.ts`) | The ledger archive, lowest schema that fits (v8 to v14), 5 MB cap. Plain, unencrypted. | It is the backup |
+| Backup files | A JSON document built on demand (`apps/mobile/app/backup.tsx`, `src/ui/backup-file.ts`, `packages/domain/recovery.ts`) | The ledger archive, lowest schema that fits (v8 to v14), 5 MB cap measured in bytes before the file is written. One compact line since 25Q2 (about 280 bytes per movement, so about 18 500 movements fit, against about 12 700 pretty-printed; measured on synthetic movements), named `FinanzApp-backup-<local date>-<HHmm>.json`. Plain, unencrypted. | It is the backup |
 | Assistant conversation | Memory only (`apps/mobile/src/assistant/session.ts`) | The current session's messages and at most one draft parked behind a clarification. Closing the app erases it. A proposal is not kept here: since 25A-04 it is captured into the review store. | No |
 
 Not present today (**NOT IMPLEMENTED**): Keychain or SecureStore use, any session or token, an outbox or sync queue,
@@ -82,7 +82,9 @@ itself (§11.5).
 
 - **Uninstall risk (EXISTS TODAY).** Deleting the app deletes the ledger. A local database is not a backup (decision
   001). The only recovery today is a backup file the person exported and kept. This must be said in the app before
-  launch (see [app-store-launch.md](app-store-launch.md) §13).
+  launch (see [app-store-launch.md](app-store-launch.md) §13). Since 25Q2 the Backup screen opens with it («Si borrás la
+  app, tus registros se borran con ella.») and Más' Copia de seguridad row says when to use it; whether it is also said
+  near the first account stays the owner's placement decision (§12).
 - **Whether iOS device or iCloud backups include the ledger** is *unverified*: expo-sqlite's source places databases
   under `Documents/SQLite`, which iOS normally includes in device backups, but neither Expo's documentation nor a device
   check confirms it. **RESEARCH GATE, DEVICE QA:** restore an iPhone backup to a second device and record whether the
