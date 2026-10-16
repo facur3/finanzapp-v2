@@ -351,6 +351,7 @@ test('a refusal from the store (the proposal changed, or went stale) is shown an
   await settle();
   const root = view.render();
   assert.equal(all(root, 'ErrorMessage')[0].props.message, domain.REVIEW_STALE_MESSAGE);
+  assert.equal(bindLocale('en-US').errorText(all(root, 'ErrorMessage')[0].props.message), 'The account, card or category changed since the proposal. Review it again.');
   assert.equal(view.nav.back, 0);
   button(root, 'Confirmar')!.props.onPress();
   await settle();
