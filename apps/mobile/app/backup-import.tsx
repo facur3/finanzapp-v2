@@ -1,11 +1,11 @@
 import { useRef, useState } from 'react';
 import { Alert, View } from 'react-native';
 import { Stack } from 'expo-router';
-import { File } from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
 import { BACKUP_MAX_BYTES, parsePilotBackup, previewBackupImport, sortCurrencies, type Currency, type ImportPreview, type LedgerArchive,
   type ParsedBackup } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
-import { restoreCatchUp } from '../src/ui/backup-file';
+import { isPickerCopy, restoreCatchUp } from '../src/ui/backup-file';
 import { ActionButton, AppText, DetailRow, EmptyState, ErrorMessage, Money, Screen, SectionTitle, Surface } from '../src/ui/components';
 import { errorHaptic, successHaptic } from '../src/ui/motion';
 import { useCurrentDay } from '../src/ui/theme';
@@ -40,11 +40,14 @@ export default function BackupImportScreen() {
     // 25Q2: a native read failure is told in the app's words, never as the platform's text. (The picker itself never
     // rejects: expo-file-system 57 turns its own failures into a cancel.)
     const readFailed = (): never => { throw new Error('backup.import.readFailed'); };
+    let copy: File | null = null;
     try {
       const picked = await File.pickFileAsync({ mimeTypes: ['application/json', 'text/plain'], multipleFiles: false });
       if (picked.canceled) return;
-      // Read only the selected file. Never remove/overwrite the original,
-      // including Android document-provider URIs and iOS picker copies.
+      copy = picked.result;
+      // Only the selected file is read. iOS hands its own copy inside the app (asCopy); that copy is deleted once its text is
+      // in memory (finally): the review and the import never read it again, and a retry picks again. The original (Files,
+      // iCloud Drive, an Android provider) is never removed or overwritten.
       if (picked.result.size > BACKUP_MAX_BYTES) throw new Error('backup.import.tooLarge');
       const backup = parsePilotBackup(await picked.result.text().catch(readFailed));
       setReview(reviewOf(archive, backup, picked.result.name));
@@ -54,7 +57,11 @@ export default function BackupImportScreen() {
       // 25Q2: after an import, a file that fails leaves «Copia incorporada» for the choice and its sentence (it said nothing).
       setDone(false);
       setError(failureMessage(cause, 'backup.import.readFailed'));
-    } finally { working.current = false; setBusy(false); }
+    } finally {
+      try { if (copy && isPickerCopy(copy.uri, Paths.document.parentDirectory.uri)) copy.delete(); } catch { /* Best effort: iOS clears tmp too. */ }
+      working.current = false;
+      setBusy(false);
+    }
   }
 
   function refreshReview() {

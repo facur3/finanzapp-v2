@@ -6,12 +6,14 @@ import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import * as SystemUI from 'expo-system-ui';
 import { useFonts } from 'expo-font';
+import { File, Paths } from 'expo-file-system';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { currenciesPresent } from '@finanzapp/domain';
 import { LedgerProvider, useLedger } from '../src/storage/LedgerProvider';
 import { NEWER_SCHEMA_MESSAGE } from '../src/storage/database';
+import { discardBackupLeftovers } from '../src/ui/backup-file';
 import { CategoryHuesProvider } from '../src/ui/category-hues';
 import { DisplayCurrencyProvider } from '../src/ui/display-currency-provider';
 import { RatesProvider } from '../src/fx/rates-provider';
@@ -75,6 +77,12 @@ function Navigation() {
     // native splash forever when font or database initialization fails.
     if (error || fontError || (fontsLoaded && snapshot && onboarding !== null)) void SplashScreen.hideAsync().catch(() => {});
   }, [error, fontError, fontsLoaded, snapshot !== null, onboarding]);
+  // 25Q4: an export left in the cache by a process iOS ended under the share sheet is deleted once the ledger first opens,
+  // before any screen can start an export. Best effort.
+  useEffect(() => {
+    if (!snapshot) return;
+    try { discardBackupLeftovers(Paths.cache.list().filter((item): item is File => item instanceof File)); } catch { /* iOS clears the cache too. */ }
+  }, [snapshot !== null]);
 
   if (fontError || !snapshot || !fontsLoaded) return <SafeAreaView style={{ flex: 1, backgroundColor: p.background }}>
     <View style={{ flex: 1, padding: 28, justifyContent: 'center', gap: 20 }}>

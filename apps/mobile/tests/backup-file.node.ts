@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import * as domain from '@finanzapp/domain';
-import { BACKUP_FILE_PREFIX, backupFileName, buildBackupFile, restoreCatchUp, utf8Length } from '../src/ui/backup-file.ts';
+import { BACKUP_FILE_PREFIX, backupFileName, buildBackupFile, discardBackupLeftovers, isPickerCopy, restoreCatchUp, utf8Length } from '../src/ui/backup-file.ts';
 import { SENSITIVE_FILES } from '../../../scripts/check-repo.mjs';
 
 // Producto 25Q2: the backup file a person shares. Pure: no file system, no share sheet (more-routes covers the screen).
@@ -79,4 +79,33 @@ test('25Q4: the restore\'s catch-up count follows storage\'s rules: each due dat
   const weekly = { ...rent, frequency: 'weekly' as const, anchorDateISO: '2018-09-21', nextDateISO: '2018-09-21' };
   assert.equal(count({ recurring: [weekly] }), domain.recurringOccurrencesThrough(weekly, '2026-09-20', 1000).length);
   assert.ok(count({ recurring: [weekly] }) > domain.RECURRING_BATCH_SIZE);
+});
+
+test('25Q4: an export an ended process left in the cache is deleted at the next launch; nothing else there is touched', () => {
+  const deleted: string[] = [];
+  const file = (name: string, refuses = false) => ({ name, delete: () => { if (refuses) throw new Error('EPERM'); deleted.push(name); } });
+  discardBackupLeftovers(['FinanzApp-backup-2026-10-15-1432.json', 'finanzapp-piloto-1728900000000.json', 'FinanzApp-backup-2026-10-15-1432.json.download', 'fonts.json',
+    'ledger.sqlite', 'ExponentExperienceData'].map(name => file(name)));
+  assert.deepEqual(deleted, ['FinanzApp-backup-2026-10-15-1432.json', 'finanzapp-piloto-1728900000000.json']);
+  // Only names the public repository's guard also knows as a backup.
+  for (const name of deleted) assert.ok(SENSITIVE_FILES.some(re => re.test(name)), name);
+  // A file that refuses never stops the next one.
+  deleted.length = 0;
+  discardBackupLeftovers([file('FinanzApp-backup-2026-10-14-0900.json', true), file('FinanzApp-backup-2026-10-15-1432.json')]);
+  assert.deepEqual(deleted, ['FinanzApp-backup-2026-10-15-1432.json']);
+});
+
+test('25Q4: only iOS\'s own copy of a picked file is the app\'s to delete', () => {
+  const container = 'file:///var/mobile/Containers/Data/Application/APP/';
+  for (const uri of ['file:///private/var/mobile/Containers/Data/Application/APP/tmp/com.facur3.finanzapp.dev-Inbox/copia.json',
+    'file:///var/mobile/Containers/Data/Application/APP/tmp/com.facur3.finanzapp.dev-Inbox/copia.json']) {
+    assert.equal(isPickerCopy(uri, container), true, uri);
+    assert.equal(isPickerCopy(uri, 'file:///private/var/mobile/Containers/Data/Application/APP'), true, 'the container spelled through /private, without its slash');
+  }
+  for (const uri of ['file:///var/mobile/Containers/Data/Application/APP/Documents/copia.json', 'file:///var/mobile/Containers/Data/Application/APP/Library/Caches/x.json',
+    'file:///var/mobile/Containers/Data/Application/OTHER/tmp/x-Inbox/copia.json', 'file:///var/mobile/Containers/Data/Application/APP-2/tmp/x-Inbox/copia.json',
+    'file:///private/var/mobile/Library/Mobile%20Documents/com~apple~CloudDocs/copia.json', 'content://com.android.providers.downloads.documents/document/42', undefined]) {
+    assert.equal(isPickerCopy(uri, container), false, String(uri));
+    assert.equal(isPickerCopy(uri, container.slice(0, -1)), false, String(uri));
+  }
 });

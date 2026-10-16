@@ -89,7 +89,9 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, useLocalSearchParams: () => options.params ?? {},
       router: { canGoBack: () => true, back: () => { backs++; }, push: (value: any) => pushed.push(value), replace: (value: any) => pushed.push(value) } },
     'expo-crypto': { randomUUID: () => 'operation-' + (++uuid) },
-    'expo-file-system': { File: { pickFileAsync: options.picker ?? (async () => ({ canceled: true })) } },
+    // 25Q4: the app's container (the parent of Documents), under which iOS places the picker's copy.
+    'expo-file-system': { File: { pickFileAsync: options.picker ?? (async () => ({ canceled: true })) },
+      Paths: { document: { parentDirectory: { uri: 'file:///var/mobile/Containers/Data/Application/APP/' } } } },
     '@finanzapp/domain': domain,
     '@expo/vector-icons/Ionicons': 'Ionicons',
     '../storage/LedgerProvider': ledger, '../src/storage/LedgerProvider': ledger, '../../src/storage/LedgerProvider': ledger,
@@ -1670,6 +1672,29 @@ test('25Q4: the review names the copy by its date and its newest live movement, 
   // A copy whose only movement was undone has none to name.
   const quiet = (await reviewCopy({ ...archive, records: [undone(record('e', '2026-01-01'))] })).render();
   assert.equal(appTexts(quiet).some(text => text.startsWith('Último movimiento')), false);
+});
+
+test('25Q4: the picker\'s copy inside the app is deleted once its text is read, also when the file is refused or too large; a file outside the app\'s tmp is never touched', async () => {
+  const json = JSON.stringify(domain.createRecoveryBackup(archive));
+  const inbox = 'file:///private/var/mobile/Containers/Data/Application/APP/tmp/com.facur3.finanzapp.dev-Inbox/copia.json';
+  const pick = async (uri: string, text: string, size = text.length) => {
+    const deleted: string[] = [];
+    const view = harness('app/backup-import.tsx', {}, { data: { accounts: [], records: [] },
+      picker: async () => ({ canceled: false, result: { uri, size, name: 'copia.json', text: async () => text, delete: () => { deleted.push(uri); } } }) });
+    await find(view.render(), 'ActionButton', 'Elegir copia').props.onPress();
+    return { view, deleted };
+  };
+  const valid = await pick(inbox, json);
+  assert.deepEqual(valid.deleted, [inbox]);
+  // The review and the import stand on the text read before: nothing opens the file again.
+  find(valid.view.render(), 'ActionButton', 'Confirmar importación').props.onPress();
+  valid.view.alerts[0].buttons[1].onPress();
+  await flush();
+  assert.equal(valid.view.restores.length, 1);
+  assert.deepEqual((await pick(inbox, 'hola')).deleted, [inbox], 'refused');
+  assert.deepEqual((await pick(inbox, json, domain.BACKUP_MAX_BYTES + 1)).deleted, [inbox], 'too large, never read');
+  for (const uri of ['file:///private/var/mobile/Library/Mobile%20Documents/com~apple~CloudDocs/copia.json', 'content://com.android.providers.downloads.documents/document/42',
+    'file:///var/mobile/Containers/Data/Application/APP/Documents/copia.json']) assert.deepEqual((await pick(uri, json)).deleted, [], uri);
 });
 
 test('25VIS2 (V1): the Gasto / Ingreso / Transferencia switch locks while either form reports a save in flight or frozen, and only then', () => {

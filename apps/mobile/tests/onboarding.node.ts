@@ -15,6 +15,7 @@ import { createLocaleStore, type DeviceReading } from '../src/i18n/store.ts';
 import { RELEASED, type ReleasedSets } from '../src/i18n/locale.ts';
 import { es } from '../src/i18n/messages/es/index.ts';
 import { NEWER_SCHEMA_MESSAGE } from '../src/storage/database.ts';
+import * as backupFile from '../src/ui/backup-file.ts';
 
 // Producto 25B: the first opening. The pure rules (when it is shown, what it suggests, the two stages) are tested
 // directly; the route runs in the harness with its hosts replaced by names. Not a rendered iPhone screen.
@@ -262,7 +263,8 @@ test('the root layout sends a new installation to the setup before the splash li
 // ---- the root layout ---------------------------------------------------------------------------------------
 
 /** 25Q4: the root layout's Navigation with its hosts replaced by names. `ledger` and `fonts` are what the provider and
- * expo-font report on the next render; `prefs` is the key-value store the first-opening decision reads. */
+ * expo-font report on the next render; `prefs` is the key-value store the first-opening decision reads; `cache` is what
+ * the app's cache folder lists (files and folders by name) and what was deleted from it. */
 function rootLayout({ prefs = memory() } = {}) {
   const source = readFileSync(new URL('../app/_layout.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
@@ -273,6 +275,9 @@ function rootLayout({ prefs = memory() } = {}) {
   let cursor = 0, effectCursor = 0, retries = 0;
   const ledger: { snapshot: { accounts: domain.Account[]; entries: domain.Entry[] } | null; error: string | null } = { snapshot: null, error: null };
   const fonts: { loaded: boolean; error: Error | null } = { loaded: false, error: null };
+  const cache = { files: [] as string[], folders: [] as string[], deleted: [] as string[], listed: 0, unreadable: false };
+  class File { name: string; constructor(name: string) { this.name = name; } delete() { cache.deleted.push(this.name); } }
+  const folder = (name: string) => ({ name, delete: () => { cache.deleted.push(name + '/'); } });
   const names = (...list: string[]) => Object.fromEntries(list.map(name => [name, name]));
   const modules: Record<string, unknown> = {
     react: { useState: (initial: unknown) => { const index = cursor++; if (!(index in state)) state[index] = initial;
@@ -289,10 +294,16 @@ function rootLayout({ prefs = memory() } = {}) {
     'expo-splash-screen': { preventAutoHideAsync: async () => {}, hideAsync: async () => {} },
     'expo-system-ui': { setBackgroundColorAsync: async () => {} },
     'expo-font': { useFonts: () => [fonts.loaded, fonts.error] },
+    'expo-file-system': { File, Paths: { cache: { list: () => {
+      cache.listed++;
+      if (cache.unreadable) throw new Error('ENOENT');
+      return [...cache.folders.map(folder), ...cache.files.map(name => new File(name))];
+    } } } },
     '@expo/vector-icons/Ionicons': { font: {} },
     '@finanzapp/domain': domain,
     '../src/storage/LedgerProvider': { LedgerProvider: 'LedgerProvider', useLedger: () => ({ ...ledger, retry: () => { retries++; } }) },
     '../src/storage/database': { NEWER_SCHEMA_MESSAGE },
+    '../src/ui/backup-file': backupFile,
     '../src/ui/category-hues': names('CategoryHuesProvider'),
     '../src/ui/display-currency-provider': names('DisplayCurrencyProvider'),
     '../src/fx/rates-provider': names('RatesProvider'),
@@ -312,7 +323,7 @@ function rootLayout({ prefs = memory() } = {}) {
   } });
   // Navigation is not exported: it is the function element inside the providers.
   const navigation = nodes(module.exports.default!()).find(node => typeof node.type === 'function' && node.type.name === 'Navigation')!.type as (props: object) => Node;
-  return { render: () => { cursor = 0; effectCursor = 0; return navigation({}); }, ledger, fonts, routes, prefs, retries: () => retries };
+  return { render: () => { cursor = 0; effectCursor = 0; return navigation({}); }, ledger, fonts, routes, prefs, cache, retries: () => retries };
 }
 
 test('25Q4: at launch a ledger from a newer build is said as itself with no «Volver a intentar»; any other open failure keeps it', () => {
@@ -351,4 +362,31 @@ test('25Q4: the root layout sends a new installation to the setup exactly once, 
   existing.render();
   assert.deepEqual(existing.routes, []);
   assert.equal(existing.prefs.rows.get(ONBOARDING_KEY), 'done');
+});
+
+test('25Q4: once the ledger has opened, the launch deletes the exports an ended process left in the cache, once per process; nothing else there, and never before', () => {
+  const view = rootLayout();
+  view.cache.files = ['FinanzApp-backup-2026-10-15-1432.json', 'finanzapp-piloto-1728900000000.json', 'fonts.json', 'ledger.sqlite'];
+  view.cache.folders = ['FinanzApp-backup-2026-10-15-1500.json', 'ExponentExperienceData'];
+  view.render();
+  assert.equal(view.cache.listed, 0, 'not while the ledger opens');
+  view.ledger.snapshot = { accounts: [], entries: [] };
+  view.render();
+  assert.deepEqual(view.cache.deleted, ['FinanzApp-backup-2026-10-15-1432.json', 'finanzapp-piloto-1728900000000.json'], 'only the app\'s own exports, never a folder');
+  // An export started since lives in the same folder: no later render, write (a new snapshot), banner or font load sweeps it.
+  view.cache.files = ['FinanzApp-backup-2026-10-16-0910.json'];
+  view.fonts.loaded = true;
+  view.render();
+  view.ledger.snapshot = { accounts: [], entries: [] };
+  view.ledger.error = es.errors.storage.refreshFailed;
+  view.render();
+  assert.equal(view.cache.listed, 1);
+  assert.equal(view.cache.deleted.length, 2);
+  // A cache that cannot be listed never stops the launch.
+  const unreadable = rootLayout();
+  unreadable.cache.unreadable = true;
+  unreadable.ledger.snapshot = { accounts: [], entries: [] };
+  unreadable.fonts.loaded = true;
+  assert.equal(unreadable.render().type, 'ThemeProvider');
+  assert.equal(unreadable.cache.listed, 1);
 });
