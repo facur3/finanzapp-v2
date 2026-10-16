@@ -95,7 +95,8 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     './presentation': presentation, '../../src/ui/presentation': presentation, './entry-prefill': entryPrefill,
     './budget-presentation': budgetPresentation, '../../src/ui/budget-presentation': budgetPresentation,
     './money-input': moneyInput, '../../src/ui/money-input': moneyInput, '../src/ui/money-input': moneyInput,
-    './liability-presentation': liabilityPresentation,
+    // 25Q4: the movement and transfer details word a card's or a debt's state after an undo or a restore.
+    './liability-presentation': liabilityPresentation, '../../src/ui/liability-presentation': liabilityPresentation,
     '../../src/ui/theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, useCurrentDay: () => '2026-09-20',
       usePalette: () => ({ text: '#000', positive: '#070', income: '#070', expense: '#700', primary: '#2557D6', warning: '#a60', secondary: '#666', tertiary: '#999' }) },
     './theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, usePalette: () => ({ background: '#fff' }) },
@@ -229,6 +230,8 @@ test('detail opens the native edit route; undo requires confirmation and cancele
   find(view.render(), 'ActionButton', 'Deshacer movimiento').props.onPress();
   assert.equal(view.updates.length, 0);
   assert.match(view.alerts[0].message, /Se sumarán 123,45 ARS a Prueba ARS/);
+  // 25Q4: an undo names where it can be restored from.
+  assert.ok(view.alerts[0].message.endsWith('Podés recuperarlo después desde Movimientos deshechos, en Más.'), view.alerts[0].message);
   view.alerts[0].buttons[0].onPress();
   assert.equal(view.updates.length, 0);
   find(view.render(), 'ActionButton', 'Deshacer movimiento').props.onPress();
@@ -240,6 +243,7 @@ test('detail opens the native edit route; undo requires confirmation and cancele
   assert.equal(nodes(view.render()).some(node => node.props.label === 'Editar movimiento'), false);
   find(view.render(), 'ActionButton', 'Recuperar movimiento').props.onPress();
   assert.match(view.alerts[2].message, /Se descontarán/);
+  assert.equal(view.alerts[2].message.includes('Movimientos deshechos'), false, 'a restore has nothing to point back to');
   view.alerts[2].buttons[1].onPress();
   await flush();
   assert.equal(view.updates[1].action, 'restore');
@@ -415,8 +419,9 @@ test('transfer undo requires confirmation, affects both sides, and updates detai
   const original = domain.initialTransferRecord(transfer);
   const view = harness('app/transfer/[id].tsx', {}, { data: { ...transferData, transfers: [original] }, params: { id: transfer.id } });
   find(view.render(), 'ActionButton', 'Deshacer transferencia').props.onPress();
-  assert.match(view.alerts[0].message, /Destino/);
-  assert.match(view.alerts[0].message, /Prueba ARS/);
+  // 25Q4: a plain transfer keeps its sentence, then the record-only note and where an undo is restored from.
+  assert.equal(view.alerts[0].message, '10,00 ARS: se descontarán de Destino y se sumarán a Prueba ARS. Solo cambia el registro en esta app, no mueve dinero en el banco. '
+    + 'Podés recuperarla después desde Movimientos deshechos, en Más.');
   view.alerts[0].buttons[0].onPress();
   assert.equal(view.transferChanges.length, 0);
   find(view.render(), 'ActionButton', 'Deshacer transferencia').props.onPress();
@@ -736,7 +741,7 @@ test('English movement detail and transfer form: titles, rows, confirmation and 
   assert.deepEqual(rows, ['Category=Salud', 'Account=Prueba ARS', 'Currency=Argentine pesos'], 'the stored name and the account name are not translated');
   find(root, 'ActionButton', 'Undo transaction').props.onPress();
   assert.equal(detail.alerts[0].title, 'Undo transaction?');
-  assert.equal(detail.alerts[0].message, '123,45 ARS will be added to Prueba ARS. It will stop counting in your balances and reports. You can restore it later.');
+  assert.equal(detail.alerts[0].message, '123,45 ARS will be added to Prueba ARS. It will stop counting in your balances and reports. You can restore it later from Undone transactions, in More.');
   assert.equal(detail.alerts[0].buttons.map((button: any) => button.text).join(','), 'Cancel,Undo');
   assert.equal(detail.updates.length, 0, 'asking never writes');
 
@@ -1883,4 +1888,81 @@ test('25Q4: Pagar tarjeta says an over-balance amount while it is typed, in word
   assert.equal(english, 'The payment is more than the recorded outstanding balance. If your statement has purchases, interest or fees that are missing, record them first as expenses on the card.');
   assert.ok(spanish.startsWith('El pago supera el saldo pendiente'), 'the opening the device checklist pins');
   assert.doesNotMatch(spanish + ' ' + english, /resumen real|actual statement/);
+});
+
+test('25Q4: undoing or restoring a card purchase says how the card will read, in its own words, never «Se sumarán … a Visa»', async () => {
+  const purchase = domain.initialRecord({ ...entry, id: 'cp', accountId: 'card-acc' });
+  const undo = (data: domain.LedgerArchive, locale: AppLocale = 'es-AR') => {
+    const view = harness('app/entry/[id].tsx', {}, { data, params: { id: 'cp' }, locale });
+    find(view.render(), 'ActionButton', locale === 'es-AR' ? 'Deshacer movimiento' : 'Undo transaction').props.onPress();
+    return view;
+  };
+  // Visa owes 173,45: 50,00 before the purchase.
+  const view = undo({ ...liabilityData, records: [purchase] });
+  assert.equal(view.alerts[0].message, 'Visa quedará con un saldo pendiente de 50,00 ARS. Dejará de contar en tus saldos y reportes. Podés recuperarlo después desde Movimientos deshechos, en Más.');
+  view.alerts[0].buttons[1].onPress(); await flush();
+  view.setData({ ...liabilityData, records: [view.updates[0].after] });
+  find(view.render(), 'ActionButton', 'Recuperar movimiento').props.onPress();
+  assert.equal(view.alerts[1].message, 'Visa quedará con un saldo pendiente de 173,45 ARS. Volverá a aparecer en tus movimientos y reportes.');
+  // A card that starts at zero: paid off by a transfer, the undo leaves it in credit; with only the purchase, owing nothing.
+  const fresh = { ...liabilityData, accounts: liabilityData.accounts.map(item => item.id === 'card-acc' ? { ...item, openingMinor: 0 } : item), records: [purchase] };
+  const paid = undo({ ...fresh, transfers: [storedTransfer('pay', 'a', 'card-acc', 12345)] });
+  assert.ok(paid.alerts[0].message.startsWith('Visa quedará con 123,45 ARS a favor. '), paid.alerts[0].message);
+  const only = undo(fresh);
+  assert.ok(only.alerts[0].message.startsWith('Visa quedará sin saldo pendiente. '), only.alerts[0].message);
+  const english = undo({ ...liabilityData, records: [purchase] }, 'en-AR');
+  assert.equal(english.alerts[0].message, 'Visa will have an outstanding balance of 50,00 ARS. It will stop counting in your balances and reports. You can restore it later from Undone transactions, in More.');
+  for (const message of [...view.alerts, paid.alerts[0], only.alerts[0]].map(alert => alert.message)) assert.doesNotMatch(message, /se sumarán|se descontarán|deuda/i);
+});
+
+test('25Q4: undoing or restoring a card payment, a debt payment or a collection says each side in its own words, and only an undo says where it is restored', () => {
+  const ask = (original: domain.TransferRecord, locale: AppLocale = 'es-AR') => {
+    const view = harness('app/transfer/[id].tsx', {}, { data: { ...withAna, transfers: [original] }, params: { id: original.transfer.id }, locale });
+    const action = locale === 'es-AR' ? (original.voided ? 'Recuperar transferencia' : 'Deshacer transferencia') : 'Undo transfer';
+    find(view.render(), 'ActionButton', action).props.onPress();
+    return view.alerts[0].message;
+  };
+  const payment = storedTransfer('pay', 'a', 'card-acc', 5000);
+  assert.equal(ask(payment), 'Se sumarán 50,00 ARS a Prueba ARS. Visa quedará con un saldo pendiente de 50,00 ARS. Solo cambia el registro en esta app, no mueve dinero en el banco. '
+    + 'Podés recuperarla después desde Movimientos deshechos, en Más.');
+  assert.equal(ask(domain.makeTransferChange('undo', payment, 'void', createdAt).after),
+    'Se descontarán 50,00 ARS de Prueba ARS. Visa quedará sin saldo pendiente. Solo cambia el registro en esta app, no mueve dinero en el banco.');
+  assert.equal(ask(storedTransfer('pay', 'a', 'debt-acc', 3000)), 'Se sumarán 30,00 ARS a Prueba ARS. Le vas a deber 70,00 ARS a Juan. '
+    + 'Solo cambia el registro en esta app, no mueve dinero en el banco. Podés recuperarla después desde Movimientos deshechos, en Más.');
+  assert.equal(ask(storedTransfer('collect', 'rec-acc', 'a', 1000)), 'Se descontarán 10,00 ARS de Prueba ARS. Ana te va a deber 40,00 ARS. '
+    + 'Solo cambia el registro en esta app, no mueve dinero en el banco. Podés recuperarla después desde Movimientos deshechos, en Más.');
+  assert.equal(ask(payment, 'en-AR'), '50,00 ARS will be added to Prueba ARS. Visa will have an outstanding balance of 50,00 ARS. '
+    + 'This only changes the record in this app; it moves no money at the bank. You can restore it later from Undone transactions, in More.');
+});
+
+test('25Q4: restoring a debt payment or a collection over what is pending is refused before any confirmation, with the way to the debt; within it restores; a card payment is not capped', async () => {
+  const undone = (record: domain.TransferRecord) => domain.makeTransferChange('undo-' + record.transfer.id, record, 'void', createdAt).after;
+  const restore = (data: domain.LedgerArchive, id: string) => {
+    const view = harness('app/transfer/[id].tsx', {}, { data, params: { id } });
+    find(view.render(), 'ActionButton', 'Recuperar transferencia').props.onPress();
+    return view;
+  };
+  // Juan was owed 70,00 and a second 50,00 payment leaves 20,00: the undone first one would overpay.
+  const p1 = undone(storedTransfer('p1', 'a', 'debt-acc', 5000)), p2 = storedTransfer('p2', 'a', 'debt-acc', 5000);
+  const view = restore({ ...withAna, transfers: [p1, p2] }, 'p1');
+  assert.equal(JSON.stringify([view.alerts[0].title, view.alerts[0].message, view.alerts[0].buttons.map((button: any) => button.text)]),
+    JSON.stringify(['No se puede recuperar ahora', 'Este pago es mayor que lo que queda pendiente con Juan (20,00 ARS). Recuperarlo pagaría de más.', ['Cancelar', 'Ver deuda']]));
+  view.alerts[0].buttons[1].onPress();
+  assert.equal(JSON.stringify(view.pushed), JSON.stringify([{ pathname: '/debt/[id]', params: { id: 'debt' } }]));
+  assert.equal(view.transferChanges.length, 0, 'nothing built or sent');
+  find(view.render(), 'ActionButton', 'Recuperar transferencia').props.onPress();
+  assert.equal(view.alerts.length, 2, 'released: the next tap asks again');
+  // Within what is pending it restores, as before.
+  const within = restore({ ...withAna, transfers: [undone(storedTransfer('p3', 'a', 'debt-acc', 2000)), p2] }, 'p3');
+  assert.equal(within.alerts[0].title, '¿Recuperar transferencia?');
+  within.alerts[0].buttons[1].onPress(); await flush();
+  assert.deepEqual(within.transferChanges.map(change => change.action), ['restore']);
+  // A collection: Ana owed 40,00 and a second 30,00 leaves 10,00.
+  const collection = restore({ ...withAna, transfers: [undone(storedTransfer('c1', 'rec-acc', 'a', 3000)), storedTransfer('c2', 'rec-acc', 'a', 3000)] }, 'c1');
+  assert.equal(collection.alerts[0].message, 'Este cobro es mayor que lo que queda pendiente con Ana (10,00 ARS). Recuperarlo cobraría de más.');
+  // A card's credit is modelled: a 60,00 payment on a card that owes 50,00 is asked as usual.
+  assert.equal(restore({ ...withAna, transfers: [undone(storedTransfer('k', 'a', 'card-acc', 6000))] }, 'k').alerts[0].title, '¿Recuperar transferencia?');
+  // A deleted debt has no screen to open: the refusal offers only Cancelar.
+  const gone = restore({ ...withAna, debts: [{ ...debt, active: false, deleted: true }, ana], transfers: [p1, p2] }, 'p1');
+  assert.equal(JSON.stringify([gone.alerts[0].title, gone.alerts[0].buttons.map((button: any) => button.text)]), JSON.stringify(['No se puede recuperar ahora', ['Cancelar']]));
 });

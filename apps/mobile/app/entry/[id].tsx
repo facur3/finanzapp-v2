@@ -3,7 +3,7 @@ import { Alert, View } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { categoryKey, entryRefundSummary, makeEntryChange, operationGuardMessage, recurringOccurrenceOf, summarizeMonthlyBudgets, todayKey, validateArchive, type EntryChange, type EntryRecord, type Account, type PurchaseOperation } from '@finanzapp/domain';
+import { categoryKey, entryRefundSummary, makeEntryChange, operationGuardMessage, recurringOccurrenceOf, snapshotFromArchive, summarizeMonthlyBudgets, todayKey, validateArchive, type EntryChange, type EntryRecord, type Account, type PurchaseOperation } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { budgetTone } from '../../src/ui/budget-presentation';
 import { AccountBadge, ActionButton, AppText, DetailRow, EmptyState, ErrorMessage, MerchantBadge, Money, Screen, SectionTitle, Surface } from '../../src/ui/components';
@@ -11,6 +11,7 @@ import { presentedAmount } from '../../src/ui/movement-amount';
 import { useI18n } from '../../src/i18n/provider';
 import { useCategoryLabel } from '../../src/ui/category-hues';
 import { installmentOfEntry } from '../../src/ui/installment-presentation';
+import { balanceAfterSentence } from '../../src/ui/liability-presentation';
 import { canRefundEntry } from '../../src/ui/operation-presentation';
 import { releasesDraft } from '../../src/ui/presentation';
 import { space, usePalette } from '../../src/ui/theme';
@@ -95,12 +96,21 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
     }
     confirming.current = true;
     const adds = restore ? entry.kind === 'income' : entry.kind === 'expense';
+    const money = (minor: number) => formatMoneyAmount(minor, account.currency) + ' ' + account.currency;
+    // 25Q4: a card says how it will read afterwards, in its own words; «Se sumarán … a Visa» read backwards on a card. Cash
+    // keeps its sentence. A balance out of range drops the sentence, never back to the inverted one.
+    let effect: string | null = t(adds ? 'entryDetail.willAdd' : 'entryDetail.willSubtract', { amount: money(entry.amountMinor), account: account.name });
+    if (card && archive) {
+      try {
+        effect = balanceAfterSentence(account, snapshotFromArchive({ ...archive, records: archive.records.map(item => item.entry.id === entry.id ? change.after : item) }),
+          archive.cards ?? [], archive.debts ?? [], money, t);
+      } catch { effect = null; }
+    }
     Alert.alert(t(restore ? 'entryDetail.restoreQuestion' : 'entryDetail.voidQuestion'),
-      t(adds ? 'entryDetail.willAdd' : 'entryDetail.willSubtract', { amount: formatMoneyAmount(entry.amountMinor, account.currency) + ' ' + account.currency, account: account.name }) + ' '
-      + t(restore ? 'entryDetail.restoreEffect' : 'entryDetail.voidEffect')
-      // An undone instalment is never recreated by the catch-up and its obligation stays open in the plan (24T1). A share of
-      // an instalment that has another (its principal and its interest) is undone alone: the note says so.
-      + (instalment && !restore ? ' ' + t(instalment.shared ? 'entryDetail.installmentShareVoidNote' : 'entryDetail.installmentVoidNote') : ''), [
+      [effect, t(restore ? 'entryDetail.restoreEffect' : 'entryDetail.voidEffect'),
+        // An undone instalment is never recreated by the catch-up and its obligation stays open in the plan (24T1). A share
+        // of an instalment that has another (its principal and its interest) is undone alone: the note says so.
+        instalment && !restore ? t(instalment.shared ? 'entryDetail.installmentShareVoidNote' : 'entryDetail.installmentVoidNote') : null].filter(Boolean).join(' '), [
         { text: t('common.cancel'), style: 'cancel', onPress: () => { confirming.current = false; } },
         { text: t(restore ? 'entryDetail.restore' : 'entryDetail.void'), style: restore ? 'default' : 'destructive', onPress: () => { confirming.current = false; void apply(change); } },
       ], { cancelable: true, onDismiss: () => { confirming.current = false; } });
