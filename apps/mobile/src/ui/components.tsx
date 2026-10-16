@@ -109,7 +109,7 @@ export function Surface({ children, style, grouped = false }: { children: ReactN
 }
 
 /** A section heading with an optional text action on the right. `quiet` (Inicio, 24UX3) draws the action at footnote
- * size with a small chevron in the `link` ink (the brand text: olive-lime in light, soft lime in dark since 25VIS1): a visible, 44 pt tappable link
+ * size with a small chevron in the `link` ink (the brand text: sapphire in light, periwinkle in dark since 25VIS2): a visible, 44 pt tappable link
  * that reads as navigation without competing with the financial field. Elsewhere the action is the brand primary. */
 export function SectionTitle({ children, action, onAction, caption, captionLabel, quiet = false }: {
   /** `captionLabel`: what VoiceOver reads for the caption when it holds an amount (its spoken twin). */
@@ -127,7 +127,8 @@ export function SectionTitle({ children, action, onAction, caption, captionLabel
         <AppText variant="footnote" style={{ color: p.link, fontWeight: '500' }}>{action}</AppText>
         <Ionicons name="chevron-forward" size={13} color={p.link} accessible={false} />
       </PressFeedback>
-      : <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={action} onPress={onAction} style={{ paddingLeft: 12, minHeight: 36 }}>
+      : <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={action} onPress={onAction} hitSlop={{ top: 4, bottom: 4 }}
+        style={{ paddingLeft: 12, minHeight: 36 }}>
         <AppText variant="subhead" style={{ color: p.primary, fontWeight: '500' }}>{action}</AppText>
       </PressFeedback>)}
   </View>;
@@ -140,21 +141,27 @@ export function SectionTitle({ children, action, onAction, caption, captionLabel
  * shrink; `opacity` (0.4) for bare text and icon buttons, like a bar button. */
 export type PressTreatment = 'scale' | 'highlight' | 'opacity';
 
-export function PressFeedback({ children, style, containerStyle, feedback = 'scale', backdrop, ...props }: PressableProps & {
+export function PressFeedback({ children, style, containerStyle, feedback = 'scale', backdrop, reducedDim = true, ...props }: PressableProps & {
   children: ReactNode; style?: StyleProp<ViewStyle>; containerStyle?: StyleProp<ViewStyle>; feedback?: PressTreatment;
   /** Drawn under the highlight and the content: a proportional fill behind a row. */
   backdrop?: ReactNode;
+  /** Under Reduce Motion a `scale` control dims instead (25VIS2). `false` only where the control wraps drawn glass, which
+   * an opacity change would break (an account detail's quick-action pills while they are glass): no pressed state then. */
+  reducedDim?: boolean;
 }) {
   const p = usePalette();
   const reduced = useReduceMotion();
   const { speechLanguage } = useI18n();
   const pressed = useSharedValue(0);
   useEffect(() => { if (props.disabled) pressed.value = 0; }, [props.disabled, pressed]);
-  const animatedStyle = useAnimatedStyle(() => feedback === 'scale' ? { transform: [{ scale: 1 - 0.03 * pressed.value }] }
+  // Reduce Motion drops the scale and keeps a pressed state as a colour change, which is not movement: the tint of a row,
+  // the dim of a text button, and since 25VIS2 a dim for a `scale` control too (it used to have none at all).
+  const dim = feedback === 'scale' && reduced && reducedDim;
+  const animatedStyle = useAnimatedStyle(() => dim ? { opacity: 1 - 0.3 * pressed.value }
+    : feedback === 'scale' ? { transform: [{ scale: 1 - 0.03 * pressed.value }] }
     : feedback === 'opacity' ? { opacity: 1 - 0.6 * pressed.value } : {});
   const highlightStyle = useAnimatedStyle(() => ({ opacity: pressed.value }));
-  // Reduce Motion drops the scale but keeps the tint and dim: a colour change is not movement.
-  const active = feedback !== 'scale' || !reduced;
+  const active = feedback !== 'scale' || !reduced || dim;
   // The Pressable is the VoiceOver element (its children's languages are not consulted), so it carries the language (see AppText).
   return <Animated.View style={[containerStyle, animatedStyle]}><Pressable {...props} accessibilityLanguage={props.accessibilityLanguage ?? speechLanguage}
     style={[{ minHeight: 44, justifyContent: 'center' }, style]} pressRetentionOffset={12}
@@ -166,9 +173,9 @@ export function PressFeedback({ children, style, containerStyle, feedback = 'sca
   </Pressable></Animated.View>;
 }
 
-/** The one filled call to action on a screen is the brand fill (Electric Lime
- * since 25VIS1) with ink on it. Secondary actions stay ink on the inset fill, so
- * a screen has at most one lime button; a semantic tone (a transfer, an income) still wins.
+/** The one filled call to action on a screen is the brand fill (sapphire since
+ * 25VIS2) with `onPrimary` on it. Secondary actions stay ink on the inset fill, so
+ * a screen has at most one brand-filled button; a semantic tone (a transfer, an income) still wins.
  * `spokenLabel` is the label for VoiceOver when it carries an amount ("Guardar
  * gasto, 1234,50 pesos", built with the spoken formatters); the button shows
  * `label` unchanged. */
@@ -214,7 +221,8 @@ export function SearchField({ label, ...props }: TextInputProps & { label: strin
 export function Field({ label, ...props }: TextInputProps & { label: string }) {
   const p = usePalette();
   const { speechLanguage } = useI18n();
-  return <View style={{ gap: 8 }}><AppText secondary variant="footnote" style={{ fontWeight: '500' }}>{label}</AppText>
+  // The caption is the field's accessibility label, so VoiceOver reads it once, on the field, not as a stop of its own.
+  return <View style={{ gap: 8 }}><AppText accessible={false} secondary variant="footnote" style={{ fontWeight: '500' }}>{label}</AppText>
     <TextInput returnKeyType="done" onSubmitEditing={Keyboard.dismiss} {...props} accessibilityLabel={label}
       accessibilityLanguage={props.accessibilityLanguage ?? speechLanguage} placeholderTextColor={p.tertiary}
       selectionColor={p.primary} style={[styles.input, { color: p.text, backgroundColor: p.surface }, props.style]} />
@@ -328,7 +336,8 @@ export function AmountField({ label, currency, tone, value = '', onChangeText, s
     emit(result.draft);
   };
   return <View style={{ gap: 6, paddingVertical: 8 }}>
-    <AppText secondary variant="footnote" style={{ fontWeight: '500' }}>{title} · {currency}</AppText>
+    {/* Said by the field itself (`amount.accessibility`: the label and the currency in words), never twice. */}
+    <AppText accessible={false} secondary variant="footnote" style={{ fontWeight: '500' }}>{title} · {currency}</AppText>
     <View style={styles.amountRow} onLayout={event => setRowWidth(event.nativeEvent.layout.width)}>
       <AppText accessible={false} maxFontSizeMultiplier={HERO_MAX_SCALE}
         style={{ fontSize: symbolSize, lineHeight: Math.round(symbolSize * 1.25), color: p.secondary, fontWeight: '500' }}>{symbol}</AppText>
@@ -344,7 +353,8 @@ export function AmountField({ label, currency, tone, value = '', onChangeText, s
     {noticeText && <AppText variant="footnote" style={{ color: p.warning }}>{noticeText}</AppText>}
     {Platform.OS === 'ios' && <InputAccessoryView nativeID={accessoryId} backgroundColor={p.surface}>
       <View style={{ alignItems: 'flex-end', paddingHorizontal: 20 }}>
-        <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('common.closeAmountKeyboard')} onPress={Keyboard.dismiss} style={{ paddingHorizontal: 12 }}>
+        {/* Named as it reads, so Voice Control's «Tocar Listo» finds it. */}
+        <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('common.done')} onPress={Keyboard.dismiss} style={{ paddingHorizontal: 12 }}>
           <AppText style={{ color: p.primary, fontWeight: '600' }}>{t('common.done')}</AppText>
         </PressFeedback>
       </View>
@@ -373,10 +383,12 @@ export function AmountShortcut({ label, caption, spokenCaption, onPress, disable
   label?: string; caption: string; spokenCaption?: string; onPress?: () => void; disabled?: boolean;
 }) {
   const p = usePalette();
+  // 25VIS2 (V15): the fill lowers the keyboard, so Save and its echo of the filled amount come into view.
+  const fill = () => { Keyboard.dismiss(); onPress?.(); };
   return <View style={{ flexDirection: 'row', justifyContent: 'flex-start', alignItems: 'center', flexWrap: 'wrap', gap: 4, marginTop: -8 }}>
     <AppText secondary variant="footnote" accessibilityLabel={spokenCaption}>{caption}{label && onPress ? ' ·' : ''}</AppText>
     {label && onPress && <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={label + ', ' + (spokenCaption ?? caption)}
-      onPress={onPress} disabled={disabled} accessibilityState={{ disabled }} hitSlop={8}
+      onPress={fill} disabled={disabled} accessibilityState={{ disabled }} hitSlop={8}
       style={{ paddingVertical: 6, paddingHorizontal: 4, opacity: disabled ? 0.5 : 1 }}>
       <AppText variant="footnote" style={{ color: p.primary, fontWeight: '600' }}>{label}</AppText>
     </PressFeedback>}
@@ -390,10 +402,13 @@ function Choice({ label, spokenLabel, selected, disabled, onPress, compact = fal
   const reduced = useReduceMotion();
   const { speechLanguage } = useI18n();
   const color = onField ? (selected ? p.heroThumbInk : p.heroSecondary) : selected ? (compact ? p.text : p.primary) : p.secondary;
-  // Compact: 28 pt segments (32 pt with the track) and an 8 pt vertical slop, so the target stays 44 pt tall; none sideways, where the neighbour is.
+  // Every segment is a 44 pt target without being drawn taller: compact 28 pt + 8 pt of vertical slop, the default 32 pt + 6
+  // (25VIS2; it was 4, 40 pt), none sideways, where the neighbour is. The field's 36 pt and the prominent 40 pt keep 4.
+  // On the new architecture a child's slop outside its parent still hits (the parent's overflow inset includes it), as long
+  // as nothing clips the track and no later sibling covers the slop (the composer's switch leaves room under it).
   return <Pressable accessibilityRole="button" accessibilityLabel={spokenLabel} accessibilityState={{ selected, disabled }} disabled={disabled} accessibilityLanguage={speechLanguage}
     onPress={onPress} style={[styles.choice, compact && styles.choiceCompact, onField && styles.choiceField, prominent && { minHeight: PROMINENT_SEGMENT.minHeight }]}
-    hitSlop={compact ? { top: 8, bottom: 8 } : 4}>
+    hitSlop={compact ? { top: 8, bottom: 8 } : onField || prominent ? 4 : { top: 6, bottom: 6 }}>
     {/* 24T3: the prominent label has no shrink-to-fit at all (its labels fit at the 1.3× cap; see PROMINENT_SEGMENT). */}
     {prominent ? <Animated.Text numberOfLines={1} maxFontSizeMultiplier={PROMINENT_SEGMENT.maxScale}
       style={{ fontSize: PROMINENT_SEGMENT.fontSize, lineHeight: PROMINENT_SEGMENT.lineHeight, textAlign: 'center', fontWeight: selected ? '600' : '500',
@@ -444,7 +459,8 @@ export function Choices<T extends string>({ value, options, onChange, disabled, 
   const thumb = onField ? p.heroThumb : p.isDark ? (compact ? p.thumb : p.elevated) : p.surface;
   // The compact thumb carries a hairline edge in both themes, so the chosen segment reads as a state, not a tint.
   const thumbEdge = compact && !onField ? { borderWidth: StyleSheet.hairlineWidth, borderColor: p.isDark ? 'rgba(255,255,255,0.10)' : 'rgba(10,10,12,0.08)' } : {};
-  return <View style={[styles.choices, onField && styles.choicesField, { backgroundColor: track }]} onLayout={event => setTrackWidth(event.nativeEvent.layout.width)}>
+  // A disabled switch looks disabled (25VIS2), as a disabled button does: the whole track at half opacity.
+  return <View style={[styles.choices, onField && styles.choicesField, { backgroundColor: track, opacity: disabled ? 0.5 : 1 }]} onLayout={event => setTrackWidth(event.nativeEvent.layout.width)}>
     {width > 0 && found >= 0 && <Animated.View pointerEvents="none" style={[styles.thumb, onField && styles.thumbField, { width, backgroundColor: thumb }, thumbEdge,
       p.isDark || onField ? {} : { shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } }, thumbStyle]} />}
     {options.map(option => <Choice key={option.value} label={option.label} spokenLabel={option.spokenLabel} selected={value === option.value} compact={compact}
@@ -518,9 +534,17 @@ export function FieldNote({ children, help }: { children: string; help?: { title
 /** A caught or stored error, shown in the interface language: a catalogue key
  * or a known thrown message is translated here, at display time, so an error
  * already on screen follows a language change (see `src/i18n/errors.ts`). */
-export function ErrorMessage({ message }: { message: string | null }) {
+export function ErrorMessage({ message, announce = true }: {
+  message: string | null;
+  /** `false` for a line a form derives while the person types (a refusal shown live): only what Save refused is spoken. */
+  announce?: boolean;
+}) {
   const p = usePalette();
   const { errorText, speechLanguage } = useI18n();
+  // 25VIS2: iOS has no live region (`accessibilityLiveRegion` is Android's), so VoiceOver is told when an error appears or
+  // changes. On Android TalkBack speaks the live region below by itself, so announcing too would say each error twice
+  // (AGENTS rule 13). The same message set again in one update (a repeated refusal) is not repeated; it is still on screen.
+  useEffect(() => { if (Platform.OS === 'ios' && announce && message) AccessibilityInfo.announceForAccessibility?.(errorText(message)); }, [message, announce]);
   return message ? <View style={{ padding: 14, borderRadius: radius.button, backgroundColor: p.expenseSoft }}>
     <Text accessibilityRole="alert" accessibilityLiveRegion="polite" accessibilityLanguage={speechLanguage} style={[type.subhead, { color: p.expense }]}>{errorText(message)}</Text>
   </View> : null;
@@ -543,7 +567,7 @@ const AMOUNT_COLUMN = '56%';
 export function Money({ minor, currency, large = false, color, signed = false, size, tone = 'neutral', weight, align = 'left', onField = false }: {
   minor: number; currency: Currency; large?: boolean; color?: string; signed?: boolean; size?: number; tone?: Tone; weight?: '500' | '600' | '700';
   align?: 'left' | 'center';
-  /** On Inicio's lime field (25A-03): a hero's symbol and cents take the field's solid graphite tones (`heroMoneySymbol`,
+  /** On Inicio's field (25A-03): a hero's symbol and cents take the field's solid quiet tones (`heroMoneySymbol`,
    * `heroMoneyCents`) instead of the ink at an alpha. The whole units keep `color`. */
   onField?: boolean;
 }) {

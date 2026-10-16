@@ -594,3 +594,16 @@ test('24T2: an unchosen date reads as a prompt, on screen and for VoiceOver; the
   english.setLocale('en-US');
   assert.equal(find(english.render('DateField', { value: null, onChange }), 'DetailRow')!.props.value, 'Choose date');
 });
+
+test('25VIS2: VoiceOver\'s escape gesture on the date sheet cancels like Cancelar: the wheel\'s draft is dropped, nothing saved', () => {
+  const field = harness('ios', { reduced: false });
+  find(field.render(), 'DetailRow')!.props.onPress();
+  present(field.render());
+  const root = field.render();
+  const { card } = sheet(root);
+  assert.equal(typeof card.props.onAccessibilityEscape, 'function', 'the modal card answers the two-finger scrub');
+  find(root, 'DateTimePicker')!.props.onValueChange({ nativeEvent: { timestamp: 0, utcOffset: 0 } }, new Date(2026, 8, 3, 12));
+  card.props.onAccessibilityEscape();
+  assert.equal(find(field.render(), 'Modal')!.props.visible, false);
+  assert.deepEqual(field.saved, []);
+});

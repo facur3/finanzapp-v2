@@ -1,8 +1,134 @@
 # Physical iPhone acceptance checklist
 
-## Producto 25Q3 — calm failures and a dock that never ignores a tap (this PR)
+## Producto 25VIS2 — Sapphire + Sand trial (this PR; **not merged until this check passes and the owner approves**)
 
-JavaScript only; Metro from this branch on the development build cut after PR #113. «FinanzApp 0.1.0 (25Q3)».
+The palette (`apps/mobile/src/ui/palette.ts`): Electric Lime replaced token for token by sheet B of
+[brand-brief.md](brand-brief.md) §4.9; it changes no layout, navigation, financial, schema (14) or backup (v14) rule;
+JavaScript only. **Needs one new development build first**, cut from `master` after PR #113 (the Expo alignment: the
+installed build predates native changes of 2026-10-07, 2026-10-12 and 2026-10-15; owner authorization for the EAS
+build), then Metro from this branch once it has merged `master`, so the JavaScript matches the build. The end of Más
+reads «FinanzApp 0.1.0 (25VIS2)». Each item in light **and** dark, and the owner scores B against A (Electric Lime,
+`master`) on brand-brief.md §4.5. The same PR carries the approved composer and accessibility polish (its section
+below), since 2026-10-15 complete: the failed-save haptics, the keyboard lowered by «Pagar total» and the recurring
+form's per-kind category.
+
+- [ ] **Inicio's field:** the sapphire field with white units; the currency symbol and the cents a step quieter, still
+  legible; the month label (Inicio has no «Hasta hoy» line: that lives on Reportes); the status bar **light** over the
+  field, the scheme's own once scrolled past.
+- [ ] **Gastado | Disponible on the field:** the chosen segment a sand-white thumb with ink text, the other label pale
+  sapphire; the scope chip and the accounts button readable on the darker control fill.
+- [ ] **The dock and «+»:** the graphite pill with warm grey glyphs and the white selected glyph in its capsule; the
+  «+» stands out against the canvas (sapphire in light, periwinkle with ink in dark), with Reduce Transparency **on and
+  off**. Whether one bright object per screen holds when Confirmar is also sapphire (brand-brief.md §4.9, item 3).
+- [ ] **The capture hub:** the Assistant tile (the field's sapphire with a white circle) against the hub surface,
+  especially in dark (the tile is close to the dark sheet: 2.1:1, a shape, not text); its resume line when present.
+- [ ] **Buttons:** a filled Confirmar / Guardar (white on sapphire; dark #3D60D4); a **disabled** filled button still
+  reads as disabled; «Pagar tarjeta» (slate, `onSemantic`) in both; swipe actions on an account, a recurring rule and a
+  debt row (destructive Eliminar, neutral Pausar / Cerrar, accent Reanudar / Saldar / Reabrir; Movimientos rows have
+  none).
+- [ ] **Text and links:** «Ver todos», selected choices and checks in sapphire (light) and periwinkle (dark); the
+  currency switch's chosen code on its inset; switches that are on (white knob visible).
+- [ ] **Semantics apart from the brand:** a transfer's slate amount next to a sapphire link reads as a different thing
+  (owner decision on the transfer tone, brand-brief.md §4.9, item 2); income green, expense red, warning amber unchanged.
+- [ ] **Reportes:** the current month's bar and the idle bars (dark tertiary 3:1); the partial-month outline on the
+  selected bar; the donut's chosen category.
+- [ ] **Accounts:** an account using the cobalt preset (#2557D6) next to the sapphire brand in light (close in colour:
+  an owner call whether it reads as a separate identity).
+- [ ] **The quiet zero hero** (an empty month) and the first opening (onboarding) on the sand canvas.
+- [ ] **Accessibility:** VoiceOver order unchanged; the largest Dynamic Type size on Inicio; Increase Contrast (not
+  handled by the app, before or after); Smart Invert.
+- [ ] **Más, the choosers and the first frame.** Más → Finanzas and Datos on sand: tiles, rows, links and the version
+  line; Idioma, Región and Apariencia in both themes (the selected row in sapphire / periwinkle); Apariencia Sistema →
+  Oscuro switches without a flash. A cold launch in light and in dark: the native splash keeps its old colours
+  (#F5F6F8 / #080B10) until the release-candidate build, so note the hand-off to the sand / warm near-black canvas;
+  it is not a failure of this PR.
+- [ ] **Owner choices before approval** (answer and date here and in the PR):
+  - **Transfer tone:** the slate #48606F / #A3B5C4 kept, or transfers in ink? Recommended: keep (Lab chroma ≤ 15, apart
+    from the sapphire by colourfulness, pinned in `tests/theme.node.ts`).
+  - **Dark brand fills:** three (#3D60D4 buttons and swipes, #4568DA switches, #7E9BF7 «+») or two (buttons and swipes
+    on #4568DA: white on it 4.95:1, its edge against the surface 3.52:1 instead of 3.17)? Recommended: two; the «+»
+    keeps #7E9BF7.
+  - **Cobalt account preset** (#2557D6, ΔE 6.7 from the light sapphire, 18.2 in dark): kept? Recommended: keep; it is an
+    identity colour in tiles, never text or money, and changing a stored preset is a domain decision, never this PR.
+  - **One bright object per screen:** Inicio with no account (the field, «Empezar», «+»), Movimientos with an account
+    and no movement (its button, «+») and the open hub. Recommended: «Empezar» stays filled; the Movimientos button
+    becomes secondary when an account exists, only if you agree after seeing it.
+  - **Card faces:** not changed by the palette (a card whose colour matters gets one in Editar cuenta). Recommended: no
+    change.
+
+### Same PR — movement composer and accessibility polish (2026-10-14; JavaScript only)
+
+The owner-approved items of the private UX review (decision record of 2026-10-14): V1, V2, V3, V7, 44 pt targets,
+VoiceOver and Reduce Motion. Not in it: autofocus, a discard confirmation, any change to the dock's appearance, any
+other field. No financial, schema (14), backup (v14), navigation or recovery change. Metro from this branch serves it,
+on the same new development build as above (no native change of its own). Light **and** dark.
+
+- [ ] **The switch during a save (V1).** Save an expense, an income and a transfer: each closes as before. While the
+  write runs the Gasto / Ingreso / Transferencia switch dims for that moment: check the dim is not jarring as the modal
+  leaves. The locked state after an unknown outcome needs a storage fault (saves are local SQLite; airplane mode does
+  not cause one), so it is covered by the Node tests, not checked here.
+- [ ] **One category per kind (V2).** Gasto → choose «Comida» → Ingreso: Categoría is empty and Save is disabled; choose
+  «Sueldo» → back to Gasto: «Comida» again → Ingreso: «Sueldo» again; amount, comercio, account and date kept through
+  every switch; save the income: Movimientos shows it under «Sueldo». An edited movement opens on its own category.
+  **The recurring form does the same (since 2026-10-15):** Más → Recurrentes → «+», Gasto, 100, «Alquiler», Categoría
+  «Comida» → Ingreso: Categoría reads «Elegir categoría» and «Crear recurrente» is dimmed and does nothing; choose
+  «Sueldo» → Gasto: «Comida» again; amount, comercio, account and date kept; save the income: Recurrentes lists it as an
+  income with «Sueldo». Open it → Editar → Gasto: Categoría empty and «Guardar cambios» dimmed; back to Ingreso:
+  «Sueldo» returns; close with × and nothing is saved.
+- [ ] **A switch locked by design.** Movimientos → a purchase that has a devolución → «Editar movimiento»: the Gasto |
+  Ingreso switch is drawn at half strength and ignores taps (the purchase stays an expense); VoiceOver reads each
+  segment as dimmed; the amount, comercio and category fields work.
+- [ ] **The amount on Save for transfers (V3).** Transferencia, type 1234,5: «Registrar transferencia · $ 1.234,50»;
+  VoiceOver reads «Registrar transferencia, 1234,50 pesos». «Usar todo» updates it; a dollar source shows «US$». Pagar
+  tarjeta → «Pagar total»: «Registrar pago · $ …» with the pending amount; a debt's «Saldar» opens already echoing it;
+  «0» or nothing typed: the plain words; editing a transfer: «Guardar cambios». At the largest text size the label
+  wraps without cutting the amount.
+- [ ] **The fill lowers the keyboard (V15, since 2026-10-15).** Pagar tarjeta with the keyboard up → «Pagar total»: the
+  keyboard goes down in the same tap, the amount shows the pending balance and «Registrar pago · $ …» is in view without
+  scrolling. The same for «Usar todo» on a transfer and «Total disponible» on a devolución. Tapping the amount again
+  raises the keyboard with the filled value.
+- [ ] **A failed save taps once (V4, since 2026-10-15).** Pagar tarjeta → type more than the pending balance → Registrar:
+  one Error haptic (three short taps), the red sentence «El pago supera el saldo pendiente…», spoken once by VoiceOver;
+  nothing saved, the fields still editable. A Gasto of 0 → «Guardar gasto»: the same Error tap and its sentence. The
+  Warning tap (a write that may have landed) needs a storage fault and is covered by the Node tests, not checked here.
+  With System Haptics off (Settings → Sounds & Haptics), no tap at all: iOS's own switch.
+- [ ] **The card or debt being paid (V7).** Pagar tarjeta and Saldar: the card or debt is drawn at full strength with
+  no chevron; tapping it does nothing; VoiceOver reads «Tarjeta: Visa, Saldo pendiente …» without «botón» or
+  «atenuado».
+- [ ] **44 pt targets, same look.** The Gasto / Ingreso / Transferencia track and «Una vez | En cuotas» look exactly as
+  tall as before; a tap 3–4 pt above or below the track still selects the segment (the slop now reaches 44 pt; whether
+  iOS honours it outside the track is the device check). The plain action of a section heading (Presupuestos,
+  Reportes) answers a tap just above or below its text. The amount field just below the switch still takes its own taps.
+- [ ] **VoiceOver.** Comercio and Nota are read once (not the caption, then the field); the amount field once, with its
+  currency; the keyboard's «Listo» is read «Listo» and Voice Control's «Tocar Listo» works; on the date sheet the
+  two-finger scrub closes without changing the date; a refused save (a card payment above the pending amount) is
+  announced as its sentence, and a different refusal after it is announced too (the same one repeated is not). On
+  «Registrar devolución», typing 12,5 is not announced as an error at the comma; a refusal from Save is.
+- [ ] **Reduce Motion on.** Pressing Save, a category or account card, a dock tab and «+» dims while held (no scale);
+  pressing a dock tab on the glass dock does not flicker the pill's material. An account's detail (Más → Cuentas → an
+  account): its three pills (Gasto, Ingreso, Transferir) show no pressed state while they are glass, by design, and dim
+  like a button when they are solid (Reduce Transparency on). With Reduce Motion off the 0.97 scale is unchanged.
+- [ ] **Shared controls elsewhere.** The first opening (name, opening balance, Continuar) and Más → Nueva cuenta:
+  captions read once, «Listo», button presses with Reduce Motion. Más → Nueva categoría: its Gasto | Ingreso segments
+  answer a tap just above or below the track and look as before. (Here the segments dim only for the instant of a local
+  write; a disabled control is drawn at half strength everywhere, see «A switch locked by design».)
+
+### The dark dock (reviewed, not changed in this PR)
+
+- No dock change: no iPhone photos were available, and one ring colour cannot clear every ground: #4F4D47 would be
+  2.33:1 on the canvas, 2.06 on surface rows, 1.86 on inset rows, 1.52 on elevated rows and 1.03 on the dark sapphire
+  field (arithmetic). The dock fill #201F1C is 1.19 / 1.06 / 1.05 / 1.29 against the first four and 2.01 against the
+  field.
+- Correction: the hairline (`rgba(255,255,255,0.12)`, 1.73:1 on the canvas) is drawn only on the solid path (Reduce
+  Transparency, Expo Go, iOS before 26). On glass the app draws no edge; whether iOS draws a rim is what the photos
+  show.
+- [ ] **Photos for the owner's decision (dark):** the iOS version; Reduce Transparency off and on (the end of Más names
+  the material); the dock over the canvas, surface rows, inset rows, elevated rows, Inicio's field (a short Inicio at the
+  top, then scrolled) and the open capture hub; the «+» beside the pill.
+
+## Producto 25Q3 — calm failures and a dock that never ignores a tap (PR #116, merged)
+
+JavaScript only; on the development build cut after PR #113, Metro from `master` or a branch that contains PR #116.
 
 - [ ] **A held dock tab.** Press and hold Movimientos for a full second, then lift: it opens (before: nothing). The same
   with every tab; a quick tap as before. With Larger Accessibility Sizes, holding still shows iOS's Large Content Viewer.
@@ -19,10 +145,10 @@ JavaScript only; Metro from this branch on the development build cut after PR #1
   stay. With VoiceOver: the title is read as a heading, then the text, then «Volver a intentar, botón». Remove the probe.
 
 
-## Producto 25Q2 — a backup that completes or says why (this PR)
+## Producto 25Q2 — a backup that completes or says why (PR #115, merged)
 
-JavaScript only; Metro from this branch on the development build cut after PR #113. The end of Más reads «FinanzApp
-0.1.0 (25Q2)». Keep a private backup first; use small real data.
+JavaScript only; on the development build cut after PR #113, Metro from `master` or a branch that contains PR #115.
+Keep a private backup first; use small real data.
 
 - [ ] **Más.** The Copia de seguridad row reads «Antes de borrar la app o cambiar de teléfono»; VoiceOver «Copia de
   seguridad, Antes de borrar la app o cambiar de teléfono, botón». The Backup screen starts «Si borrás la app, tus
@@ -42,10 +168,10 @@ JavaScript only; Metro from this branch on the development build cut after PR #1
   a native failure of the picker or the sheet. Covered by the Node tests.
 
 
-## Producto 25Q1 — money that reads right (this PR)
+## Producto 25Q1 — money that reads right (PR #114, merged)
 
-Read-side corrections only; JavaScript only. Metro from this branch on the development build cut after PR #113. The end
-of Más reads «FinanzApp 0.1.0 (25Q1)». Light and dark; Spanish unless a step says English.
+Read-side corrections only; JavaScript only. On the development build cut after PR #113, Metro from `master` or a branch
+that contains PR #114. Light and dark; Spanish unless a step says English.
 
 - [ ] **The Assistant's category link** (a development build with `EXPO_PUBLIC_ASSISTANT_FIXTURES=1`). Record an expense
   in «Supermercado» dated between 1 and 21 September 2026 (the fixture's period). Asistente → «¿Cuánto gasté en comida
@@ -495,8 +621,8 @@ rule 7.
   scrolls clear of it.
 - [ ] **Tarjetas density (evaluate only; no redesign in 24T3).** With 24T3 verified, note whether the Tarjetas root
   feels dense next to a more deck-focused, Wallet-inspired composition (the full movements and facts mainly after
-  opening a card). The 24UX6D rule stays: one card is always in front and selected and drives the snapshot, tapping
-  another card selects it, tapping the front card opens its detail; no «choose a card first» state.
+  opening a card). (Since 25UX1, Tarjetas opens idle with no card selected, even with one: a first tap selects a card
+  and shows its snapshot, a tap on the selected card opens its detail. Judge the density once a card is selected.)
 
 Record: date, iPhone model, iOS version, build, language, and every result above (a failure with a screenshot of your
 own test data only, never of real financial data).
@@ -1302,7 +1428,7 @@ unchanged: keep a backup first** (Más → Copia de seguridad). Use your own sma
 2. **Chip.** With one currency held Inicio and Reportes show no chip and the number is simply the total; add a
    second currency: the chip appears with the previous choice; delete that account: the chip goes away again.
 3. **Delete an account** (one with movements, a transfer and an active recurring rule): a short swipe on its row
-   reveals Eliminar; a full swipe opens the confirmation without deleting; Cancelar leaves everything. Confirm: the
+   reveals Eliminar; dragging to the edge opens nothing by itself; tapping Eliminar asks first; Cancelar leaves everything. Confirm: the
    row leaves Cuentas and Disponible; Movimientos still lists its movements and transfers with the account's name;
    Reportes for that month keeps them; Recurrentes shows the rule paused; the account's detail (from a movement)
    reads "Cuenta eliminada" without Editar or actions; Nuevo gasto and Transferir no longer offer it. VoiceOver on a

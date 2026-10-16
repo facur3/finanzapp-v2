@@ -27,7 +27,7 @@ function load(file: string, extra: Record<string, unknown> = {}, fontScale = 1, 
   const jsx = (type: any, props: any) => ({ type, props });
   const state: unknown[] = [];
   const alerts: { title: string; message: string; buttons?: { text: string }[] }[] = [];
-  const haptics: string[] = [];
+  const haptics: string[] = [], keyboard: string[] = [];
   let cursor = 0;
   const p = palette ?? { isDark: false, surface: '#FFFFFF', inset: '#EEEEF3', text: '#0A0A0C', secondary: '#6E7078', tertiary: '#8E9098', line: '#E6E6EC', primary: '#2557D6', primaryFill: '#2557D6', onPrimary: '#FFF', primarySoft: '#E5ECFB', background: '#F2F2F6',
     income: '#1F7A4D', expense: '#C0392B', warning: '#B26A00', transfer: '#2D6476', transferSoft: '#E2EDF1', incomeSoft: '#E3F1E8' };
@@ -37,7 +37,7 @@ function load(file: string, extra: Record<string, unknown> = {}, fontScale = 1, 
       Children: { map: (children: unknown, fn: (child: unknown) => unknown) => (Array.isArray(children) ? children : [children]).map(fn) } },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': { View: 'View', Text: 'Text', TextInput: 'TextInput', ScrollView: 'ScrollView', Pressable: 'Pressable', ActivityIndicator: 'ActivityIndicator', InputAccessoryView: 'InputAccessoryView',
-      FlatList: 'FlatList', Modal: 'Modal', Platform: { OS: 'ios' }, Keyboard: { dismiss() {} }, StyleSheet: { hairlineWidth: 0.5, create: (styles: unknown) => styles, flatten: (style: any) => Object.assign({}, ...(Array.isArray(style) ? style.flat(Infinity).filter(Boolean) : [style])), absoluteFill: {} },
+      FlatList: 'FlatList', Modal: 'Modal', Platform: { OS: 'ios' }, Keyboard: { dismiss() { keyboard.push('dismiss'); } }, StyleSheet: { hairlineWidth: 0.5, create: (styles: unknown) => styles, flatten: (style: any) => Object.assign({}, ...(Array.isArray(style) ? style.flat(Infinity).filter(Boolean) : [style])), absoluteFill: {} },
       useWindowDimensions: () => ({ fontScale, width, height: 844 }), Alert: { alert: (title: string, message: string, buttons?: { text: string }[]) => alerts.push({ title, message, buttons }) } },
     'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View', Text: 'Animated.Text' }, useSharedValue: (value: number) => ({ value }), withTiming: (value: number) => value, useAnimatedStyle: (fn: () => unknown) => fn() },
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
@@ -62,7 +62,7 @@ function load(file: string, extra: Record<string, unknown> = {}, fontScale = 1, 
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected ' + file + ' dependency: ' + name);
     return modules[name];
   } });
-  return { exports: module.exports, render: (component: string, props: any) => { cursor = 0; return module.exports[component](props); }, alerts, haptics };
+  return { exports: module.exports, render: (component: string, props: any) => { cursor = 0; return module.exports[component](props); }, alerts, haptics, keyboard };
 }
 function nodes(value: any): Node[] {
   if (!value || typeof value !== 'object') return [];
@@ -348,7 +348,7 @@ test('A filled semantic ActionButton paints its label and glyph in onSemantic, r
   }
 });
 
-test('25VIS1 final: Inicio\'s Gastado | Disponible on the field: a white thumb with an ink label, the other label secondary; accessibilityState says which', () => {
+test('25VIS1 final, kept in 25VIS2: Inicio\'s Gastado | Disponible on the field: a light thumb with the light ink label, the other label secondary; accessibilityState says which', () => {
   for (const palette of [lightPalette, darkPalette]) {
     const ui = load('components.tsx', {}, 1, 390, { ...palette, isDark: palette === darkPalette });
     const props = { onField: true, value: 'spent', onChange: () => {}, options: [{ value: 'spent', label: 'Gastado' }, { value: 'available', label: 'Disponible' }] };
@@ -358,7 +358,7 @@ test('25VIS1 final: Inicio\'s Gastado | Disponible on the field: a white thumb w
     assert.equal(flat(control.props.style).backgroundColor, palette.heroControl, 'the track is unchanged');
     const thumb = nodes(control).find(node => node.type === 'Animated.View')!;
     assert.equal(flat(thumb.props.style).backgroundColor, palette.heroThumb);
-    assert.deepEqual([palette.heroThumb, palette.heroThumbInk], [lightPalette.surface, palette.heroInk], 'white thumb, ink label, in both themes');
+    assert.deepEqual([palette.heroThumb, palette.heroThumbInk], [lightPalette.surface, lightPalette.text], 'the light surface\'s thumb and ink, in both themes');
     const labels = nodes(control).filter(node => node.type === 'Animated.Text');
     assert.deepEqual(labels.map(label => flat(label.props.style).color), [palette.heroThumbInk, palette.heroSecondary]);
     assert.deepEqual(labels.map(label => flat(label.props.style).fontWeight), ['600', '500'], 'weight marks the chosen one too, not colour alone');
@@ -436,6 +436,11 @@ test('AmountShortcut and SelectionRow read their spoken twins; the visible capti
   const plain = ui.render('AmountShortcut', { label: 'Usar todo', caption: 'Saldo', onPress: () => {} });
   assert.equal(nodes(plain).find(node => is(node, 'PressFeedback'))!.props.accessibilityLabel, 'Usar todo, Saldo');
   assert.equal(texts(plain)[0].props.accessibilityLabel, undefined);
+  // 25VIS2 (V15): the fill lowers the keyboard first, so Save and its echo of the filled amount come into view.
+  const filled: string[] = [];
+  const pay = ui.render('AmountShortcut', { label: 'Pagar total', caption: 'Saldo pendiente', onPress: () => filled.push('fill') });
+  nodes(pay).find(node => is(node, 'PressFeedback'))!.props.onPress();
+  assert.equal(ui.keyboard.join(',') + '|' + filled.join(','), 'dismiss|fill');
   const row = ui.render('SelectionRow', { label: 'Cuenta', value: 'Banco', detail: 'Saldo $ 1.234,56', spokenDetail: 'Saldo 1234,56 pesos', onPress: () => {} });
   assert.equal(nodes(row).find(node => is(node, 'PressFeedback'))!.props.accessibilityLabel, 'Cuenta: Banco, Saldo 1234,56 pesos');
   assert.equal(texts(row)[2].props.children, 'Saldo $ 1.234,56');
@@ -862,4 +867,137 @@ test('25OPS1: Screen and EntryList (Más, Movimientos) take the dock clearance a
   const account = list({});
   assert.equal(account.props.contentContainerStyle.paddingBottom, 40);
   assert.deepEqual([account.props.contentInset, account.props.scrollIndicatorInsets, account.props.contentInsetAdjustmentBehavior], [undefined, undefined, 'automatic']);
+});
+
+test('25VIS2: every segment is a 44 pt target without being drawn taller (the default 32 pt segment gets 6 pt of vertical slop)', () => {
+  const ui = load('components.tsx');
+  const options = [{ value: 'expense', label: 'Gasto' }, { value: 'income', label: 'Ingreso' }, { value: 'transfer', label: 'Transferencia' }];
+  const reach = (slop: any) => typeof slop === 'number' ? 2 * slop : (slop.top ?? 0) + (slop.bottom ?? 0);
+  for (const [variant, drawn] of [['default', 32], ['compact', 28], ['onField', 36], ['prominent', 40]] as const) {
+    const control = ui.render('Choices', { value: 'expense', onChange: () => {}, options, [variant]: true });
+    const segments = [...new Set(nodes(control).filter(node => node.type === 'Pressable'))];
+    assert.equal(segments.length, 3, variant);
+    for (const segment of segments) {
+      assert.equal(flat(segment.props.style).minHeight, drawn, variant + ': drawn as before');
+      assert.ok(drawn + reach(segment.props.hitSlop) >= 44, variant + ': a 44 pt target');
+    }
+  }
+  const segment = nodes(ui.render('Choices', { value: 'expense', onChange: () => {}, options })).find(node => node.type === 'Pressable')!;
+  assert.equal(JSON.stringify(segment.props.hitSlop), '{"top":6,"bottom":6}', 'vertical only: the neighbour is 2 pt away sideways');
+  // The composer leaves the 4 pt the slop reaches below the 36 pt track clear of the scroller that follows it.
+  const composer = readFileSync(new URL('../src/ui/movement-form.tsx', import.meta.url), 'utf8');
+  assert.match(composer, /paddingTop: space\.m, paddingBottom: 4 \}\}>\s*<Choices<MovementKind>/);
+});
+
+test('25VIS2: a disabled segmented control looks disabled and says so on every segment', () => {
+  const ui = load('components.tsx');
+  const options = [{ value: 'expense', label: 'Gasto' }, { value: 'income', label: 'Ingreso' }];
+  const live = ui.render('Choices', { value: 'expense', onChange: () => {}, options });
+  assert.equal(flat(live.props.style).opacity, 1);
+  const locked = ui.render('Choices', { value: 'expense', onChange: () => {}, options, disabled: true });
+  assert.equal(flat(locked.props.style).opacity, 0.5, 'the whole track at half strength, as a disabled button');
+  const segments = [...new Set(nodes(locked).filter(node => node.type === 'Pressable'))];
+  for (const segment of segments) assert.deepEqual([segment.props.disabled, segment.props.accessibilityState.disabled], [true, true]);
+});
+
+test('25VIS2: under Reduce Motion a pressed scale control dims instead of showing nothing; glass opts out; without Reduce Motion it still scales', () => {
+  const shared = { value: 0 };
+  const theme = (reduced: boolean) => ({ radius: { chip: 14, tile: 12, group: 16, card: 20, sheet: 24, creditCard: 18, button: 14 }, space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
+    type: { body: { fontSize: 17 }, subhead: { fontSize: 15 }, footnote: { fontSize: 13 }, caption: { fontSize: 12 }, title2: { fontSize: 22 }, title3: { fontSize: 20 }, headline: { fontSize: 17 }, eyebrow: {} },
+    usePalette: () => ({ isDark: false }), useReduceMotion: () => reduced, useCurrentDay: () => '2026-09-22' });
+  const press = (reduced: boolean, props: Record<string, unknown> = {}) => {
+    shared.value = 0;
+    const ui = load('components.tsx', { './theme': theme(reduced), 'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View', Text: 'Animated.Text' },
+      useSharedValue: () => shared, withTiming: (value: number) => value, useAnimatedStyle: (fn: () => unknown) => fn } });
+    const root = ui.render('PressFeedback', { onPress: () => {}, children: 'x', ...props });
+    const style = () => root.props.style.find((item: unknown) => typeof item === 'function')();
+    const before = JSON.stringify(style());
+    root.props.children.props.onPressIn({});
+    return [before, JSON.stringify(style())];
+  };
+  assert.deepEqual(press(true), ['{"opacity":1}', '{"opacity":0.7}'], 'Save, the selector cards, the dock tabs and «+» dim when pressed');
+  assert.deepEqual(press(true, { reducedDim: false }), ['{"transform":[{"scale":1}]}', '{"transform":[{"scale":1}]}'], 'a glass pill keeps no pressed state');
+  assert.deepEqual(press(false), ['{"transform":[{"scale":1}]}', '{"transform":[{"scale":0.97}]}'], 'the scale is unchanged without Reduce Motion');
+  assert.deepEqual(press(true, { feedback: 'opacity' }), ['{"opacity":1}', '{"opacity":0.4}'], 'a text button dims as before');
+  const quick = readFileSync(new URL('../src/ui/quick-actions.tsx', import.meta.url), 'utf8');
+  assert.match(quick, /<PressFeedback[^>]*reducedDim=\{material !== 'glass'\}[^>]*>\s*<ControlSurface/, 'an account detail\'s pills opt out only while they are glass');
+});
+
+test('25VIS2: a field\'s caption is not a VoiceOver stop of its own; the amount keyboard\'s Listo is named as it reads', async () => {
+  const ui = load('components.tsx', { '@finanzapp/domain': await import('@finanzapp/domain') });
+  const field = ui.render('Field', { label: 'Comercio', value: '' });
+  const caption = nodes(field).find(node => is(node, 'AppText'))!;
+  assert.equal(caption.props.accessible, false);
+  assert.equal(nodes(field).find(node => node.type === 'TextInput')!.props.accessibilityLabel, 'Comercio', 'the field says its label once');
+  const amount = ui.render('AmountField', { label: 'Gasto', currency: 'ARS', value: '', onChangeText: () => {} });
+  for (const text of nodes(amount).filter(node => is(node, 'AppText') && node.props.variant === 'footnote')) assert.equal(text.props.accessible, false);
+  assert.match(nodes(amount).find(node => node.type === 'TextInput')!.props.accessibilityLabel, /^Gasto/, 'the field itself carries the label and the currency');
+  const done = nodes(amount).find(node => is(node, 'PressFeedback') && node.props.onPress)!;
+  assert.equal(done.props.accessibilityLabel, 'Listo', 'Voice Control finds «Listo» by what it shows');
+  assert.ok(texts(done).some(node => node.props.children === 'Listo'));
+});
+
+test('25VIS2: a section\'s plain action reaches 44 pt with slop, as the quiet one does', () => {
+  const ui = load('components.tsx');
+  for (const quiet of [false, true]) {
+    const heading = ui.render('SectionTitle', { children: 'Presupuestos', action: 'Ver todos', onAction: () => {}, quiet });
+    const action = nodes(heading).find(node => is(node, 'PressFeedback'))!;
+    assert.equal(flat(action.props.style).minHeight, 36, 'drawn as before');
+    assert.ok(36 + action.props.hitSlop.top + action.props.hitSlop.bottom >= 44, quiet ? 'quiet' : 'plain');
+  }
+});
+
+// ErrorMessage alone on a platform. The effect stub follows React's rule (it runs again only when its keys changed), so
+// «a re-render is not spoken» is exercised, not read off the deps array; one slot is enough because nothing else renders.
+function errorMessageOn(os: 'ios' | 'android') {
+  const said: string[] = [];
+  let last: string | undefined;
+  const ui = load('components.tsx', {
+    react: { useState: (value: unknown) => [value, () => {}], useEffect: (effect: () => void, keys: unknown[]) => { const next = JSON.stringify(keys); if (next !== last) { last = next; effect(); } },
+      useId: () => 'id', useRef: (value: unknown) => ({ current: value }), useMemo: (fn: () => unknown) => fn(), Children: { map: () => [] } },
+    'react-native': { View: 'View', Text: 'Text', Pressable: 'Pressable', Platform: { OS: os }, StyleSheet: { hairlineWidth: 0.5, create: (styles: unknown) => styles },
+      AccessibilityInfo: { announceForAccessibility: (text: string) => said.push(text) } },
+  });
+  const alert = (root: Node) => nodes(root).find(node => node.type === 'Text' && node.props.accessibilityRole === 'alert')!;
+  return { said, show: (props: Record<string, unknown>) => ui.render('ErrorMessage', props), alert };
+}
+
+test('25VIS2: on iOS ErrorMessage tells VoiceOver when an error appears or changes, never twice for the same one, and not for a line shown while typing', () => {
+  const { said, show, alert } = errorMessageOn('ios');
+  const sentence = bindLocale('es-AR').errorText('transferForm.overCardDebt');
+  show({ message: null });
+  assert.equal(said.length, 0);
+  const line = show({ message: 'transferForm.overCardDebt' });
+  assert.deepEqual(said, [sentence], 'the translated sentence, not the key');
+  show({ message: 'transferForm.overCardDebt' });
+  assert.equal(said.length, 1, 'a re-render of the same error is not spoken again');
+  show({ message: 'entryForm.futureDate' });
+  assert.equal(said.length, 2, 'a new error is spoken');
+  show({ message: 'transferForm.overCardDebt', announce: false });
+  assert.equal(said.length, 2, 'a line a form shows while typing is not spoken');
+  assert.equal(alert(line).props.accessibilityLiveRegion, 'polite', 'the live region stays for Android');
+});
+
+test('25VIS2: on Android ErrorMessage announces nothing itself: TalkBack speaks its live region, so each error is said once', () => {
+  const { said, show, alert } = errorMessageOn('android');
+  const line = show({ message: 'transferForm.overCardDebt' });
+  show({ message: 'entryForm.futureDate' });
+  assert.equal(said.length, 0, 'one utterance per error: the live region\'s');
+  assert.equal(alert(line).props.accessibilityLiveRegion, 'polite');
+});
+
+test('25VIS2 (V7): a fixed SelectorCard reads as a fact: full strength, no chevron, no button role, the same label and the language', () => {
+  const ui = load('form-controls.tsx', { './categories': { categoryChoices: () => [], categoryKey: (label: string) => label.toLowerCase(), customCategory: () => null } });
+  const props = { label: 'Tarjeta', value: 'Visa', placeholder: '', detail: 'Saldo pendiente ARS 50,00', spokenDetail: 'Saldo pendiente 50,00 pesos', icon: 'card-outline' };
+  const fixed = ui.render('SelectorCard', { ...props, fixed: true, disabled: true });
+  assert.equal(fixed.type, 'View');
+  assert.deepEqual([fixed.props.accessible, fixed.props.accessibilityRole, fixed.props.accessibilityState], [true, undefined, undefined]);
+  assert.equal(fixed.props.accessibilityLabel, 'Tarjeta: Visa, Saldo pendiente 50,00 pesos');
+  assert.ok(Object.hasOwn(fixed.props, 'accessibilityLanguage'), 'the View is its own VoiceOver element, so it carries the language (voiceover.node.ts rule b)');
+  assert.equal(flat(fixed.props.style).opacity, 1);
+  assert.equal(nodes(fixed).some(node => node.type === 'Ionicons'), false, 'no chevron: nothing opens');
+  const chooser = ui.render('SelectorCard', { ...props, onPress: () => {} });
+  assert.equal(chooser.type, 'PressFeedback');
+  assert.equal(chooser.props.accessibilityRole, 'button');
+  assert.ok(nodes(chooser).some(node => node.type === 'Ionicons'), 'a chooser keeps its chevron');
 });

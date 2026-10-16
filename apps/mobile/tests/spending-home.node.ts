@@ -401,7 +401,7 @@ test('24UX6C: the hero numbers are byte-identical to the domain figures: Gastado
 test('24UX6A: the number is the field\'s ink at 46 pt, and the secondary ink when it is exactly zero; dark keeps the dark field', () => {
   let root = routeHarness('(tabs)/index.tsx', {}, homeData).render();
   assert.deepEqual([find(root, 'Money').props.size, find(root, 'Money').props.color], [46, lightPalette.heroInk]);
-  // 25A-03: the hero asks for the field's solid graphite symbol and cents; the whole units keep the ink.
+  // 25A-03: the hero asks for the field's solid quiet symbol and cents; the whole units keep the ink.
   assert.equal(find(root, 'Money').props.onField, true);
   root = routeHarness('(tabs)/index.tsx', {}, snapshot).render();
   assert.deepEqual([find(root, 'Money').props.minor, find(root, 'Money').props.color], [0, lightPalette.heroSecondary], 'a true zero reads quieter');
@@ -414,35 +414,37 @@ test('24UX6A: the number is the field\'s ink at 46 pt, and the secondary ink whe
   } finally { dark = false; }
 });
 
-test('24UX6A: the status bar is the field\'s own over it (dark on the lime since 25VIS1), the scheme\'s own after scrolling past it or when another screen is in front', () => {
+test('24UX6A: the status bar is the field\'s own over it (`heroStatusBar`: light over the sapphire since 25VIS2), the scheme\'s own after scrolling past it or when another screen is in front', () => {
+  const field = lightPalette.heroStatusBar, nightField = darkPalette.heroStatusBar;
+  assert.deepEqual([field, nightField], ['light', 'light'], 'the sapphire field is dark in both themes');
   const view = routeHarness('(tabs)/index.tsx', {}, homeData);
   let root = view.render();
-  assert.equal(view.statusBar.join(), 'dark', 'focused at the top: dark content over the lime field');
+  assert.equal(view.statusBar.join(), field, 'focused at the top: the field\'s own');
   fieldOf(root).props.onLayout({ nativeEvent: { layout: { height: 320 } } });
   root.props.onScroll({ nativeEvent: { contentOffset: { y: 100 } } });
-  assert.equal(view.statusBar.join(), 'dark', 'still over the field: nothing changes');
+  assert.equal(view.statusBar.join(), field, 'still over the field: nothing changes');
   root.props.onScroll({ nativeEvent: { contentOffset: { y: 320 - INSETS.top + 1 } } });
   assert.equal(view.statusBar.at(-1), 'dark', 'past the field in light: dark text on the light canvas');
   root = view.render();
   root.props.onScroll({ nativeEvent: { contentOffset: { y: 0 } } });
-  assert.equal(view.statusBar.at(-1), 'dark', 'back over the field');
+  assert.equal(view.statusBar.at(-1), field, 'back over the field');
   view.blur();
   assert.equal(view.statusBar.at(-1), 'dark', 'another screen in front: the light scheme\'s own');
   const count = view.statusBar.length;
   root.props.onScroll({ nativeEvent: { contentOffset: { y: 5 } } });
   assert.equal(view.statusBar.length, count, 'no change while still over the field');
   view.focus();
-  assert.equal(view.statusBar.at(-1), 'dark', 'focused again at the top');
+  assert.equal(view.statusBar.at(-1), field, 'focused again at the top');
   dark = true;
   try {
     const night = routeHarness('(tabs)/index.tsx', {}, homeData);
     const nightRoot = night.render();
-    assert.equal(night.statusBar.at(-1), 'dark', 'dark scheme, at the top: the lime field still wants dark content');
+    assert.equal(night.statusBar.at(-1), nightField, 'dark scheme, at the top: the field\'s own');
     fieldOf(nightRoot).props.onLayout({ nativeEvent: { layout: { height: 320 } } });
     nightRoot.props.onScroll({ nativeEvent: { contentOffset: { y: 600 } } });
     assert.equal(night.statusBar.at(-1), 'light', 'dark scheme past the field: its own light content on the near-black');
     nightRoot.props.onScroll({ nativeEvent: { contentOffset: { y: 0 } } });
-    assert.equal(night.statusBar.at(-1), 'dark', 'back over the field');
+    assert.equal(night.statusBar.at(-1), nightField, 'back over the field');
     night.blur();
     assert.equal(night.statusBar.at(-1), 'light');
   } finally { dark = false; }
@@ -643,7 +645,7 @@ test('24UX6A: commitments without activity show only the commitments; with neith
   const surface = nodes(root).find(n => n.type === 'Surface' && nodes(n).some(child => child.type === 'UpcomingRecurringRow'))!;
   assert.equal(surface.props.grouped, true);
   // 25VIS1 (owner): future content is not brand content. The commitments' surface is the same neutral grouped surface as
-  // Actividad reciente's, with no tint of its own (no lime, no wash); only each row's mark keeps its category identity.
+  // Actividad reciente's, with no tint of its own (no brand tint, no wash); only each row's mark keeps its category identity.
   assert.equal(JSON.stringify(surface.props.style ?? {}).includes('backgroundColor'), false, 'no tinted fill on the commitments');
   nodes(root).find(n => n.type === 'SectionTitle' && n.props.children === 'Próximos compromisos')!.props.onAction();
   assert.equal(view.pushed.at(-1), '/recurring');

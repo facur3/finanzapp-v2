@@ -283,6 +283,7 @@ test('24T3: the refund form keeps the submission frozen on an unknown outcome an
   await find(again.render(), 'ActionButton').props.onPress();
   root = again.render();
   assert.equal(find(root, 'ErrorMessage').props.message, domain.REFUND_OVER_MESSAGE);
+  assert.equal(find(root, 'ErrorMessage').props.announce, true, '25VIS2: what Save refused is spoken');
   assert.equal(bindLocale('en-US').errorText(domain.REFUND_OVER_MESSAGE) !== domain.REFUND_OVER_MESSAGE, true, 'the refusal is catalogued in English too');
   assert.equal(find(root, 'AmountField').props.editable, true, 'released: the person reviews the draft');
   assert.notEqual(find(root, 'ActionButton').props.label, 'Reintentar guardado');
@@ -301,7 +302,12 @@ test('24T3: an amount over what is left is refused live with Save disabled; a pu
   find(root, 'AmountField').props.onChangeText('300,01');
   root = view.render();
   assert.equal(find(root, 'ErrorMessage').props.message, domain.REFUND_OVER_MESSAGE);
+  assert.equal(find(root, 'ErrorMessage').props.announce, false, '25VIS2: the live line is shown, not spoken while typing');
   assert.equal(find(root, 'ActionButton').props.disabled, true);
+  find(root, 'AmountField').props.onChangeText('12,');
+  root = view.render();
+  assert.equal(find(root, 'ErrorMessage').props.message, domain.REFUND_AMOUNT_MESSAGE, 'a half-typed decimal shows the hint');
+  assert.equal(find(root, 'ErrorMessage').props.announce, false, 'and VoiceOver does not hear a false refusal mid-typing');
   assert.equal(has(root, 'SectionTitle'), false, 'no preview for a draft the domain refuses');
 
   const full = harness('app/new-refund.tsx', { params: { entryId: buy.id }, data: refundOf(base(), 'r1', 50000, '2026-09-20') }).render();
