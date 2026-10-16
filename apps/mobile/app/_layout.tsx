@@ -16,6 +16,7 @@ import { DisplayCurrencyProvider } from '../src/ui/display-currency-provider';
 import { RatesProvider } from '../src/fx/rates-provider';
 import { ActionButton, AppText, ErrorMessage } from '../src/ui/components';
 import { reviewSheetScrolls } from '../src/ui/geometry';
+import { ScreenFailure } from '../src/ui/screen-failure';
 import { UIProvider, themePreferenceStore, usePalette, useReduceMotion } from '../src/ui/theme';
 import { HeldCurrenciesProvider, I18nProvider, useI18n } from '../src/i18n/provider';
 import { defaultPreferenceStore } from '../src/i18n/preference';
@@ -91,7 +92,8 @@ function Navigation() {
     {error && <SafeAreaView edges={['top']} style={{ padding: 16, backgroundColor: p.surface }}>
       <ErrorMessage message={error} /><ActionButton label={t('boot.verifyAgain')} onPress={retry} secondary />
     </SafeAreaView>}
-    <Stack screenOptions={{ headerStyle: { backgroundColor: p.background }, headerTintColor: p.text,
+    {/* 25Q3: a screen that fails to draw shows ScreenFailure in its own place; the stack, its header and the dock stay. */}
+    <Stack unstable_screenErrorBoundary={ScreenFailure} screenOptions={{ headerStyle: { backgroundColor: p.background }, headerTintColor: p.text,
       headerTitleStyle: { color: p.text }, headerShadowVisible: false,
       contentStyle: { backgroundColor: p.background }, animation: reduced ? 'fade' : 'default',
       headerBackButtonDisplayMode: 'minimal', gestureEnabled: true }}>

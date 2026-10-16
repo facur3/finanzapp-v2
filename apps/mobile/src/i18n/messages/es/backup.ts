@@ -4,7 +4,8 @@ export const backup = {
     export: {
       /** Section title and button label. */
       share: 'Compartir copia',
-      intro: 'Guardá tus cuentas, tarjetas, deudas, movimientos, presupuestos y recurrentes en un lugar privado antes de borrar la app o cambiar de teléfono.',
+      /** 25Q2: the uninstall consequence first (production-plan.md §1.3), then what to do; nothing claimed about iCloud (unverified). */
+      intro: 'Si borrás la app, tus registros se borran con ella. Guardá tus cuentas, tarjetas, deudas, movimientos, presupuestos y recurrentes en un lugar privado antes de borrarla o de cambiar de teléfono.',
       note: 'Incluye el estado actual y los movimientos deshechos. El archivo no está cifrado: guardalo en un lugar privado.',
       importTitle: 'Importar copia',
       importSubtitle: 'Revisar el archivo antes de agregar',

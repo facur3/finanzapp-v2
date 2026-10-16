@@ -4,7 +4,15 @@ Updated: 2026-10-15 (**25VIS2 finish line**, same draft PR #112: the rest of the
 haptics (V4), the Save-gating table (V8) and the keyboard lowered by «Pagar total» (V15); the recurring form keeps one
 category per kind; `ErrorMessage` announces only on iOS (Codex); the binding interface and motion rules no longer name a
 palette; checklist steps that described UI that does not exist corrected; the owner's five-choice sheet and the
-merge-time flip list; «Producto 25VIS2», §2). Before (2026-10-15, later, 25A-06 **B8 closed**: the owner-led drills ran on 2026-10-14 and 2026-10-15 at `S` 173ce76; the
+merge-time flip list; «Producto 25VIS2», §2). Before (2026-10-15, latest, **25Q3 — calm failures and a dock that never ignores a tap**, on its branch, stacked on
+25Q2: a screen that fails to draw shows a card in the app's words instead of ending the app; an unknown link opens a
+localised screen instead of Expo's English developer one; a dock tab held past half a second selects on release; no
+domain, storage, schema, navigation model or motion change; «Producto 25Q3», §1, §2). Before (2026-10-15, latest, **25Q2 — a backup that completes or says why**, on its branch, stacked on 25Q1: the export
+is one dated compact file measured before it is written; native failures say so in the app's words; a failed pick after an
+import is no longer silent; the uninstall consequence is said where the person backs up; the repository guard knows a real
+backup by name or header; no domain, schema 14, backup v14 or format change; «Producto 25Q2», §1, §2). Before (2026-10-15, later, **25Q1 — money that reads right**, on its branch: the first delivery after the post-B8 audit,
+seven read-side corrections where the app showed a wrong or missing figure, plus an honest account-deletion confirmation;
+no domain, storage, schema 14, backup v14, navigation or animation change; «Producto 25Q1», §1, §2). Before (2026-10-15, 25A-06 **B8 closed**: the owner-led drills ran on 2026-10-14 and 2026-10-15 at `S` 173ce76; the
 record names the evidence that was not kept, accounts for the fourth settled reservation by inference, gives the month total, 2 649
 µUSD, and B9's inputs; the runbook takes the corrections B8 found; `master` is unfrozen once this merges; «Producto
 25A-06», runbook §0.2, §6.4, §6.5, §12. **CI:** the Expo SDK 57 patches aligned again, with a native change, so a new
@@ -404,6 +412,25 @@ history file keeps the evidence of when and why.
   branch and PR per delivery, CI green, the checks recorded in this file at handoff.
 
 ## 1. Implemented (current state)
+
+- **25Q3 — calm failures and a dock that never ignores a tap (on its branch, after 25Q2).** «Producto 25Q3». The root
+  stack gives every route `ScreenFailure` (expo-router's `unstable_screenErrorBoundary`, pinned by a test on the
+  installed package): a drawing error shows «No pudimos mostrar esta pantalla» with «Volver a intentar», never the error
+  text, while the header, the back gesture and the dock stay; `app/+not-found.tsx` answers an unknown link in the app's
+  language with «Ir a Inicio»; the dock's tabs have no long press, so a slow tap selects.
+
+- **25Q2 — a backup that completes or says why (on its branch, after 25Q1).** «Producto 25Q2». The export is
+  `FinanzApp-backup-<date>-<HHmm>.json`, one compact line measured in bytes before anything is written (a copy over 5 MB
+  says so in its own words instead of the import's), shared as JSON and always deleted; native failures read «No se pudo
+  preparar la copia…» or «No pudimos leer la copia…»; a bad pick after an import returns to the choice with its
+  sentence; the Backup screen and its Más row say that deleting the app deletes the records; `check:repo` and
+  `.gitignore` recognise a real backup by its old, new or dated name and by its header.
+
+- **25Q1 — money that reads right (on its branch; Metro on the new development build).** «Producto 25Q1». The
+  Assistant's category link opens the figure it cites; Reportes keeps budgets while a consolidated total waits for a
+  rate; «Neto del día» heads only a whole day's movements; an archived card in credit says so; a budget in a currency no
+  account holds stays reachable; a card with only instalments to come says when they are recorded; deleting an account
+  names the balance leaving Disponible and that the deletion is final.
 
 What exists in code on `master` as of Producto 24T3 (PR #76, merge commit 399a1fa), after 24UX6E (PR #75, merge commit
 d30b77f), 24UX6D (PR #74, merge
@@ -940,6 +967,16 @@ item unless a section says a new native build is needed. The checklist sections 
   Same PR (JavaScript only): the checklist's «Same PR — movement composer and accessibility polish» and the dark dock's
   photos on every ground («The dark dock»).
 - **Fix — «Pagar tarjeta» in dark (PR #107, merged; no EAS build):** the checklist's section; nothing device-verified.
+- **25Q3 — calm failures and a dock that never ignores a tap (on its branch; the development build after PR #113):**
+  the checklist's «Producto 25Q3»: an unknown link, a probe failure in a tab and in a pushed screen (local, never
+  committed), a held dock tab.
+- **25Q2 — a backup that completes or says why (on its branch; the development build after PR #113):** the
+  checklist's «Producto 25Q2»: the file's name and one-line content through AirDrop, Mail and Files, the cancelled and
+  failed sheet, a bad pick after an import, the new sentences.
+- **25Q1 — money that reads right (on its branch; the development build after PR #113):** the checklist's «Producto
+  25Q1»: the Assistant's category link (fixtures), Reportes without a rate, the day headings under a filter, an archived
+  card in credit, a budget in euros with no euro account, a card with only cuotas to come, the account deletion text.
+
 - **25A-06 — ledger currencies (PR #101; no EAS build; nothing
   device-verified):** every build stays disconnected; the fixture view is unchanged. With a connected build (25A-07), a
   ledger in MXN, COP, EUR or JPY records through the Assistant (the currency chips name any ledger currency in the
@@ -1189,6 +1226,11 @@ item unless a section says a new native build is needed. The checklist sections 
   TestFlight.
 
 ## 3. Next deliveries
+
+*(2026-10-15: after B8 the post-audit quality deliveries run one at a time, each a focused PR with its tests and its
+iPhone steps: #113 (B8 closed, Expo CI), #112's finish line, 25Q1 (money that reads right); next, in the owner's order
+of priorities, the payment-edit guards once #112 merges (they share its form), backup and recovery, touch reliability
+and robustness, accessibility, then the App Store shell when its inputs exist. Nothing here reorders a feature.)*
 
 **Recommended next (2026-10-10, corrected after the owner's review): the release plan.** 2026-10-31 is a **target, not a
 mandatory public release deadline**. *(Owner preference, 2026-10-13, §4 «Release plan to 2026-10-31»: milestone (2)
@@ -4538,6 +4580,128 @@ nothing of it is on a screen yet.
     `regions:verify` OK; `i18n:check -- --strict` 0 errors, 0 stale; `expo install --check` with `EXPO_OFFLINE=1` up to
     date (the live check waits for PR #113 on `master`); `export:ios` OK; bundle secret scan OK; root `npm test` 703
     passed; `check:repo` OK. CI runs the rest once `master` (with #113) is merged in. None of this is iPhone QA.
+
+### Producto 25Q3 — calm failures and a dock that never ignores a tap (this PR, stacked on 25Q2)
+
+- **Why.** A drawing error in any screen reached React Native unhandled and ended the app in a release build; an unknown
+  link (`finanzapp-dev://nope`) opened Expo Router's black English «Unmatched Route» screen with a Sitemap link; and the
+  most used control failed silently: a dock tab held past half a second selected nothing (React Native cancels the tap of
+  a touch held past its long-press delay when an `onLongPress` exists, `Pressability.js` «isPressCanceledByLongPress»;
+  nothing listened to the `tabLongPress` it emitted).
+- **What.**
+  - `src/ui/screen-failure.tsx`: `ScreenFailure`, given to every route by the root stack's
+    `unstable_screenErrorBoundary` (typed in the installed expo-router; a test reads the installed package so an upgrade
+    that renames it fails instead of dropping the fallback). «No pudimos mostrar esta pantalla» / «Lo que ya guardaste
+    sigue ahí. Podés volver atrás o abrir otra pestaña.» and «Volver a intentar», which draws that screen again. It never
+    shows the error (no names or amounts from it) and never touches storage (AGENTS rule 9). Drawing errors only: a
+    handler, an effect or a promise is not caught, so no crash-free claim is made. The tabs layout hands the same
+    fallback to its own four screens (Codex, PR #116): expo-router wraps each leaf route inside its navigator and never a
+    layout, so a tab that fails is replaced inside the tabs layout and the dock stays; the explicit prop keeps that true
+    without relying on the root stack's context, a render test with expo-router's own `Try` shows the dock staying (and
+    lost if the boundary wrapped the layout), and the library's wrapping rule is pinned. A throw in the tabs layout
+    itself (the dock) is still not caught.
+  - `app/+not-found.tsx`: «Pantalla no encontrada», «No encontramos esa pantalla», «El enlace no lleva a ninguna
+    pantalla de FinanzApp.» and «Ir a Inicio» (`router.replace('/')`; a cold start has no back stack). The framework's
+    fallback, not a destination: decision 005 holds.
+  - `src/ui/floating-tab-bar.tsx`: the tabs carry no `onLongPress`; a held tab selects on release, as iOS's tab bar
+    does; the Large Content Viewer is iOS's own and unchanged.
+- **Owner decisions recorded for review:** the `unstable_` API (recommended: the stable alternative is an exported
+  ErrorBoundary in each of about 60 route files) and the copy of the two cards.
+- **Tests.** `failure-screens.node.ts` (the card, retry once, no error text, the not-found screen and its replace, the
+  layout's prop and the installed package), `floating-tab-bar.node.ts` (no tab has a long press; a press navigates).
+- **Checks** (local, Linux, 2026-10-15): `typecheck` OK; `test:storage` 1385 passed, 0 failed, 1 skipped (3 new);
+  `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0 errors, 0 stale (English accepted after review);
+  `i18n:extract` clean; `expo install --check` live and offline up to date; `export:ios` (with the new route) and the
+  bundle secret scan OK; root `npm test` 704 passed; `check:repo` OK. None of this is iPhone QA.
+
+### Producto 25Q2 — a backup that completes or says why (this PR, stacked on 25Q1)
+
+- **Why.** The backup is the only recovery of a ledger that lives on the phone (production-plan.md §1.3). The audit found
+  the export failing with the import's sentence from about 12 700 movements (the pretty file passed the import's 5 MB
+  check before its own size check could run), native file-system and share-sheet errors shown as the platform's English
+  text, a bad pick after an import doing nothing visible, a file named `finanzapp-piloto-<epoch>.json`, and a repository
+  guard that did not recognise that name in a public repository.
+- **What.**
+  - `src/ui/backup-file.ts` (pure): `buildBackupFile` writes compact JSON, measures its UTF-8 bytes against the 5 MB cap
+    before any file exists (`backup.export.tooLarge`, «No borres la app…»), then checks this app can restore it;
+    `backupFileName` gives `FinanzApp-backup-2026-10-15-1432.json` (local day and time, ASCII, one prefix constant for
+    the naming workflow); the format and its identifiers are unchanged and older builds read the compact file.
+  - **Measured** (synthetic movements with 36-character ids): about 283 bytes per movement compact against 412
+    pretty-printed, so the 5 MB cap holds about 18 500 movements instead of 12 700. The cap itself is unchanged (raising
+    it touches the domain and older builds; an owner decision once a large file is measured on the oldest iPhone).
+  - `app/backup.tsx`: a native failure (availability, writing, the sheet) reads `backup.export.prepareFailed`; the
+    temporary file is still deleted in every case.
+  - `app/backup-import.tsx`: after a successful import, a file that fails returns to the choice with its sentence (it
+    left «Copia incorporada» on screen and said nothing); a file iOS cannot read reads `backup.import.readFailed`. (The
+    picker itself never rejects: expo-file-system 57 reports its own failures as a cancel, so they stay silent.)
+  - An independent review found nothing high or medium; its follow-ups are in: the dead picker branch removed, and tests
+    that fail if the cap counted characters instead of bytes, if a same-minute leftover blocked the export, if the
+    availability check's failure leaked, and for the guard's own head reader on a file above 2 MiB. Not done (known, as
+    before 25Q2): a plaintext copy left in Caches when iOS ends the app while the sheet is open; a sweep belongs to the
+    file-protection evaluation (25D), which needs a device observation.
+  - Copy: the Backup screen opens with «Si borrás la app, tus registros se borran con ella.»; Más' row subtitle reads «Antes
+    de borrar la app o cambiar de teléfono». *Owner decisions recorded here for review:* compact JSON (recommended: smaller,
+    no format change), the file name, and this placement of the uninstall sentence (production-plan §12 leaves the
+    placement to the owner; nothing is claimed about iCloud, which is unverified).
+  - `scripts/check-repo.mjs` and `.gitignore`: a tracked `finanzapp-piloto-*.json`, `FinanzApp-backup-*.json` or neutral
+    dated backup name fails, and so does any tracked `.json` or `.txt` whose first 4 KB carry a backup's schema id,
+    whatever its size or folder (no folder is exempt: Codex on PR #115; tests build their backups at run time).
+- **Not in this PR** (next): the import review that predicts the write (the recurring dates a restore records right
+  after, the export date, the conflicting records by name, same-name accounts), the guarded catch-up after a restore, a
+  newer-schema file told as such at launch, «Importar copia» on an empty Inicio (owner decision) and undone rows that
+  look undone.
+- **Tests.** `backup-file.node.ts` (name, bytes, compact round trip, the cap's own sentence, the measured sizes),
+  `more-routes` (the export: one dated file in the cache, JSON mime and UTI, deleted afterwards, a failed sheet, a
+  failed write, over the cap with no file created, no sheet; the new copy in es and en), `recovery-routes` (a failed pick
+  after an import, native picker and read failures), `check-repo.test.js` (names and headers). Each new route assertion
+  fails on the source before the change.
+- **Checks** (local, Linux, 2026-10-15): `typecheck` OK; `test:storage` 1382 passed, 0 failed, 1 skipped (7 new);
+  `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0 errors, 0 stale (English accepted after review);
+  `i18n:extract` no copy outside the catalogue; `expo install --check` live and offline up to date; `export:ios` and the
+  bundle secret scan OK; root `npm test` 704 passed (the guard's new test); `check:repo` OK. None of this is iPhone QA.
+
+### Producto 25Q1 — money that reads right (this PR)
+
+- **Why.** The whole-app audit of 2026-10-15 (private record) found screens that print a wrong, zero or missing figure.
+  These seven are read-side only and independent of PR #112; the write-side guards for editing or restoring a payment
+  share #112's transfer form and follow its merge.
+- **What.**
+  - *The Assistant's category link* (`app/spending-detail.tsx`): the link carries the stored spelling («Supermercado»)
+    and the screen compared it with normalised keys, so the evidence meant to verify an answer opened «$ 0,00»; both
+    sides now compare `categoryKey` (so does the category report). A category with no line in the period keeps its own
+    title and tile over its true zero, and a blank one is an invalid link. A gate for the AI-first release (AGENTS rule
+    12), latent while every build is disconnected. The screen shows the category's net, as before; the Assistant's row
+    is gross (the known gap of 25A).
+  - *Budgets without a rate* (`app/(tabs)/reports.tsx`): a budget reads the real ledger in its own currency and needs
+    no rate (currency.md), so Reportes keeps its block when a consolidated total waits for one.
+  - *«Neto del día»* (`EntryList dayNet`): off on a category's or a day's drill-down (expenses only) and on Movimientos
+    under Gastos, Ingresos or a search (a subset's sum, read aloud as the day's net); on for the whole day's
+    movements, as before. *The Movimientos part is its own commit, droppable if the owner prefers the figure there.*
+  - *An archived card in credit* reads «Saldo a favor · $ …», never «Sin saldo pendiente» (`ArchivedCardRow`).
+  - *A budget in a currency no account holds* (allowed by decision 7.6.3) can be opened, edited and deleted:
+    Presupuestos offers its currency, with one quiet note that there are no expenses to compare
+    (`budgetCurrencies`; a deleted account's history counts as held).
+  - *A card whose only records are instalments still to come* says «Todavía no hay movimientos. Tus cuotas se registran
+    cuando cierra cada resumen.» instead of «no registraste compras ni pagos» (Tarjetas and the card detail).
+  - *Deleting an account* (the only confirmation, from the row, the rotor or Editar cuenta) names the recorded balance
+    that stops counting in Disponible (either sign) and ends with «Una cuenta eliminada no se puede volver a activar.»;
+    «No borra nada» goes (it read as reversible).
+- **Copy for the owner to confirm** (Spanish; English in the catalogue): the two new sentences above, the budget note
+  («Todavía no tenés cuentas en {euros}, así que no hay gastos para comparar con este presupuesto.») and the two
+  deletion sentences. Not done, owner-gated: the capture hub's captions (decision 005 pins them).
+- **Tests.** Each new assertion fails on the source before its change: the category link by every spelling and end to
+  end from the Assistant's evidence (`spending-home`), the budget block without a rate and the drill-downs' day net
+  (`report-routes`), Movimientos' day net (`activity-route`), the archived credit and the plans-only card
+  (`installment-routes`), the unheld-currency budget and `budgetCurrencies` (`budgets-routes`), the deletion text with
+  its balance and finality (`lifecycle-actions`, `polish-routes`).
+- **Checks** (local, Linux, 2026-10-15): `typecheck` OK; `test:storage` 1375 passed, 0 failed, 1 skipped (5
+  new tests and new assertions in five others); `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0
+  errors, 0 stale (English accepted after review); `i18n:extract` no copy outside the catalogue; `expo install --check`
+  live and offline up to date; `export:ios` and the bundle secret scan OK; root `npm test` 703 passed; `check:repo` OK.
+  None of this is iPhone QA.
+- **Invariants.** Integer minor units only; unknown stays unknown (a missing rate still withholds every converted
+  total; a budget's zero in a never-held currency is explained, never shown as verified); no domain, storage, schema 14,
+  backup v14, navigation, motion or write-path change.
 
 ### Producto 25VIS1 — Electric Lime palette, accepted as the current palette (PR #83, merged)
 

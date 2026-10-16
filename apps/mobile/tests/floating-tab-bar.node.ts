@@ -144,7 +144,7 @@ test('24UX6A: the «+» is a sibling of the pill, outside the tab list, drawn on
   assert.equal(Object.keys(plus.props).length, 0, 'no selection, index or route: an action, not a destination');
 });
 
-test('24UX6A: a tap sends the stock tabPress, then navigates only to another tab that nobody prevented; a long press sends tabLongPress', () => {
+test('24UX6A: a tap sends the stock tabPress, then navigates only to another tab that nobody prevented; 25Q3: a held tab still selects (no long press)', () => {
   const { FloatingTabBar } = harness();
   const nav = navigator(0);
   const { items } = dockOf(FloatingTabBar(nav.props));
@@ -154,8 +154,11 @@ test('24UX6A: a tap sends the stock tabPress, then navigates only to another tab
   items[0].rendered.props.onPress();
   assert.equal(nav.events.at(-1)?.target, 'index-key');
   assert.equal(nav.navigated.length, 1, 'the selected tab is not pushed again');
-  items[1].rendered.props.onLongPress();
-  assert.equal(JSON.stringify(nav.events.at(-1)), JSON.stringify({ type: 'tabLongPress', target: 'activity-key' }));
+  // 25Q3: with an onLongPress, React Native cancels the tap of a touch held past 500 ms (Pressability: «isPressCanceledByLongPress»),
+  // so a slow tap on the dock selected nothing. No tab carries one now; nothing listened to tabLongPress.
+  assert.equal(items.every(item => item.rendered.props.onLongPress === undefined), true);
+  items[1].rendered.props.onPress();
+  assert.equal(JSON.stringify(nav.navigated.at(-1)), JSON.stringify(['activity', undefined]), 'released however long it was held');
   const blocked = navigator(0, true);
   dockOf(FloatingTabBar(blocked.props)).items[3].rendered.props.onPress();
   assert.equal(JSON.stringify(blocked.events.at(-1)), JSON.stringify({ type: 'tabPress', target: 'settings-key', canPreventDefault: true }));

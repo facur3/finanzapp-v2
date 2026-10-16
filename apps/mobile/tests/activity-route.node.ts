@@ -107,6 +107,22 @@ test('24UX6C: VoiceOver hears the count after a filter change at once and after 
   assert.deepEqual(view.announced, ['1 movimiento', '0 movimientos']);
 });
 
+test('25Q1: «Neto del día» heads the days only while nothing narrows the list', () => {
+  const view = harness();
+  let root = view.render();
+  assert.equal(root.props.dayNet, true, 'every movement of the day: its net');
+  header(root).find(node => node.type === 'Choices')!.props.onChange('expense');
+  root = view.render();
+  assert.equal(root.props.dayNet, false, 'Gastos alone: a subset\'s sum is not the day\'s net');
+  header(root).find(node => node.type === 'Choices')!.props.onChange('all');
+  root = view.render();
+  assert.equal(root.props.dayNet, true);
+  header(root).find(node => node.type === 'SearchField')!.props.onChangeText('coto');
+  assert.equal(view.render().props.dayNet, false, 'a search narrows it too');
+  header(view.render()).find(node => node.type === 'SearchField')!.props.onChangeText('   ');
+  assert.equal(view.render().props.dayNet, true, 'blank search: the whole list again');
+});
+
 test('Codex (PR #72): a pending count announcement is cancelled when Movimientos loses focus, and none starts while unfocused', () => {
   const view = harness();
   const root = view.render();

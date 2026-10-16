@@ -33,7 +33,8 @@ export default function ReportDayScreen() {
   const entries = selectEntries(expensesInPeriod(listingSnapshot(real, view), period), real.accounts);
   let total: number | null = null;
   try { if (view.complete(date, date, 'expense')) total = dailySpending(snapshot, period)[0]?.amountMinor ?? 0; } catch { /* Keep the records accessible when their sum exceeds the safe range. */ }
-  return <EntryList entries={entries} accounts={real.accounts} header={<View style={{ gap: 16 }}>
+  // 25Q1: no «Neto del día» on the heading: these rows are the day's expenses, whose total is the hero above.
+  return <EntryList entries={entries} accounts={real.accounts} dayNet={false} header={<View style={{ gap: 16 }}>
     <AppText accessibilityRole="header" variant="title2">{formatDate(date, 'long')}</AppText>
     {total !== null ? <Money minor={total} currency={currency} large /> : <AppText>{t('reports.day.totalUnavailable')}</AppText>}
     {/* 24T3 (A23): purchases and devoluciones counted apart; every line stays listed below. */}

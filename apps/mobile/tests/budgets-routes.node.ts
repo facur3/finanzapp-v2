@@ -299,7 +299,7 @@ test('24B5: the budget form offers the gate\'s currencies before the amount; wit
 
 // Producto 24T3 (A24): the Presupuestos screen when devoluciones leave the month (or a category) below zero. The actual
 // route with its hosts as descriptors and the real projection (`snapshotFromArchive`) of a purchase operation.
-async function budgetsScreen(data: domain.LedgerArchive, locale: AppLocale = 'es-AR') {
+async function budgetsScreen(data: domain.LedgerArchive, locale: AppLocale = 'es-AR', route: Record<string, string> = { currency: 'ARS', month: '2026-09' }) {
   const presentation = await import('../src/ui/presentation.ts');
   const reportPresentation = await import('../src/ui/report-presentation.ts');
   const budgetPresentation = await import('../src/ui/budget-presentation.ts');
@@ -319,7 +319,7 @@ async function budgetsScreen(data: domain.LedgerArchive, locale: AppLocale = 'es
     } },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': { View: 'View', StyleSheet: { hairlineWidth: 0.5 }, useWindowDimensions: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }) },
-    'expo-router': { Stack: { Screen: 'Stack.Screen' }, useLocalSearchParams: () => ({ currency: 'ARS', month: '2026-09' }), router: { push: () => {} } },
+    'expo-router': { Stack: { Screen: 'Stack.Screen' }, useLocalSearchParams: () => route, router: { push: () => {} } },
     'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View' }, useSharedValue: (value: number) => ({ value }), withTiming: (value: number) => value, useAnimatedStyle: (fn: () => unknown) => fn() },
     '@expo/vector-icons/Ionicons': 'Ionicons',
     '@finanzapp/domain': domain,
@@ -345,6 +345,40 @@ async function budgetsScreen(data: domain.LedgerArchive, locale: AppLocale = 'es
     : !value.props ? [] : [value, ...(typeof value.type === 'function' ? expand(value.type(value.props)) : []), ...expand(value.props.children)];
   return () => { cursor = 0; return expand(module.exports.default!()) as Node[]; };
 }
+
+test('25Q1 (BUDGETS-02): a budget in a currency no account holds stays reachable: the switch offers it, its panel opens, and a note says there is nothing to compare', async () => {
+  const textOf = (node: Node) => [node.props.children].flat().join('');
+  const eur: domain.MonthlyBudget = { ...total, id: 'eur', currency: 'EUR', amountMinor: 20000 };
+  const render = await budgetsScreen({ ...archive, budgets: [total, food, eur] });
+  const currencySwitch = render().find(node => node.type === 'CurrencySwitch')!;
+  assert.equal(currencySwitch.props.currencies.join(), 'ARS,EUR', 'before: ARS alone, so the EUR budget could be neither listed, edited nor deleted');
+  const note = 'Todavía no tenés cuentas en euros, así que no hay gastos para comparar con este presupuesto.';
+  assert.equal(render().filter(node => node.type === 'AppText').map(textOf).includes(note), false, 'ARS has an account: no note');
+  currencySwitch.props.onChange('EUR');
+  const tree = render();
+  assert.ok(tree.filter(node => node.type === 'AppText').map(textOf).includes(note), 'a zero spent is no data here, never a verified zero');
+  assert.ok(tree.some(node => node.type === 'View' && typeof node.props.accessibilityLabel === 'string' && node.props.accessibilityLabel.startsWith('Presupuesto general')), 'its panel opens');
+  // A deleted EUR account still holds the month's EUR spending: the budget reads it, with no note.
+  const gone: domain.Account = { id: 'gone', name: 'Euros', currency: 'EUR', openingMinor: 0, createdAt, deletedAt: createdAt, revision: 1 };
+  const spentInEuros: domain.Entry = { ...entry, id: 'eur-e', accountId: 'gone', amountMinor: 700 };
+  const withHistory = await budgetsScreen({ ...archive, accounts: [account, gone], records: [entry, spentInEuros].map(domain.initialRecord), budgets: [total, food, eur] });
+  withHistory().find(node => node.type === 'CurrencySwitch')!.props.onChange('EUR');
+  const read = withHistory();
+  assert.equal(read.filter(node => node.type === 'AppText').map(textOf).includes(note), false);
+  assert.equal(read.filter(node => node.type === 'Stat').map(node => (node.props.children as Node).props.minor)[0], 700, 'Gastado reads the deleted account\'s euros');
+  // Codex (#114): Reportes' «Administrar» names the budget's currency; Presupuestos opens on it although no account holds it.
+  const routed = (await budgetsScreen({ ...archive, budgets: [total, food, eur] }, 'es-AR', { currency: 'EUR', month: '2026-09' }))();
+  assert.equal(routed.find(node => node.type === 'CurrencySwitch')!.props.value, 'EUR');
+  assert.ok(routed.filter(node => node.type === 'AppText').map(textOf).includes(note));
+  // In a month with no EUR budget the note does not speak of «este presupuesto».
+  const october = await budgetsScreen({ ...archive, budgets: [total, food, { ...eur, monthISO: '2026-10' }] });
+  october().find(node => node.type === 'CurrencySwitch')!.props.onChange('EUR');
+  assert.equal(october().filter(node => node.type === 'AppText').map(textOf).includes(note), false, 'September holds no EUR budget');
+  // An inactive EUR budget adds no currency.
+  assert.equal((await budgetsScreen({ ...archive, budgets: [total, food, { ...eur, active: false }] }))().some(node => node.type === 'CurrencySwitch'), false);
+  const { budgetCurrencies } = await import('../src/ui/budget-presentation.ts');
+  assert.equal(budgetCurrencies(['USD', 'ARS'], [eur, { ...eur, id: 'usd', currency: 'USD' }, { ...eur, id: 'jpy', currency: 'JPY', active: false }]).join(), 'ARS,USD,EUR');
+});
 
 test('24T3 (A24): devoluciones above a month\'s purchases leave the whole limit available, never more, and say so; Gastado keeps the exact net', async () => {
   const ropa: domain.Entry = { id: 'ropa', accountId: 'a', kind: 'expense', amountMinor: 80000, merchant: 'Tienda', category: 'Ropa', dateISO: '2026-08-20', createdAt };

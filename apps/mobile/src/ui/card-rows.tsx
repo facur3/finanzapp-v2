@@ -15,9 +15,11 @@ import { radius, useCurrentDay, usePalette, type Palette } from './theme';
 export function ArchivedCardRow({ summary, color, onPress, last = false }: { summary: CardSummary; color: string | null; onPress: () => void; last?: boolean }) {
   const p = usePalette();
   const { t, moneyText, spokenMoney } = useI18n();
-  const { card, account, debtMinor } = summary;
-  const line = debtMinor > 0 ? t('cards.archived.debt', { amount: moneyText(debtMinor, account.currency) }) : t('cards.archived.clear');
-  const spoken = debtMinor > 0 ? t('cards.archived.debt', { amount: spokenMoney(debtMinor, account.currency) }) : t('cards.archived.clear');
+  const { card, account, debtMinor, creditMinor } = summary;
+  // 25Q1: a card archived while in credit says so (one signed balance: owed, in credit or clear), never «Sin saldo pendiente».
+  const balance = (format: (minor: number, currency: Currency) => string) => debtMinor > 0 ? t('cards.archived.debt', { amount: format(debtMinor, account.currency) })
+    : creditMinor > 0 ? t('cards.panel.credit', { amount: format(creditMinor, account.currency) }) : t('cards.archived.clear');
+  const line = balance(moneyText), spoken = balance(spokenMoney);
   return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={account.name + ', ' + spoken} accessibilityHint={t('cards.list.openHint')}
     onPress={onPress} style={[styles.row, separator(p, last)]}>
     <View style={[styles.swatch, { backgroundColor: cardFaceTone(card.id, color).base }]} />

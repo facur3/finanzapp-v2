@@ -9,6 +9,12 @@ export function budgetTone(progress: Pick<BudgetProgress, 'ratio' | 'exceeded'>)
   const state = budgetState(progress);
   return state === 'exceeded' ? 'expense' : state === 'warning' ? 'warning' : 'neutral';
 }
+/** 25Q1: the currencies Presupuestos offers: the ones live accounts hold, plus any an active budget is in. A budget may be
+ * in a currency no account holds (decision 7.6.3), and it must stay reachable to read, edit or delete. */
+export function budgetCurrencies(held: readonly Currency[], budgets: readonly MonthlyBudget[]): Currency[] {
+  return sortCurrencies(new Set([...held, ...budgets.filter(budget => budget.active).map(budget => budget.currency)]));
+}
+
 export function percentUsed(progress: Pick<BudgetProgress, 'ratio'>): number {
   return Math.round(progress.ratio * 100);
 }
