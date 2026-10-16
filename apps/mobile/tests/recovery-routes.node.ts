@@ -45,7 +45,8 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   const state: any[] = [];
   const refs: any[] = [];
   let cursor = 0, refCursor = 0, uuid = 0, backs = 0;
-  const pushed: any[] = [], alerts: any[] = [], updates: domain.EntryChange[] = [], additions: domain.Entry[] = [], restores: any[] = [], haptics: string[] = [];
+  // 25O1: a replace is recorded in `pushed` too (as before) and apart in `replaced`, so a test can tell the two.
+  const pushed: any[] = [], replaced: any[] = [], alerts: any[] = [], updates: domain.EntryChange[] = [], additions: domain.Entry[] = [], restores: any[] = [], haptics: string[] = [];
   const transfers: domain.Transfer[] = [], transferChanges: domain.TransferChange[] = [], accountChanges: domain.AccountChange[] = [], newAccounts: domain.Account[] = [], rules: domain.RecurringRule[] = [];
   // null: the ledger has not hydrated yet; setData moves it on.
   let data = (options.data === undefined ? archive : options.data) as domain.LedgerArchive;
@@ -87,7 +88,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': { View: 'View', Keyboard: { dismiss() {} }, Alert: { alert: (title: string, message: string, buttons: any[]) => alerts.push({ title, message, buttons }) } },
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, useLocalSearchParams: () => options.params ?? {},
-      router: { canGoBack: () => true, back: () => { backs++; }, push: (value: any) => pushed.push(value), replace: (value: any) => pushed.push(value) } },
+      router: { canGoBack: () => true, back: () => { backs++; }, push: (value: any) => pushed.push(value), replace: (value: any) => { pushed.push(value); replaced.push(value); } } },
     'expo-crypto': { randomUUID: () => 'operation-' + (++uuid) },
     // 25Q4: the app's container (the parent of Documents), under which iOS places the picker's copy.
     'expo-file-system': { File: { pickFileAsync: options.picker ?? (async () => ({ canceled: true })) },
@@ -140,7 +141,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
       return node; },
     setData: (next: domain.LedgerArchive | null) => { data = next as domain.LedgerArchive; },
     setLocale: (next: AppLocale) => { locale = next; },
-    pushed, alerts, updates, additions, restores, transfers, transferChanges, accountChanges, newAccounts, rules, haptics, backs: () => backs,
+    pushed, replaced, alerts, updates, additions, restores, transfers, transferChanges, accountChanges, newAccounts, rules, haptics, backs: () => backs,
   };
 }
 function nodes(value: any): Node[] {
@@ -1277,13 +1278,13 @@ test('24B6 review: with only cards, Gasto still records a card purchase; Ingreso
   root = own.render();
   assert.equal(nodes(root).some(node => node.type === 'EmptyState'), false);
   assert.equal(find(root, 'AccountField').props.value, 'card-acc');
-  // An empty ledger keeps the original no-account state (replace, no currency).
+  // An empty ledger keeps the original no-account state (no currency); 25O1: pushed over the form too, never replacing it.
   const none = harness('src/ui/entry-form.tsx', { kind: 'income' }, { data: { accounts: [], records: [] } });
   root = none.render();
   assert.equal(find(root, 'EmptyState').props.detail, 'Cada movimiento necesita una cuenta para actualizar su saldo.');
   assert.equal(nodes(root).some(node => node.type === 'Choices'), false, 'nothing to switch between without an account');
   find(root, 'EmptyState').props.action.props.onPress();
-  assert.equal(none.pushed[0], '/new-account');
+  assert.deepEqual([none.pushed[0], none.replaced.length], ['/new-account', 0]);
   // A mixed ledger: an income lands on cash, never on the empty state.
   const mixed = harness('src/ui/entry-form.tsx', { kind: 'income', accountId: 'card-acc' }, { data: liabilityData });
   root = mixed.render();
@@ -2353,4 +2354,82 @@ test('25Q4: restoring a debt payment or a collection over what is pending is ref
   gone.alerts[0].buttons[0].onPress();
   find(gone.render(), 'ActionButton', 'Recuperar transferencia').props.onPress();
   assert.equal(gone.alerts.length, 2, 'Cancelar, its only button, released it');
+});
+
+// ---- 25O1: the composer's «Agregar cuenta» comes back to what was being recorded ---------------------------------------
+
+test('25O1: with no account at all, the expense and the recurring forms push the account form over themselves (never replace) and, once it is saved, come back on the new account with what was typed', () => {
+  const empty: domain.LedgerArchive = { accounts: [], records: [] };
+  const cash: domain.Account = { id: 'nueva', name: 'Efectivo', currency: 'ARS', openingMinor: 0, createdAt };
+  for (const file of ['src/ui/entry-form.tsx', 'src/ui/recurring-form.tsx']) {
+    const view = harness(file, file.includes('entry') ? { kind: 'expense', onKindChange: () => {} } : {}, { data: empty });
+    let root = view.render();
+    find(root, 'EmptyState').props.action.props.onPress();
+    assert.deepEqual([JSON.stringify(view.pushed), view.replaced.length], [JSON.stringify(['/new-account']), 0], file + ': the form stays under the account form');
+    // Nueva cuenta saves and goes back: the ledger now holds the account, and the same form instance renders again.
+    view.setData({ accounts: [cash], records: [] });
+    root = view.render();
+    assert.equal(nodes(root).some(node => node.type === 'EmptyState'), false, file);
+    assert.equal(find(root, 'AccountField').props.value, 'nueva', file + ': on the account just added');
+    find(root, 'AmountField').props.onChangeText('2500');
+    root = view.render();
+    assert.equal(find(root, 'AmountField').props.value, '2500', file + ': ready to record');
+  }
+  // A prefilled draft in a currency (the Assistant's Editar) asks for an account in that currency, so the draft fits it.
+  const prefilled = harness('src/ui/entry-form.tsx', { kind: 'expense', onKindChange: () => {}, currency: 'USD' }, { data: empty });
+  find(prefilled.render(), 'EmptyState').props.action.props.onPress();
+  assert.equal(JSON.stringify(prefilled.pushed), JSON.stringify([{ pathname: '/new-account', params: { currency: 'USD' } }]));
+});
+
+test('25O1: a card payment, a debt payment or a collection opened before a cash account in its currency existed push the account form and come back with the obligation, its note and the new account as the cash side; a plain transfer comes back on it as the source', () => {
+  const receivableAccount: domain.Account = { ...account, id: 'rec-acc', name: 'Me deben · Ana', openingMinor: 4000 };
+  const receivable: domain.PersonalDebtProfile = { ...debt, id: 'rec', accountId: receivableAccount.id, direction: 'owed_to_me', counterparty: 'Ana' };
+  // Only the obligations and a USD account: nothing in ARS to pay from or collect into.
+  const usd: domain.Account = { ...account, id: 'u', name: 'Dólares', currency: 'USD' };
+  const before: domain.LedgerArchive = { accounts: [usd, cardAccount, debtAccount, receivableAccount], records: [], cards: [card], debts: [debt, receivable] };
+  const pesos: domain.Account = { ...account, id: 'nueva', name: 'Efectivo' };
+  const after: domain.LedgerArchive = { ...before, accounts: [...before.accounts, pesos] };
+  const cases = [
+    [{ toAccountId: 'card-acc', maxAmountMinor: '5000' }, 'Desde', 'Pago Visa'],
+    [{ toAccountId: 'debt-acc' }, 'Desde', 'Pago a Juan'],
+    [{ fromAccountId: 'rec-acc' }, 'Hacia', 'Cobro de Ana'],
+  ] as const;
+  for (const [props, side, note] of cases) {
+    const view = harness('src/ui/transfer-form.tsx', props, { data: before });
+    let root = view.render();
+    assert.equal(find(root, 'EmptyState').props.title, 'Primero, una cuenta');
+    find(root, 'EmptyState').props.action.props.onPress();
+    assert.deepEqual([JSON.stringify(view.pushed), view.replaced.length], [JSON.stringify([{ pathname: '/new-account', params: { currency: 'ARS' } }]), 0], note + ': pushed, in the obligation\'s currency');
+    view.setData(after);
+    root = view.render();
+    assert.equal(nodes(root).some(node => node.type === 'EmptyState'), false, note);
+    assert.equal(find(root, 'AccountField', side).props.value, 'nueva', note + ': the account just added is the cash side');
+    assert.equal(find(root, 'Field').props.value, note, note + ': the obligation and its note are still there');
+  }
+  // A plain transfer with no account at all: back on the new account as the source, then «Falta otra cuenta en esta moneda».
+  const plain = harness('src/ui/transfer-form.tsx', {}, { data: { accounts: [], records: [] } });
+  find(plain.render(), 'EmptyState').props.action.props.onPress();
+  assert.deepEqual([JSON.stringify(plain.pushed), plain.replaced.length], [JSON.stringify([{ pathname: '/new-account', params: {} }]), 0]);
+  plain.setData({ accounts: [pesos], records: [] });
+  const root = plain.render();
+  assert.equal(find(root, 'AccountField', 'Desde').props.value, 'nueva');
+  assert.equal(find(root, 'EmptyState').props.title, 'Falta otra cuenta en esta moneda');
+  // A side the person chose is never moved (an edit's stored sides are pinned by the edit tests above).
+  const chosen = harness('src/ui/transfer-form.tsx', { toAccountId: 'card-acc', maxAmountMinor: '5000' }, { data: { ...after, accounts: [...after.accounts, { ...pesos, id: 'otra', name: 'Banco' }] } });
+  find(chosen.render(), 'AccountField', 'Desde').props.onChange('otra');
+  assert.equal(find(chosen.render(), 'AccountField', 'Desde').props.value, 'otra');
+});
+
+test('25O1: the recurring form says what a rule does right under its date (Recurrentes\' empty state no longer does): one line, the whole story behind its information button', () => {
+  const view = harness('src/ui/recurring-form.tsx');
+  let root = view.render();
+  const types = nodes(root).map(node => node.type).filter(type => type === 'DateField' || type === 'FieldNote' || type === 'ActionButton');
+  assert.deepEqual(types, ['DateField', 'FieldNote', 'ActionButton'], 'the note follows the date it explains');
+  const note = find(root, 'FieldNote');
+  assert.equal(note.props.children, 'Se anota en cada vencimiento; no paga ni cobra nada.');
+  assert.equal(note.props.help.title, 'Cómo se anota');
+  assert.match(note.props.help.detail, /^Si la próxima fecha es hoy, el movimiento se anota al guardar; .*una sola vez\. Un recurrente solo anota: no paga ni cobra nada\.$/);
+  view.setLocale('en-AR');
+  root = view.render();
+  assert.equal(find(root, 'FieldNote').props.children, 'It’s recorded on each due date; it doesn’t pay or collect anything.');
 });

@@ -129,9 +129,22 @@ function find(root: Node, type: string, label?: string): Node {
 }
 const flush = () => new Promise<void>(resolve => setImmediate(resolve));
 
-test('new account: name, icon, colour, currency and opening balance; the look is saved with the account in one call and defaults to wallet on cobalt', async () => {
+/** 25O1: the fields of an account form in the order they are drawn. */
+const formOrder = (root: Node) => nodes(root).map(node => node.type)
+  .filter(type => ['Field', 'CurrencyField', 'AmountField', 'FieldNote', 'SectionTitle', 'IconColorPicker', 'ActionButton'].includes(type as string));
+/** 25O1: «Apariencia» heads the picker it sits with (one block, so the title stays attached to it). */
+const appearanceBlock = (root: Node) => {
+  const block = nodes(root).find(node => node.type === 'View' && [node.props.children].flat().some((child: any) => child?.type === 'SectionTitle'));
+  assert.ok(block, 'Missing the Apariencia block');
+  return [block.props.children].flat().map((child: any) => child.type === 'SectionTitle' ? 'SectionTitle:' + child.props.children : child.type);
+};
+
+test('new account: name, currency and opening balance, then «Apariencia» (25O1: last); the look is saved with the account in one call and defaults to wallet on cobalt', async () => {
   const view = harness('app/new-account.tsx');
   let root = view.render();
+  // 25O1: the two choices that carry money meaning come right after the name; the optional look comes last, before Guardar.
+  assert.deepEqual(formOrder(root), ['Field', 'CurrencyField', 'AmountField', 'FieldNote', 'SectionTitle', 'IconColorPicker', 'ActionButton']);
+  assert.deepEqual(appearanceBlock(root), ['SectionTitle:Apariencia', 'IconColorPicker']);
   const picker = find(root, 'IconColorPicker');
   assert.equal(picker.props.icons, appearance.ACCOUNT_ICON_CHOICES, 'the account icon set, not the category set');
   assert.equal(picker.props.colors, appearance.COLOR_CHOICES);
@@ -169,6 +182,13 @@ test('new account: a failed save freezes the same account and look for retry; an
 test('edit account: changing only the look calls the appearance write, never the account correction or its audit', async () => {
   const view = harness('app/edit-account/[id].tsx', {}, { params: { id: 'cash' } });
   let root = view.render();
+  // 25O1: Nueva cuenta's order: the name, the recorded balance and the currency with their notes, «Apariencia», Guardar and, apart, Eliminar.
+  assert.deepEqual(formOrder(root), ['Field', 'AmountField', 'FieldNote', 'CurrencyField', 'FieldNote', 'SectionTitle', 'IconColorPicker', 'ActionButton', 'ActionButton']);
+  assert.deepEqual(appearanceBlock(root), ['SectionTitle:Apariencia', 'IconColorPicker']);
+  view.setLocale('en-AR');
+  assert.deepEqual(appearanceBlock(view.render()), ['SectionTitle:Appearance', 'IconColorPicker']);
+  view.setLocale('es-AR');
+  root = view.render();
   assert.deepEqual([find(root, 'IconColorPicker').props.icon, find(root, 'IconColorPicker').props.color], ['bank', 'azure'], 'prefilled from the stored look');
   find(root, 'IconColorPicker').props.onColorChange('green');
   root = view.render();

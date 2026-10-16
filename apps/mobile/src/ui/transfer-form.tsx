@@ -62,10 +62,17 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
     : requestedSource && hidden.has(requestedSource.id) ? requestedSource : null;
   // 25B2: a deleted account is never a side of a new transfer.
   const cash = accounts.filter(a => !hidden.has(a.id) && isLiveAccount(a));
-  const [fromId, setFromId] = useState(() => before?.transfer.fromAccountId ?? lockedFrom?.id ?? requestedSource?.id
+  const [chosenFrom, setFromId] = useState(() => before?.transfer.fromAccountId ?? lockedFrom?.id ?? requestedSource?.id
     ?? (lockedTo ? cash.find(a => a.currency === lockedTo.currency)?.id : undefined) ?? initialAccountId(cash, accountId));
-  const [toId, setToId] = useState(() => before?.transfer.toAccountId ?? lockedTo?.id ?? requestedTarget?.id
+  const [chosenTo, setToId] = useState(() => before?.transfer.toAccountId ?? lockedTo?.id ?? requestedTarget?.id
     ?? (lockedFrom ? cash.find(a => a.currency === lockedFrom.currency)?.id : undefined) ?? '');
+  // 25O1: the empty state below pushes the account form over a new transfer, payment or collection opened before it had a
+  // cash side; on the way back the account added there is the side the first render would have chosen. A side the
+  // person chose fits already and stays, and an edit's sides are never moved.
+  const fits = (id: string, currency?: Account['currency']) => cash.some(a => a.id === id && (!currency || a.currency === currency));
+  const fromId = before || lockedFrom || fits(chosenFrom, lockedTo?.currency) ? chosenFrom
+    : (lockedTo ? cash.find(a => a.currency === lockedTo.currency)?.id : initialAccountId(cash, accountId)) || chosenFrom;
+  const toId = before || !lockedFrom || fits(chosenTo, lockedFrom.currency) ? chosenTo : cash.find(a => a.currency === lockedFrom.currency)?.id ?? chosenTo;
   // An untouched prefill keeps the stored minor units (a stored amount may exceed the entry bound); an edited text is a new entry.
   const [stored] = useState<StoredDraft | null>(() => {
     const own = before ? accounts.find(a => a.id === before.transfer.fromAccountId)?.currency : undefined;
@@ -269,7 +276,8 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
     {!sources.length || noCashCounterpart ? <EmptyState title={t('entryForm.noAccountTitle')} detail={obligation
       ? t(lockedTo ? 'transferForm.needAccountOut' : 'transferForm.needAccountIn', { currency: obligation.currency })
       : t('transferForm.needAccounts')}
-      action={<ActionButton label={t('common.addAccount')} onPress={() => router.replace({ pathname: '/new-account', params: obligation ? { currency: obligation.currency } : {} })} />} /> : <>
+      /* 25O1: pushed over the form (it was replaced), so saving the account comes back here with the obligation and the draft. */
+      action={<ActionButton label={t('common.addAccount')} onPress={() => router.push({ pathname: '/new-account', params: obligation ? { currency: obligation.currency } : {} })} />} /> : <>
       <AmountField label={t(obligationKind === 'card' ? 'transferForm.payment' : obligationKind === 'debt' ? (lockedTo ? 'transferForm.payment' : 'transferForm.collection') : 'transferForm.transfer')}
         currency={(obligation ?? from)?.currency ?? 'ARS'} value={amount} onChangeText={value => { setAmount(value); setError(null); }} editable={!locked} tone="transfer" stored={stored ?? undefined} />
       {shortcut && <AmountShortcut caption={shortcut.text} spokenCaption={shortcut.spoken} label={shortcut.fill > 0 ? shortcut.label : undefined} disabled={locked}

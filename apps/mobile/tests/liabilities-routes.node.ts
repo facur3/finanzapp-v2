@@ -167,7 +167,7 @@ function textOf(node: any): string {
 
 test('Tarjetas shows an honest empty state and a debts invitation without any card', () => {
   const root = harness('cards.tsx', {}, empty).render();
-  assert.equal(find(root, 'EmptyState').props.title, 'Tus tarjetas, como en la billetera');
+  assert.equal(find(root, 'EmptyState').props.title, 'Tus tarjetas de crédito');
   assert.equal(nodes(root).some(node => node.type === 'CardDeck'), false);
   find(root, 'EmptyState').props.action.props.onPress();
   assert.equal(nodes(root).some(node => node.type === 'DebtRow'), false);
@@ -299,7 +299,7 @@ test('debts screen separates what I owe from what they owe me and never mixes cu
   assert.deepEqual(rows.map(row => row.props.debt.id), ['debt', 'receivable']);
   const totals = nodes(root).filter(node => node.type === 'Money').map(node => [node.props.currency, node.props.minor]);
   assert.deepEqual(totals, [['ARS', 30000], ['ARS', 0], ['USD', 0], ['USD', 4000]]);
-  assert.equal(find(harness('debts.tsx', {}, empty).render(), 'EmptyState').props.title, 'Lo que debés y lo que te deben');
+  assert.equal(find(harness('debts.tsx', {}, empty).render(), 'EmptyState').props.title, 'Sin deudas ni cobros');
 });
 
 test('debt detail offers a capped payment into the debt and lists its settlements with debt context', () => {
@@ -544,7 +544,7 @@ test('24UX4: deleting a debt asks first, names the payments that stay, writes on
   const deletedData = { ...settledData, debts: [view.savedDebts[0]] };
   const list = harness('debts.tsx', {}, deletedData).render();
   assert.equal(rowsOf(list).length, 0);
-  assert.equal(find(list, 'EmptyState').props.title, 'Lo que debés y lo que te deben');
+  assert.equal(find(list, 'EmptyState').props.title, 'Sin deudas ni cobros');
   assert.equal(find(harness('debt/[id].tsx', { id: 'debt' }, deletedData).render(), 'EmptyState').props.title, 'No encontramos esta deuda');
   assert.equal(domain.snapshotFromArchive(deletedData).transfers!.some(transfer => transfer.id === 'settle-juan'), true);
   // A receivable with no collection yet: its own wording.
@@ -799,4 +799,29 @@ test('25Q4 review: a new debt taps Error for an amount refused before anything i
   await find(render(), 'ActionButton', 'Reintentar guardado').props.onPress();
   assert.equal(JSON.stringify(view.debts[1]), JSON.stringify(view.debts[0]), 'the retry resends the same debt and account');
   assert.deepEqual([view.haptics.join(','), view.backs()], ['Success', 1]);
+});
+
+test('25O1: the empty states of Tarjetas, Deudas y cobros and Recurrentes are a title of five words at most and one line of twelve; the rules they used to carry are said where each is recorded', () => {
+  const words = (text: string) => text.split(/\s+/).filter(word => /[\p{L}\p{N}]/u.test(word)).length;
+  const pairs = [['cards.list.emptyTitle', 'cards.list.emptyDetail'], ['cards.list.noActiveTitle', 'cards.list.noActiveDetail'], ['debts.list.emptyTitle', 'debts.list.emptyDetail'],
+    ['recurring.list.emptyTitle', 'recurring.list.emptyDetail'], ['recurring.list.emptyTitle', 'recurring.list.emptyDetailAccount']] as const;
+  for (const language of ['es-AR', 'en-US'] as const) {
+    const { t } = bindLocale(language);
+    for (const [title, detail] of pairs) {
+      assert.ok(words(t(title)) <= 5, language + ' ' + title + ': «' + t(title) + '»');
+      assert.ok(words(t(detail)) <= 12, language + ' ' + detail + ': «' + t(detail) + '»');
+      assert.ok((t(detail).match(/[.!?](\s|$)/g) ?? []).length <= 1, language + ' ' + detail + ': one sentence, no paragraph');
+    }
+    // «Saldo pendiente», never «deuda», in card copy (decision 003).
+    assert.doesNotMatch(t('cards.list.emptyTitle') + ' ' + t('cards.list.emptyDetail'), /deuda|\bdebt/i);
+  }
+  // Each rule now lives where the person records what it is about: a card purchase and its instalments in the composer, a
+  // card payment in its form, a debt's payment or collection in the debt form, a recurring rule in its form.
+  const { t } = bindLocale('es-AR');
+  assert.match(t('entryForm.cardNote'), /una sola vez/);
+  assert.match(t('entryForm.plan.note'), /cada cuota cuenta como gasto cuando cierra su resumen/);
+  assert.match(t('transferForm.explainCard'), /no lo duplica/);
+  for (const key of ['debts.form.explainOwed', 'debts.form.explainReceivable'] as const) assert.match(t(key), /No se crean gastos ni ingresos/);
+  assert.match(t('recurring.form.note'), /no paga ni cobra nada/);
+  assert.match(t('recurring.form.noteHelp'), /al guardar.*una sola vez.*no paga ni cobra nada/);
 });

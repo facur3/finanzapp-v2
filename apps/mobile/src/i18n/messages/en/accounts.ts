@@ -34,6 +34,7 @@ export const accounts: Pick<Messages, 'accounts'> = {
       retryNote: 'Retry the same submission to avoid duplicates. To change it, close and check your accounts first.',
       save: 'Save account',
       saveFailed: 'Couldn’t save. We kept what you entered so you can try again.',
+      appearance: 'Appearance',
     },
     manage: {
       delete: 'Delete',

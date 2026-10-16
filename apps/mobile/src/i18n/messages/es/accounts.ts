@@ -36,6 +36,8 @@ export const accounts = {
       retryNote: 'Reintentá el mismo envío para evitar duplicados. Para cambiarlo, cerrá y revisá primero tus cuentas.',
       save: 'Guardar cuenta',
       saveFailed: 'No se pudo guardar. Conservamos lo que escribiste para que puedas reintentar.',
+      /** 25O1: the section of Nueva cuenta and Editar cuenta that holds the icon and colour picker, last, after the money. */
+      appearance: 'Apariencia',
     },
     /** Producto 25B2: the lifecycle of a normal account. Deleting keeps every movement and transfer; the row only
      * leaves the lists, the totals and the forms. */
