@@ -69,6 +69,18 @@ export function successHaptic() {
   void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
 }
 
+/** 25Q4: a write the person asked for failed and no unverified submission waits for «Reintentar»: refused before sending, or
+ * by storage before writing, or offered again as new. Once, in its catch, after the error is set; never while typing. */
+export function errorHaptic() {
+  void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+}
+
+/** 25Q4: a write the person asked for failed with an outcome the app cannot verify, and the screen keeps the exact submission
+ * frozen for «Reintentar». Once, in its catch, after the error is set. */
+export function warningHaptic() {
+  void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+}
+
 const rise = FadeInUp.duration(duration.enter).easing(easeOut).withInitialValues({ opacity: 0, transform: [{ translateY: 6 }] });
 // A fade is what Reduce Motion keeps (it explains a change without moving anything), so its policy is explicit, as for
 // the sheet (`sheetTiming`): without one, Reanimated follows the device setting and lands in one frame, and every

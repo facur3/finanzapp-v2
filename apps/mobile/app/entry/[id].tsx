@@ -2,7 +2,6 @@ import { useRef, useState } from 'react';
 import { Alert, View } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
-import * as Haptics from 'expo-haptics';
 import { categoryKey, entryRefundSummary, makeEntryChange, operationGuardMessage, recurringOccurrenceOf, snapshotFromArchive, summarizeMonthlyBudgets, todayKey, validateArchive, type EntryChange, type EntryRecord, type Account, type PurchaseOperation } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { budgetTone } from '../../src/ui/budget-presentation';
@@ -12,6 +11,7 @@ import { useI18n } from '../../src/i18n/provider';
 import { useCategoryLabel } from '../../src/ui/category-hues';
 import { installmentOfEntry } from '../../src/ui/installment-presentation';
 import { balanceAfterSentence } from '../../src/ui/liability-presentation';
+import { errorHaptic, successHaptic, warningHaptic } from '../../src/ui/motion';
 import { canRefundEntry } from '../../src/ui/operation-presentation';
 import { releasesDraft } from '../../src/ui/presentation';
 import { space, usePalette } from '../../src/ui/theme';
@@ -57,12 +57,13 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
     try {
       await updateEntry(change);
       setPending(null);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      successHaptic();
     } catch (cause) {
       setError(failureMessage(cause, 'entryDetail.changeUnverified'));
       // A13: a refusal storage decided before writing (an instalment a devolución's credit stands on, …) releases the change:
       // Editar unlocks and the next tap asks again from the current ledger. Only an unknown outcome stays frozen for a retry.
-      if (cause instanceof Error && releasesDraft(cause.message)) setPending(null);
+      // 25Q4: the haptic says which: Error for the release, Warning for the frozen retry.
+      if (cause instanceof Error && releasesDraft(cause.message)) { setPending(null); errorHaptic(); } else warningHaptic();
     } finally { saving.current = false; setBusy(false); }
   }
   function confirm() {

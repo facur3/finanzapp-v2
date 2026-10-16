@@ -56,7 +56,7 @@ function harness(props: any = {}, data: domain.LedgerArchive = archive, options:
     'react-native': { View: 'View', Keyboard: { dismiss() {} } },
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, router: { canGoBack: () => true, back: () => {}, push: () => {}, replace: () => {} } },
     'expo-crypto': { randomUUID: () => 'operation-' + (++uuid) },
-    'expo-haptics': { NotificationFeedbackType: { Success: 'Success' }, notificationAsync: async () => {} },
+    './motion': { successHaptic() {}, errorHaptic() {}, warningHaptic() {} },
     '@finanzapp/domain': domain,
     '../storage/LedgerProvider': ledger,
     './components': components,

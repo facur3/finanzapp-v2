@@ -2,13 +2,13 @@ import { useRef, useState } from 'react';
 import { Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
-import * as Haptics from 'expo-haptics';
 import { accountBalanceMinor, accountKind, assertTransferSides, editedDraftFits, hiddenLiabilityAccountIds, isLiveAccount, makeTransferChange, minorFromEditedDraft, sameTransfer, todayKey, type StoredDraft,
   totalsByCurrency, validateTransfer, validateTransferChange, type Account, type Transfer, type TransferChange, type TransferRecord } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { ActionButton, AmountField, AmountShortcut, AppText, DetailRow, EmptyState, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
 import { amountFromMinor, draftFromMinor } from './money-input';
 import { AccountField, DateField, SelectorCard } from './form-controls';
+import { errorHaptic, successHaptic, warningHaptic } from './motion';
 import { initialAccountId, releasesDraft } from './presentation';
 import { space, usePalette } from './theme';
 import { useI18n } from '../i18n/provider';
@@ -173,14 +173,14 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
         submission = { transfer, change }; setPending(submission); frozen = true;
       }
       if (submission.change) await updateTransfer(submission.change); else await addTransfer(submission.transfer);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      successHaptic();
       saving.current = false; close();
     } catch (cause) {
       setError(failureMessage(cause, 'transferForm.saveUnverified'));
       // 25VIS2 (V4): a refusal (before the submission froze, or one storage decided before writing) taps Error; an outcome
       // that may have been written taps Warning. Either way a frozen submission stays frozen here, for the exact retry.
       const refused = !frozen || (cause instanceof Error && releasesDraft(cause.message));
-      void Haptics.notificationAsync(refused ? Haptics.NotificationFeedbackType.Error : Haptics.NotificationFeedbackType.Warning).catch(() => {});
+      if (refused) errorHaptic(); else warningHaptic();
     }
     finally { saving.current = false; setBusy(false); onLockedChange?.(frozen); }
   }

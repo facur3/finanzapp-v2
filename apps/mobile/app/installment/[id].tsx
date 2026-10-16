@@ -7,7 +7,7 @@ import { PlanProgressSummary, ScheduleRow } from '../../src/ui/card-rows';
 import { useCategoryLabel } from '../../src/ui/category-hues';
 import { isPlanWriteRefusal, planActions, planOperationRows, planScheduleRows, planStateWord, planSummary, scheduleRowOpens, type PlanClosings } from '../../src/ui/installment-presentation';
 import { numberRanges } from '../../src/ui/operation-presentation';
-import { successHaptic } from '../../src/ui/motion';
+import { errorHaptic, successHaptic, warningHaptic } from '../../src/ui/motion';
 import { withCurrencyCode } from '../../src/i18n/format';
 import { useI18n } from '../../src/i18n/provider';
 import { space, useCurrentDay, usePalette } from '../../src/ui/theme';
@@ -94,8 +94,9 @@ export default function InstallmentPlanScreen() {
       setError(failureMessage(cause, failure[next.action]));
       // Refused before anything was written (the plan changed, an instalment or an operation was recorded since the screen was
       // drawn, nothing is left to stop…): the screen has read the plan again and the next tap asks again. 25Q4: a deletion too.
-      // Only an unknown outcome stays frozen; for a deletion Reintentar sends the same deletion (24T2).
-      if (cause instanceof Error && isPlanWriteRefusal(cause.message)) setPending(null);
+      // Only an unknown outcome stays frozen; for a deletion Reintentar sends the same deletion (24T2). 25Q4: Error for the
+      // release, Warning for the frozen retry.
+      if (cause instanceof Error && isPlanWriteRefusal(cause.message)) { setPending(null); errorHaptic(); } else warningHaptic();
     } finally { writing.current = false; setBusy(false); }
   }
   const money = (minor: number) => moneyText(minor, plan.currency);

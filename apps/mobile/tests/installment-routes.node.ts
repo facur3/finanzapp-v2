@@ -72,7 +72,10 @@ function harness(file: string, options: { params?: Record<string, string>; data?
     transfer: '#03c', primary: '#2557D6' };
   const theme = { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, radius: { tile: 12, group: 16, creditCard: 18 },
     useCurrentDay: () => day, useReduceMotion: () => true, usePalette: () => palette };
-  const motion = { ValueTransition: 'ValueTransition', Reflow: 'Reflow', timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }), successHaptic: () => { haptics++; }, selectionHaptic: () => {} };
+  // 25Q4: a failed write's haptic, by type (Success is counted in `haptics`).
+  const failures: string[] = [];
+  const motion = { ValueTransition: 'ValueTransition', Reflow: 'Reflow', timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }), successHaptic: () => { haptics++; }, selectionHaptic: () => {},
+    errorHaptic: () => { failures.push('Error'); }, warningHaptic: () => { failures.push('Warning'); } };
   const hues = { useCategoryLabel: (stored: string) => stored };
   const cardVisual = { CardDeck: 'CardDeck', CardFace: 'CardFace', cardFaceWidth: (width: number) => Math.min(width - 40, 420), cardFaceHeight: (width: number) => Math.round(width / 1.586) };
   const both = (path: string, value: unknown) => ({ ['../src/' + path]: value, ['../../src/' + path]: value });
@@ -95,7 +98,6 @@ function harness(file: string, options: { params?: Record<string, string>; data?
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, useLocalSearchParams: () => options.params ?? {},
       router: { push: (to: unknown) => pushed.push(to), navigate: (to: unknown) => pushed.push(to), replace: (to: unknown) => pushed.push(to), back: () => { backs++; }, canGoBack: () => true } },
     'expo-crypto': { randomUUID: () => 'op-' + (++uuid) },
-    'expo-haptics': { NotificationFeedbackType: { Success: 'Success' }, notificationAsync: async () => {}, selectionAsync: async () => {} },
     '@finanzapp/domain': domain,
     ...both('storage/LedgerProvider', ledger), ...both('ui/components', components), ...both('ui/card-visual', cardVisual), ...both('ui/entry-list', { EntryList: 'EntryList' }),
     ...both('ui/geometry', geometry), ...both('ui/movement-amount', movementAmount),
@@ -123,7 +125,7 @@ function harness(file: string, options: { params?: Record<string, string>; data?
     render: () => { cursor = 0; refCursor = 0; return module.exports.default(); },
     setData: (next: domain.LedgerArchive | null) => { data = next as domain.LedgerArchive; },
     setLocale: (next: AppLocale) => { locale = next; },
-    pushed, alerts, updates, removals, writes, backs: () => backs, haptics: () => haptics,
+    pushed, alerts, updates, removals, writes, failures, backs: () => backs, haptics: () => haptics,
   };
 }
 
@@ -556,10 +558,12 @@ test('plan detail: a failed deletion keeps the plan and the error; Reintentar se
   assert.equal(find(failed, 'ErrorMessage').props.message, 'installments.detail.deleteFailed', '25Q4: the action\'s own sentence, never the engine\'s text');
   const retry = find(failed, 'ActionButton', 'Reintentar cambio');
   assert.equal(view.backs(), 0, 'nothing was deleted: the screen stays');
+  assert.equal(view.failures.join(','), 'Warning', '25Q4: it may have been written, so Warning while it stays frozen');
   retry.props.onPress();
   assert.equal(view.alerts.length, 1, 'the retry asks nothing new');
   await settle();
   assert.equal(JSON.stringify([attempts, view.removals.join(','), view.backs()]), JSON.stringify([2, 'nb,nb', 1]));
+  assert.equal(JSON.stringify([view.failures.join(','), view.haptics()]), JSON.stringify(['Warning', 1]));
 });
 
 test('25Q4: a deletion storage refuses before writing (an instalment or an operation recorded since the screen was drawn) releases it; the plan is read again and offers «Dejar de seguir el plan», never «Eliminar plan» or «Reintentar cambio»', async () => {
@@ -576,6 +580,7 @@ test('25Q4: a deletion storage refuses before writing (an instalment or an opera
     assert.equal(nodes(root).some(node => node.type === 'ActionButton' && ['Eliminar plan', 'Reintentar cambio'].includes(node.props.label)), false, refusal);
     const stop = find(root, 'ActionButton', 'Dejar de seguir el plan');
     assert.equal(stop.props.disabled, false, 'the error says «Dejá de seguirlo»: that button is live');
+    assert.equal(view.failures.join(','), 'Error', '25Q4: nothing was written, so Error');
     stop.props.onPress();
     assert.equal(view.alerts[1].title, '¿Dejar de seguir este plan?');
     assert.equal(JSON.stringify(view.removals), JSON.stringify(['nb']));
@@ -800,6 +805,7 @@ test('24T3: «Dejar de seguir el plan» says what stops, what stays and what it 
   const failed = view.render();
   assert.equal(find(failed, 'ErrorMessage').props.message, 'installments.detail.stopFailed');
   assert.equal(find(failed, 'ActionButton', 'Registrar devolución').props.disabled, true, 'nothing else starts while the outcome is unknown');
+  assert.equal(view.failures.join(','), 'Warning', '25Q4: it may have been written, so Warning while it stays frozen');
   find(failed, 'ActionButton', 'Reintentar cambio').props.onPress();
   assert.equal(view.alerts.length, 1, 'the retry asks nothing new');
   await settle();
@@ -818,6 +824,7 @@ test('24T3: a stop storage refuses before writing (the plan changed) releases it
   const refused = view.render();
   assert.equal(find(refused, 'ErrorMessage').props.message, 'El plan de cuotas cambió desde que lo abriste. Volvé a revisarlo.');
   assert.equal(find(refused, 'ActionButton', 'Registrar devolución').props.disabled, false);
+  assert.equal(view.failures.join(','), 'Error', '25Q4: nothing was written, so Error');
   find(refused, 'ActionButton', 'Dejar de seguir el plan').props.onPress();
   assert.equal(view.alerts.length, 2, 'released: asked again');
   // In English the message is the catalogue's.
@@ -942,11 +949,12 @@ test('24T3 adelanto: a write with an unknown outcome is retried unchanged; recor
   assert.equal(find(root, 'ErrorMessage').props.message, 'installments.payoff.saveFailed');
   assert.ok(texts(root).includes('Conservamos el envío: Reintentar nunca registra el adelanto dos veces. Para cambiarlo, cerrá y revisá primero el plan.'));
   assert.equal(find(root, 'DateField').props.disabled, true, 'frozen: nothing changes under the retry');
+  assert.equal(view.failures.join(','), 'Warning', '25Q4: it may have been written, so Warning while it stays frozen');
   find(root, 'ActionButton', 'Reintentar guardado').props.onPress();
   await settle();
   assert.equal(view.writes.length, 2);
   assert.equal(view.writes[1].arg, view.writes[0].arg, 'the same adelanto, the same id');
-  assert.equal(view.haptics(), 1);
+  assert.equal(JSON.stringify([view.failures.join(','), view.haptics()]), JSON.stringify(['Warning', 1]));
   // The provider refreshed: the card now owes the instalments brought forward ($ 120.000,00 + $ 1.000.000,00).
   view.setData({ ...withPlans, purchaseOperations: [view.writes[0].arg as domain.PlanPayoff] });
   root = view.render();
@@ -976,6 +984,7 @@ test('24T3 adelanto: a refusal storage gave before writing (the instalments chan
   const view = harness('plan-payoff/[id].tsx', { params: { id: 'tv' }, data: withPlans, write: async () => { throw new Error(domain.OPERATION_CHANGED_MESSAGE); } });
   find(view.render(), 'ActionButton').props.onPress();
   await settle();
+  assert.equal(view.failures.join(','), 'Error', '25Q4: nothing was written, so Error');
   // Meanwhile a devolución recorded elsewhere lowered instalment 12 by $ 50.000,00 (the provider read the ledger again).
   const refund = domain.newPlanRefund(withPlans, { id: 'rf3', planId: 'tv', amountMinor: 25000000, dateISO: '2026-10-01', todayISO: '2026-10-01', createdAt: opNow });
   view.setData({ ...withPlans, purchaseOperations: [refund] });

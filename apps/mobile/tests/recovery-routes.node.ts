@@ -70,6 +70,9 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     consequences: () => ({ movements: 0, transfers: 0, recurring: 0 }) }) };
   const swipe = { SwipeRow: 'SwipeRow', swipeAccessibility: (actions: { key: string; label: string; onPress: () => void }[]) => ({ accessibilityActions: actions.map(action => ({ name: action.key, label: action.label })),
     onAccessibilityAction: (event: { nativeEvent: { actionName: string } }) => actions.find(action => action.key === event.nativeEvent.actionName)?.onPress() }) };
+  // 25Q4: every haptic comes from motion.tsx; the recorder keeps each notification's type.
+  const motion = { ValueTransition: 'ValueTransition', successHaptic: () => { haptics.push('Success'); }, errorHaptic: () => { haptics.push('Error'); },
+    warningHaptic: () => { haptics.push('Warning'); }, selectionHaptic: () => {} };
   const modules: Record<string, unknown> = {
     // 24UX6C: the transaction presentation rule, a pure module.
     '../src/ui/movement-amount': movementAmount, '../../src/ui/movement-amount': movementAmount,
@@ -103,7 +106,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     './theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, usePalette: () => ({ background: '#fff' }) },
     './entry-form': { EntryForm: 'EntryForm' }, './transfer-form': { TransferForm: 'TransferForm' },
     '../../src/ui/recurring-form': { RecurringForm: 'RecurringForm' },
-    './motion': { ValueTransition: 'ValueTransition' },
+    './motion': motion, '../src/ui/motion': motion, '../../src/ui/motion': motion,
     './category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) }, '../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) }, '../../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) },
     '../src/ui/appearance': appearance, '../../src/ui/appearance': appearance,
     '../src/ui/appearance-picker': { IconColorPicker: 'IconColorPicker' }, '../../src/ui/appearance-picker': { IconColorPicker: 'IconColorPicker' },
@@ -1675,6 +1678,24 @@ test('25VIS2 (V1): the transfer form reports the same lock; a failed write stays
   assert.equal(view.haptics.splice(0).join(','), 'Warning,Warning', '25VIS2 (V4): an outcome that may have been written taps Warning, each time');
   assert.equal(view.transfers.length, 2);
   assert.equal(view.transfers[0].id, view.transfers[1].id, 'the retry resends the same transfer');
+});
+
+test('25Q4: the transfer detail taps Warning while «Reintentar cambio» keeps an unverified change, Error for a refusal storage decided before writing, Success once it goes through', async () => {
+  let failure: Error | null = new Error('Refresh failed');
+  const view = harness('app/transfer/[id].tsx', {}, { data: { ...transferData, transfers: [domain.initialTransferRecord(transfer)] }, params: { id: transfer.id },
+    updateTransfer: async () => { if (failure) throw failure; } });
+  find(view.render(), 'ActionButton', 'Deshacer transferencia').props.onPress();
+  view.alerts[0].buttons[1].onPress(); await flush();
+  assert.equal(view.haptics.splice(0).join(','), 'Warning', 'it may have been written');
+  assert.ok(find(view.render(), 'ActionButton', 'Reintentar cambio'), 'the change stays for the exact retry');
+  failure = new Error(domain.CARD_DELETED_MESSAGE);
+  find(view.render(), 'ActionButton', 'Reintentar cambio').props.onPress(); await flush();
+  assert.equal(view.haptics.splice(0).join(','), 'Error', 'nothing was written');
+  failure = null;
+  find(view.render(), 'ActionButton', 'Reintentar cambio').props.onPress(); await flush();
+  assert.equal(view.haptics.splice(0).join(','), 'Success');
+  assert.equal(view.transferChanges.length, 3);
+  assert.equal(new Set(view.transferChanges.map(change => change.id)).size, 1, 'every attempt carried the one change, as the screen keeps it frozen');
 });
 
 test('25VIS2 (V2): Gasto and Ingreso keep separate categories; an expense category never rides into an income, and a prefill keeps its own', async () => {

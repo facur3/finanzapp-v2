@@ -79,6 +79,8 @@ function harness(file: string, options: { data?: domain.LedgerArchive; params?: 
   const pushed: any[] = [], alerts: { title: string; message: string; buttons: { text: string; style?: string; onPress?: () => void }[] }[] = [];
   const refunds: (domain.EntryRefund | domain.PlanRefund)[] = [], changes: domain.OperationChange[] = [], updates: domain.EntryChange[] = [];
   let haptics = 0;
+  // 25Q4: a failed write's haptic, by type (Success is counted in `haptics`).
+  const failures: string[] = [];
   let data = options.data ?? base();
   const locale: AppLocale = options.locale ?? 'es-AR';
   const i18nProvider = { useI18n: () => bindLocale(locale) };
@@ -107,7 +109,6 @@ function harness(file: string, options: { data?: domain.LedgerArchive; params?: 
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, useLocalSearchParams: () => options.params ?? {},
       router: { canGoBack: () => true, back: () => { backs++; }, push: (value: unknown) => pushed.push(value), replace: (value: unknown) => pushed.push(value) } },
     'expo-crypto': { randomUUID: () => 'operation-' + (++uuid) },
-    'expo-haptics': { NotificationFeedbackType: { Success: 'Success' }, notificationAsync: async () => { haptics++; } },
     '@finanzapp/domain': clockDomain,
     '../storage/LedgerProvider': ledger, '../src/storage/LedgerProvider': ledger, '../../src/storage/LedgerProvider': ledger,
     '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
@@ -117,6 +118,7 @@ function harness(file: string, options: { data?: domain.LedgerArchive; params?: 
     ...ui('movement-amount', movementAmount), ...ui('entry-prefill', entryPrefill), ...ui('purchase-plan', purchasePlan),
     ...ui('form-controls', { AccountField: 'AccountField', CategoryField: 'CategoryField', DateField: 'DateField', SelectorCard: 'SelectorCard' }),
     ...ui('installment-purchase', { InstallmentPurchase: 'InstallmentPurchase' }), ...ui('entry-list', { EntryList: 'EntryList' }),
+    ...ui('motion', { successHaptic: () => { haptics++; }, errorHaptic: () => { failures.push('Error'); }, warningHaptic: () => { failures.push('Warning'); } }),
   };
   const require = function require(name: string) {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected refund route dependency: ' + name);
@@ -133,7 +135,7 @@ function harness(file: string, options: { data?: domain.LedgerArchive; params?: 
       return node;
     },
     setData: (next: domain.LedgerArchive) => { data = next; },
-    pushed, alerts, refunds, changes, updates, backs: () => backs, haptics: () => haptics,
+    pushed, alerts, refunds, changes, updates, failures, backs: () => backs, haptics: () => haptics,
   };
 }
 function nodes(value: any): Node[] {
@@ -271,11 +273,13 @@ test('24T3: the refund form keeps the submission frozen on an unknown outcome an
   assert.equal(find(root, 'AmountField').props.editable, false, 'frozen while the outcome is unknown');
   assert.equal(find(root, 'ActionButton').props.label, 'Reintentar guardado');
   assert.ok(texts(root).includes('Reintentá: se envía la misma devolución y no se registra dos veces.'));
+  assert.equal(view.failures.join(','), 'Warning', '25Q4: it may have been written, so Warning while it stays frozen');
   // The commit happened: the ledger now holds it; the retry sends the very same devolución (storage's retry is a no-op).
   view.setData(domain.applyNewOperation(base(), view.refunds[0], TODAY));
   await find(view.render(), 'ActionButton').props.onPress();
   assert.equal(JSON.stringify(view.refunds[1]), JSON.stringify(view.refunds[0]));
   assert.equal(view.backs(), 1);
+  assert.equal(JSON.stringify([view.failures.join(','), view.haptics()]), JSON.stringify(['Warning', 1]), 'the retry taps Success once');
 
   let refused = true;
   const again = harness('app/new-refund.tsx', { params: { entryId: buy.id }, addRefund: async () => { if (refused) { refused = false; throw new Error(domain.REFUND_OVER_MESSAGE); } } });
@@ -287,10 +291,12 @@ test('24T3: the refund form keeps the submission frozen on an unknown outcome an
   assert.equal(bindLocale('en-US').errorText(domain.REFUND_OVER_MESSAGE) !== domain.REFUND_OVER_MESSAGE, true, 'the refusal is catalogued in English too');
   assert.equal(find(root, 'AmountField').props.editable, true, 'released: the person reviews the draft');
   assert.notEqual(find(root, 'ActionButton').props.label, 'Reintentar guardado');
+  assert.equal(again.failures.join(','), 'Error', '25Q4: nothing was written, so Error');
   find(root, 'AmountField').props.onChangeText('150');
   await find(again.render(), 'ActionButton').props.onPress();
   assert.equal(JSON.stringify(again.refunds.map(item => [item.id, item.amountMinor])), JSON.stringify([['operation-1', 20000], ['operation-1', 15000]]), 'the same id, built again');
   assert.equal(again.backs(), 1);
+  assert.equal(JSON.stringify([again.failures.join(','), again.haptics()]), JSON.stringify(['Error', 1]));
 });
 
 test('24T3: an amount over what is left is refused live with Save disabled; a purchase returned in full and an income offer no form', () => {
@@ -386,10 +392,12 @@ test('24T3: an undo whose outcome is unknown keeps the change for «Reintentar c
   await flush();
   const root = view.render();
   assert.equal(find(root, 'ErrorMessage').props.message, 'operations.change.failed', '25Q4: the action\'s own sentence, never the engine\'s text');
+  assert.equal(view.failures.join(','), 'Warning', '25Q4: it may have been written, so Warning while it stays frozen');
   find(root, 'ActionButton', 'Reintentar cambio').props.onPress();
   await flush();
   assert.equal(view.alerts.length, 1, 'no second confirmation');
   assert.equal(JSON.stringify(view.changes[1]), JSON.stringify(view.changes[0]), 'the same change, resent');
+  assert.equal(JSON.stringify([view.failures.join(','), view.haptics()]), JSON.stringify(['Warning', 1]));
 
   // Undone, then another devolución took everything that was left: restoring it would exceed the purchase.
   const blocked = refundOf(undoOf(data, 'r1'), 'r2', 50000, '2026-09-25');
@@ -719,6 +727,7 @@ test('24T3 (review): an undo storage refuses before writing releases the change:
   assert.equal(find(root, 'ErrorMessage').props.message, domain.operationGuardMessage('refund-credit'));
   assert.equal(has(root, 'ActionButton', 'Reintentar cambio'), false, 'released: no retry of a change storage always refuses');
   assert.equal(find(root, 'ActionButton', 'Editar movimiento').props.disabled, false);
+  assert.equal(view.failures.join(','), 'Error', '25Q4: released, nothing was written');
   // The next tap asks again, about the ledger as it is now, with a new change.
   find(root, 'ActionButton', 'Deshacer movimiento').props.onPress();
   assert.equal(JSON.stringify([view.alerts.length, view.alerts[1].title]), JSON.stringify([2, '¿Deshacer movimiento?']));
@@ -729,6 +738,7 @@ test('24T3 (review): an undo storage refuses before writing releases the change:
   assert.notEqual(view.updates[1].id, view.updates[0].id);
   assert.ok(has(root, 'ActionButton', 'Reintentar cambio'), 'an unknown outcome keeps the change for an exact retry');
   assert.equal(find(root, 'ActionButton', 'Editar movimiento').props.disabled, true);
+  assert.equal(view.failures.join(','), 'Error,Warning', '25Q4: frozen for the retry, so Warning');
 });
 
 // ---- 24T3 (owner review): a devolución de compra is not a bank reintegro -----------------------------------------------

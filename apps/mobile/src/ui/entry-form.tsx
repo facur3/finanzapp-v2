@@ -2,7 +2,6 @@ import { useMemo, useRef, useState } from 'react';
 import { Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
-import * as Haptics from 'expo-haptics';
 import { accountBalanceMinor, accountKind, categoryKey, editedDraftFits, entryRefundSummary, installmentOccurrenceOf, interestCategoryLabel, keepsHistoricalCardIncome, makeEntryChange, minorFromEditedDraft, postingAccountsFor, sameEntry, summarizeMonthlyBudgets, todayKey, validateEntry, validateEntryChange, type Account, type Entry, type EntryChange, type EntryKind, type EntryRecord, type InstallmentPlan, type StoredDraft } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { budgetTone } from './budget-presentation';
@@ -13,6 +12,7 @@ export type { EntryPrefill } from './entry-prefill';
 import { AccountField, CategoryField, DateField } from './form-controls';
 import { InstallmentPurchase } from './installment-purchase';
 import { accountKindLabel, postingAccounts } from './liability-presentation';
+import { errorHaptic, successHaptic, warningHaptic } from './motion';
 import { initialAccountId, releasesDraft } from './presentation';
 import { installmentOfEntry } from './installment-presentation';
 import { INITIAL_PURCHASE, buildPurchasePlan, purchaseState, type PurchaseDraft } from './purchase-plan';
@@ -205,7 +205,7 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
       if (submission.plan) await addInstallmentPlan(submission.plan);
       else if (submission.change) await updateEntry(submission.change);
       else await addEntry(submission.entry);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      successHaptic();
       saving.current = false;
       close();
     } catch (cause) {
@@ -217,7 +217,7 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
       if (cause instanceof Error && releasesDraft(cause.message)) { setPending(null); frozen = false; }
       // 25VIS2 (V4): a refusal (before the submission froze, or one storage decided before writing) taps Error; an outcome
       // that may have been written taps Warning, while the frozen draft waits for the exact retry.
-      void Haptics.notificationAsync(frozen ? Haptics.NotificationFeedbackType.Warning : Haptics.NotificationFeedbackType.Error).catch(() => {});
+      if (frozen) warningHaptic(); else errorHaptic();
     } finally {
       saving.current = false;
       setBusy(false);

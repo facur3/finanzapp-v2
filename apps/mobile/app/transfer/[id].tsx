@@ -2,13 +2,14 @@ import { useRef, useState } from 'react';
 import { Alert, View } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
-import * as Haptics from 'expo-haptics';
 import { accountKind, debtOutstandingMinor, makeTransferChange, snapshotFromArchive, type Account, type TransferRecord, type TransferChange } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { AccountBadge, ActionButton, AppText, DetailRow, EmptyState, ErrorMessage, GlyphTile, Money, Screen, Surface } from '../../src/ui/components';
 import { useI18n } from '../../src/i18n/provider';
 import { useAccountNameOf } from '../../src/ui/category-hues';
 import { balanceAfterSentence } from '../../src/ui/liability-presentation';
+import { errorHaptic, successHaptic, warningHaptic } from '../../src/ui/motion';
+import { releasesDraft } from '../../src/ui/presentation';
 import { space, usePalette } from '../../src/ui/theme';
 
 export default function TransferScreen() {
@@ -50,8 +51,13 @@ function TransferDetail({ record, accounts }: { record: TransferRecord; accounts
     working.current = true; setBusy(true); setPending(change); setError(null);
     try {
       await updateTransfer(change); setPending(null);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    } catch (cause) { setError(failureMessage(cause, 'transferDetail.changeUnverified')); }
+      successHaptic();
+    } catch (cause) {
+      setError(failureMessage(cause, 'transferDetail.changeUnverified'));
+      // 25Q4: the change stays frozen for «Reintentar cambio» either way (as in TransferForm); a refusal storage decided
+      // before writing taps Error, an outcome that may have been written taps Warning.
+      if (cause instanceof Error && releasesDraft(cause.message)) errorHaptic(); else warningHaptic();
+    }
     finally { working.current = false; setBusy(false); }
   }
   /** 25Q4: a restored debt payment or collection may settle at most what is pending now, the ceiling a new one has (the

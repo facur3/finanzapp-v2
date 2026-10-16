@@ -9,7 +9,7 @@ import { ActionButton, AppText, CheckRow, DetailRow, EmptyState, ErrorMessage, G
 import { DateField } from '../../src/ui/form-controls';
 import { isPlanWriteRefusal, payoffFigures, payoffPreview, planOperationDate } from '../../src/ui/installment-presentation';
 import { numberRanges } from '../../src/ui/operation-presentation';
-import { successHaptic } from '../../src/ui/motion';
+import { errorHaptic, successHaptic, warningHaptic } from '../../src/ui/motion';
 import { withCurrencyCode } from '../../src/i18n/format';
 import { useI18n } from '../../src/i18n/provider';
 import { space, useCurrentDay } from '../../src/ui/theme';
@@ -115,8 +115,9 @@ export default function PlanPayoffScreen() {
     } catch (cause) {
       setError(failureMessage(cause, 'installments.payoff.saveFailed'));
       // Refused before anything was written (the instalments changed since the preview, a statement closed, the plan
-      // stopped…): released, so the sheet previews the plan as it is now and Save builds the adelanto again (same id).
-      if (cause instanceof Error && isPlanWriteRefusal(cause.message)) setPending(null);
+      // stopped…): released, so the sheet previews the plan as it is now and Save builds the adelanto again (same id). 25Q4:
+      // Error for that release, Warning while the adelanto stays frozen for «Reintentar guardado».
+      if (cause instanceof Error && isPlanWriteRefusal(cause.message)) { setPending(null); errorHaptic(); } else warningHaptic();
     } finally {
       saving.current = false;
       setBusy(false);

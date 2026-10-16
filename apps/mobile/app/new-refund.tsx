@@ -2,12 +2,12 @@ import { useRef, useState } from 'react';
 import { Keyboard, View } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
-import * as Haptics from 'expo-haptics';
 import { REFUND_AMOUNT_MESSAGE, isPlanRefund, minorFromEditedDraft, todayKey, type Account, type LedgerArchive } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { ActionButton, AmountField, AmountShortcut, AppText, DetailRow, EmptyState, ErrorMessage, FieldNote, IconButton, Money, Screen, SectionTitle, Surface } from '../src/ui/components';
 import { DateField } from '../src/ui/form-controls';
 import { amountFromMinor } from '../src/ui/money-input';
+import { errorHaptic, successHaptic, warningHaptic } from '../src/ui/motion';
 import { previewRefund, refundBounds, type RefundPreview, type RefundTarget } from '../src/ui/operation-presentation';
 import { releasesDraft } from '../src/ui/presentation';
 import { useAccountNameOf, useCategoryLookOf } from '../src/ui/category-hues';
@@ -90,12 +90,16 @@ function RefundForm({ target }: { target: RefundTarget | null }) {
       // The submission carries the allocation the person read (A13): storage recomputes it after its catch-up and refuses a
       // different one; a retry with the same id and inputs is a no-op.
       await addRefund(submission.refund);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      successHaptic();
       saving.current = false;
       close();
     } catch (cause) {
       setError(failureMessage(cause, 'operations.refund.saveUnverified'));
-      if (cause instanceof Error && releasesDraft(cause.message)) setPending(null);
+      const released = cause instanceof Error && releasesDraft(cause.message);
+      if (released) setPending(null);
+      // 25Q4: Warning while the sent devolución stays frozen for the exact retry; Error when nothing was sent (a submission
+      // exists only once the checks above passed) or storage refused it before writing.
+      if (submission && !released) warningHaptic(); else errorHaptic();
     } finally {
       saving.current = false;
       setBusy(false);
