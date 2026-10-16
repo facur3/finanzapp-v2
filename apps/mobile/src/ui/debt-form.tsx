@@ -2,7 +2,6 @@ import { useMemo, useRef, useState } from 'react';
 import { Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
-import * as Haptics from 'expo-haptics';
 import { draftFitsCurrency, minorFromLedgerDraft, samePersonalDebtProfile, todayKey, validateAccount, validatePersonalDebtProfile,
   type Account, type Currency, type DebtDirection, type PersonalDebtProfile, LEDGER_CURRENCIES } from '@finanzapp/domain';
 import { useI18n } from '../i18n/provider';
@@ -12,6 +11,7 @@ import { CurrencySwitch } from './currency-switch';
 import { useDefaultCurrency } from './use-default-currency';
 import { offeredCurrencies } from './currencies';
 import { DateField } from './form-controls';
+import { errorHaptic, successHaptic, warningHaptic } from './motion';
 import { space } from './theme';
 
 type DueMode = 'none' | 'dated';
@@ -61,6 +61,8 @@ export function DebtForm({ original }: { original?: PersonalDebtProfile }) {
   async function save() {
     if (saving.current || !snapshot) return;
     saving.current = true; setBusy(true); setError(null); Keyboard.dismiss();
+    // 25Q4: true once the write is sent: a failure after it taps Warning (frozen for the retry), before it Error.
+    let sent = false;
     try {
       if (before) {
         let submission = pendingEdit;
@@ -72,6 +74,7 @@ export function DebtForm({ original }: { original?: PersonalDebtProfile }) {
           validatePersonalDebtProfile(submission, snapshot.accounts);
           setPendingEdit(submission);
         }
+        sent = true;
         await saveDebt(submission);
       } else {
         let submission = pendingCreate;
@@ -92,12 +95,14 @@ export function DebtForm({ original }: { original?: PersonalDebtProfile }) {
           submission = { account: newAccount, debt };
           setPendingCreate(submission);
         }
+        sent = true;
         await addDebt(submission.account, submission.debt);
       }
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      successHaptic();
       saving.current = false; close();
     } catch (cause) {
       setError(failureMessage(cause, 'debts.form.saveFailed'));
+      if (sent) warningHaptic(); else errorHaptic();
     } finally { saving.current = false; setBusy(false); }
   }
 

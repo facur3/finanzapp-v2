@@ -43,6 +43,8 @@ function harness({ fail = false, language = 'es-AR' as const, paid = false, dele
   const removed: string[] = [], removedCards: string[] = [], pushed: unknown[] = [];
   const savedCards: domain.CreditCardProfile[] = [];
   const savedDebts: domain.PersonalDebtProfile[] = [], removedDebts: string[] = [];
+  // 25Q4: every haptic comes from motion.tsx; the recorder keeps each one's kind.
+  const haptics: string[] = [];
   const state: unknown[] = [], refs: unknown[] = [];
   let cursor = 0, refCursor = 0;
   const accounts = (deletedAccount ? [{ ...cash, revision: 1, updatedAt: createdAt, deletedAt: createdAt }, other, lonely, cardAccount] : [cash, other, lonely, cardAccount]).concat(owedAccount, lentAccount);
@@ -52,7 +54,8 @@ function harness({ fail = false, language = 'es-AR' as const, paid = false, dele
       useRef: (initial: unknown) => { const i = refCursor++; return (refs[i] ??= { current: initial }); } },
     'react-native': { Alert: { alert: (title: string, message: string, buttons: any[]) => alerts.push({ title, message, buttons }) } },
     'expo-router': { router: { push: (target: unknown) => pushed.push(target) } },
-    'expo-haptics': { NotificationFeedbackType: { Success: 'Success' }, notificationAsync: async () => {}, selectionAsync: async () => {} },
+    './motion': { successHaptic: () => { haptics.push('Success'); }, selectionHaptic: () => { haptics.push('Selection'); },
+      errorHaptic: () => { haptics.push('Error'); }, warningHaptic: () => { haptics.push('Warning'); } },
     '@finanzapp/domain': domain,
     '../storage/LedgerProvider': { useLedger: () => ({ snapshot, archive: { accounts: snapshot.accounts, records: entries.map(domain.initialRecord), recurring: rules, cards: [card], installmentPlans: plans },
       removeAccount: async (id: string) => { if (fail) throw new Error('disk full'); removed.push(id); },
@@ -69,7 +72,7 @@ function harness({ fail = false, language = 'es-AR' as const, paid = false, dele
     return modules[name];
   } });
   const render = (hook: 'useAccountManagement' | 'useCardManagement' | 'useRecurringManagement' | 'useDebtManagement') => { cursor = 0; refCursor = 0; return module.exports[hook](); };
-  return { render, alerts, removed, removedCards, savedCards, savedDebts, removedDebts, pushed };
+  return { render, alerts, removed, removedCards, savedCards, savedDebts, removedDebts, pushed, haptics };
 }
 const settle = () => new Promise(resolve => setTimeout(resolve, 0));
 
@@ -86,10 +89,13 @@ test('deleting an account asks first and names what stays and what stops; Cancel
     + ' Su saldo registrado, ' + money(94400) + ', deja de contar en Disponible. Su 1 recurrente activo se detendrá; lo ya registrado no cambia.' + final);
   assert.equal(JSON.stringify(view.alerts[0].buttons.map(button => [button.text, button.style])), JSON.stringify([['Cancelar', 'cancel'], ['Eliminar', 'destructive']]));
   assert.deepEqual(view.removed, [], 'nothing written before the destructive button');
+  view.alerts[0].buttons[0].onPress?.();
+  assert.equal(view.haptics.join(','), '', 'Cancelar taps nothing');
   view.alerts[0].buttons[1].onPress!();
   await settle();
   assert.equal(JSON.stringify(view.removed), JSON.stringify(['cash']));
   assert.equal(done, 1);
+  assert.equal(view.haptics.join(','), 'Success');
   // A transfer counts as history too; an account with none says so and lists no rule.
   view.render('useAccountManagement').remove(other);
   assert.equal(view.alerts[1].message, 'Deja de aparecer en tus cuentas, en Disponible y en los formularios. Sus movimientos y transferencias siguen en Movimientos con su nombre y su moneda: 0 movimientos y 1 transferencia.'
@@ -112,6 +118,7 @@ test('a failed deletion keeps the account as it was and says so; in English the 
   await settle();
   assert.equal(failing.render('useAccountManagement').error, 'accounts.manage.deleteFailed', '25Q4: the action\'s own sentence, never the engine\'s text');
   assert.deepEqual(failing.removed, []);
+  assert.equal(failing.haptics.join(','), 'Error', '25Q4: nothing is kept frozen and Eliminar is offered again, so Error');
   const english = harness({ language: 'en-US' as never });
   english.render('useAccountManagement').remove(cash);
   assert.equal(english.alerts[0].title, 'Delete Banco?');
@@ -243,6 +250,7 @@ test('25B2 close: a settled debt or receivable asks first, names what stays and 
   await settle();
   assert.equal(failing.render('useDebtManagement').error, 'debts.manage.deleteFailed');
   assert.equal(failing.removedDebts.length, 0);
+  assert.equal(failing.haptics.join(','), 'Error', '25Q4: nothing is kept frozen, so Error');
 });
 
 test('25B2 close: a tracker created by mistake (a balance, no payment or collection) is deleted after a clear confirmation, without inventing a payment', async () => {
@@ -274,6 +282,7 @@ test('25B2 close: Cerrar then Reabrir from the row keep the tracker as it was (r
   await settle();
   assert.deepEqual(view.savedDebts[1], { ...owed, revision: 2, updatedAt: view.savedDebts[1].updatedAt });
   assert.equal(view.removedDebts.length, 0);
+  assert.equal(view.haptics.join(','), 'Selection,Selection', 'closing and reopening tick, as a state change does');
 });
 
 // ---- Producto 24T1: a card with a pending instalment plan ----------------------------------------------------------------

@@ -2,7 +2,6 @@ import { useRef, useState } from 'react';
 import { Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
-import * as Haptics from 'expo-haptics';
 import { accountKind, editedDraftFits, keepsHistoricalCardIncome, minorFromEditedDraft, postingAccountsFor, sameRecurringRule, todayKey, validateRecurringRule, type StoredDraft,
   type EntryKind, type RecurringFrequency, type RecurringRule } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
@@ -10,6 +9,7 @@ import { ActionButton, AmountField, AppText, Choices, EmptyState, ErrorMessage, 
 import { draftFromMinor } from './money-input';
 import { AccountField, CategoryField, DateField } from './form-controls';
 import { accountKindLabel, postingAccounts } from './liability-presentation';
+import { errorHaptic, successHaptic, warningHaptic } from './motion';
 import { initialAccountId } from './presentation';
 import { space } from './theme';
 import { useI18n } from '../i18n/provider';
@@ -74,6 +74,8 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
     setBusy(true);
     setError(null);
     Keyboard.dismiss();
+    // 25Q4: true once the write is sent: a failure after it taps Warning (frozen for the retry), before it Error.
+    let sent = false;
     try {
       let submission = pending;
       if (!submission) {
@@ -117,12 +119,14 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
         validateRecurringRule(submission, accounts);
         setPending(submission);
       }
+      sent = true;
       await saveRecurring(submission);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      successHaptic();
       saving.current = false;
       close();
     } catch (cause) {
       setError(failureMessage(cause, 'recurring.form.saveFailed'));
+      if (sent) warningHaptic(); else errorHaptic();
     } finally {
       saving.current = false;
       setBusy(false);

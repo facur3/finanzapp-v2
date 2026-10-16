@@ -1,17 +1,18 @@
 import { useRef, useState } from 'react';
 import { Alert } from 'react-native';
 import { router } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import { accountBalanceMinor, assertCardDeletable, assertOpenAccount, cardCreditMinor, cardDebtMinor, cardHasPendingInstallments, closePersonalDebt, debtDeletion, debtOutstandingMinor, deleteRecurringRule, liabilityActivity, pauseRecurringRule, recurringHistory,
   reopenPersonalDebt, resumeRecurringRule, todayKey, type Account, type CreditCardProfile, type PersonalDebtProfile, type RecurringRule } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { useI18n } from '../i18n/provider';
 import type { MessageKey } from '../i18n/messages';
+import { errorHaptic, selectionHaptic, successHaptic } from './motion';
 import type { SwipeAction } from './swipe-actions';
 
 /** Producto 24UX4: managing commitments from a list row (trailing swipe) and from the detail screen, with one set of
  * rules. Every change is a revision of the stored row, saved before anything confirms it; a failed save keeps the row
- * as it was and says so (`error`, a catalogue key or the thrown message). Deleting asks first and names what stays:
+ * as it was, says so (`error`, a catalogue key or the thrown message) and taps Error (25Q4: nothing is kept frozen, the
+ * action is offered again). Deleting asks first and names what stays:
  * the movements, payments and collections already recorded are never touched. `done` runs after a durable save
  * (a detail screen closes itself there). */
 export function useRecurringManagement() {
@@ -28,10 +29,11 @@ export function useRecurringManagement() {
     setError(null);
     try {
       await saveRecurring(next);
-      void (feedback === 'success' ? Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) : Haptics.selectionAsync()).catch(() => {});
+      if (feedback === 'success') successHaptic(); else selectionHaptic();
       done?.();
     } catch (cause) {
       setError(failureMessage(cause, failure));
+      errorHaptic();
     } finally {
       writing.current = false;
       setBusyId(null);
@@ -83,10 +85,11 @@ export function useDebtManagement() {
     setError(null);
     try {
       await (typeof next === 'string' ? removeDebt(next) : saveDebt(next));
-      void (feedback === 'success' ? Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) : Haptics.selectionAsync()).catch(() => {});
+      if (feedback === 'success') successHaptic(); else selectionHaptic();
       done?.();
     } catch (cause) {
       setError(failureMessage(cause, failure));
+      errorHaptic();
     } finally {
       writing.current = false;
       setBusyId(null);
@@ -175,10 +178,11 @@ export function useAccountManagement() {
     setError(null);
     try {
       await removeAccount(account.id);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      successHaptic();
       done?.();
     } catch (cause) {
       setError(failureMessage(cause, 'accounts.manage.deleteFailed'));
+      errorHaptic();
     } finally {
       writing.current = false;
       setBusyId(null);
@@ -233,10 +237,11 @@ export function useCardManagement() {
     setError(null);
     try {
       await write();
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      successHaptic();
       done?.();
     } catch (cause) {
       setError(failureMessage(cause, failure));
+      errorHaptic();
     } finally {
       writing.current = false;
       setBusyId(null);

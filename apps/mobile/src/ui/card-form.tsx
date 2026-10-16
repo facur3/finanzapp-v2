@@ -2,7 +2,6 @@ import { useMemo, useRef, useState } from 'react';
 import { Alert, Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
-import * as Haptics from 'expo-haptics';
 import { addDaysISO, cardCycleDatesOf, cardCycleView, draftFitsCurrency, editedDraftFits, minorFromEditedDraft, minorFromLedgerDraft, newCardCycle, planCardCycle,
   sameCreditCardProfile, todayKey, validateAccount, validateCreditCardProfile, type StoredDraft, type Account, type CardCycleDates, type CardCycleDays,
   type CardCycleIntent, type CreditCardProfile, type Currency, LEDGER_CURRENCIES } from '@finanzapp/domain';
@@ -16,6 +15,7 @@ import { useCardManagement } from './commitment-actions';
 import { offeredCurrencies } from './currencies';
 import { DateField } from './form-controls';
 import { draftFromMinor } from './money-input';
+import { errorHaptic, successHaptic, warningHaptic } from './motion';
 import { SwitchRow } from './switch-row';
 import { space, useCurrentDay } from './theme';
 
@@ -101,6 +101,8 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
   async function save() {
     if (saving.current || !snapshot) return;
     saving.current = true; setBusy(true); setError(null); Keyboard.dismiss();
+    // 25Q4: true once the write is sent: a failure after it taps Warning (frozen for the retry), before it Error.
+    let sent = false;
     try {
       if (before) {
         let submission = pendingEdit;
@@ -118,6 +120,7 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
           submission = { card, intent: edit.intent };
           setPendingEdit(submission);
         }
+        sent = true;
         await saveCard(submission.card, submission.intent);
       } else {
         let submission = pendingCreate;
@@ -134,12 +137,14 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
           submission = { account: newAccount, card, rows: cycle.rows };
           setPendingCreate(submission);
         }
+        sent = true;
         await addCard(submission.account, submission.card, submission.rows);
       }
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      successHaptic();
       saving.current = false; close();
     } catch (cause) {
       setError(failureMessage(cause, 'cards.form.saveFailed'));
+      if (sent) warningHaptic(); else errorHaptic();
     } finally { saving.current = false; setBusy(false); }
   }
 
@@ -149,10 +154,12 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
     try {
       setPendingArchive(submission);
       await saveCard(submission);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      successHaptic();
       saving.current = false; close();
     } catch (cause) {
       setError(failureMessage(cause, 'cards.form.archiveFailed'));
+      // 25Q4: only the write fails here, and the archive stays frozen for the exact retry.
+      warningHaptic();
     } finally { saving.current = false; setBusy(false); }
   }
   function archive() {

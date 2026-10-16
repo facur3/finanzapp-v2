@@ -63,6 +63,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   (components as any).surfaceShadow = () => ({});
   const GATE = options.gate ?? domain.LEDGER_CURRENCIES;
   const defaults = { useDefaultCurrency: ({ accountCurrency, requested }: { accountCurrency?: string | null; requested?: unknown } = {}) => accountCurrency ?? (domain.isLedgerCurrency(requested, GATE) ? requested : 'ARS') };
+  const motion = { selectionHaptic: () => {}, successHaptic: () => {}, errorHaptic: () => {}, warningHaptic: () => {}, timing: () => ({ duration: 0 }) };
   const modules: Record<string, unknown> = {
     '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
     react: { useState: (initial: any) => { const i = cursor++; if (!(i in state)) state[i] = typeof initial === 'function' ? initial() : initial;
@@ -81,7 +82,6 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
       router: { canGoBack: () => !options.root, back: () => { backs++; }, push: (value: any) => pushed.push(value), replace: (value: any) => pushed.push(value),
         dismissTo: (value: any) => dismissed.push(value) } },
     'expo-crypto': { randomUUID: () => 'op-' + (++uuid) },
-    'expo-haptics': { NotificationFeedbackType: { Success: 'Success' }, notificationAsync: async () => {} },
     '@finanzapp/domain': domain,
     '../storage/LedgerProvider': ledger, '../src/storage/LedgerProvider': ledger, '../../src/storage/LedgerProvider': ledger,
     './components': components, '../src/ui/components': components, '../../src/ui/components': components,
@@ -99,7 +99,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     '../src/ui/use-default-currency': defaults, '../../src/ui/use-default-currency': defaults,
     '../../src/ui/commitment-actions': accountManagement, '../src/ui/commitment-actions': accountManagement,
     '../src/ui/swipe-actions': swipe, '../../src/ui/swipe-actions': swipe,
-    './motion': { selectionHaptic: () => {}, timing: () => ({ duration: 0 }) },
+    './motion': motion, '../src/ui/motion': motion, '../../src/ui/motion': motion,
     './theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, radius: { group: 16, sheet: 24 }, usePalette: () => p, useReduceMotion: () => true },
   };
   const module = { exports: {} as Record<string, (props: any) => Node> };

@@ -75,6 +75,9 @@ function harness(file: string, ledger: Ledger, params: Record<string, string> = 
   const pushed: unknown[] = [];
   const alerts: { title: string; detail: string; buttons: { text: string; style?: string; onPress?: () => void }[] }[] = [];
   const nav = { back: 0, replaced: [] as unknown[] };
+  // 25Q4: every haptic comes from motion.tsx; the recorder keeps each one's kind.
+  const haptics: string[] = [];
+  const motion = { successHaptic: () => { haptics.push('Success'); }, errorHaptic: () => { haptics.push('Error'); } };
   const i18n = { useI18n: () => bindLocale(options.locale ?? 'es-AR') };
   const useLedger = () => ({
     archive, snapshot: domain.snapshotFromArchive(archive), review: ledger.review, reviewVersion: ledger.reviewVersion ?? 0,
@@ -115,7 +118,6 @@ function harness(file: string, ledger: Ledger, params: Record<string, string> = 
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, useLocalSearchParams: () => params,
       useFocusEffect: (effect: () => unknown) => { const index = focusCursor++; focusEffects[index] = effect; focusCells[index] ??= { cleanup: effect() }; },
       router: { push: (to: unknown) => pushed.push(to), back: () => { nav.back += 1; }, canGoBack: () => options.canGoBack ?? true, replace: (to: unknown) => nav.replaced.push(to) } },
-    'expo-haptics': { notificationAsync: () => Promise.resolve(), NotificationFeedbackType: { Success: 'success' } },
     '@finanzapp/domain': domain,
   };
   for (const prefix of ['../', '../../']) Object.assign(modules, {
@@ -135,6 +137,7 @@ function harness(file: string, ledger: Ledger, params: Record<string, string> = 
     [prefix + 'src/ui/liability-presentation']: liabilityPresentation,
     [prefix + 'src/ui/money-input']: moneyInput,
     [prefix + 'src/ui/geometry']: geometry,
+    [prefix + 'src/ui/motion']: motion,
   });
   modules['../storage/LedgerProvider'] = { useLedger };
   modules['../i18n/provider'] = i18n;
@@ -146,6 +149,7 @@ function harness(file: string, ledger: Ledger, params: Record<string, string> = 
   const reviewItemHook = realModule('src/ui/use-review-item.ts', require);
   for (const prefix of ['../', '../../']) modules[prefix + 'src/ui/use-review-item'] = reviewItemHook;
   // 25A-04: the one Confirmar / Descartar of the detail and the review sheet, real, over the same mocks.
+  modules['./motion'] = motion;
   const reviewActions = realModule('src/ui/review-actions.ts', require);
   for (const prefix of ['../', '../../']) modules[prefix + 'src/ui/review-actions'] = reviewActions;
   const module = { exports: {} as { default?: () => Node } };
@@ -153,7 +157,7 @@ function harness(file: string, ledger: Ledger, params: Record<string, string> = 
   const blur = () => { for (const cell of focusCells) if (typeof cell.cleanup === 'function') (cell.cleanup as () => void)(); };
   /** Focus regained (the screen in front again): each focus effect runs again, as React Navigation does. */
   const refocus = () => { for (const [index, effect] of focusEffects.entries()) focusCells[index] = { cleanup: effect() }; };
-  return { render: () => { cursor = 0; refCursor = 0; effectCursor = 0; focusCursor = 0; return module.exports.default!(); }, pushed, alerts, nav, blur, refocus };
+  return { render: () => { cursor = 0; refCursor = 0; effectCursor = 0; focusCursor = 0; return module.exports.default!(); }, pushed, alerts, nav, blur, refocus, haptics };
 }
 /** Every node, local components rendered once per element (their hooks run in traversal order, as React would). */
 function nodes(value: any): Node[] {
@@ -269,6 +273,7 @@ test('a complete, current proposal: what will be recorded, where and when, and C
   await settle();
   assert.deepEqual(ledger.calls, [['confirm', item.id, 3]]);
   assert.equal(view.nav.back, 1, 'back to the tray once recorded');
+  assert.equal(view.haptics.join(','), 'Success', 'one Success tap; the double tap adds nothing');
   root = view.render();
   assert.equal(all(root, 'ErrorMessage')[0].props.message, null);
 });
@@ -354,9 +359,11 @@ test('a refusal from the store (the proposal changed, or went stale) is shown an
   assert.equal(all(root, 'ErrorMessage')[0].props.message, domain.REVIEW_STALE_MESSAGE);
   assert.equal(bindLocale('en-US').errorText(all(root, 'ErrorMessage')[0].props.message), 'The account, card or category changed since the proposal. Review it again.');
   assert.equal(view.nav.back, 0);
+  assert.equal(view.haptics.join(','), 'Error', '25Q4: nothing is kept frozen and Confirmar is offered again, so Error');
   button(root, 'Confirmar')!.props.onPress();
   await settle();
   assert.equal(ledger.calls.length, 2);
+  assert.equal(view.haptics.join(','), 'Error,Error', 'every refused attempt taps');
   // 25Q4: an engine's error is never shown as itself: Confirmar's own sentence (a retry records it once either way).
   const failing = itemOf(drafted());
   const engine: Ledger = { review: trayOf([failing]), calls: [], confirmResult: () => Promise.reject(new Error('disk I/O error')) };
@@ -474,6 +481,7 @@ test('Editar refused because the proposal changed since it opened: the message s
   assert.equal(all(root(), 'ErrorMessage')[0].props.message, REVIEW_ITEM_CHANGED_MESSAGE);
   assert.equal(view.nav.back, 0);
   assert.equal(ledger.calls.length, 1);
+  assert.equal(view.haptics.join(','), 'Error', '25Q4: nothing is kept frozen and Guardar cambios is offered again, so Error');
   // 25Q4: an engine's error says Guardar cambios' own sentence; the editor stays open.
   const engine: Ledger = { review: trayOf([item]), calls: [], updateResult: () => Promise.reject(new Error('disk I/O error')) };
   const failing = editor(item, engine);

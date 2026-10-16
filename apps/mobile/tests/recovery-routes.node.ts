@@ -87,7 +87,6 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, useLocalSearchParams: () => options.params ?? {},
       router: { canGoBack: () => true, back: () => { backs++; }, push: (value: any) => pushed.push(value), replace: (value: any) => pushed.push(value) } },
     'expo-crypto': { randomUUID: () => 'operation-' + (++uuid) },
-    'expo-haptics': { NotificationFeedbackType: { Success: 'Success', Warning: 'Warning', Error: 'Error' }, notificationAsync: async (type: string) => { haptics.push(type); }, selectionAsync: async () => {} },
     'expo-file-system': { File: { pickFileAsync: options.picker ?? (async () => ({ canceled: true })) } },
     '@finanzapp/domain': domain,
     '@expo/vector-icons/Ionicons': 'Ionicons',
@@ -338,6 +337,16 @@ test('backup preview shows exact totals, cancel stays read-only, confirm waits f
   assert.equal(view.restores.length, 1);
   assert.equal(view.restores[0].baseline, domain.archiveKey({ accounts: [], records: [] }));
   assert.equal(find(view.render(), 'EmptyState').props.title, 'Copia incorporada');
+  assert.equal(view.haptics.join(','), 'Success');
+  // 25Q4: a failed import keeps nothing frozen and offers the import again, so it taps Error.
+  const failing = harness('app/backup-import.tsx', {}, { data: { accounts: [], records: [] }, restore: async () => { throw new Error('database is locked'); },
+    picker: async () => ({ canceled: false, result: { size: json.length, name: 'test.json', text: async () => json } }) });
+  await find(failing.render(), 'ActionButton', 'Elegir copia').props.onPress();
+  find(failing.render(), 'ActionButton', 'Confirmar importación').props.onPress();
+  failing.alerts[0].buttons[1].onPress();
+  await flush();
+  assert.deepEqual([failing.restores.length, failing.haptics.join(',')], [1, 'Error']);
+  assert.equal(nodes(failing.render()).some(node => node.type === 'EmptyState' && node.props.title === 'Copia incorporada'), false);
 });
 test('identical or conflicting backups cannot show an enabled import action', async () => {
   const json = JSON.stringify(domain.createRecoveryBackup(archive));

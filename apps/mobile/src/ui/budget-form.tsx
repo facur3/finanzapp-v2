@@ -2,7 +2,6 @@ import { useMemo, useRef, useState } from 'react';
 import { Alert, Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
-import * as Haptics from 'expo-haptics';
 import { LEDGER_CURRENCIES, editedDraftFits, minorFromEditedDraft, sameMonthlyBudget, validateBudgetCollection, validateMonthlyBudget, type StoredDraft,
   type BudgetScope, type Currency, type MonthlyBudget } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
@@ -11,6 +10,7 @@ import { CurrencySwitch } from './currency-switch';
 import { useDefaultCurrency } from './use-default-currency';
 import { offeredCurrencies } from './currencies';
 import { draftFromMinor } from './money-input';
+import { errorHaptic, successHaptic, warningHaptic } from './motion';
 import { CategoryField } from './form-controls';
 import { useI18n } from '../i18n/provider';
 
@@ -51,6 +51,8 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency, sc
     setBusy(true);
     setError(null);
     Keyboard.dismiss();
+    // 25Q4: true once the write is sent: a failure after it taps Warning (frozen for the retry), before it Error.
+    let sent = false;
     try {
       let submission = pending;
       if (!submission) {
@@ -78,12 +80,14 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency, sc
         }
         setPending(submission);
       }
+      sent = true;
       await saveBudget(submission);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      successHaptic();
       saving.current = false;
       close();
     } catch (cause) {
       setError(failureMessage(cause, 'budgets.form.saveFailed'));
+      if (sent) warningHaptic(); else errorHaptic();
     } finally {
       saving.current = false;
       setBusy(false);
@@ -98,11 +102,13 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency, sc
     try {
       setArchivePending(submission);
       await saveBudget(submission);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      successHaptic();
       saving.current = false;
       close();
     } catch (cause) {
       setError(failureMessage(cause, 'budgets.form.deleteFailed'));
+      // 25Q4: only the write fails here, and the deletion stays frozen for the exact retry.
+      warningHaptic();
     } finally {
       saving.current = false;
       setBusy(false);

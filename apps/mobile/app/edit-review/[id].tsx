@@ -10,6 +10,7 @@ import { QUICK_COUNTS, type CountChoice } from '../../src/ui/purchase-plan';
 import { parseInstallmentCount, placementOptions } from '../../src/ui/installment-presentation';
 import { accountKindLabel } from '../../src/ui/liability-presentation';
 import { draftFromMinor } from '../../src/ui/money-input';
+import { errorHaptic } from '../../src/ui/motion';
 import { editedReviewDraft, editorDestinations } from '../../src/ui/review-presentation';
 import { useReviewItem } from '../../src/ui/use-review-item';
 import { space } from '../../src/ui/theme';
@@ -97,6 +98,8 @@ function ReviewEditor({ item }: { item: ReviewItem }) {
       close();
     } catch (cause) {
       setError(failureMessage(cause, 'review.edit.saveFailed'));
+      // 25Q4: nothing stays frozen here; Guardar cambios is offered again.
+      errorHaptic();
     } finally {
       saving.current = false;
       setBusy(false);

@@ -2,7 +2,6 @@ import { useRef, useState } from 'react';
 import { Alert, Keyboard } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
-import * as Haptics from 'expo-haptics';
 import { accountBalanceMinor, accountLook, isLiveAccount, makeAccountAppearance, makeAccountChange, minorFromEditedDraft, validateAccountAppearance,
   validateAccountChange, type Account, type AccountAppearance, type AccountChange, type LedgerSnapshot, type StoredDraft } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
@@ -12,6 +11,7 @@ import { draftFromMinor } from '../../src/ui/money-input';
 import { ActionButton, AmountField, AppText, EmptyState, ErrorMessage, Field, FieldNote, IconButton, Screen } from '../../src/ui/components';
 import { CurrencyField } from '../../src/ui/form-controls';
 import { useAccountManagement } from '../../src/ui/commitment-actions';
+import { errorHaptic, successHaptic, warningHaptic } from '../../src/ui/motion';
 import { useI18n } from '../../src/i18n/provider';
 
 export default function EditAccountScreen() {
@@ -65,9 +65,13 @@ function AccountEditor({ account, snapshot, current }: { account: Account; snaps
     try {
       if (submission.change) await updateAccount(submission.change, submission.appearance ?? undefined);
       else if (submission.appearance) await saveAppearance(submission.appearance);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      successHaptic();
       working.current = false; close();
-    } catch (cause) { setError(failureMessage(cause, 'accounts.edit.saveUnverified')); }
+    } catch (cause) {
+      setError(failureMessage(cause, 'accounts.edit.saveUnverified'));
+      // 25Q4: only the write fails here, and the change stays frozen for the exact retry.
+      warningHaptic();
+    }
     finally { working.current = false; setBusy(false); }
   }
   function save() {
@@ -91,7 +95,11 @@ function AccountEditor({ account, snapshot, current }: { account: Account; snaps
         { text: t('common.cancel'), style: 'cancel', onPress: () => { confirming.current = false; } },
         { text: t('accounts.edit.correctConfirm'), onPress: () => { confirming.current = false; void apply(submission); } },
       ], { cancelable: true, onDismiss: () => { confirming.current = false; } });
-    } catch (cause) { setError(failureMessage(cause, 'accounts.edit.invalid')); }
+    } catch (cause) {
+      setError(failureMessage(cause, 'accounts.edit.invalid'));
+      // 25Q4: refused before anything was sent.
+      errorHaptic();
+    }
   }
   const locked = busy || pending !== null;
   return <Screen>

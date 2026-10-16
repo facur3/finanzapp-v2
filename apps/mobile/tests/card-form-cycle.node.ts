@@ -51,7 +51,7 @@ function harness(props: { original?: domain.CreditCardProfile } = {}, options: O
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, router: { canGoBack: () => true, back: () => { backs++; }, push: (to: unknown) => { pushed.push(to); }, replace: (to: unknown) => { replaced.push(to); },
       dismissTo: (to: unknown) => { dismissed.push(to); } } },
     'expo-crypto': { randomUUID: () => 'id-' + (++uuid) },
-    'expo-haptics': { NotificationFeedbackType: { Success: 'Success' }, notificationAsync: async () => {} },
+    './motion': { successHaptic() {}, errorHaptic() {}, warningHaptic() {}, selectionHaptic() {} },
     '@finanzapp/domain': domain,
     '../i18n/provider': { useI18n: () => bindLocale(locale) },
     '../storage/LedgerProvider': ledger,

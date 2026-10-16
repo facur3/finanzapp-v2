@@ -31,6 +31,8 @@ function harness(props: any, data: domain.LedgerArchive = archive, save?: (budge
   let cursor = 0, refCursor = 0, uuid = 0, backs = 0;
   const saved: domain.MonthlyBudget[] = [];
   const alerts: any[] = [];
+  // 25Q4: every haptic comes from motion.tsx; the recorder keeps each notification's type.
+  const haptics: string[] = [];
   const jsx = (type: Node['type'], props: Node['props']) => ({ type, props });
   const ledger = { useLedger: () => ({ archive: data, snapshot: domain.snapshotFromArchive(data), ...(gate ? { gate } : {}),
     saveBudget: async (budget: domain.MonthlyBudget) => { saved.push(budget); await save?.(budget); } }) };
@@ -46,7 +48,7 @@ function harness(props: any, data: domain.LedgerArchive = archive, save?: (budge
     'react-native': { View: 'View', Keyboard: { dismiss() {} }, Alert: { alert: (title: string, message: string, buttons: any[]) => alerts.push({ title, message, buttons }) } },
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, router: { canGoBack: () => true, back: () => { backs++; }, push: () => {}, replace: () => {} } },
     'expo-crypto': { randomUUID: () => 'budget-' + (++uuid) },
-    'expo-haptics': { NotificationFeedbackType: { Success: 'Success' }, notificationAsync: async () => {} },
+    './motion': { successHaptic: () => { haptics.push('Success'); }, errorHaptic: () => { haptics.push('Error'); }, warningHaptic: () => { haptics.push('Warning'); } },
     '@finanzapp/domain': domain,
     '../storage/LedgerProvider': ledger,
     './components': components, './money-input': moneyInput, './currencies': currencies, './currency-switch': { CurrencySwitch: 'CurrencySwitch' },
@@ -58,7 +60,7 @@ function harness(props: any, data: domain.LedgerArchive = archive, save?: (budge
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected budget-form dependency: ' + name);
     return modules[name];
   } });
-  return { render: () => { cursor = 0; refCursor = 0; return module.exports.BudgetForm(props); }, saved, alerts, backs: () => backs };
+  return { render: () => { cursor = 0; refCursor = 0; return module.exports.BudgetForm(props); }, saved, alerts, haptics, backs: () => backs };
 }
 function nodes(value: any): Node[] {
   if (!value || typeof value !== 'object') return [];
@@ -146,6 +148,7 @@ test('a failed write, a zero amount and a negative one keep the draft, and archi
   assert.equal(find(root, 'ErrorMessage').props.message, 'budgets.form.saveFailed', '25Q4: the form\'s own sentence, never the engine\'s text');
   assert.equal(find(root, 'AmountField').props.editable, false, 'the same submission stays frozen for retry');
   assert.equal(find(root, 'ActionButton', 'Reintentar guardado').props.label, 'Reintentar guardado');
+  assert.equal(failed.haptics.join(','), 'Warning', '25Q4: sent and frozen for «Reintentar guardado», so Warning');
   const zero = harness({ monthISO: '2026-09', currency: 'ARS', scope: 'total' }, { ...archive, budgets: [] });
   find(zero.render(), 'AmountField').props.onChangeText('0');
   await find(zero.render(), 'ActionButton', 'Crear presupuesto').props.onPress();
@@ -153,11 +156,13 @@ test('a failed write, a zero amount and a negative one keep the draft, and archi
   assert.match(find(root, 'ErrorMessage').props.message, /mayor que cero/);
   assert.equal(zero.saved.length, 0);
   assert.equal(find(root, 'AmountField').props.editable, true, 'invalid input never freezes the draft');
+  assert.equal(zero.haptics.join(','), 'Error', '25Q4: refused before sending, so Error');
   const negative = harness({ monthISO: '2026-09', currency: 'ARS', scope: 'total' }, { ...archive, budgets: [] });
   find(negative.render(), 'AmountField').props.onChangeText('-5');
   await find(negative.render(), 'ActionButton', 'Crear presupuesto').props.onPress();
   assert.ok(find(negative.render(), 'ErrorMessage').props.message, 'a negative limit is refused');
   assert.equal(negative.saved.length, 0);
+  assert.equal(negative.haptics.join(','), 'Error');
   const archiving = harness({ original: total, monthISO: total.monthISO });
   await find(archiving.render(), 'ActionButton', 'Eliminar presupuesto').props.onPress();
   assert.equal(archiving.alerts.length, 1);
@@ -165,6 +170,7 @@ test('a failed write, a zero amount and a negative one keep the draft, and archi
   archiving.alerts[0].buttons[1].onPress();
   await new Promise(resolve => setImmediate(resolve));
   assert.deepEqual([archiving.saved[0].scope, archiving.saved[0].active, archiving.saved[0].revision], ['total', false, 1]);
+  assert.equal(archiving.haptics.join(','), 'Success');
 });
 
 test('24UX6E: a second general budget or a second limit for the same category, currency and month is an input error before anything freezes; the draft stays editable and a different choice saves once', async () => {
@@ -190,6 +196,7 @@ test('24UX6E: a second general budget or a second limit for the same category, c
   await find(view.render(), 'ActionButton', 'Crear presupuesto').props.onPress();
   assert.deepEqual([view.saved.length, view.saved[0].scope, view.saved[0].category, view.saved[0].amountMinor], [1, 'category', 'Ocio', 100]);
   assert.equal(view.backs(), 1);
+  assert.equal(view.haptics.join(','), 'Error,Error,Success', '25Q4: one Error tap for each refusal before sending, then Success');
   // Another currency, or an archived general budget, is no conflict.
   const usd = harness({ monthISO: '2026-09', currency: 'USD', scope: 'total' });
   find(usd.render(), 'AmountField').props.onChangeText('1');

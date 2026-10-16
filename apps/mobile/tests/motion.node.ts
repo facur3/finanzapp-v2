@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
@@ -269,4 +269,24 @@ test('form selectors keep the category hue and give the account the interaction 
   const none = selector(render('AccountField', { accounts, value: '', onChange: () => {}, prominent: true }));
   assert.equal(tileOf(none).props.color, undefined);
   assert.equal(tileOf(none).props.tone, 'neutral');
+});
+
+test('25Q4: every haptic comes from motion.tsx, and a write that taps Success also taps Error or Warning when it fails', () => {
+  const root = new URL('../', import.meta.url);
+  const files = ['app/', 'src/'].flatMap(dir => readdirSync(new URL(dir, root), { recursive: true, encoding: 'utf8' })
+    .filter(name => /\.tsx?$/.test(name)).map(name => dir + name));
+  const read = (file: string) => readFileSync(new URL(file, root), 'utf8');
+  assert.deepEqual(files.filter(file => read(file).includes("from 'expo-haptics'")), ['src/ui/motion.tsx'], 'no screen calls expo-haptics directly');
+  const silent = files.filter(file => file !== 'src/ui/motion.tsx' && read(file).includes('successHaptic()')
+    && !read(file).includes('errorHaptic()') && !read(file).includes('warningHaptic()'));
+  assert.deepEqual(silent, [], 'a write that taps Success taps Error or Warning in its catch');
+  // The helpers exist and say what their names say.
+  const motion = read('src/ui/motion.tsx');
+  const body = (name: string) => {
+    const start = motion.indexOf('export function ' + name + '()');
+    assert.ok(start >= 0, name);
+    return motion.slice(start, motion.indexOf('}', start));
+  };
+  assert.ok(body('errorHaptic').includes('NotificationFeedbackType.Error)'));
+  assert.ok(body('warningHaptic').includes('NotificationFeedbackType.Warning)'));
 });

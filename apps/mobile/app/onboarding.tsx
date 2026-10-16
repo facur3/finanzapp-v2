@@ -3,7 +3,6 @@ import { BackHandler, Keyboard, Platform, ScrollView, View } from 'react-native'
 import { router, Stack } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { randomUUID } from 'expo-crypto';
-import * as Haptics from 'expo-haptics';
 import { LEDGER_CURRENCIES, draftFitsCurrency, makeAccountAppearance, minorFromLedgerDraft, validateAccount, validateAccountAppearance,
   type Account, type AccountAppearance, type Currency } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
@@ -12,7 +11,7 @@ import { ActionButton, AmountField, AppText, ErrorMessage, Field, FieldNote, Nav
 import { CurrencyField } from '../src/ui/form-controls';
 import { preferenceSummary, showsPreference } from '../src/ui/locale-options';
 import { useDisplayCurrency } from '../src/ui/display-currency-provider';
-import { ValueTransition } from '../src/ui/motion';
+import { ValueTransition, errorHaptic, successHaptic, warningHaptic } from '../src/ui/motion';
 import { markOnboardingDone, nextStep, onboardingDecision, previousStep, suggestedCurrency, type OnboardingStep } from '../src/ui/onboarding-flow';
 import { space, usePalette } from '../src/ui/theme';
 import { defaultPreferenceStore } from '../src/i18n/preference';
@@ -70,6 +69,8 @@ export default function OnboardingScreen() {
     setBusy(true);
     setError(null);
     Keyboard.dismiss();
+    // 25Q4: true once the write is sent: a failure after it taps Warning (frozen for the retry), before it Error.
+    let sent = false;
     try {
       // The same validation and the same retry rule as the New account form: a failed write keeps the draft and its
       // operation id, so retrying can never create the account twice.
@@ -82,8 +83,9 @@ export default function OnboardingScreen() {
         submission = { account, appearance };
         setPending(submission);
       }
+      sent = true;
       await addAccount(submission.account, submission.appearance);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      successHaptic();
       // The first account's currency is the first suggestion for the totals: the display currency, consolidated
       // (docs/currency.md §2.9); the person changes it later from the chip. Language and region are untouched.
       display.setCurrency(submission.account.currency);
@@ -92,6 +94,7 @@ export default function OnboardingScreen() {
       finish();
     } catch (cause) {
       setError(failureMessage(cause, 'accounts.form.saveFailed'));
+      if (sent) warningHaptic(); else errorHaptic();
     } finally {
       saving.current = false;
       setBusy(false);

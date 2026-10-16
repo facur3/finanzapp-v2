@@ -2,10 +2,10 @@ import { useRef, useState } from 'react';
 import { Alert, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { File } from 'expo-file-system';
-import * as Haptics from 'expo-haptics';
 import { BACKUP_MAX_BYTES, parsePilotBackup, previewBackupImport, sortCurrencies, type Currency, type ImportPreview, type ParsedBackup } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { ActionButton, AppText, DetailRow, EmptyState, ErrorMessage, Money, Screen, SectionTitle, Surface } from '../src/ui/components';
+import { errorHaptic, successHaptic } from '../src/ui/motion';
 import { useI18n } from '../src/i18n/provider';
 
 type Review = { backup: ParsedBackup; preview: ImportPreview; name: string };
@@ -61,9 +61,11 @@ export default function BackupImportScreen() {
     try {
       await restoreBackup(selected.backup.archive, selected.preview.baseline);
       setDone(true);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      successHaptic();
     } catch (cause) {
       setError(failureMessage(cause, 'backup.import.verifyFailed'));
+      // 25Q4: nothing stays frozen here; the review offers the import again.
+      errorHaptic();
     } finally { working.current = false; setBusy(false); }
   }
   function confirm() {

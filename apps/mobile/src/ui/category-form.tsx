@@ -1,13 +1,13 @@
 import { useRef, useState } from 'react';
 import { Alert, Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import { assertCategoryName, categoryNameTaken, editedCategoryDefinition, newCategoryDefinition, sameCategoryDefinition, validateCategoryDefinition,
   validateCategoryDefinitions, type CategoryDefinition, type CategoryIdentity, type EntryKind } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { CATEGORY_ICON_CHOICES, COLOR_CHOICES, identityGlyph, localizedCategoryLabel } from './appearance';
 import { IconColorPicker } from './appearance-picker';
 import { ActionButton, AppText, Choices, ErrorMessage, Field, FieldNote, IconButton, LifecycleNote, Screen } from './components';
+import { errorHaptic, successHaptic, warningHaptic } from './motion';
 import { space } from './theme';
 import { useI18n } from '../i18n/provider';
 
@@ -61,10 +61,12 @@ export function CategoryForm({ original, kind: requestedKind }: { original?: Cat
     Keyboard.dismiss();
     try {
       await saveCategory(definition);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      successHaptic();
       saving.current = false; close();
     } catch (cause) {
       setError(failureMessage(cause, 'categoryManager.form.saveUnverified'));
+      // 25Q4: the definition was sent and stays frozen for the exact retry (the name rules were checked before it froze).
+      warningHaptic();
     } finally { saving.current = false; setBusy(false); }
   }
   /** 24UX6E: the two name rules storage applies (saveCategoryDefinition), checked here first so a clash is an editable
@@ -94,7 +96,11 @@ export function CategoryForm({ original, kind: requestedKind }: { original?: Cat
       validateCategoryDefinition(definition);
       checkStorageRules(definition);
       void apply(definition);
-    } catch (cause) { setError(failureMessage(cause, 'categoryManager.form.checkName')); }
+    } catch (cause) {
+      setError(failureMessage(cause, 'categoryManager.form.checkName'));
+      // 25Q4: refused before anything was sent.
+      errorHaptic();
+    }
   }
   function toggleArchive() {
     if (!before || saving.current || confirming.current) return;
@@ -106,6 +112,7 @@ export function CategoryForm({ original, kind: requestedKind }: { original?: Cat
     try { checkStorageRules(definition); } catch (cause) {
       confirming.current = false;
       setError(failureMessage(cause, 'categoryManager.form.checkName'));
+      errorHaptic();
       return;
     }
     Alert.alert(t(archiving ? 'categoryManager.form.archiveTitle' : 'categoryManager.form.unarchiveTitle'),
