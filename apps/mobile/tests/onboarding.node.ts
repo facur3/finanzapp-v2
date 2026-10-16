@@ -90,6 +90,11 @@ test('25O1: the illustrations\' figures: pesos of their own, dollar-like elsewhe
   for (const currency of ['JPY', 'KRW', 'CLP', 'COP', 'PYG', 'IDR', 'VND', 'HUF', 'ISK'] as const) {
     for (const [name, minor] of Object.entries(sampleFigures(currency))) assert.ok(significant(minor, currency) <= 2, `${currency} ${name}: ${minor} reads as a round figure`);
   }
+  // Every currency of the gate without decimals is scaled: no released region's first opening draws a five-franc coffee.
+  const whole = domain.LEDGER_CURRENCIES.filter(currency => domain.minorUnitExponent(currency) === 0);
+  assert.ok(whole.length >= 16);
+  for (const currency of whole) assert.ok(sampleFigures(currency).coffee >= 100, `${currency}: a coffee of ${sampleFigures(currency).coffee}`);
+  assert.deepEqual(sampleFigures('XOF'), { coffee: 2_700, groceries: 23_000, transport: 1_700, instalment: 110_000, available: 1_900_000, spent: 580_000 });
   for (const currency of domain.LEDGER_CURRENCIES) {
     const figures = sampleFigures(currency);
     for (const [name, minor] of Object.entries(figures)) {

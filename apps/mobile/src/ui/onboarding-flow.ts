@@ -68,8 +68,10 @@ const OWN_FIGURES: Partial<Record<string, readonly number[]>> = { ARS: [2_500, 1
 /** Every other currency, in hundredths of a dollar-like unit: 4.50, 38.90, 2.75, 184, 3 240, 964. */
 const HUNDREDTHS = [450, 3_890, 275, 18_400, 324_000, 96_400];
 /** How many units of these currencies make a dollar-like figure look real (a coffee is about 680 yen). A presentation
- * factor for an illustration, never an exchange rate. */
-const LARGE_UNITS: Partial<Record<string, number>> = { JPY: 150, KRW: 1_500, CLP: 1_000, COP: 4_000, PYG: 7_000, IDR: 15_000, VND: 25_000, HUF: 400, ISK: 150 };
+ * factor for an illustration, never an exchange rate. Every currency of the gate without decimals is here, so none draws a
+ * five-franc coffee. */
+const LARGE_UNITS: Partial<Record<string, number>> = { JPY: 150, KRW: 1_500, CLP: 1_000, COP: 4_000, PYG: 7_000, IDR: 15_000, VND: 25_000, HUF: 400, ISK: 150,
+  BIF: 2_900, DJF: 180, GNF: 8_600, KMF: 450, RWF: 1_400, UGX: 3_700, VUV: 120, XAF: 600, XOF: 600, XPF: 110 };
 
 /** Two significant digits, half up: 41 250 → 41 000, 67 500 → 68 000. */
 const twoSignificant = (value: number) => {
