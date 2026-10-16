@@ -324,7 +324,9 @@ export default function ReportsScreen() {
           <AppText secondary variant="subhead" style={{ flex: 1, minWidth: 0 }}>{t('reports.history.single')}</AppText>
         </Surface>
       </View>}
-      {ready && budgets && scope && (budgets.total || budgets.rows.length > 0) && <View>
+      {/* 25Q1: a budget reads the real ledger in its own currency and needs no rate (docs/currency.md), so it stays when a
+          consolidated total waits for one. */}
+      {report.status === 'ready' && budgets && scope && (budgets.total || budgets.rows.length > 0) && <View>
         <SectionTitle action={t('reports.budgets.manage')} onAction={() => router.push({ pathname: '/budgets', params: { currency: scope.currency, month: monthISO } })}>
           {scope.labelsCurrency ? withCurrencyCode(t('reports.budgets.title'), scope.currency) : t('reports.budgets.title')}</SectionTitle>
         <Surface grouped>

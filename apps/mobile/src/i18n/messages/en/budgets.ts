@@ -26,6 +26,7 @@ export const budgets: Pick<Messages, 'budgets'> = {
       unbudgeted: 'You also spent {amount} in categories without their own limit.',
       unavailableTitle: 'We couldn’t calculate this month',
       unavailableDetail: 'Your budgets and transactions are still saved.',
+      noAccountsInCurrency: 'You don’t have any accounts in {currency} yet, so there are no expenses to compare with this budget.',
     },
     caption: {
       categories: { one: '{count} category', other: '{count} categories' },

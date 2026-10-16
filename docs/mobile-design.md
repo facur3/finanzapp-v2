@@ -218,7 +218,8 @@ que leen son ahora los de Forest. Su restyle por pantalla queda para 24UX6B–6D
   movimientos viven en Movimientos, el análisis en Reportes, los presupuestos en Presupuestos.
 - **Movimientos.** Buscador, filtro Todos / Gastos / Ingresos / Transf., secciones
   "Hoy · 20 sep", "Ayer", día de la semana en los últimos siete días y luego la fecha,
-  con el neto del día cuando hay una sola moneda.
+  con el neto del día cuando hay una sola moneda y nada acota la lista (25Q1: con Gastos, Ingresos o una búsqueda esa
+  cifra sería la suma de una parte, no el neto del día; tampoco en los detalles de una categoría o de un día).
 - **Detalle de movimiento.** Tile, importe con signo, comercio, fecha completa y
   estado; categoría, cuenta o tarjeta, contexto de presupuesto solo si existe uno
   activo para ese mes, moneda; editar y deshacer. Nada inventado: sin referencias
@@ -991,6 +992,46 @@ navegación ni la recuperación de un guardado.
 - **El dock oscuro, revisado y sin cambios.** Sin fotos del iPhone no se agrega borde: un solo color de anillo no
   alcanza en todos los fondos (#4F4D47: 2,33:1 sobre el lienzo, 1,52 sobre filas elevadas, 1,03 sobre el campo zafiro
   oscuro). El filete actual existe solo sin vidrio. Las fotos que hacen falta están en la lista del iPhone.
+
+## Producto 25Q3 — fallas tranquilas y un dock que no ignora un toque (PR #116, mergeada)
+
+- **Una pantalla que no se puede dibujar** muestra, en su lugar, «No pudimos mostrar esta pantalla», «Lo que ya guardaste
+  sigue ahí. Podés volver atrás o abrir otra pestaña.» y «Volver a intentar»; la cabecera, el gesto de volver y el dock
+  siguen. Nunca muestra el error ni toca el almacenamiento. Solo cubre errores de dibujo.
+- **Un enlace desconocido** abre «Pantalla no encontrada» en el idioma de la app, con «Ir a Inicio»; nunca la pantalla
+  negra en inglés de Expo.
+- **El dock** ya no tiene pulsación larga: una pestaña sostenida más de medio segundo se elige al soltar, como en iOS.
+
+## Producto 25Q2 — una copia que se completa o dice por qué (PR #115, mergeada)
+
+- **El archivo** se llama `FinanzApp-backup-<fecha local>-<HHmm>.json` y es una sola línea de JSON (sin cambio de
+  formato: toda versión lo lee). Se mide en bytes antes de escribirlo: si supera 5 MB, lo dice con su frase («No borres
+  la app: tus datos siguen guardados…»), no con la de importar.
+- **Las fallas nativas** (el sistema de archivos, la hoja de compartir, el selector, la lectura) se cuentan con las
+  palabras de la app, nunca con el texto en inglés de la plataforma.
+- **Después de importar**, si el archivo siguiente falla, la pantalla vuelve a elegir copia con su frase (antes se quedaba
+  en «Copia incorporada» sin decir nada).
+- **Borrar la app**: la pantalla de copia empieza con «Si borrás la app, tus registros se borran con ella.» y la fila de
+  Más dice «Antes de borrar la app o cambiar de teléfono».
+
+## Producto 25Q1 — cifras que dicen la verdad (PR #114, mergeada)
+
+Correcciones de lectura, sin cambios de dominio, almacenamiento, esquema (14), backup (v14), navegación ni movimiento.
+
+- **El enlace de categoría del Asistente** abre la cifra que cita: la pantalla compara la categoría por su clave
+  (`categoryKey`), como el reporte, aunque el enlace traiga la forma guardada («Supermercado»).
+- **Presupuestos en Reportes sin cotización.** Un presupuesto lee el libro real en su moneda y no necesita cotización:
+  su bloque queda aunque el total consolidado espere una.
+- **El neto del día** encabeza solo los movimientos completos de un día: no en el detalle de una categoría o de un día
+  (son solo gastos) ni en Movimientos con Gastos, Ingresos o una búsqueda (sería la suma de una parte).
+- **Una tarjeta archivada con saldo a favor** lo dice («Saldo a favor · $ …»), nunca «Sin saldo pendiente».
+- **Un presupuesto en una moneda sin cuentas** (permitido, decisión 7.6.3) se puede abrir, editar y borrar: Presupuestos
+  ofrece su moneda, con una nota tranquila: «Todavía no tenés cuentas en euros, así que no hay gastos para comparar con
+  este presupuesto.»
+- **Una tarjeta con solo cuotas por venir** dice «Todavía no hay movimientos. Tus cuotas se registran cuando cierra cada
+  resumen.»
+- **Eliminar una cuenta** nombra el saldo registrado que deja de contar en Disponible y termina con «Una cuenta
+  eliminada no se puede volver a activar.»; ya no dice «No borra nada», que sonaba reversible.
 
 ## Producto 25A-06 — activación del staging de la IA, fase A (sin cambios visuales)
 
@@ -3218,6 +3259,20 @@ color propio.
   deuda fija, los objetivos de 44 pt con el mismo dibujo, VoiceOver y Reduce Motion, el háptico de un guardado fallido y
   el teclado que baja al completar el monto; las fotos del dock oscuro en cada fondo (docs/mobile-device-checklist.md,
   «Same PR — movement composer and accessibility polish» y «The dark dock»).
+
+- Producto 25Q3 (PR #116, mergeada; el build de desarrollo posterior a #113): una pestaña sostenida del dock, un enlace
+  desconocido y una falla de prueba local en una pestaña y en una pantalla apilada (docs/mobile-device-checklist.md,
+  «Producto 25Q3»).
+
+- Producto 25Q2 (PR #115, mergeada; el build de desarrollo posterior a #113): el nombre y el contenido de una línea del archivo
+  por AirDrop, Mail y Archivos, la hoja cancelada, una copia mala después de importar y las frases nuevas
+  (docs/mobile-device-checklist.md, «Producto 25Q2»).
+
+- Producto 25Q1 (PR #114, mergeada; el build de desarrollo posterior a #113): el enlace de categoría del Asistente, los
+  presupuestos de Reportes sin cotización, el neto del día con filtros, la tarjeta archivada a favor, el presupuesto en
+  una moneda sin cuentas, la tarjeta con solo cuotas y el texto de eliminar una cuenta (docs/mobile-device-checklist.md,
+  «Producto 25Q1»).
+
 - Producto 25A-06 B7, decisión A (en su rama; sin build de EAS): en la vista de prueba, la nota debajo de la respuesta
   para el comercio demasiado largo, en español y en inglés; el resto con el Asistente conectado
   (docs/mobile-device-checklist.md, «Producto 25A-04», «Over-long names»).

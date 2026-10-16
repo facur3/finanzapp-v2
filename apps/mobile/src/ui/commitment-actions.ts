@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { Alert } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { assertCardDeletable, assertOpenAccount, cardCreditMinor, cardDebtMinor, cardHasPendingInstallments, closePersonalDebt, debtDeletion, debtOutstandingMinor, deleteRecurringRule, liabilityActivity, pauseRecurringRule, recurringHistory,
+import { accountBalanceMinor, assertCardDeletable, assertOpenAccount, cardCreditMinor, cardDebtMinor, cardHasPendingInstallments, closePersonalDebt, debtDeletion, debtOutstandingMinor, deleteRecurringRule, liabilityActivity, pauseRecurringRule, recurringHistory,
   reopenPersonalDebt, resumeRecurringRule, todayKey, type Account, type CreditCardProfile, type PersonalDebtProfile, type RecurringRule } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { useI18n } from '../i18n/provider';
@@ -162,7 +162,7 @@ export function useDebtManagement() {
  * keeps the account as it was and says so. A card's or a debt's account is never offered here. */
 export function useAccountManagement() {
   const { removeAccount, snapshot, archive } = useLedger();
-  const { t } = useI18n();
+  const { t, moneyText } = useI18n();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const writing = useRef(false);
@@ -192,9 +192,15 @@ export function useAccountManagement() {
   }
   function remove(account: Account, done?: () => void) {
     const { movements, transfers, recurring } = consequences(account);
+    // 25Q1: the recorded balance that stops counting in Disponible is named (either sign: nothing blocks a deletion), and
+    // the last sentence says it is final: no screen reactivates a deleted account.
+    let balance = 0;
+    try { balance = snapshot ? accountBalanceMinor(account, snapshot.entries, snapshot.transfers) : 0; } catch { balance = 0; }
     const detail = (movements || transfers
       ? t('accounts.manage.deleteDetail', { movements: t('accounts.manage.movements', { count: movements }), transfers: t('accounts.manage.transfers', { count: transfers }) })
-      : t('accounts.manage.deleteDetailEmpty')) + (recurring ? t('accounts.manage.deleteRecurring', { count: recurring }) : '');
+      : t('accounts.manage.deleteDetailEmpty'))
+      + (balance ? t('accounts.manage.deleteBalance', { amount: moneyText(balance, account.currency) }) : '')
+      + (recurring ? t('accounts.manage.deleteRecurring', { count: recurring }) : '') + t('accounts.manage.deleteFinal');
     Alert.alert(t('accounts.manage.deleteTitle', { name: account.name }), detail, [
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('accounts.manage.deleteConfirm'), style: 'destructive', onPress: () => { void commit(account, done); } },

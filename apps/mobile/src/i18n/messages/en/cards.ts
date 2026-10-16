@@ -40,6 +40,7 @@ export const cards: Pick<Messages, 'cards'> = {
       recent: 'Recent',
       movements: 'Transactions',
       noActivity: 'You haven’t recorded any purchases or payments on this card yet.',
+      noActivityPlans: 'No transactions yet. Your installments are recorded as each statement closes.',
       refunds: ' · refunds {amount}',
       editCard: 'Edit card',
       notFoundTitle: 'We couldn’t find this card',

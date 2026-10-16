@@ -195,6 +195,85 @@ on the same new development build as above (no native change of its own). Light 
   the material); the dock over the canvas, surface rows, inset rows, elevated rows, Inicio's field (a short Inicio at the
   top, then scrolled) and the open capture hub; the «+» beside the pill.
 
+## Producto 25Q3 — calm failures and a dock that never ignores a tap (PR #116, merged)
+
+JavaScript only; on the development build cut after PR #113, Metro from `master` or a branch that contains PR #116.
+
+- [ ] **A held dock tab.** Press and hold Movimientos for a full second, then lift: it opens (before: nothing). The same
+  with every tab; a quick tap as before. With Larger Accessibility Sizes, holding still shows iOS's Large Content Viewer.
+- [ ] **An unknown link.** From Notes tap `finanzapp-dev://nope` (or `xcrun simctl openurl booted finanzapp-dev://nope`),
+  in Spanish and in English. **Expect:** no black screen, no «Unmatched Route» or Sitemap; the header «Pantalla no
+  encontrada», the compass card «No encontramos esa pantalla», «El enlace no lleva a ninguna pantalla de FinanzApp.» and
+  «Ir a Inicio», which opens Inicio with the dock.
+- [ ] **A screen that fails** (a local probe, never committed): add `throw new Error('probe 1234,50 Visa')` at the top of
+  the render of `app/(tabs)/reports.tsx`, start Metro with `--no-dev --minify` (a development bundle draws React
+  Native's red box over any error), open Reportes, then Inicio, Reportes again and «Volver a intentar». **Expect:** the
+  alert card «No pudimos mostrar esta pantalla», «Lo que ya guardaste sigue ahí…» and «Volver a intentar», clear of the
+  status bar and the dock; the dock and the other tabs work; the probe text never appears; retry fails again the same
+  way (no crash, no loop). Then the same probe in `app/categories.tsx` (Más → Categorías): the header and the back swipe
+  stay. With VoiceOver: the title is read as a heading, then the text, then «Volver a intentar, botón». Remove the probe.
+
+
+## Producto 25Q2 — a backup that completes or says why (PR #115, merged)
+
+JavaScript only; Metro from this branch on the development build cut after PR #113. The end of Más reads «FinanzApp
+0.1.0 (25Q2)». Keep a private backup first; use small real data.
+
+- [ ] **Más.** The Copia de seguridad row reads «Antes de borrar la app o cambiar de teléfono»; VoiceOver «Copia de
+  seguridad, Antes de borrar la app o cambiar de teléfono, botón». The Backup screen starts «Si borrás la app, tus
+  registros se borran con ella. Guardá tus cuentas, …». English: «If you delete the app, your records are deleted with it.».
+- [ ] **Compartir copia.** The sheet offers a file named `FinanzApp-backup-<today as YYYY-MM-DD>-<HHmm of your clock>.json`
+  (no «piloto», no long number); the button is busy until the sheet appears and normal again after it closes.
+- [ ] **Where it lands.** Send it by AirDrop to a computer, by Mail and with Save to Files (once with Low Power Mode on).
+  **Expect:** each received file opens as ONE line of JSON starting `{"app":"FinanzApp","schema":"finanzapp.native-pilot.v`
+  and its size equals what the sheet or Files showed. If a received file is empty or cut, stop and report it (the
+  temporary file is deleted when the sheet closes). Cancelling the sheet shows nothing red and claims no success.
+- [ ] **Round trip.** Importar copia → the file just exported: «Esta copia ya está incorporada. No hay nada nuevo para
+  agregar.» The compact file imports as the old one did.
+- [ ] **A failed pick after an import.** On «Copia incorporada» tap «Elegir otra copia» and pick a text file that only says
+  `hola`: the screen returns to «Recuperá tus registros» with «El archivo no es una copia JSON válida.», spoken once by
+  VoiceOver. Cancelling the picker keeps «Copia incorporada».
+- [ ] **Not checkable by hand:** a ledger near the cap (about 18 500 movements) and «La copia supera el límite de 5 MB…»;
+  a native failure of the picker or the sheet. Covered by the Node tests.
+
+
+## Producto 25Q1 — money that reads right (PR #114, merged)
+
+Read-side corrections only; JavaScript only. Metro from this branch on the development build cut after PR #113. The end
+of Más reads «FinanzApp 0.1.0 (25Q1)». Light and dark; Spanish unless a step says English.
+
+- [ ] **The Assistant's category link** (a development build with `EXPO_PUBLIC_ASSISTANT_FIXTURES=1`). Record an expense
+  in «Supermercado» dated between 1 and 21 September 2026 (the fixture's period). Asistente → «¿Cuánto gasté en comida
+  este mes?» → «Ver categoría». **Expect:** «Supermercado» with its tile and period, a total equal to your Supermercado
+  expenses of that period (never «$ 0,00») and their rows. The fixture's «$ 121.200,00» is scripted text, not your
+  ledger.
+- [ ] **Budgets without a rate.** Accounts in ARS and USD, Reportes in consolidated mode, a month where a USD expense has no
+  stored rate (offline on a month's first launch), and an ARS budget for that month. **Expect:** the per-currency
+  subtotals as before (no donut, no total) and, below them, «Presupuestos · ARS» with its row and bar. When the rate
+  arrives the donut and total appear above and the budget block neither moves nor repeats.
+- [ ] **«Neto del día».** Movimientos with Todos and no search: day headings show the date and the signed net, and
+  VoiceOver adds «Neto del día …». Choose Gastos, or type in the search: the headings show only the date. Reportes → a
+  category, and Reportes → a day: headings show only the date; the big total above is unchanged.
+- [ ] **An archived card in credit.** Tarjetas → Archivadas with a card archived while in credit: «Saldo a favor · $ …»
+  (VoiceOver «…, Saldo a favor · … pesos»); one owing keeps «Saldo pendiente $ …»; one at zero «Sin saldo pendiente».
+- [ ] **A budget in a currency with no account.** Presupuestos → + → General → EUR (no euro account) → an amount → Crear.
+  **Expect:** a currency switch offers ARS and EUR; EUR shows the general budget with «Editar» and, under the month,
+  «Todavía no tenés cuentas en euros, así que no hay gastos para comparar con este presupuesto.» (only in a month that
+  holds a EUR budget). A second general EUR budget for the month is still refused, and the one it names can now be
+  opened and deleted.
+- [ ] **A category link with nothing in the period.** From the Assistant fixtures, or after undoing the only Supermercado
+  expense of the period: the detail is still titled «Supermercado» with its tile and «$ 0,00» (never «Gastos
+  registrados»).
+- [ ] **A card with only cuotas to come.** Save a purchase «En cuotas» on a card before its first closing; Tarjetas → that
+  card, then its detail. **Expect:** «Todavía no hay movimientos. Tus cuotas se registran cuando cierra cada resumen.»
+  (before: «Todavía no registraste compras ni pagos en esta tarjeta.»), above the detail's «Cuotas» list.
+- [ ] **Deleting an account.** Más → Cuentas → swipe an account holding money → Eliminar. **Expect:** «Deja de aparecer
+  en tus cuentas, en Disponible y en los formularios. Sus movimientos y transferencias siguen en Movimientos con su nombre
+  y su moneda: N movimientos y M transferencias. Su saldo registrado, $ …, deja de contar en Disponible.» (and the
+  recurring sentence when a rule is active), ending «Una cuenta eliminada no se puede volver a activar.»; Cancelar
+  changes nothing. An account at zero names no balance.
+- [ ] **Large text.** The new sentences at AX3 and AX5 wrap in full; nothing is clipped. No animation or haptic changed.
+
 ## Fix — «Pagar tarjeta» readable in dark (PR #107, merged)
 
 Colour only: a filled semantic button's label and glyph take `onSemantic` (white in light, ink in dark). Nothing else moves.

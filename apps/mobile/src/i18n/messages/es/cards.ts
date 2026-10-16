@@ -53,6 +53,8 @@ export const cards = {
       recent: 'Recientes',
       movements: 'Movimientos',
       noActivity: 'Todavía no registraste compras ni pagos en esta tarjeta.',
+      /** 25Q1: the card's only records are instalment plans still to come: nothing is recorded until a statement closes. */
+      noActivityPlans: 'Todavía no hay movimientos. Tus cuotas se registran cuando cierra cada resumen.',
       /** Appended to the statement caption: " · devoluciones $ 1.000,00". */
       refunds: ' · devoluciones {amount}',
       editCard: 'Editar tarjeta',
