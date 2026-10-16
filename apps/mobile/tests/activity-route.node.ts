@@ -23,7 +23,7 @@ const snapshot: domain.LedgerSnapshot = {
   transfers: [],
 };
 
-function harness() {
+function harness(data: domain.LedgerSnapshot = snapshot) {
   const source = readFileSync(new URL('../app/(tabs)/activity.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   // The automatic runtime passes an element's key as the third argument.
@@ -35,6 +35,7 @@ function harness() {
   const cleanups: (void | (() => void))[] = [];
   let cursor = 0, effectCursor = 0;
   const announced: string[] = [];
+  const pushed: unknown[] = [];
   // A fake clock: timers run when the test advances time.
   let now = 0;
   const timers = new Map<number, { at: number; fn: () => void }>();
@@ -62,9 +63,9 @@ function harness() {
     },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': { View: 'View', AccessibilityInfo: { announceForAccessibility: (text: string) => announced.push(text) } },
-    'expo-router': { router: { push: () => {} }, useLocalSearchParams: () => params,
+    'expo-router': { router: { push: (to: unknown) => { pushed.push(to); } }, useLocalSearchParams: () => params,
       useFocusEffect: (effect: () => void | (() => void)) => { if (!focusEffect) { focusEffect = effect; blur = effect(); } } },
-    '../../src/storage/LedgerProvider': { useLedger: () => ({ snapshot }) },
+    '../../src/storage/LedgerProvider': { useLedger: () => ({ snapshot: data }) },
     '../../src/ui/components': { ActionButton: 'ActionButton', AppText: 'AppText', Choices: 'Choices', EmptyState: 'EmptyState', SearchField: 'SearchField' },
     '../../src/ui/entry-list': { EntryList: 'EntryList' },
     '../../src/ui/presentation': presentation,
@@ -77,7 +78,7 @@ function harness() {
     return modules[name];
   } });
   const render = () => { cursor = 0; effectCursor = 0; return module.exports.default!(); };
-  return { render, announced, clock, params, blurNow: () => { if (typeof blur === 'function') blur(); }, focusAgain: () => { blur = focusEffect?.(); } };
+  return { render, announced, pushed, clock, params, blurNow: () => { if (typeof blur === 'function') blur(); }, focusAgain: () => { blur = focusEffect?.(); } };
 }
 const flat = (value: any): any[] => !value || typeof value !== 'object' ? [] : Array.isArray(value) ? value.flatMap(flat) : [value, ...flat(value.props?.children)];
 const header = (root: Node) => flat(root.props.header);
@@ -178,4 +179,18 @@ test('25Q4: a link into Movimientos (a new `reset`) shows the whole list from th
   view.render();
   root = view.render();
   assert.deepEqual([search(root).props.value, root.key], ['', '1700000000001']);
+});
+
+test('25O1: an empty Movimientos leaves the filled action to the dock\'s «+» once an account exists; without one, adding an account stays the filled way forward', () => {
+  const empty = (accounts: domain.Account[]) => { const view = harness({ accounts, entries: [], transfers: [] }); return { view, state: view.render().props.empty }; };
+  const withAccount = empty(snapshot.accounts);
+  assert.equal(withAccount.state.type, 'EmptyState');
+  const record = withAccount.state.props.action;
+  assert.deepEqual([record.props.label, record.props.secondary], ['Registrar movimiento', true], 'secondary: the dock\'s «+» is the one filled action');
+  record.props.onPress();
+  const none = empty([]);
+  const add = none.state.props.action;
+  assert.deepEqual([add.props.label, add.props.secondary], ['Agregar cuenta', false], 'the only way forward stays filled');
+  add.props.onPress();
+  assert.deepEqual([...withAccount.view.pushed, ...none.view.pushed], ['/new-entry', '/new-account']);
 });
