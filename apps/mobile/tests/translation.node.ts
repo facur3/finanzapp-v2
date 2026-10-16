@@ -267,7 +267,7 @@ test('English fits where Spanish fits: segment, tab, quick-action, button and he
       'quickActions.expense', 'quickActions.income', 'quickActions.transfer'], 11],
     [['common.addAccount', 'common.retrySave', 'common.retryChange', 'common.saveChanges', 'entryForm.saveExpense', 'entryForm.saveIncome',
       'transferForm.recordPayment', 'transferForm.recordCollection', 'transferForm.recordTransfer', 'entryDetail.edit', 'entryDetail.restoreAction',
-      'entryDetail.voidAction', 'transferDetail.edit', 'transferDetail.restoreAction', 'transferDetail.voidAction', 'activity.clearFilters', 'home.start',
+      'entryDetail.voidAction', 'transferDetail.edit', 'transferDetail.restoreAction', 'transferDetail.voidAction', 'activity.clearFilters',
       'transferForm.payTotal', 'transferForm.settleTotal', 'transferForm.collectTotal', 'transferForm.useAll', 'home.capture.label', 'home.capture.title',
       'home.capture.close', 'home.capture.assistant', 'home.capture.expense', 'home.capture.income', 'home.capture.transfer'], 24],
     [Object.keys(es.nav.titles).map(key => 'nav.titles.' + key).concat(['entryForm.editTitle', 'entryForm.cardPurchaseTitle', 'entryForm.expenseTitle',

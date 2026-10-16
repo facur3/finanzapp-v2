@@ -3,19 +3,19 @@ import { ScrollView, View, useWindowDimensions, type NativeScrollEvent, type Nat
 import { router, useFocusEffect } from 'expo-router';
 import { setStatusBarStyle } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { currentMonthISO, hiddenLiabilityAccountIds, spendingWindow } from '@finanzapp/domain';
+import { currentMonthISO, hiddenLiabilityAccountIds, isLiveAccount, spendingWindow } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
-import { ActionButton, AppText, Choices, EmptyState, EntryRow, Money, SectionTitle, Surface, TransferRow } from '../../src/ui/components';
+import { AppText, Choices, EmptyState, EntryRow, Money, SectionTitle, Surface, TransferRow } from '../../src/ui/components';
 import { DisplayCurrencyButton } from '../../src/ui/currency-switch';
 import { useDisplayCurrency } from '../../src/ui/display-currency-provider';
 import { useFinanceView } from '../../src/fx/rates-provider';
 import { availableFigure, inView, spendingFigure } from '../../src/fx/finance-view';
 import { figureInfo, shortfallDetail } from '../../src/fx/fx-copy';
 import { useI18n } from '../../src/i18n/provider';
-import { BudgetAttentionRow, CurrencyParts, FieldButton, MetricHelp, UpcomingRecurringRow } from '../../src/ui/home-modules';
+import { BudgetAttentionRow, CurrencyParts, FieldButton, FirstSteps, MetricHelp, UpcomingRecurringRow } from '../../src/ui/home-modules';
 import { homeBudgets, homeCommitments, homeRecent, recentRowLimit } from '../../src/ui/home-focus';
 import { Reflow, ValueTransition } from '../../src/ui/motion';
-import { historyCurrencies, homeNamesCategory, sharedGlyphs, visibleNamesAccount } from '../../src/ui/presentation';
+import { availableCurrencies, historyCurrencies, homeNamesCategory, sharedGlyphs, visibleNamesAccount } from '../../src/ui/presentation';
 import { useCategoryLookOf } from '../../src/ui/category-hues';
 import { space, useCurrentDay, usePalette } from '../../src/ui/theme';
 import { useDockInset } from '../../src/ui/dock-clearance';
@@ -48,8 +48,10 @@ const FIELD_RADIUS = 32;
  * + 30 days, both ends inclusive (`COMMITMENT_WINDOW_DAYS`; two at most, the section absent without one), then the month's
  * latest activity, expenses, incomes and transfers (24UX6C2), each record once (four under commitments, six without;
  * «Ver todos» selects Movimientos). With neither, one quiet
- * line points at «+» and the Assistant. Nothing is drawn to fill space: no rankings, charts, permanent budget card, insight
- * lines, Registrar button or Assistant banner.
+ * line points at «+» and the Assistant. 25O1: while nothing is recorded yet (a new person), Primeros pasos stands where
+ * the empty states stood: create an account, log a first expense, add a card (optional), each done step marked, no
+ * filled button. Nothing is drawn to fill space: no rankings, charts, permanent budget card, insight lines, Registrar
+ * button or Assistant banner.
  *
  * The figures are the repository's, unchanged: Gastado is `spendingFigure` over the calendar month to today (expenses
  * only; transfers and card payments are never spending; an instalment counts in the month its statement closes),
@@ -142,6 +144,12 @@ export default function HomeScreen() {
     : !spending ? <MetricHelp title={t('home.available')} detail={t('home.availableHelp')} color={p.heroSecondary} /> : null;
   const quiet = hero.status === 'ready' && hero.minor === 0;
   const scope = currencies.length > 1;
+  // 25O1: nothing recorded yet (no movement, no transfer, and no instalment plan, whose purchase records nothing until its
+  // statement closes): Primeros pasos stands where the empty states stood. A returning person with a quiet month keeps the
+  // quiet line. A step is done by the first live account that holds money (never a card's or a debt's own) and the first card.
+  const fresh = !snapshot.entries.length && !snapshot.transfers?.length && !archive?.installmentPlans?.length;
+  const firstAccount = snapshot.accounts.find(account => isLiveAccount(account) && !hiddenAccounts.has(account.id));
+  const firstCard = archive?.cards?.find(card => !card.deleted);
 
   return <ScrollView style={{ flex: 1, backgroundColor: p.background }} contentInsetAdjustmentBehavior="never" onScroll={onScroll} scrollEventThrottle={32}
     contentContainerStyle={{ paddingBottom: 48 + dock.extraPadding, flexGrow: 1 }} scrollIndicatorInsets={dock.indicator}>
@@ -183,36 +191,36 @@ export default function HomeScreen() {
     </View>
 
     <View style={{ paddingHorizontal: space.xl, paddingTop: 28, gap: 28 }}>
-      {!snapshot.accounts.length
-        ? <EmptyState title={t('home.emptyTitle')} detail={t('home.emptyDetail')} icon="receipt-outline"
-          action={<ActionButton label={t('home.start')} icon="add-outline" onPress={() => router.push('/new-account')} />} />
-        : <>
-          {/* Actionable context first: the budgets that need attention (two at most, one grouped surface), then what is due soon. */}
-          {budgets.length > 0 && <Reflow fade>
-            <Surface grouped>{budgets.map((budget, index) => <BudgetAttentionRow key={budget.currency + '|' + budget.progress.budget.id} attention={budget}
-              currency={budget.currency} labelsCurrency={budget.labelsCurrency} last={index === budgets.length - 1}
-              onPress={() => router.push({ pathname: '/budgets', params: { currency: budget.currency, month } })} />)}</Surface>
-          </Reflow>}
-          {upcoming.length > 0 && <Reflow fade>
-            <SectionTitle quiet action={t('common.seeAll')} onAction={() => router.push('/recurring')}>{t('home.upcoming')}</SectionTitle>
-            <Surface grouped style={{ paddingHorizontal: space.l }}>{upcoming.map((rule, index) => <UpcomingRecurringRow key={rule.id} rule={rule} showAccount={upcomingAccount}
-              showCategory={namesCategory(rule)} account={snapshot.accounts.find(account => account.id === rule.accountId)!} day={day} last={index === upcoming.length - 1} />)}</Surface>
-          </Reflow>}
-          {recent.length > 0 && <Reflow fade>
-            {/* 25Q4: «Ver todos» asks for the whole list: Movimientos clears its search, filter and scroll on a new `reset`;
-                the dock keeps them. */}
-            <SectionTitle quiet action={t('common.seeAll')} onAction={() => router.navigate({ pathname: '/activity', params: { reset: String(Date.now()) } })}>{t('home.recent')}</SectionTitle>
-            {/* A transfer is its own row (origin → destination, its own tone, «Transferencia» for VoiceOver) and opens its
-                detail; it is never spending or income. */}
-            <Surface grouped>{recent.map((item, index) => item.type === 'entry'
-              ? <EntryRow key={item.key} entry={item.value} showAccount={recentAccount}
-                account={snapshot.accounts.find(account => account.id === item.value.accountId)!} last={index === recent.length - 1} />
-              : <TransferRow key={item.key} transfer={item.value} accounts={snapshot.accounts} last={index === recent.length - 1} />)}</Surface>
-          </Reflow>}
-          {/* One currency of several shown alone: the month may have movements in another, so the line names the currency (24UX2). */}
-          {!upcoming.length && !recent.length && <EmptyState title={mode === 'single' && scope ? t('home.quietTitleIn', { currency }) : t('home.quietTitle')}
-            detail={t('home.quietDetail')} icon="receipt-outline" />}
-        </>}
+      {/* Actionable context first: the budgets that need attention (two at most, one grouped surface), then what is due soon. */}
+      {budgets.length > 0 && <Reflow fade>
+        <Surface grouped>{budgets.map((budget, index) => <BudgetAttentionRow key={budget.currency + '|' + budget.progress.budget.id} attention={budget}
+          currency={budget.currency} labelsCurrency={budget.labelsCurrency} last={index === budgets.length - 1}
+          onPress={() => router.push({ pathname: '/budgets', params: { currency: budget.currency, month } })} />)}</Surface>
+      </Reflow>}
+      {upcoming.length > 0 && <Reflow fade>
+        <SectionTitle quiet action={t('common.seeAll')} onAction={() => router.push('/recurring')}>{t('home.upcoming')}</SectionTitle>
+        <Surface grouped style={{ paddingHorizontal: space.l }}>{upcoming.map((rule, index) => <UpcomingRecurringRow key={rule.id} rule={rule} showAccount={upcomingAccount}
+          showCategory={namesCategory(rule)} account={snapshot.accounts.find(account => account.id === rule.accountId)!} day={day} last={index === upcoming.length - 1} />)}</Surface>
+      </Reflow>}
+      {recent.length > 0 && <Reflow fade>
+        {/* 25Q4: «Ver todos» asks for the whole list: Movimientos clears its search, filter and scroll on a new `reset`;
+            the dock keeps them. */}
+        <SectionTitle quiet action={t('common.seeAll')} onAction={() => router.navigate({ pathname: '/activity', params: { reset: String(Date.now()) } })}>{t('home.recent')}</SectionTitle>
+        {/* A transfer is its own row (origin → destination, its own tone, «Transferencia» for VoiceOver) and opens its
+            detail; it is never spending or income. */}
+        <Surface grouped>{recent.map((item, index) => item.type === 'entry'
+          ? <EntryRow key={item.key} entry={item.value} showAccount={recentAccount}
+            account={snapshot.accounts.find(account => account.id === item.value.accountId)!} last={index === recent.length - 1} />
+          : <TransferRow key={item.key} transfer={item.value} accounts={snapshot.accounts} last={index === recent.length - 1} />)}</Surface>
+      </Reflow>}
+      {/* 25O1: the first steps leave with a fade once something is recorded. The expense form opens in the currency shown,
+          when an account holds it (the dock's «+» rule). */}
+      {fresh ? <Reflow fade><FirstSteps account={firstAccount?.name ?? null}
+        card={firstCard ? snapshot.accounts.find(account => account.id === firstCard.accountId)?.name ?? null : null}
+        currency={availableCurrencies(snapshot.accounts).includes(currency) ? currency : undefined} /></Reflow>
+        // One currency of several shown alone: the month may have movements in another, so the line names the currency (24UX2).
+        : !upcoming.length && !recent.length && <EmptyState title={mode === 'single' && scope ? t('home.quietTitleIn', { currency }) : t('home.quietTitle')}
+          detail={t('home.quietDetail')} icon="receipt-outline" />}
     </View>
   </ScrollView>;
 }

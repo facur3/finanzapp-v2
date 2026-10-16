@@ -3,9 +3,10 @@ export const cards = {
   cards: {
     list: {
       add: 'Agregar tarjeta',
-      emptyTitle: 'Tus tarjetas, como en la billetera',
-      /** 24T2: a purchase without instalments counts once; in instalments, each instalment counts when its statement closes. */
-      emptyDetail: 'Una compra sin cuotas cuenta como gasto una sola vez; en cuotas, cada cuota cuenta cuando cierra su resumen. Cuando pagás la tarjeta, el dinero sale de tu cuenta y baja el saldo pendiente, sin volver a contar el consumo.',
+      /** 25O1: what a card here gives, in one line; how a purchase, its instalments and a payment count is said where they are
+       * recorded (entryForm.cardNote, entryForm.plan.note, transferForm.explainCard). «Saldo pendiente», never «deuda». */
+      emptyTitle: 'Tus tarjetas de crédito',
+      emptyDetail: 'Agregá una para ver su saldo pendiente, cierres y cuotas.',
       /** VoiceOver hint of the card in front of the deck (and of a row that opens a card). */
       openHint: 'Abre el detalle de la tarjeta',
       /** VoiceOver hint of a card stacked in the deck: tapping it brings it to the front. */
@@ -13,7 +14,7 @@ export const cards = {
       chooseCaption: 'Tocá una tarjeta para ver su saldo y sus movimientos.',
       /** Only archived cards: shown in place of the deck, above the Archivadas section. */
       noActiveTitle: 'Ninguna tarjeta activa',
-      noActiveDetail: 'Tus tarjetas archivadas están abajo. Agregá una tarjeta para registrar compras nuevas.',
+      noActiveDetail: 'Agregá una tarjeta para registrar compras nuevas.',
     },
     panel: {
       /** The card's balance due (purchases minus payments). Always «saldo pendiente», never «deuda»: that word is the Deudas y cobros section. */

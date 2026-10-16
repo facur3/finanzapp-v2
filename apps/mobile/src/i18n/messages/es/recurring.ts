@@ -17,7 +17,8 @@ export const recurring = {
       add: 'Agregar recurrente',
       emptyTitle: 'Nada recurrente todavía',
       emptyDetailAccount: 'Creá un gasto o ingreso recurrente para esta cuenta.',
-      emptyDetail: 'Alquiler, suscripciones, sueldo o cualquier movimiento que se repita. FinanzApp lo anota en tus movimientos cuando vence, una sola vez. No paga ni cobra nada.',
+      /** 25O1: one line; how a rule records (and that it never pays or collects) is the form's note. */
+      emptyDetail: 'Alquiler, suscripciones, sueldo: lo que se repite.',
       create: 'Crear recurrente',
       next30: 'Próximos 30 días',
       /** 24UX6E: the 30-day projection of expenses (it was «Pagos»: FinanzApp never pays anything). */
@@ -95,7 +96,10 @@ export const recurring = {
       merchantIncomePlaceholder: 'Ej. Sueldo',
       frequency: 'Frecuencia',
       nextDate: 'Próxima fecha',
-      todayNote: 'Si la próxima fecha es hoy, FinanzApp anota ese movimiento al guardar. Después lo anota en cada vencimiento, al abrir la app, sin duplicarlo.',
+      /** 25O1: under the date, one line with the whole story behind its information button. */
+      note: 'Se anota en cada vencimiento; no paga ni cobra nada.',
+      noteHelpTitle: 'Cómo se anota',
+      noteHelp: 'Si la próxima fecha es hoy, el movimiento se anota al guardar; después, cada vencimiento al abrir la app, una sola vez. Un recurrente solo anota: no paga ni cobra nada.',
       retryNote: 'El envío quedó congelado para que Reintentar no cree otra regla.',
       create: 'Crear recurrente',
       pastDate: 'La próxima fecha debe ser hoy o una fecha futura.',

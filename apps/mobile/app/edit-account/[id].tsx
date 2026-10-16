@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Alert, Keyboard } from 'react-native';
+import { Alert, Keyboard, View } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import { accountBalanceMinor, accountLook, isLiveAccount, makeAccountAppearance, makeAccountChange, minorFromEditedDraft, validateAccountAppearance,
@@ -8,7 +8,7 @@ import { useLedger } from '../../src/storage/LedgerProvider';
 import { ACCOUNT_ICON_CHOICES, COLOR_CHOICES } from '../../src/ui/appearance';
 import { IconColorPicker } from '../../src/ui/appearance-picker';
 import { draftFromMinor } from '../../src/ui/money-input';
-import { ActionButton, AmountField, AppText, EmptyState, ErrorMessage, Field, FieldNote, IconButton, Screen } from '../../src/ui/components';
+import { ActionButton, AmountField, AppText, EmptyState, ErrorMessage, Field, FieldNote, IconButton, Screen, SectionTitle } from '../../src/ui/components';
 import { CurrencyField } from '../../src/ui/form-controls';
 import { useAccountManagement } from '../../src/ui/commitment-actions';
 import { errorHaptic, successHaptic, warningHaptic } from '../../src/ui/motion';
@@ -38,7 +38,8 @@ type Submission = { change: AccountChange | null; appearance: AccountAppearance 
 
 /** Display name, icon and colour change how the account is shown; only the
  * balance correction touches a financial field, and it still asks first.
- * Everything is saved in one commit. Currency stays immutable. */
+ * Everything is saved in one commit. Currency stays immutable. 25O1: Nueva cuenta's order: the name, the money (the
+ * recorded balance, the currency), then «Apariencia»; Guardar and, apart, Eliminar. */
 function AccountEditor({ account, snapshot, current }: { account: Account; snapshot: LedgerSnapshot; current?: AccountAppearance }) {
   const { updateAccount, saveAppearance, archive } = useLedger();
   const { t, formatMoneyAmount, failureMessage } = useI18n();
@@ -106,13 +107,16 @@ function AccountEditor({ account, snapshot, current }: { account: Account; snaps
     <Stack.Screen options={{ title: t('nav.titles.editAccount'), gestureEnabled: !busy,
       headerLeft: () => <IconButton name="close" label={t('common.close')} onPress={close} disabled={busy} /> }} />
     <Field label={t('accounts.form.name')} value={name} onChangeText={setName} maxLength={80} editable={!locked} />
-    <IconColorPicker icons={ACCOUNT_ICON_CHOICES} colors={COLOR_CHOICES} icon={icon} color={color}
-      onIconChange={setIcon} onColorChange={setColor} disabled={locked} previewLabel={name} />
     <AmountField label={t('accounts.edit.recordedBalance')} currency={account.currency} value={balance} onChangeText={setBalance} stored={stored}
       keyboardType="numbers-and-punctuation" inputMode={undefined} editable={!locked} />
     <FieldNote help={{ title: t('accounts.edit.recordedBalance'), detail: t('accounts.edit.balanceHelp') }}>{t('accounts.edit.balanceNote')}</FieldNote>
     <CurrencyField value={account.currency} />
     <FieldNote help={{ title: t('selection.currency'), detail: t('accounts.edit.currencyHelp') }}>{t('accounts.edit.currencyNote')}</FieldNote>
+    <View>
+      <SectionTitle>{t('accounts.form.appearance')}</SectionTitle>
+      <IconColorPicker icons={ACCOUNT_ICON_CHOICES} colors={COLOR_CHOICES} icon={icon} color={color}
+        onIconChange={setIcon} onColorChange={setColor} disabled={locked} previewLabel={name} />
+    </View>
     <ErrorMessage message={error} />
     {pending && error && <AppText secondary style={{ fontSize: 13 }}>{t('accounts.edit.retryNote')}</AppText>}
     <ActionButton label={pending && error ? t('common.retrySave') : t('common.saveChanges')} onPress={save} busy={busy} disabled={!name.trim() || !balance.trim()} />

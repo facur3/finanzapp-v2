@@ -75,8 +75,10 @@ export default function ActivityScreen() {
     empty={hasRecords ? <EmptyState title={t('activity.noMatchesTitle')} icon="search-outline"
       detail={t('activity.noMatchesDetail')}
       action={<ActionButton label={t('activity.clearFilters')} secondary onPress={() => { setQuery(''); setFilter('all'); }} />} />
+      // 25O1: with an account the dock's «+» is the filled action, so this one is secondary; without one, adding an account
+      // is the only way forward and it stays filled.
       : <EmptyState title={t('activity.emptyTitle')} icon="receipt-outline"
         detail={t('activity.emptyDetail')}
-        action={<ActionButton label={snapshot.accounts.length ? t('nav.recordMovement') : t('common.addAccount')}
+        action={<ActionButton label={snapshot.accounts.length ? t('nav.recordMovement') : t('common.addAccount')} secondary={snapshot.accounts.length > 0}
           onPress={() => router.push(snapshot.accounts.length ? '/new-entry' : '/new-account')} />} />} />;
 }

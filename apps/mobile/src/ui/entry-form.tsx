@@ -275,11 +275,14 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
       options={[{ value: 'expense', label: t('movement.expense') }, { value: 'income', label: t('movement.income') }]} />}
     {!eligibleAccounts.length ? <EmptyState title={t('entryForm.noAccountTitle')}
       /* No account at all, or none this kind may post to (a card-only ledger asked for an income): the action adds a cash
-         account, pushed over the draft (the carried card's currency prefilled) so the modal and its fields come back. */
+         account, pushed over the draft (the carried card's currency prefilled) so the modal and its fields come back. 25O1:
+         with no account at all too (it was replaced): the person who skipped the first opening returns to the expense they
+         started, on the new account, in the draft's currency when it has one. */
       detail={t(accounts.length ? 'entryForm.noCashAccountDetail' : 'entryForm.noAccountDetail')}
-      action={<ActionButton label={t('common.addAccount')} onPress={() => accounts.length
-        ? router.push({ pathname: '/new-account', params: { currency: accounts.find(item => item.id === chosenAccountId)?.currency ?? currency ?? accounts[0].currency } })
-        : router.replace('/new-account')} />} /> : <>
+      action={<ActionButton label={t('common.addAccount')} onPress={() => {
+        const preferred = accounts.find(item => item.id === chosenAccountId)?.currency ?? currency ?? accounts[0]?.currency;
+        router.push(preferred ? { pathname: '/new-account', params: { currency: preferred } } : '/new-account');
+      }} />} /> : <>
       <AmountField currency={account?.currency ?? 'ARS'} value={amount} onChangeText={value => { setAmount(value); setError(null); }} editable={!locked} stored={stored ?? undefined}
         tone={kind === 'income' ? 'income' : 'neutral'} label={t(kind === 'expense' ? 'movement.expense' : 'movement.income')} />
       <View style={{ gap: space.m }}>

@@ -265,8 +265,8 @@ test('Tarjetas: archived cards stay reachable under Archivadas with their balanc
   assert.equal(byName(onlyArchived, 'ArchivedCardRow').length, 1);
   // No card at all: the first invitation; an empty Archivadas never shows.
   const none = harness('cards.tsx', { data: { accounts: [cash], records: [], cards: [gone], } }).render();
-  assert.equal(find(none, 'EmptyState').props.title, 'Tus tarjetas, como en la billetera');
-  assert.match(find(none, 'EmptyState').props.detail, /en cuotas, cada cuota cuenta cuando cierra su resumen/);
+  // 25O1: a title and one line; how instalments count is said in the composer, where a purchase is recorded.
+  assert.deepEqual([find(none, 'EmptyState').props.title, find(none, 'EmptyState').props.detail], ['Tus tarjetas de crédito', 'Agregá una para ver su saldo pendiente, cierres y cuotas.']);
   assert.equal(nodes(none).some(node => node.type === 'SectionTitle'), false);
   // An archived card with nothing owed says so.
   const clear = harness('cards.tsx', { data: { ...data, accounts: [...archive.accounts, { ...oldAccount, openingMinor: 0 }, goneAccount] } }).render();
