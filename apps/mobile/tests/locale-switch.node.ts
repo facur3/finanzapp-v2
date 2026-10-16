@@ -487,30 +487,31 @@ test('without a store prop the provider builds the runtime store once; a provide
 
 /** Más → Idioma / Región since 24R2A: the real `LocaleChooser` over the real `ChoiceScreen` (hosts replaced by names,
  * FlatList drawing every row), with its recents in a memory store. */
-function loadPreferenceScreen(provider: Record<string, any>, recentStore = memory().store) {
+function loadPreferenceScreen(provider: Record<string, any>, recentStore = memory().store, os: 'ios' | 'android' = 'ios') {
   const host = (name: string) => name;
-  let haptics = 0;
+  let haptics = 0, settingsOpened = 0;
   function FlatList(props: any) {
     return h('FlatList', null, props.ListHeaderComponent, ...props.data.map((item: any) => h(React.Fragment, { key: props.keyExtractor(item) }, props.renderItem({ item }))),
       props.ListFooterComponent);
   }
-  const components = { AppText: host('AppText'), CheckRow: host('CheckRow'), ErrorMessage: host('ErrorMessage'), Field: host('Field'), Screen: host('Screen') };
+  const components = { AppText: host('AppText'), CheckRow: host('CheckRow'), ErrorMessage: host('ErrorMessage'), Field: host('Field'), PressFeedback: host('PressFeedback'), Screen: host('Screen') };
   const choiceScreen = loadModule('../src/ui/choice-screen.tsx', {
     react: React, 'react/jsx-runtime': require('react/jsx-runtime'), 'react-native': { FlatList, View: host('View'), StyleSheet: { create: (styles: unknown) => styles } },
     'expo-router': { Stack: { Screen: host('Stack.Screen') } }, '../i18n/provider': provider, './components': components,
-    './choice-list': require('../src/ui/choice-list.ts'), './motion': { selectionHaptic: () => { haptics++; } },
+    './choice-list': require('../src/ui/choice-list.ts'), './marks': { FlagTile: host('FlagTile'), RegionMark: host('RegionMark') }, './motion': { selectionHaptic: () => { haptics++; } },
     './theme': { radius: { group: 16 }, space: { s: 8, m: 12, l: 16, xl: 20 }, usePalette: () => ({ background: '#F2F2F6', surface: '#FFFFFF' }) },
   });
   const recentModule = require('../src/i18n/recent.ts');
   const screen = loadModule('../src/ui/locale-choosers.tsx', {
     react: React, 'react/jsx-runtime': require('react/jsx-runtime'), 'expo-router': { Stack: { Screen: host('Stack.Screen') } },
+    'react-native': { Platform: { OS: os }, Linking: { openSettings: async () => { settingsOpened++; } } },
     '../i18n/provider': provider, './choice-screen': choiceScreen, './components': components, './locale-options': localeOptions,
     '../i18n/recent': {
       readRecent: (kind: string, accept: (value: unknown) => boolean) => recentModule.readRecent(kind, accept, recentStore),
       rememberRecent: (kind: string, value: string, accept: (value: unknown) => boolean) => recentModule.rememberRecent(kind, value, accept, recentStore),
     },
   });
-  return { screen: { LocaleChooser: screen.LocaleChooser, LocalePreferenceScreen: screen.LocaleChooser }, haptics: () => haptics };
+  return { screen: { LocaleChooser: screen.LocaleChooser, LocalePreferenceScreen: screen.LocaleChooser }, haptics: () => haptics, settingsOpened: () => settingsOpened };
 }
 
 test('Idioma: a tap saves and applies in place, the checkmark moves, the screen title follows the language, and a failed save keeps the old checkmark', () => {
@@ -538,7 +539,7 @@ test('Idioma: a tap saves and applies in place, the checkmark moves, the screen 
   assert.equal(saved.rows.get(LANGUAGE_PREFERENCE_KEY), 'en');
   saved.faults.set = false;
   act(() => rows()[0].onPress());
-  assert.equal(root.root.findByType('ErrorMessage' as never).props.message, null, 'the error clears on the next successful save');
+  assert.equal(root.root.findAllByType('ErrorMessage' as never).length, 0, 'the error clears on the next successful save');
   assert.equal(saved.rows.has(LANGUAGE_PREFERENCE_KEY), false);
   act(() => root.unmount());
 });
@@ -561,7 +562,7 @@ test('LocaleChooser for the onboarding: confirming the checked value calls onCho
   assert.deepEqual(chosen, ['AR'], 'the onboarding continues with the value in use');
   assert.equal(writes(), before, 'no preference and no recent written');
   assert.equal(notified, 0, 'the locale did not change: nothing re-renders');
-  assert.equal(root.root.findByType('ErrorMessage' as never).props.message, null);
+  assert.equal(root.root.findAllByType('ErrorMessage' as never).length, 0);
   act(() => rows()[2].onPress()); // Estados Unidos
   assert.deepEqual(chosen, ['AR', 'US']);
   assert.deepEqual([saved.rows.get(REGION_PREFERENCE_KEY), recents.rows.get('finanzapp.recent.region')], ['US', '["US"]'], 'a new value is saved first, then remembered');
@@ -585,12 +586,13 @@ test('Idioma and Región on the default gate: Según el dispositivo, Español an
   assert.deepEqual(rows().map(row => [row.title, row.subtitle ?? '', row.selected]), [['Según el dispositivo', 'Ahora: Español', true], ['Español', '', false], ['English', '', false]]);
   assert.deepEqual(rows().map(row => row.accessibilityLanguage ?? ''), ['', 'es', 'en'], 'each language is spoken in its own language, as in iOS Settings');
   assert.doesNotMatch(note(), /Por ahora/, 'English is released: the note no longer says the app is Spanish-only');
-  assert.match(note(), /no modifica tus movimientos, tus cuentas ni tus copias de seguridad/);
+  assert.match(note(), /Para que iOS también use este idioma en sus menús, elegilo en Ajustes\./, '25O1: the one fact, not a disclaimer');
+  assert.doesNotMatch(note(), /no modifica tus movimientos/);
   act(() => root.update(h(provider.I18nProvider, { store }, h(screen.LocalePreferenceScreen, { kind: 'region' }))));
   assert.equal(root.root.findByType('Stack.Screen' as never).props.options.title, 'Región');
   assert.deepEqual(rows().map(row => [row.title, row.subtitle, row.selected]), [['Según el dispositivo', 'Ahora: Estados Unidos', true],
     ['Argentina', '22/9/2026 · 1.234,56', false], ['Estados Unidos', '9/22/2026 · 1,234.56', false]], 'Spanish names, each region\'s own conventions');
-  assert.match(note(), /No cambia la moneda de tus cuentas/);
+  assert.match(note(), /Cambia cómo se escriben fechas y números\. Tus importes y monedas no cambian\./);
   act(() => rows()[1].onPress());
   assert.deepEqual(rows().map(row => row.selected), [false, true, false], 'Argentina chosen over the device\'s United States');
   act(() => root.unmount());
@@ -603,12 +605,52 @@ test('Idioma with a narrower gate lists no unfinished language; Región lists on
   let root!: ReturnType<typeof renderer.create>;
   act(() => { root = renderer.create(h(provider.I18nProvider, { store }, h(screen.LocalePreferenceScreen, { kind: 'language' }))); });
   assert.deepEqual(root.root.findAllByType('CheckRow' as never).map(row => [row.props.title, row.props.subtitle ?? '']), [['Según el dispositivo', 'Ahora: Español'], ['Español', '']]);
-  assert.match(root.root.findAllByType('AppText' as never).map(node => String(node.props.children)).join(' '), /no modifica tus movimientos, tus cuentas ni tus copias de seguridad/);
+  assert.match(root.root.findAllByType('AppText' as never).map(node => String(node.props.children)).join(' '), /elegilo en Ajustes/);
   act(() => root.update(h(provider.I18nProvider, { store }, h(screen.LocalePreferenceScreen, { kind: 'region' }))));
   // 24R1: the device's Region (US) is one the catalogue names but this gate does not honour: the subtitle says whose formats stand in.
   assert.deepEqual(root.root.findAllByType('CheckRow' as never).map(row => [row.props.title, row.props.subtitle]), [['Según el dispositivo', 'Ahora: Estados Unidos (formatos de Argentina)'], ['Argentina', '22/9/2026 · 1.234,56']]);
   assert.equal(root.root.findByType('Stack.Screen' as never).props.options.title, 'Región');
-  assert.match(root.root.findAllByType('AppText' as never).map(node => String(node.props.children)).join(' '), /No cambia la moneda de tus cuentas/);
+  assert.match(root.root.findAllByType('AppText' as never).map(node => String(node.props.children)).join(' '), /Tus importes y monedas no cambian/);
+  act(() => root.unmount());
+});
+
+test('25O1: Idioma\'s note opens FinanzApp\'s page in iOS Settings; Android, with no such row yet, shows neither the note nor the button; Región never has one', () => {
+  for (const os of ['ios', 'android'] as const) {
+    const store = createLocaleStore({ devices: () => device('es-AR', 'AR'), store: memory().store, released: HOME_GATE });
+    const { provider } = loadProvider();
+    const { screen, settingsOpened } = loadPreferenceScreen(provider, memory().store, os);
+    let root!: ReturnType<typeof renderer.create>;
+    act(() => { root = renderer.create(h(provider.I18nProvider, { store }, h(screen.LocaleChooser, { kind: 'language' }))); });
+    const footnotes = () => root.root.findAllByType('AppText' as never).filter(node => node.props.variant === 'footnote').map(node => String(node.props.children));
+    const buttons = () => root.root.findAllByType('PressFeedback' as never);
+    if (os === 'ios') {
+      assert.deepEqual(footnotes(), ['Para que iOS también use este idioma en sus menús, elegilo en Ajustes.', 'Abrir Ajustes']);
+      assert.deepEqual([buttons().length, buttons()[0].props.accessibilityRole, buttons()[0].props.accessibilityLabel], [1, 'button', 'Abrir Ajustes']);
+      act(() => buttons()[0].props.onPress());
+      assert.equal(settingsOpened(), 1, 'Linking.openSettings: the app\'s own page, where iOS keeps its Idioma row');
+    } else {
+      assert.deepEqual([footnotes(), buttons().length, settingsOpened()], [[], 0, 0], 'Android: no per-app language row to send anyone to');
+    }
+    act(() => root.update(h(provider.I18nProvider, { store }, h(screen.LocaleChooser, { kind: 'region' }))));
+    assert.deepEqual([footnotes(), buttons().length], [['Cambia cómo se escriben fechas y números. Tus importes y monedas no cambian.'], 0], os + ': Región says its fact on both');
+    act(() => root.unmount());
+  }
+});
+
+test('25O1: the long Región list opens with the current choice in Recientes, checked, even when no recent was ever written', () => {
+  // Uruguay saved before recents existed (or its recent refused): the list must not open with the checkmark 200 rows down.
+  const store = createLocaleStore({ devices: () => device('es-AR', 'AR'), store: memory({ [REGION_PREFERENCE_KEY]: 'UY' }).store });
+  const { provider } = loadProvider();
+  const recents = memory({ 'finanzapp.recent.region': '["JP","FR","CL"]' });
+  const { screen } = loadPreferenceScreen(provider, recents.store);
+  let root!: ReturnType<typeof renderer.create>;
+  act(() => { root = renderer.create(h(provider.I18nProvider, { store }, h(screen.LocaleChooser, { kind: 'region' }))); });
+  const rows = () => root.root.findAllByType('CheckRow' as never).map(row => row.props);
+  assert.deepEqual(rows().slice(0, 4).map(row => [row.title, row.selected]), [['Según el dispositivo', false], ['Uruguay', true], ['Japón', false], ['Francia', false]],
+    'the current choice first, then two of the three remembered');
+  assert.equal(recents.rows.get('finanzapp.recent.region'), '["JP","FR","CL"]', 'opening writes nothing');
+  assert.deepEqual([localeOptions.recentWithCurrent(['UY', 'JP'], 'UY'), localeOptions.recentWithCurrent(['JP'], 'system')], [['UY', 'JP'], ['JP']],
+    'already first, or following the device: the remembered list as it is');
   act(() => root.unmount());
 });
 

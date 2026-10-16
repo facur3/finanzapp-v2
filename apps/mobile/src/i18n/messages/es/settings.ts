@@ -37,7 +37,6 @@ export const settings = {
       undoneNone: 'Ninguno',
       undoneCount: { one: '{count} recuperable', other: '{count} recuperables' },
     },
-    localNote: 'Tus registros se guardan solo en este dispositivo y funcionan sin conexión. No se sincronizan con otros dispositivos.',
     /** The version line at the end of Más; `release` is the internal delivery name ("24UX5") and is not translated. */
     version: 'FinanzApp {version} ({release})',
     /** 24UX5: only in a development build, under the version: the control material and where the languages were read. */
