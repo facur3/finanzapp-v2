@@ -147,8 +147,8 @@ JavaScript only; on the development build cut after PR #113, Metro from `master`
 
 ## Producto 25Q2 — a backup that completes or says why (PR #115, merged)
 
-JavaScript only; Metro from this branch on the development build cut after PR #113. The end of Más reads «FinanzApp
-0.1.0 (25Q2)». Keep a private backup first; use small real data.
+JavaScript only; on the development build cut after PR #113, Metro from `master` or a branch that contains PR #115.
+Keep a private backup first; use small real data.
 
 - [ ] **Más.** The Copia de seguridad row reads «Antes de borrar la app o cambiar de teléfono»; VoiceOver «Copia de
   seguridad, Antes de borrar la app o cambiar de teléfono, botón». The Backup screen starts «Si borrás la app, tus
@@ -170,8 +170,8 @@ JavaScript only; Metro from this branch on the development build cut after PR #1
 
 ## Producto 25Q1 — money that reads right (PR #114, merged)
 
-Read-side corrections only; JavaScript only. Metro from this branch on the development build cut after PR #113. The end
-of Más reads «FinanzApp 0.1.0 (25Q1)». Light and dark; Spanish unless a step says English.
+Read-side corrections only; JavaScript only. On the development build cut after PR #113, Metro from `master` or a branch
+that contains PR #114. Light and dark; Spanish unless a step says English.
 
 - [ ] **The Assistant's category link** (a development build with `EXPO_PUBLIC_ASSISTANT_FIXTURES=1`). Record an expense
   in «Supermercado» dated between 1 and 21 September 2026 (the fixture's period). Asistente → «¿Cuánto gasté en comida
