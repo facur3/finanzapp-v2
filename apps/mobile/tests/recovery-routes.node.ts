@@ -12,6 +12,7 @@ import * as liabilityPresentation from '../src/ui/liability-presentation.ts';
 import * as installmentPresentation from '../src/ui/installment-presentation.ts';
 import * as moneyInput from '../src/ui/money-input.ts';
 import * as entryPrefill from '../src/ui/entry-prefill.ts';
+import { memoryOf } from './preference-memory.ts';
 import * as appearance from '../src/ui/appearance.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
@@ -42,7 +43,9 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   updateAccount?: (value: domain.AccountChange) => Promise<void>; addAccount?: (value: domain.Account) => Promise<void>; saveRecurring?: (value: domain.RecurringRule) => Promise<void>;
   restore?: (value: domain.LedgerArchive, baseline: string) => Promise<void>; picker?: () => Promise<any>; locale?: AppLocale;
   /** The day the archive's catch-ups last ran through (the provider's `asOfISO`); absent: as the screen's own day. */
-  asOfISO?: string } = {}) {
+  asOfISO?: string;
+  /** 25N1: the device's key-value store as the last-account preference sees it (read and written in place). */
+  memory?: Record<string, string> } = {}) {
   const source = readFileSync(new URL('../' + file, import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const state: any[] = [];
@@ -67,7 +70,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     addAccount: async (value: domain.Account) => { newAccounts.push(value); await options.addAccount?.(value); },
     restoreBackup: async (value: domain.LedgerArchive, baseline: string) => { restores.push({ value, baseline }); await options.restore?.(value, baseline); },
   }) };
-  const components = Object.fromEntries(['Screen', 'EmptyState', 'ActionButton', 'AppText', 'AmountField', 'AmountShortcut', 'Choices', 'ErrorMessage', 'Field', 'FieldNote', 'IconButton', 'Surface',
+  const components = Object.fromEntries(['Screen', 'EmptyState', 'ActionButton', 'AppText', 'AmountField', 'AmountShortcut', 'Choices', 'ErrorMessage', 'Field', 'FieldNote', 'IconButton', 'PressFeedback', 'Surface',
     'CategoryBadge', 'DetailRow', 'Money', 'SectionTitle', 'GlyphTile', 'AccountBadge', 'EntryRow', 'MerchantBadge', 'LifecycleNote'].map(name => [name, name]));
   const defaults = { useDefaultCurrency: ({ accountCurrency, requested }: { accountCurrency?: string | null; requested?: unknown } = {}) => accountCurrency ?? (domain.isLedgerCurrency(requested) ? requested : 'ARS') };
   const accountManagement = { useAccountManagement: () => ({ busyId: null, error: null,
@@ -103,7 +106,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     './form-controls': { AccountField: 'AccountField', CategoryField: 'CategoryField', CurrencyField: 'CurrencyField', DateField: 'DateField', SelectorCard: 'SelectorCard' },
     '../src/ui/form-controls': { CurrencyField: 'CurrencyField' }, '../../src/ui/form-controls': { CurrencyField: 'CurrencyField' },
     '../src/ui/currencies': currencies, '../../src/ui/currencies': currencies,
-    './presentation': presentation, '../src/ui/presentation': presentation, '../../src/ui/presentation': presentation, './entry-prefill': entryPrefill,
+    './presentation': presentation, '../src/ui/presentation': presentation, '../../src/ui/presentation': presentation, './entry-prefill': entryPrefill, './last-account': memoryOf(options.memory ?? {}),
     './budget-presentation': budgetPresentation, '../../src/ui/budget-presentation': budgetPresentation,
     './money-input': moneyInput, '../../src/ui/money-input': moneyInput, '../src/ui/money-input': moneyInput,
     // 25Q4: the movement and transfer details word a card's or a debt's state after an undo or a restore.
@@ -240,6 +243,38 @@ test('new-entry mode keeps income/account selection and creates no edit command'
   assert.equal(view.additions[0].accountId, 'u');
   assert.equal(view.updates.length, 0);
 });
+test('25N1: a new Gasto or Ingreso opens on the account last saved with that kind; a requested account wins, and the rule is today\'s without one', async () => {
+  const memory: Record<string, string> = {};
+  const save = async (props: any) => {
+    const view = harness('src/ui/entry-form.tsx', props, { memory });
+    let root = view.render();
+    find(root, 'AmountField').props.onChangeText('1');
+    find(root, 'Field').props.onChangeText('Prueba');
+    find(root, 'CategoryField').props.onChange('Otros');
+    root = view.render();
+    await find(root, 'ActionButton').props.onPress();
+    return view.additions[0];
+  };
+  const opens = (props: any, data?: domain.LedgerArchive) => find(harness('src/ui/entry-form.tsx', props, { memory, data }).render(), 'AccountField').props.value;
+  assert.equal(opens({ kind: 'expense', currency: 'ARS' }), 'a', 'nothing remembered: the first account in the screen\'s currency');
+  assert.equal((await save({ kind: 'expense', currency: 'USD' })).accountId, 'u');
+  assert.equal(memory['finanzapp.lastAccount.expense'], 'u', 'saved, then remembered on the device');
+  assert.equal(opens({ kind: 'expense', currency: 'ARS' }), 'u', 'the last Gasto\'s account, whatever the screen\'s currency');
+  assert.equal(opens({ kind: 'income', currency: 'ARS' }), 'a', 'an Ingreso keeps its own memory');
+  assert.equal(opens({ kind: 'expense', currency: 'ARS', accountId: 'a' }), 'a', 'an account the screen asks for wins');
+  assert.equal(opens({ kind: 'expense', currency: 'ARS', prefill: { amountMinor: '100', currency: 'ARS' } }), 'a', 'a prefilled amount keeps its currency\'s account');
+  const gone = { ...archive, accounts: [archive.accounts[0], { ...archive.accounts[1], deletedAt: createdAt }] } as domain.LedgerArchive;
+  assert.equal(opens({ kind: 'expense', currency: 'ARS' }, gone), 'a', 'a remembered account deleted since: today\'s rule');
+  memory['finanzapp.lastAccount.income'] = 'nowhere';
+  assert.equal(opens({ kind: 'income', currency: 'USD' }), 'u', 'an unknown id is ignored');
+  // An edit never changes what is remembered.
+  const edit = harness('src/ui/entry-form.tsx', { original: archive.records[0] }, { memory });
+  let root = edit.render();
+  find(root, 'Field').props.onChangeText('Otra');
+  await find(edit.render(), 'ActionButton').props.onPress();
+  assert.equal(edit.updates.length, 1);
+  assert.equal(memory['finanzapp.lastAccount.expense'], 'u');
+});
 test('detail opens the native edit route; undo requires confirmation and canceled undo does nothing', async () => {
   const view = harness('app/entry/[id].tsx', {}, { params: { id: entry.id } });
   find(view.render(), 'ActionButton', 'Editar movimiento').props.onPress();
@@ -249,7 +284,7 @@ test('detail opens the native edit route; undo requires confirmation and cancele
   assert.equal(view.updates.length, 0);
   assert.match(view.alerts[0].message, /Se sumarán 123,45 ARS a Prueba ARS/);
   // 25Q4: an undo names where it can be restored from.
-  assert.ok(view.alerts[0].message.endsWith('Podés recuperarlo después desde Movimientos deshechos, en Más.'), view.alerts[0].message);
+  assert.ok(view.alerts[0].message.endsWith('Podés recuperarlo después desde Movimientos deshechos, en Movimientos.'), view.alerts[0].message);
   view.alerts[0].buttons[0].onPress();
   assert.equal(view.updates.length, 0);
   find(view.render(), 'ActionButton', 'Deshacer movimiento').props.onPress();
@@ -504,7 +539,8 @@ test('transfer undo requires confirmation, affects both sides, and updates detai
   find(view.render(), 'ActionButton', 'Deshacer transferencia').props.onPress();
   // 25Q4: a plain transfer keeps its sentence, then the record-only note and where an undo is restored from.
   assert.equal(view.alerts[0].message, '10,00 ARS: se descontarán de Destino y se sumarán a Prueba ARS. Solo cambia el registro en esta app, no mueve dinero en el banco. '
-    + 'Podés recuperar la transferencia después desde Movimientos deshechos, en Más.');
+    + 'Podés recuperar la transferencia después desde Movimientos deshechos, en Movimientos.');
+  assert.equal(view.alerts[0].buttons.map((button: { style?: string }) => button.style ?? '').join(','), 'cancel,default', 'recoverable from Movimientos deshechos: not the destructive style');
   view.alerts[0].buttons[0].onPress();
   assert.equal(view.transferChanges.length, 0);
   find(view.render(), 'ActionButton', 'Deshacer transferencia').props.onPress();
@@ -671,6 +707,54 @@ test('a plain transfer between accounts never lists cards or debts; editing a ca
   assert.equal(nodes(root).some(node => node.type === 'AccountField' && node.props.label === 'Hacia'), false);
   assert.deepEqual(nodes(root).filter(node => node.type === 'SelectorCard').map(node => [node.props.label, node.props.value, node.props.fixed]), [['Tarjeta', 'Visa', true]]);
   assert.deepEqual(find(root, 'AccountField', 'Desde').props.accounts.map((item: domain.Account) => item.id), ['a']);
+});
+
+test('25N1: back from «Agregar cuenta» under a plain transfer, «Hacia» comes back with the one account added in «Desde»\'s currency', () => {
+  const view = harness('src/ui/transfer-form.tsx', { accountId: 'a' }, { data: archive });
+  let root = view.render();
+  assert.deepEqual(find(root, 'AccountField', 'Hacia').props.accounts, []);
+  const added: domain.Account = { ...account, id: 'n', name: 'Nueva', openingMinor: 0 };
+  // An account that appears without the person asking from here (another screen) is not preselected.
+  view.setData({ ...archive, accounts: [...archive.accounts, added] });
+  assert.equal(find(view.render(), 'AccountField', 'Hacia').props.value, '');
+  view.setData(archive);
+  root = view.render();
+  const add = nodes(root).find(node => node.type === 'EmptyState')!.props.action;
+  add.props.onPress();
+  assert.equal(JSON.stringify(view.pushed.pop()), JSON.stringify({ pathname: '/new-account', params: { currency: 'ARS' } }));
+  view.setData({ ...archive, accounts: [...archive.accounts, added, { ...added, id: 'd', name: 'Dólares', currency: 'USD' }] });
+  root = view.render();
+  assert.equal(find(root, 'AccountField', 'Hacia').props.value, 'n', 'the new ARS account, not the USD one');
+  find(root, 'AmountField').props.onChangeText('10');
+  assert.equal(nodes(view.render()).find(node => node.type === 'ActionButton' && /Registrar/.test(node.props.label))?.props.disabled, false, 'ready to save');
+  // Two added in that currency: nothing is obvious, «Hacia» stays to choose.
+  const twice = harness('src/ui/transfer-form.tsx', { accountId: 'a' }, { data: archive });
+  nodes(twice.render()).find(node => node.type === 'EmptyState')!.props.action.props.onPress();
+  twice.setData({ ...archive, accounts: [...archive.accounts, added, { ...added, id: 'm' }] });
+  assert.equal(find(twice.render(), 'AccountField', 'Hacia').props.value, '');
+});
+
+test('25N1: a plain transfer while a card owes points quietly to «Pagar tarjeta»; a payment, an edit or a card owing nothing shows nothing', () => {
+  const pointer = (root: Node) => nodes(root).find(node => node.type === 'PressFeedback');
+  const view = harness('src/ui/transfer-form.tsx', { accountId: 'a' }, { data: liabilityData });
+  const link = pointer(view.render())!;
+  assert.equal(link.props.accessibilityLabel, '¿Pagás Visa? Usá «Pagar tarjeta».');
+  link.props.onPress();
+  assert.equal(JSON.stringify(view.pushed.pop()), JSON.stringify({ pathname: '/new-transfer', params: { toAccountId: 'card-acc', maxAmountMinor: '5000' } }));
+  assert.equal(view.replaced.length, 1, 'the payment replaces this form: saving it never returns to an abandoned transfer');
+  const english = harness('src/ui/transfer-form.tsx', { accountId: 'a' }, { data: liabilityData, locale: 'en-AR' });
+  assert.equal(pointer(english.render())!.props.accessibilityLabel, 'Paying Visa? Use “Pay card”.');
+  const second: domain.Account = { ...cardAccount, id: 'card-2', name: 'Master' };
+  const two = harness('src/ui/transfer-form.tsx', { accountId: 'a' }, { data: { ...liabilityData, accounts: [...liabilityData.accounts, second], cards: [card, { ...card, id: 'card2', accountId: 'card-2' }] } }).render();
+  assert.equal(pointer(two), undefined);
+  assert.ok(nodes(two).some(node => node.type === 'AppText' && node.props.children === 'Para pagar una tarjeta, usá «Pagar tarjeta» en Tarjetas.'));
+  const clear = { ...liabilityData, accounts: [...archive.accounts, { ...cardAccount, openingMinor: 0 }, debtAccount] };
+  const archived = { ...liabilityData, cards: [{ ...card, active: false }] };
+  for (const [props, data] of [[{ accountId: 'a' }, clear], [{ accountId: 'a' }, archived], [{ toAccountId: 'card-acc', maxAmountMinor: '5000' }, liabilityData]] as const) {
+    const root = harness('src/ui/transfer-form.tsx', props, { data }).render();
+    assert.equal(pointer(root), undefined);
+    assert.equal(nodes(root).some(node => node.type === 'AppText' && /Pagar tarjeta/.test(String(node.props.children))), false);
+  }
 });
 
 test('expense form offers cash accounts and cards but never a personal debt account', () => {
@@ -849,7 +933,7 @@ test('English movement detail and transfer form: titles, rows, confirmation and 
   assert.deepEqual(rows, ['Category=Salud', 'Account=Prueba ARS', 'Currency=Argentine pesos'], 'the stored name and the account name are not translated');
   find(root, 'ActionButton', 'Undo transaction').props.onPress();
   assert.equal(detail.alerts[0].title, 'Undo transaction?');
-  assert.equal(detail.alerts[0].message, '123,45 ARS will be added to Prueba ARS. This transaction will stop counting in your balances and reports. You can restore it later from Undone transactions, in More.');
+  assert.equal(detail.alerts[0].message, '123,45 ARS will be added to Prueba ARS. This transaction will stop counting in your balances and reports. You can restore it later from Undone transactions, in Activity.');
   assert.equal(detail.alerts[0].buttons.map((button: any) => button.text).join(','), 'Cancel,Undo');
   assert.equal(detail.updates.length, 0, 'asking never writes');
 
@@ -2303,7 +2387,7 @@ test('25Q4: undoing or restoring a card purchase says how the card will read, in
   };
   // Visa owes 173,45: 50,00 before the purchase.
   const view = undo({ ...liabilityData, records: [purchase] });
-  assert.equal(view.alerts[0].message, 'Visa quedará con un saldo pendiente de 50,00 ARS. Este movimiento dejará de contar en tus saldos y reportes. Podés recuperarlo después desde Movimientos deshechos, en Más.');
+  assert.equal(view.alerts[0].message, 'Visa quedará con un saldo pendiente de 50,00 ARS. Este movimiento dejará de contar en tus saldos y reportes. Podés recuperarlo después desde Movimientos deshechos, en Movimientos.');
   view.alerts[0].buttons[1].onPress(); await flush();
   view.setData({ ...liabilityData, records: [view.updates[0].after] });
   find(view.render(), 'ActionButton', 'Recuperar movimiento').props.onPress();
@@ -2315,7 +2399,7 @@ test('25Q4: undoing or restoring a card purchase says how the card will read, in
   const only = undo(fresh);
   assert.ok(only.alerts[0].message.startsWith('Visa quedará sin saldo pendiente. '), only.alerts[0].message);
   const english = undo({ ...liabilityData, records: [purchase] }, 'en-AR');
-  assert.equal(english.alerts[0].message, 'Visa will have an outstanding balance of 50,00 ARS. This transaction will stop counting in your balances and reports. You can restore it later from Undone transactions, in More.');
+  assert.equal(english.alerts[0].message, 'Visa will have an outstanding balance of 50,00 ARS. This transaction will stop counting in your balances and reports. You can restore it later from Undone transactions, in Activity.');
   english.alerts[0].buttons[1].onPress(); await flush();
   english.setData({ ...liabilityData, records: [english.updates[0].after] });
   find(english.render(), 'ActionButton', 'Restore transaction').props.onPress();
@@ -2333,15 +2417,15 @@ test('25Q4: undoing or restoring a card payment, a debt payment or a collection 
   };
   const payment = storedTransfer('pay', 'a', 'card-acc', 5000);
   assert.equal(ask(payment), 'Se sumarán 50,00 ARS a Prueba ARS. Visa quedará con un saldo pendiente de 50,00 ARS. Solo cambia el registro en esta app, no mueve dinero en el banco. '
-    + 'Podés recuperar la transferencia después desde Movimientos deshechos, en Más.');
+    + 'Podés recuperar la transferencia después desde Movimientos deshechos, en Movimientos.');
   assert.equal(ask(domain.makeTransferChange('undo', payment, 'void', createdAt).after),
     'Se descontarán 50,00 ARS de Prueba ARS. Visa quedará sin saldo pendiente. Solo cambia el registro en esta app, no mueve dinero en el banco.');
   assert.equal(ask(storedTransfer('pay', 'a', 'debt-acc', 3000)), 'Se sumarán 30,00 ARS a Prueba ARS. Le vas a deber 70,00 ARS a Juan. '
-    + 'Solo cambia el registro en esta app, no mueve dinero en el banco. Podés recuperar la transferencia después desde Movimientos deshechos, en Más.');
+    + 'Solo cambia el registro en esta app, no mueve dinero en el banco. Podés recuperar la transferencia después desde Movimientos deshechos, en Movimientos.');
   assert.equal(ask(storedTransfer('collect', 'rec-acc', 'a', 1000)), 'Se descontarán 10,00 ARS de Prueba ARS. Ana te va a deber 40,00 ARS. '
-    + 'Solo cambia el registro en esta app, no mueve dinero en el banco. Podés recuperar la transferencia después desde Movimientos deshechos, en Más.');
+    + 'Solo cambia el registro en esta app, no mueve dinero en el banco. Podés recuperar la transferencia después desde Movimientos deshechos, en Movimientos.');
   assert.equal(ask(payment, 'en-AR'), '50,00 ARS will be added to Prueba ARS. Visa will have an outstanding balance of 50,00 ARS. '
-    + 'This only changes the record in this app; it moves no money at the bank. You can restore the transfer later from Undone transactions, in More.');
+    + 'This only changes the record in this app; it moves no money at the bank. You can restore the transfer later from Undone transactions, in Activity.');
   // 25Q4 review: a restore that settles a debt says so by its direction; «la deuda con» is only money the person owes.
   const undone = (record: domain.TransferRecord) => domain.makeTransferChange('undo', record, 'void', createdAt).after;
   const collected = undone(storedTransfer('collect', 'rec-acc', 'a', 4000)), paid = undone(storedTransfer('pay', 'a', 'debt-acc', 7000));

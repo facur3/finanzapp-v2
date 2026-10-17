@@ -118,7 +118,7 @@ function AccountEditor({ account, snapshot, current }: { account: Account; snaps
         onIconChange={setIcon} onColorChange={setColor} disabled={locked} previewLabel={name} />
     </View>
     <ErrorMessage message={error} />
-    {pending && error && <AppText secondary style={{ fontSize: 13 }}>{t('accounts.edit.retryNote')}</AppText>}
+    {pending && error && <AppText secondary variant="footnote">{t('accounts.edit.retryNote')}</AppText>}
     <ActionButton label={pending && error ? t('common.retrySave') : t('common.saveChanges')} onPress={save} busy={busy} disabled={!name.trim() || !balance.trim()} />
     {/* 25B2: the destructive action last, apart from Save, with its own confirmation naming what stays. */}
     {deletable && <>

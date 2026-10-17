@@ -268,6 +268,11 @@ test('25A-03: a hero on Inicio\'s field takes the solid graphite symbol and cent
   assert.deepEqual([plainSymbol.props.style.color, plainCents.props.style.color], ['#131411E6', '#131411CC']);
   const canvas = render('Money', { minor: 123456, currency: 'ARS', large: true }).props.children.props.children.props.children;
   assert.deepEqual([canvas[0].props.style.color, canvas[2].props.style.color], ['#666', '#999']);
+  // 25N1: the zero month draws its units quieter (heroSecondary, luminance 0.72) than the grey symbol (0.76): the quiet
+  // hero is one tone throughout, so the symbol is never brighter than the number.
+  const zero = render('Money', { minor: 0, currency: 'ARS', large: true, size: 46, color: '#D3DCF6', onField: true }).props.children;
+  const [zeroSymbol, , zeroCents] = zero.props.children.props.children;
+  assert.deepEqual([zero.props.style.color, zeroSymbol.props.style.color, zeroCents.props.style.color], ['#D3DCF6', '#D3DCF6', '#D3DCF6']);
 });
 
 test('25D1: AppText stops every style at the size iOS gives it at AX5, which keeps iOS\'s order at every setting; an explicit cap wins', () => {

@@ -404,10 +404,11 @@ test('plan detail: the price first, then only its figures (recorded, future, rem
     'Tarjeta=Visa Gold', 'Categoría=Hogar', 'Fecha de compra=10 ago 2026 (10 de agosto de 2026)', 'Precio=$ 1.200.000,00 (1200000,00 pesos)',
     'Ya registrado=$ 200.000,00 (200000,00 pesos)', 'Cuotas futuras=$ 1.000.000,00 (1000000,00 pesos)',
   ].map(row => row.replace(/\$ /g, '$' + NBSP)));
-  // The hero, then the progress, then the facts, then the Calendario.
+  // The hero, then the progress, then the facts, then (25N1) the actions, then the Calendario.
   const order = nodes(root).map(node => node.type === 'Money' && node.props.minor === 120000000 ? 'hero' : typeof node.type === 'function' && node.type.name === 'PlanProgressSummary' ? 'progress'
-    : node.type === 'DetailRow' ? 'facts' : node.type === 'SectionTitle' ? 'schedule' : null).filter((item, index, all) => item && all.indexOf(item) === index);
-  assert.deepEqual(order, ['hero', 'progress', 'facts', 'schedule'])
+    : node.type === 'DetailRow' ? 'facts' : node.type === 'ActionButton' ? 'actions' : node.type === 'SectionTitle' ? 'schedule' : null).filter((item, index, all) => item && all.indexOf(item) === index);
+  assert.deepEqual(order, ['hero', 'progress', 'facts', 'actions', 'schedule'], 'the actions above a calendar of up to 120 rows')
+  assert.deepEqual(nodes(root).filter(node => node.type === 'ActionButton').map(node => node.props.tone ?? 'plain'), ['plain', 'plain', 'expense'], 'refund, adelanto, then the destructive one last')
   find(root, 'DetailRow', 'Tarjeta').props.onPress();
   assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/card/[id]', params: { id: 'card' } }));
   // The calendar: one row per instalment, its statement's closing and due, its state.
@@ -802,7 +803,7 @@ test('24T3: «Dejar de seguir el plan» says what stops, what stays and what it 
   assert.equal(alert.title, '¿Dejar de seguir este plan?');
   assert.equal(alert.message, 'Las cuotas que faltan ($' + NBSP + '1.000.000,00) dejan de registrarse. Las ya registradas siguen en Movimientos. No es una devolución ni un pago: '
     + 'si devolviste la compra, usá Registrar devolución; si adelantaste las cuotas, Registrar adelanto de cuotas.');
-  assert.equal(alert.buttons.map((item: { text: string; style?: string }) => item.text + ':' + item.style).join(','), 'Cancelar:cancel,Dejar de seguir:destructive');
+  assert.equal(alert.buttons.map((item: { text: string; style?: string }) => item.text + ':' + item.style).join(','), 'Cancelar:cancel,Dejar de seguir:default');
   assert.equal(view.writes.length, 0, 'asking writes nothing');
   alert.buttons[1].onPress();
   assert.deepEqual(view.writes.map(item => [item.action, JSON.stringify(item.arg)]), [['stop', JSON.stringify({ planId: 'tv', expectedRevision: 0 })]]);
@@ -1073,7 +1074,7 @@ test('movement detail of an instalment: «Cuota de tarjeta», a «Cuota 2 de 12�
   find(root, 'ActionButton', 'Deshacer movimiento').props.onPress();
   // 25Q4: the card says how it will read afterwards (it owes $ 120.000,00; this instalment is $ 100.000,00 of it), never «Se sumarán … a Visa Gold».
   assert.equal(view.alerts[0].message, 'Visa Gold quedará con un saldo pendiente de 20.000,00 ARS. Este movimiento dejará de contar en tus saldos y reportes. '
-    + 'Podés recuperarlo después desde Movimientos deshechos, en Más. La cuota queda deshecha: no se vuelve a registrar sola y sigue pendiente en su plan.');
+    + 'Podés recuperarlo después desde Movimientos deshechos, en Movimientos. La cuota queda deshecha: no se vuelve a registrar sola y sigue pendiente en su plan.');
   view.alerts[0].buttons[1].onPress();
   await settle();
   assert.equal(view.updates[0].action, 'void');

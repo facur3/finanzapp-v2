@@ -4,7 +4,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { AppText, GlyphTile, PressFeedback } from './components';
 import { ACCOUNT_ICON_CHOICES, appearanceHex, appearanceName, type ColorChoice, type IconChoice } from './appearance';
 import { tintOf } from './category-color';
-import { duration, selectionHaptic } from './motion';
+import { duration, easeOutCss, selectionHaptic } from './motion';
 import { space, usePalette, useReduceMotion, type Palette } from './theme';
 import { useI18n } from '../i18n/provider';
 import type { MessageKey, Translate } from '../i18n/messages';
@@ -68,9 +68,9 @@ export function IconColorPicker({ icons, colors, icon, color, onIconChange, onCo
 function IconOption({ item, name, selected, hex, disabled, onPress, p }: { item: IconChoice; name: string; selected: boolean; hex: string; disabled: boolean; onPress: () => void; p: Palette }) {
   const reduced = useReduceMotion();
   return <PressFeedback accessibilityRole="radio" accessibilityLabel={name} accessibilityState={{ selected, checked: selected, disabled }}
-    disabled={disabled} onPress={onPress} hitSlop={2} style={styles.option}>
+    disabled={disabled} onPress={onPress} hitSlop={2} style={[styles.option, disabled && styles.disabled]}>
     <Animated.View style={[styles.iconTile, { backgroundColor: selected ? tintOf(hex, p) : p.inset, borderColor: selected ? hex : 'transparent',
-      transitionProperty: ['backgroundColor', 'borderColor'], transitionDuration: reduced ? 0 : duration.state }]}>
+      transitionProperty: ['backgroundColor', 'borderColor'], transitionDuration: reduced ? 0 : duration.state, transitionTimingFunction: easeOutCss }]}>
       <Ionicons name={item.glyph} size={20} color={selected ? hex : p.secondary} accessible={false} />
     </Animated.View>
   </PressFeedback>;
@@ -80,8 +80,8 @@ function ColorOption({ item, name, selected, disabled, onPress, p }: { item: Col
   const reduced = useReduceMotion();
   const hex = appearanceHex(item.id, p);
   return <PressFeedback accessibilityRole="radio" accessibilityLabel={name} accessibilityState={{ selected, checked: selected, disabled }}
-    disabled={disabled} onPress={onPress} hitSlop={2} style={styles.option}>
-    <Animated.View style={[styles.ring, { borderColor: selected ? hex : 'transparent', transitionProperty: 'borderColor', transitionDuration: reduced ? 0 : duration.state }]}>
+    disabled={disabled} onPress={onPress} hitSlop={2} style={[styles.option, disabled && styles.disabled]}>
+    <Animated.View style={[styles.ring, { borderColor: selected ? hex : 'transparent', transitionProperty: 'borderColor', transitionDuration: reduced ? 0 : duration.state, transitionTimingFunction: easeOutCss }]}>
       <View style={[styles.dot, { backgroundColor: hex }]}>
         {/* 25D1: the check takes onSemantic, white in light and ink in dark, where white fell to 2:1 on the brighter dots. */}
         {selected && <Ionicons name="checkmark" size={16} color={p.onSemantic} accessible={false} />}
@@ -96,6 +96,7 @@ export const PICKER_COLUMNS = 6;
 const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   option: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', minHeight: 44 },
+  disabled: { opacity: 0.6 },
   iconTile: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 2 },
   ring: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   dot: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },

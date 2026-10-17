@@ -1,6 +1,6 @@
 import { useEffect, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { todayKey, type ReviewArchive } from '@finanzapp/domain';
 import type { AnswerContent, ClarificationOption, Message, ProposalContent } from '../assistant/conversation';
@@ -10,7 +10,7 @@ import type { LanguageCode } from '../i18n/locale';
 import { useI18n } from '../i18n/provider';
 import { useCategoryLook, useCategoryLookOf } from './category-hues';
 import { AccountBadge, ActionButton, AppText, CategoryBadge, Money, PressFeedback, Surface, useStacked, type IconName } from './components';
-import { Appear, Reflow, selectionHaptic } from './motion';
+import { Appear, Reflow, pulseTiming, selectionHaptic } from './motion';
 import { activityDateLabel } from './presentation';
 import { reviewFacts } from './review-presentation';
 import { radius, space, useCurrentDay, usePalette, useReduceMotion } from './theme';
@@ -62,7 +62,7 @@ function Thinking() {
   const pulse = useSharedValue(1);
   useEffect(() => {
     if (reduced) { pulse.value = 1; return; }
-    pulse.value = withRepeat(withSequence(withTiming(0.3, { duration: 600, easing: Easing.inOut(Easing.quad) }), withTiming(1, { duration: 600, easing: Easing.inOut(Easing.quad) })), -1, false);
+    pulse.value = withRepeat(withSequence(withTiming(0.3, pulseTiming), withTiming(1, pulseTiming)), -1, false);
     return () => { pulse.value = 1; };
   }, [reduced, pulse]);
   const style = useAnimatedStyle(() => ({ opacity: pulse.value }));

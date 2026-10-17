@@ -165,7 +165,7 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
           whole story (today's save, the catch-up, never twice, never a payment) behind its information button. */}
       <FieldNote help={{ title: t('recurring.form.noteHelpTitle'), detail: t('recurring.form.noteHelp') }}>{t('recurring.form.note')}</FieldNote>
       <ErrorMessage message={error} />
-      {pending && !busy && error && <AppText secondary style={{ fontSize: 13, textAlign: 'center' }}>
+      {pending && !busy && error && <AppText secondary variant="footnote" style={{ textAlign: 'center' }}>
         {t('recurring.form.retryNote')}
       </AppText>}
       <ActionButton label={pending && error ? t('common.retrySave') : before ? t('common.saveChanges') : t('recurring.form.create')}
@@ -179,7 +179,7 @@ function ViewFrequency({ value, onChange, disabled }: {
 }) {
   const { t } = useI18n();
   return <>
-    <AppText secondary style={{ fontSize: 14, fontWeight: '500' }}>{t('recurring.form.frequency')}</AppText>
+    <AppText secondary variant="footnote" style={{ fontWeight: '500' }}>{t('recurring.form.frequency')}</AppText>
     <Choices value={value} onChange={onChange} disabled={disabled}
       options={[
         { value: 'weekly', label: t('recurring.frequency.weekly') },

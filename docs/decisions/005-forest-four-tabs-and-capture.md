@@ -25,11 +25,14 @@ línea visual amplia de Forest.* *Enmendada el 2026-10-03 por Producto 25VIS1, *
 mismo día como la paleta actual del producto (los colores de Forest reemplazados por Electric Lime con los mismos tokens; navegación, composición y
 reglas semánticas sin cambio): ver «Enmienda 2026-10-03 — Producto 25VIS1» al final.* *Enmendada el 2026-10-17 por
 Producto 25O1, solo en el texto de las leyendas del «+» (dicen lo que registra cada formulario): ver «Enmienda
-2026-10-17 — Producto 25O1» al final.*
+2026-10-17 — Producto 25O1» al final.* *Enmendada otra vez el 2026-10-17 por Producto 25N1 (la cuarta pestaña pasa a
+ser Finanzas; Ajustes detrás de un engranaje en su barra; Movimientos deshechos en la barra de Movimientos; Licencias):
+ver «Enmienda 2026-10-17 — Producto 25N1 (Finanzas y Ajustes)» al final.*
 
 ## Decisión
 
-1. **Cuatro pestañas:** Inicio, Movimientos, Reportes y Más. Tarjetas sigue en Más → Finanzas.
+1. **Cuatro pestañas:** Inicio, Movimientos, Reportes y Más. Tarjetas sigue en Más → Finanzas. *(Más pasa a ser
+   Finanzas el 2026-10-17, 25N1: ver «Enmienda 2026-10-17 — Producto 25N1», abajo.)*
    El Asistente deja de ser pestaña.
 2. **Una acción de registro separada, el «+»**, al lado de las pestañas y fuera de la lista de
    pestañas. Abre el hub Registrar con cuatro opciones, en este orden: **Asistente, Gasto,
@@ -57,7 +60,7 @@ borra ninguna entrega pasada.
 
 - **Raíces.** `app/(tabs)/_layout.tsx` declara cuatro raíces: `index` (Inicio, sin encabezado),
   `activity` (Movimientos, conserva el «+» de su encabezado hacia `/new-entry`) *(Reemplazado el 2026-10-01 por 24UX6C: ver «Enmienda 2026-10-01 — Producto 24UX6C», abajo.)*, `reports`
-  (Reportes) y `settings` (Más). No hay pestaña de Asistente.
+  (Reportes) y `settings` (Más; Finanzas desde 25N1, ver su enmienda). No hay pestaña de Asistente.
 - **Mitigación de pantallas negras, sin cambio.** `src/ui/navigation.ts` sigue igual:
   `detachInactiveScreens: false`; cada pestaña `animation: 'none'`, `lazy: false`,
   `freezeOnBlur: false`; fondo de escena opaco. Las cuatro raíces quedan montadas, sin
@@ -81,7 +84,10 @@ borra ninguna entrega pasada.
 - **El estado elegido nunca es solo color:** glifo relleno más una cápsula `dockActive` detrás
   del glifo; las demás pestañas, glifo de contorno en `dockInk`.
 - **Eventos.** Tocar emite `tabPress` (prevenible) y navega solo a una pestaña no elegida y no
-  prevenida; mantener presionado emite `tabLongPress`.
+  prevenida; mantener presionado emite `tabLongPress`. *(Corregido por Producto 25Q3: ninguna pestaña
+  tiene pulsación larga ni emite `tabLongPress`, que nadie escuchaba; con ella React Native cancelaba el toque
+  sostenido más de medio segundo. Soltar elige la pestaña por largo que sea el toque, como en la barra del sistema, y
+  el visor de contenido grande no la necesita.)*
 - **El «+» no es una pestaña.** Un botón «Registrar» («Abre las opciones para registrar»), fuera
   de la lista de pestañas, sin estado elegido, con un toque háptico liviano. **Solo toque:** sin
   pulsación larga en esta versión.
@@ -535,3 +541,40 @@ el dueño en el iPhone el 2026-10-03; el símbolo y los centavos del monto de In
   Tarjetas › Pagar tarjeta y un pago o cobro de deuda en la deuda.
 
 **Estado.** Implementado en su rama, sobre 25Q4; sin revisar en un iPhone (`docs/mobile-device-checklist.md`, «Producto 25O1»).
+
+## Enmienda 2026-10-17 — Producto 25N1 (Finanzas y Ajustes)
+
+- **Qué reemplaza.** La cuarta pestaña deja de ser «Más» (ícono de puntos) y pasa a ser **Finanzas** (en inglés
+  «Finances»), con el ícono de billetera (`wallet` / `wallet-outline`). El archivo de ruta sigue siendo
+  `app/(tabs)/settings.tsx`. Su contenido es una sola lista agrupada, con los mosaicos teñidos de siempre: Para revisar
+  (con la misma regla de visibilidad, y la insignia sigue en la pestaña), Cuentas, Tarjetas, Presupuestos, Recurrentes,
+  Deudas y cobros y Categorías. El grupo «App y datos» desaparece:
+  - Idioma, Región, Apariencia y Copia de seguridad pasan a **Ajustes** (`app/preferences.tsx`, pantalla de la pila
+    raíz), que se abre con un botón de engranaje al final de la barra de Finanzas («Ajustes», 44 pt). Ajustes tiene tres
+    grupos: Preferencias (Idioma, Región, Apariencia), Tus datos (Copia de seguridad) y Acerca de (Licencias). El pie de
+    Más (la versión, ahora «FinanzApp 0.1.0 (25N1)», los diagnósticos de desarrollo y los avisos de monedas de prueba y
+    del perfil de QA) queda al final de Ajustes.
+  - **Licencias** (`app/licenses.tsx`, y cada aviso en `app/license/[id].tsx`) es nueva. Lista el software y los datos
+    de terceros que van en el binario: React Native, Expo, @expo/vector-icons, Ionicons, las bibliotecas de Software
+    Mansion, Safe Area Context, SVG, DateTimePicker, decode-uri-component, circle-flags y Unicode CLDR. Cada aviso se
+    muestra completo y tal como se publicó, en inglés. Debajo de los datos, una línea dice de dónde vienen los tipos de
+    cambio de referencia (Frankfurter) y que cada tasa queda sujeta a los términos de su proveedor. Un test compara
+    cada aviso con el archivo LICENSE del paquete y con `LICENSES/Unicode-3.0.txt`.
+  - **Movimientos deshechos** pasa a la barra de Movimientos: un botón con la flecha de deshacer que solo aparece
+    mientras hay algo deshecho (un movimiento, una transferencia, una devolución o un adelanto). Los avisos de deshacer
+    dicen «…desde Movimientos deshechos, en Movimientos». Las filas de esa pantalla ya no parecen vigentes: el importe va
+    en la tinta terciaria y sin «+», y VoiceOver dice «deshecho» después del tipo.
+- **Por qué.** «Más» mezclaba siete destinos financieros con cinco utilidades del dispositivo y de los datos, bajo un
+  nombre que no dice qué hay adentro. Separarlos reduce lo que hay que leer para elegir (Hick): la pestaña tiene un solo
+  tipo de cosa, y su nombre lo dice. Los ajustes se usan poco, así que no merecen una pestaña: las pestañas llevan a
+  contenido de primer nivel, no a configuración (HIG). Por eso no hay una quinta pestaña, que además rompería las
+  cuatro de esta decisión. Tampoco hay un engranaje en Inicio: Inicio es el mes y lo que vence, y un engranaje ahí
+  competiría con su campo financiero. El engranaje vive en la barra de la pestaña que agrupa las herramientas, como en
+  la raíz de muchas apps de iOS. Movimientos deshechos está al lado de lo que recupera.
+- **Qué no cambia.** Las cuatro pestañas y su orden, el dock y su «+», el hub Registrar, la mitigación de pantallas
+  negras, la insignia de Para revisar, ninguna regla contable y ninguna ruta: `/language`, `/region`, `/appearance`,
+  `/backup` y `/undone-entries` siguen iguales y solo cambia desde dónde se abren. Ninguna fila cambió de nombre ni de
+  subtítulo. No se agrega ninguna dependencia ni se hace un build de EAS.
+
+**Estado.** Implementado en su rama, sobre 25O1. El dueño aprueba la navegación en el iPhone antes del merge; sin
+revisar en un iPhone.

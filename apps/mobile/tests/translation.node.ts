@@ -81,7 +81,9 @@ test('both catalogues are complete: no empty text, and English is really English
     // 24C1: "Total · USD", a code with the same word in both languages.
     'display.total',
     // 24UX6D: Día a día's short «Total» label, the same word in both languages.
-    'reports.dayTotal']);
+    'reports.dayTotal',
+    // 25N1: Licencias' «Software» group, the same word in both languages.
+    'licenses.software']);
   for (const key of keys) {
     for (const catalogue of [es, en]) {
       const value = leaf(catalogue, key);
@@ -263,7 +265,7 @@ test('English fits where Spanish fits: segment, tab, quick-action, button and he
   const budgets: [string[], number][] = [
     [['activity.all', 'activity.expenses', 'activity.incomes', 'activity.transfers', 'movement.expense', 'movement.income', 'movement.transfer',
       'home.spending', 'home.available'], 13],
-    [['nav.tabs.home', 'nav.tabs.activity', 'nav.tabs.reports', 'nav.tabs.more',
+    [['nav.tabs.home', 'nav.tabs.activity', 'nav.tabs.reports', 'nav.tabs.finances',
       'quickActions.expense', 'quickActions.income', 'quickActions.transfer'], 11],
     [['common.addAccount', 'common.retrySave', 'common.retryChange', 'common.saveChanges', 'entryForm.saveExpense', 'entryForm.saveIncome',
       'transferForm.recordPayment', 'transferForm.recordCollection', 'transferForm.recordTransfer', 'entryDetail.edit', 'entryDetail.restoreAction',

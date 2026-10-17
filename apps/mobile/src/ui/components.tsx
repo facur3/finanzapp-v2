@@ -14,7 +14,7 @@ import { useDockInset } from './dock-clearance';
 import { useAccountLook, useAccountNameOf, useCategoryLook } from './category-hues';
 import { AMOUNT_FIELD, HERO_MAX_SCALE, PROMINENT_SEGMENT, ROW_CHEVRON, ROW_STACK_SCALE, SEGMENT_GAP, SEGMENT_PADDING, TEXT_STYLE_MAX_SCALE, amountFieldLayout, amountMaxScale, fitFontSize,
   rowStacks, segmentLayout } from './geometry';
-import { duration, easeOut, selectionHaptic, timing } from './motion';
+import { duration, easeOut, easeOutCss, selectionHaptic, timing } from './motion';
 import { AmountInput, displayAmount, precisionOf, splitAmount, type AmountNotice, type PasteRejection } from './money-input';
 import { BUILD_MERCHANT_MARK_PREVIEW, merchantMark } from './merchant-mark';
 import { presentedAmount } from './movement-amount';
@@ -106,7 +106,7 @@ export function Screen({ children, gap = space.xl, scrollRef }: { children: Reac
 
 /** Light: white card with a soft shadow. Dark: a surface step, no shadow. */
 export function surfaceShadow(p: Palette): ViewStyle {
-  return p.isDark ? {} : { shadowColor: '#0A0A0C', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } };
+  return p.isDark ? {} : { shadowColor: p.shadow, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } };
 }
 
 /** A card (padded, soft shadow in light) or a grouped list (flat, clipped rows,
@@ -172,11 +172,11 @@ export function PressFeedback({ children, style, containerStyle, feedback = 'sca
   const active = feedback !== 'scale' || !reduced || dim;
   // The Pressable is the VoiceOver element (its children's languages are not consulted), so it carries the language (see AppText).
   return <Animated.View style={[containerStyle, animatedStyle]}><Pressable {...props} accessibilityLanguage={props.accessibilityLanguage ?? speechLanguage}
-    style={[{ minHeight: 44, justifyContent: 'center' }, style]} pressRetentionOffset={12}
+    style={[{ minHeight: 44, justifyContent: 'center' }, style]}
     onPressIn={event => { pressed.value = active ? withTiming(1, { duration: duration.press, easing: easeOut }) : 0; props.onPressIn?.(event); }}
     onPressOut={event => { pressed.value = withTiming(0, { duration: active ? duration.release : 0, easing: easeOut }); props.onPressOut?.(event); }}>
     {backdrop}
-    {feedback === 'highlight' && <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: p.isDark ? 'rgba(255,255,255,0.07)' : 'rgba(10,10,12,0.05)' }, highlightStyle]} />}
+    {feedback === 'highlight' && <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: p.pressWash }, highlightStyle]} />}
     {children}
   </Pressable></Animated.View>;
 }
@@ -233,15 +233,37 @@ export function SearchField({ label, ...props }: TextInputProps & { label: strin
   </View>;
 }
 
+/** Keyboards with no Return key: a field on one gets the «Listo» bar the amount field has. */
+const PAD_KEYBOARDS: ReadonlySet<string> = new Set(['number-pad', 'decimal-pad', 'numeric', 'phone-pad']);
+
+/** A text field. Clear while editing (iOS hides it while the field is locked), a «Listo» bar over a keyboard with no
+ * Return key, and a locked field (editable false) drawn at the row family's disabled strength. */
 export function Field({ label, ...props }: TextInputProps & { label: string }) {
   const p = usePalette();
   const { speechLanguage } = useI18n();
+  const accessoryId = useId();
+  const pad = Platform.OS === 'ios' && PAD_KEYBOARDS.has(props.keyboardType ?? '');
   // The caption is the field's accessibility label, so VoiceOver reads it once, on the field, not as a stop of its own.
-  return <View style={{ gap: 8 }}><AppText accessible={false} secondary variant="footnote" style={{ fontWeight: '500' }}>{label}</AppText>
-    <TextInput returnKeyType="done" onSubmitEditing={Keyboard.dismiss} {...props} accessibilityLabel={label}
+  return <View style={{ gap: 8, opacity: props.editable === false ? 0.6 : 1 }}><AppText accessible={false} secondary variant="footnote" style={{ fontWeight: '500' }}>{label}</AppText>
+    <TextInput returnKeyType="done" onSubmitEditing={Keyboard.dismiss} clearButtonMode="while-editing" inputAccessoryViewID={pad ? accessoryId : undefined} {...props} accessibilityLabel={label}
       accessibilityLanguage={props.accessibilityLanguage ?? speechLanguage} placeholderTextColor={p.tertiary}
       selectionColor={p.primary} style={[styles.input, { color: p.text, backgroundColor: p.surface }, props.style]} />
+    {pad && <DoneAccessory id={accessoryId} />}
   </View>;
+}
+
+/** The bar over a keyboard with no Return key: one «Listo» that dismisses it. */
+function DoneAccessory({ id }: { id: string }) {
+  const p = usePalette();
+  const { t } = useI18n();
+  return <InputAccessoryView nativeID={id} backgroundColor={p.surface}>
+    <View style={{ alignItems: 'flex-end', paddingHorizontal: 20 }}>
+      {/* Named as it reads, so Voice Control's «Tocar Listo» finds it. */}
+      <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('common.done')} onPress={Keyboard.dismiss} style={{ paddingHorizontal: 12 }}>
+        <AppText style={{ color: p.primary, fontWeight: '600' }}>{t('common.done')}</AppText>
+      </PressFeedback>
+    </View>
+  </InputAccessoryView>;
 }
 
 type Caret = { start: number; end: number };
@@ -353,7 +375,7 @@ export function AmountField({ label, currency, tone, value = '', onChangeText, s
     setSelection({ start: result.view.caret, end: result.view.caret });
     emit(result.draft);
   };
-  return <View style={{ gap: 6, paddingVertical: 8 }}>
+  return <View style={{ gap: 6, paddingVertical: 8, opacity: props.editable === false ? 0.6 : 1 }}>
     {/* Said by the field itself (`amount.accessibility`: the label and the currency in words), never twice. */}
     {!bare && <AppText accessible={false} secondary variant="footnote" style={{ fontWeight: '500' }}>{title} · {currency}</AppText>}
     <View style={styles.amountRow} onLayout={event => setRowWidth(event.nativeEvent.layout.width)}>
@@ -369,14 +391,7 @@ export function AmountField({ label, currency, tone, value = '', onChangeText, s
         style={[styles.amountInput, { color, fontSize, paddingRight: AMOUNT_FIELD.caret }, props.style]} />
     </View>
     {noticeText && <AppText variant="footnote" style={{ color: p.warning }}>{noticeText}</AppText>}
-    {Platform.OS === 'ios' && <InputAccessoryView nativeID={accessoryId} backgroundColor={p.surface}>
-      <View style={{ alignItems: 'flex-end', paddingHorizontal: 20 }}>
-        {/* Named as it reads, so Voice Control's «Tocar Listo» finds it. */}
-        <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('common.done')} onPress={Keyboard.dismiss} style={{ paddingHorizontal: 12 }}>
-          <AppText style={{ color: p.primary, fontWeight: '600' }}>{t('common.done')}</AppText>
-        </PressFeedback>
-      </View>
-    </InputAccessoryView>}
+    {Platform.OS === 'ios' && <DoneAccessory id={accessoryId} />}
   </View>;
 }
 
@@ -433,10 +448,10 @@ function Choice({ label, spokenLabel, selected, disabled, onPress, compact = fal
     {/* 24T3: the prominent label has no shrink-to-fit at all (its labels fit at the 1.3× cap; see PROMINENT_SEGMENT). */}
     {prominent ? <Animated.Text numberOfLines={1} maxFontSizeMultiplier={PROMINENT_SEGMENT.maxScale}
       style={{ fontSize: PROMINENT_SEGMENT.fontSize, lineHeight: PROMINENT_SEGMENT.lineHeight, textAlign: 'center', fontWeight: selected ? '600' : '500',
-        color, transitionProperty: 'color', transitionDuration: reduced ? 0 : duration.state }}>{label}</Animated.Text>
+        color, transitionProperty: 'color', transitionDuration: reduced ? 0 : duration.state, transitionTimingFunction: easeOutCss }}>{label}</Animated.Text>
     : <Animated.Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={1.3}
       style={{ fontSize: onField ? 15 : 13, lineHeight: onField ? 20 : 18, textAlign: 'center', fontWeight: (compact || onField) && !selected ? '500' : '600',
-        color, transitionProperty: 'color', transitionDuration: reduced ? 0 : duration.state }}>{label}</Animated.Text>}
+        color, transitionProperty: 'color', transitionDuration: reduced ? 0 : duration.state, transitionTimingFunction: easeOutCss }}>{label}</Animated.Text>}
   </Pressable>;
 }
 
@@ -479,11 +494,11 @@ export function Choices<T extends string>({ value, options, onChange, disabled, 
   const track = onField ? p.heroControl : compact && p.isDark ? p.surface : p.inset;
   const thumb = onField ? p.heroThumb : p.isDark ? (compact ? p.thumb : p.elevated) : p.surface;
   // The compact thumb carries a hairline edge in both themes, so the chosen segment reads as a state, not a tint.
-  const thumbEdge = compact && !onField ? { borderWidth: StyleSheet.hairlineWidth, borderColor: p.isDark ? 'rgba(255,255,255,0.10)' : 'rgba(10,10,12,0.08)' } : {};
+  const thumbEdge = compact && !onField ? { borderWidth: StyleSheet.hairlineWidth, borderColor: p.edge } : {};
   // A disabled switch looks disabled (25VIS2), as a disabled button does: the whole track at half opacity.
   return <View style={[styles.choices, onField && styles.choicesField, { backgroundColor: track, opacity: disabled ? 0.5 : 1 }]} onLayout={event => setTrackWidth(event.nativeEvent.layout.width)}>
     {width > 0 && found >= 0 && <Animated.View pointerEvents="none" style={[styles.thumb, onField && styles.thumbField, { width, backgroundColor: thumb }, thumbEdge,
-      p.isDark || onField ? {} : { shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } }, thumbStyle]} />}
+      p.isDark || onField ? {} : { shadowColor: p.shadow, shadowOpacity: 0.1, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } }, thumbStyle]} />}
     {options.map(option => <Choice key={option.value} label={option.label} spokenLabel={option.spokenLabel} selected={value === option.value} compact={compact}
       onField={onField} prominent={prominent} disabled={disabled} onPress={() => { if (option.value !== value) { selectionHaptic(); onChange(option.value); } }} />)}
   </View>;
@@ -590,7 +605,8 @@ export function Money({ minor, currency, large = false, color, signed = false, s
   minor: number; currency: Currency; large?: boolean; color?: string; signed?: boolean; size?: number; tone?: Tone; weight?: '500' | '600' | '700';
   align?: 'left' | 'center';
   /** On Inicio's field (25A-03): a hero's symbol and cents take the field's solid quiet tones (`heroMoneySymbol`,
-   * `heroMoneyCents`) instead of the ink at an alpha. The whole units keep `color`. */
+   * `heroMoneyCents`) instead of the ink at an alpha. The whole units keep `color`. 25N1: a hero drawn quieter than the
+   * field's ink (the zero month's `heroSecondary`) is one tone throughout, never units dimmer than their own symbol. */
   onField?: boolean;
 }) {
   const p = usePalette();
@@ -615,7 +631,7 @@ export function Money({ minor, currency, large = false, color, signed = false, s
   // With iOS's Increase Contrast on, nothing steps back: the quiet parts are a
   // composition choice, never one a person who asked for contrast pays for.
   const parts = hero && safe ? splitAmount(text, amountFormat) : null;
-  const quiet = p.increaseContrast ? { symbol: ink, cents: ink } : onField ? { symbol: p.heroMoneySymbol, cents: p.heroMoneyCents }
+  const quiet = p.increaseContrast || (onField && ink !== p.heroInk) ? { symbol: ink, cents: ink } : onField ? { symbol: p.heroMoneySymbol, cents: p.heroMoneyCents }
     : ink === p.text ? { symbol: p.secondary, cents: p.tertiary }
     // 25O1 review: the light palette's ink only sits on a light ground (the close's sand-white card): its quiet pair in both themes.
     : ink === lightPalette.text ? { symbol: lightPalette.secondary, cents: lightPalette.tertiary }
@@ -663,7 +679,7 @@ export function DetailRow({ label, value, spokenValue, icon, leading, onPress, l
     </View>
     {onPress && <Ionicons name="chevron-forward" size={16} color={p.tertiary} accessible={false} />}
   </>;
-  const style: StyleProp<ViewStyle> = [styles.detailRow, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }];
+  const style: StyleProp<ViewStyle> = [styles.detailRow, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, opacity: disabled ? 0.6 : 1 }];
   return onPress ? <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={label + ': ' + (spokenValue ?? value)}
     disabled={disabled} accessibilityState={{ disabled }} onPress={onPress} style={style}>{content}</PressFeedback> : <View style={style}>{content}</View>;
 }
@@ -818,8 +834,11 @@ export function AccountBadge({ accountId, large = false, size }: { accountId: st
 /** One transaction line: merchant, then category · account · date; amount on the right. VoiceOver hears the full
  * sentence. (24UX6A: Inicio's «Actividad reciente» uses this same row in a grouped surface, so the open `home` variant
  * of 24UX3/24UX5 is gone.) */
-export function EntryRow({ entry, account, last = false, showDate = true, showAccount = true }: {
+export function EntryRow({ entry, account, last = false, showDate = true, showAccount = true, voided = false }: {
   entry: Entry; account: Account; last?: boolean; showDate?: boolean; showAccount?: boolean;
+  /** 25N1: a row of Movimientos deshechos. It counts nowhere, so it never looks live: the amount in the tertiary ink with no
+   * «+» (as the detail dims a voided amount) and VoiceOver hears «deshecho» after the kind. */
+  voided?: boolean;
 }) {
   const p = usePalette();
   const day = useCurrentDay();
@@ -846,7 +865,7 @@ export function EntryRow({ entry, account, last = false, showDate = true, showAc
     : component === undefined ? [entry.merchant, t(income ? 'movement.incomeWord' : 'movement.expenseWord')]
       : [t('operations.row.payoffWord'), ...(component === 'principal' ? [] : [t(`operations.row.payoffShareSpoken.${component}`)]), entry.merchant];
   return <PressFeedback feedback="highlight" accessibilityRole="button"
-    accessibilityLabel={[...spokenKind, spokenAmount(amount.minor, account.currency), category, account.name, dateLabel].join(', ')}
+    accessibilityLabel={[...spokenKind, ...(voided ? [t(refund ? 'rows.undoneTransfer' : 'rows.undone')] : []), spokenAmount(amount.minor, account.currency), category, account.name, dateLabel].join(', ')}
     onPress={() => router.push(operationId !== undefined ? { pathname: '/operation/[id]', params: { id: operationId } } : { pathname: '/entry/[id]', params: { id: entry.id } })}
     style={[styles.row, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
     {refund ? <GlyphTile icon="arrow-undo-outline" />
@@ -857,7 +876,7 @@ export function EntryRow({ entry, account, last = false, showDate = true, showAc
         {!!detail && <AppText secondary variant="footnote" numberOfLines={stacked ? undefined : 2}>{detail}</AppText>}
       </View>
       <View style={{ maxWidth: stacked ? '100%' : AMOUNT_COLUMN, alignItems: 'flex-end' }}>
-        <Money minor={amount.minor} currency={account.currency} signed={amount.signed} tone={amount.tone} />
+        <Money minor={amount.minor} currency={account.currency} signed={amount.signed && !voided} tone={amount.tone} color={voided ? p.tertiary : undefined} />
       </View>
     </View>
   </PressFeedback>;
@@ -897,15 +916,17 @@ export function AccountRow({ account, entries, transfers, last = false, accessib
  * a transfer is a payment/collection and reads better without a +/− sign. */
 export type RowContext = 'card' | 'debt';
 
-export function MovementRow({ item, accounts, accountId, last, showDate = true, context }: {
-  item: ActivityItem; accounts: Account[]; accountId?: string; last?: boolean; showDate?: boolean; context?: RowContext;
+export function MovementRow({ item, accounts, accountId, last, showDate = true, context, voided }: {
+  item: ActivityItem; accounts: Account[]; accountId?: string; last?: boolean; showDate?: boolean; context?: RowContext; voided?: boolean;
 }) {
-  return item.type === 'entry' ? <EntryRow entry={item.value} account={accounts.find(a => a.id === item.value.accountId)!} last={last} showDate={showDate} showAccount={!accountId} />
-    : <TransferRow transfer={item.value} accounts={accounts} accountId={accountId} last={last} showDate={showDate} context={context} />;
+  return item.type === 'entry' ? <EntryRow entry={item.value} account={accounts.find(a => a.id === item.value.accountId)!} last={last} showDate={showDate} showAccount={!accountId} voided={voided} />
+    : <TransferRow transfer={item.value} accounts={accounts} accountId={accountId} last={last} showDate={showDate} context={context} voided={voided} />;
 }
 
-export function TransferRow({ transfer: t, accounts, accountId, last = false, showDate = true, context }: {
+export function TransferRow({ transfer: t, accounts, accountId, last = false, showDate = true, context, voided = false }: {
   transfer: Transfer; accounts: Account[]; accountId?: string; last?: boolean; showDate?: boolean; context?: RowContext;
+  /** 25N1: as on EntryRow, a row of Movimientos deshechos: the amount in the tertiary ink, «deshecha» after the kind. */
+  voided?: boolean;
 }) {
   const p = usePalette();
   const day = useCurrentDay();
@@ -925,7 +946,7 @@ export function TransferRow({ transfer: t, accounts, accountId, last = false, sh
   const stacked = useStacked({ minor: amount.minor, currency: from.currency, signed: amount.signed });
   // VoiceOver hears the kind even when a note names the row («Transferencia, Alquiler, de … a …»).
   const kindWord = tr('rows.transfer');
-  const spokenTitle = context || title === kindWord ? title : kindWord + ', ' + title;
+  const spokenTitle = (context || title === kindWord ? title : kindWord + ', ' + title) + (voided ? ', ' + tr('rows.undoneTransfer') : '');
   return <PressFeedback feedback="highlight" accessibilityRole="button"
     accessibilityLabel={tr('rows.transferLabel', { title: spokenTitle, from: fromName, to: toName, amount: spokenAmount(t.amountMinor, from.currency), date }) + (t.note && t.note !== title ? ', ' + t.note : '')}
     onPress={() => router.push({ pathname: '/transfer/[id]', params: { id: t.id } })}
@@ -937,7 +958,7 @@ export function TransferRow({ transfer: t, accounts, accountId, last = false, sh
         <AppText secondary variant="footnote" numberOfLines={stacked ? undefined : 2}>{detail}</AppText>
       </View>
       <View style={{ maxWidth: stacked ? '100%' : AMOUNT_COLUMN, alignItems: 'flex-end' }}>
-        <Money minor={amount.minor} currency={from.currency} signed={amount.signed} tone={amount.tone} />
+        <Money minor={amount.minor} currency={from.currency} signed={amount.signed} tone={amount.tone} color={voided ? p.tertiary : undefined} />
       </View>
     </View>
   </PressFeedback>;
@@ -969,3 +990,6 @@ const styles = StyleSheet.create({
   navigationGlyph: { width: 30, alignItems: 'center' },
   selectionRow: { minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 10 },
 });
+
+/** The geometry of a list row (EntryRow, AccountRow, TransferRow), for a row drawn elsewhere (DebtRow). */
+export const rowStyle = styles.row;

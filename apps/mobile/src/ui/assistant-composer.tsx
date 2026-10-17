@@ -43,8 +43,8 @@ export function AssistantComposer({ value, onChange, onSend, onStop, busy, disab
   const { fontScale } = useWindowDimensions();
   const canSend = value.trim().length > 0 && !busy && !disabled;
   const maxHeight = Math.round(LINE_HEIGHT * Math.min(fontScale, 1.6) * COMPOSER_MAX_LINES);
-  const opaque = { backgroundColor: p.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: p.isDark ? 'rgba(255,255,255,0.10)' : 'rgba(10,10,12,0.08)',
-    ...(p.isDark ? {} : styles.barShadow) };
+  const opaque = { backgroundColor: p.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: p.edge,
+    ...(p.isDark ? {} : { ...styles.barShadow, shadowColor: p.shadow }) };
   return <KeyboardSpace bottomInset={insets.bottom}>
     <ControlSurface material={material} style={styles.bar} opaque={opaque}>
       <TextInput value={value} onChangeText={onChange} multiline editable={!disabled} placeholder={t(COMPOSER_PLACEHOLDER)} placeholderTextColor={p.tertiary}
@@ -87,7 +87,7 @@ function KeyboardSpace({ children, bottomInset }: { children: ReactNode; bottomI
 const styles = StyleSheet.create({
   space: { paddingHorizontal: space.l, paddingTop: space.s, gap: space.s },
   bar: { flexDirection: 'row', alignItems: 'flex-end', gap: 2, paddingLeft: 16, paddingRight: 6, paddingVertical: 4, borderRadius: 24, minHeight: 48 },
-  barShadow: { shadowColor: '#0A0A0C', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } },
+  barShadow: { shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } },
   input: { flex: 1, fontSize: 17, paddingTop: Platform.OS === 'ios' ? 9 : 6, paddingBottom: Platform.OS === 'ios' ? 9 : 6, minHeight: 40 },
   // 25D1: a real 44 pt target (it was 40) that still costs 40 pt of layout: the extra 2 pt each side sit inside the bar's
   // 4 pt padding, so the 32 pt disc, the field and the 48 pt bar do not move.

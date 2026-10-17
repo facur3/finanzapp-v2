@@ -13,15 +13,17 @@ export interface FaceTone {
   highlight: string;
 }
 
-/** The tones of a card without a chosen colour, by hash (unchanged since Interfaz 10, except bronze's highlight, one
- * step deeper in 24T2 so it reaches 7:1 with white too). */
+/** The tones of a card without a chosen colour, by hash (since Interfaz 10; bronze's highlight one step deeper in 24T2 so
+ * it reaches 7:1 with white too). 25N1: the sixth tone is a rust, the terracotta face: the slate it replaced was the
+ * graphite's twin (ΔE 1.6), so two cards of three could look the same. Every pair is now ΔE 12 or more apart
+ * (tests/cards-deck.node.ts). Only the drawn colour of a card hashed to that slot changes; nothing stored does. */
 export const HASH_FACES: readonly FaceTone[] = [
   { base: '#1F2937', highlight: '#374151' }, // graphite
   { base: '#0F1F3D', highlight: '#1E3A6E' }, // navy
   { base: '#12352A', highlight: '#1F5C46' }, // forest
   { base: '#3B1F44', highlight: '#5B3268' }, // plum
   { base: '#4A3A1D', highlight: '#6A532D' }, // bronze
-  { base: '#1F2A36', highlight: '#33475B' }, // slate
+  { base: '#4C2318', highlight: '#723626' }, // rust
 ];
 
 /** A deep tone for each appearance colour (`APPEARANCE_COLORS`, packages/domain/appearance.ts), the same hue as the
@@ -39,6 +41,10 @@ export const COLOR_FACES: Readonly<Record<string, FaceTone>> = {
   slate: { base: '#1F2A36', highlight: '#33475B' },
   graphite: { base: '#232326', highlight: '#3A3A3F' },
 };
+
+/** The rim of every face (the deck's cards and a row's swatch): a white hairline, what separates two dark faces in dark
+ * mode, where the deck has no shadow. */
+export const FACE_RIM = 'rgba(255, 255, 255, 0.12)';
 
 /** 25D1: the black wash a pressed deck card gets under Reduce Motion, where it does not scale. Pinned by
  * tests/cards-deck.node.ts: white text keeps 6:1 and the issuer line 4.5:1 on every face while pressed. */

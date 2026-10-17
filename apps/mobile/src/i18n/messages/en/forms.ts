@@ -116,6 +116,8 @@ export const forms: Pick<Messages, 'entryForm' | 'transferForm'> = {
     explainCard: 'The payment lowers the card’s outstanding balance and the account’s balance. The original purchase already counted as an expense; this does not count it twice.',
     explainDebt: 'Moves balance between your account and the obligation. It is neither an expense nor income.',
     explainTransfer: 'Only records a transfer between your accounts. It sends no money to the bank and does not count as an expense or income.',
+    cardPointerOne: 'Paying {name}? Use “Pay card”.',
+    cardPointer: 'To pay a card, use “Pay card” in Cards.',
     retryNote: 'The submission is locked so a retry cannot duplicate it. Before changing it, close and check Activity.',
     notEditableTitle: 'This cannot be edited',
     notEditableDetail: 'This transfer does not exist or was undone. Go back to its details to check it.',

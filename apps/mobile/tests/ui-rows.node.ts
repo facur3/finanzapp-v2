@@ -43,6 +43,8 @@ function load(file: string, extra: Record<string, unknown> = {}, fontScale = 1, 
       FlatList: 'FlatList', Modal: 'Modal', Platform: { OS: 'ios' }, Keyboard: { dismiss() { keyboard.push('dismiss'); } }, StyleSheet: { hairlineWidth: 0.5, create: (styles: unknown) => styles, flatten: (style: any) => Object.assign({}, ...(Array.isArray(style) ? style.flat(Infinity).filter(Boolean) : [style])), absoluteFill: {} },
       useWindowDimensions: () => ({ fontScale, width, height: 844 }), Alert: { alert: (title: string, message: string, buttons?: { text: string }[]) => alerts.push({ title, message, buttons }) } },
     'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View', Text: 'Animated.Text' }, useSharedValue: (value: number) => ({ value }), withTiming: (value: number) => value, useAnimatedStyle: (fn: () => unknown) => fn() },
+    // The sheet hands its exit back to React Native with react-native-worklets' scheduleOnRN (runOnJS is deprecated).
+    'react-native-worklets': { scheduleOnRN: (fn: (...args: unknown[]) => void, ...args: unknown[]) => fn(...args) },
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
     '@react-native-community/datetimepicker': 'DateTimePicker',
     '@expo/vector-icons/Ionicons': 'Ionicons',
@@ -821,6 +823,32 @@ test('24UX6C: a transfer row shows the stored amount unsigned in the transfer to
     'in a card context the note is still read after the facts');
 });
 
+test('25N1: a row of Movimientos deshechos never looks live: the amount in the tertiary ink with no «+», and VoiceOver hears «deshecho»', () => {
+  const ui = load('components.tsx');
+  const bank = { id: 'a', name: 'Banco', currency: 'ARS', openingMinor: 0, createdAt: 't' };
+  const cash = { id: 'b', name: 'Efectivo', currency: 'ARS', openingMinor: 0, createdAt: 't' };
+  const income = { id: 'i', accountId: 'a', kind: 'income', merchant: 'Sueldo', category: 'Sueldo', amountMinor: 500000, dateISO: '2026-09-22', createdAt: 't' };
+  const row = ui.render('EntryRow', { entry: income, account: bank, voided: true });
+  const [money] = moneyOf(row);
+  assert.deepEqual([money.props.minor, money.props.signed, money.props.color], [500000, false, '#8E9098'], 'the stored amount, unsigned, in palette.tertiary');
+  assert.equal(drawn(row).some(text => text.startsWith('+')), false, 'no «+» on an undone income: ' + drawn(row).join(' | '));
+  assert.equal(pressOf(row).props.accessibilityLabel, 'Sueldo, ingreso, deshecho, 5000,00 ARS, x, Banco, Hoy');
+  const live = ui.render('EntryRow', { entry: income, account: bank });
+  assert.deepEqual([moneyOf(live)[0].props.signed, moneyOf(live)[0].props.color], [true, undefined], 'a live row is unchanged');
+  const expense = ui.render('EntryRow', { entry: { ...income, kind: 'expense', merchant: 'Café', category: 'Comida' }, account: bank, voided: true });
+  assert.equal(pressOf(expense).props.accessibilityLabel, 'Café, gasto, deshecho, 5000,00 ARS, x, Banco, Hoy');
+  // A devolución is feminine: «Devolución, Café, deshecha».
+  const refundRow = ui.render('EntryRow', { entry: { ...income, merchant: 'Café', category: 'Comida', refund: { operationId: 'op' } }, account: bank, voided: true });
+  assert.match(pressOf(refundRow).props.accessibilityLabel, /^Devolución, Café, deshecha, /);
+  const transfer = { id: 't', fromAccountId: 'a', toAccountId: 'b', amountMinor: 250000, dateISO: '2026-09-22', createdAt: 't', note: '' };
+  const undoneTransfer = ui.render('TransferRow', { transfer, accounts: [bank, cash], voided: true });
+  assert.equal(moneyOf(undoneTransfer)[0].props.color, '#8E9098');
+  assert.equal(pressOf(undoneTransfer).props.accessibilityLabel, 'Transferencia, deshecha, de Banco a Efectivo, 2500,00 ARS, Hoy');
+  // Through MovementRow, as EntryList draws them.
+  const viaList = ui.render('MovementRow', { item: { type: 'transfer', value: { ...transfer, note: 'Alquiler' }, key: 't' }, accounts: [bank, cash], voided: true });
+  assert.equal(pressOf(viaList).props.accessibilityLabel, 'Transferencia, Alquiler, deshecha, de Banco a Efectivo, 2500,00 ARS, Hoy');
+});
+
 test('24UX6C: a computed sign is kept: a negative account balance still renders with its minus', () => {
   const ui = load('components.tsx', { '@finanzapp/domain': { accountBalanceMinor: () => -45000, formatMinorUnits, labelFromISO: (d: string) => d, categoryKey: (s: string) => s.toLowerCase(), todayKey: (d: Date) => d.toISOString().slice(0, 10) } });
   const account = { id: 'a', name: 'Banco', currency: 'ARS', openingMinor: 0, createdAt: 't' };
@@ -1125,4 +1153,55 @@ test('25VIS2 (V7): a fixed SelectorCard reads as a fact: full strength, no chevr
   assert.equal(chooser.type, 'PressFeedback');
   assert.equal(chooser.props.accessibilityRole, 'button');
   assert.ok(nodes(chooser).some(node => node.type === 'Ionicons'), 'a chooser keeps its chevron');
+});
+
+test('25N1: a press keeps React Native\'s own retention (20/20/20/30 pt of drift) unless its caller sets one', () => {
+  const ui = load('components.tsx');
+  const pressable = (props: Record<string, unknown> = {}) => ui.render('PressFeedback', { onPress: () => {}, children: 'x', ...props }).props.children;
+  assert.equal(pressable().props.pressRetentionOffset, undefined, 'never a tighter 12 pt');
+  assert.equal(pressable({ pressRetentionOffset: 40 }).props.pressRetentionOffset, 40, 'a caller may widen it');
+  const deck = readFileSync(new URL('../src/ui/card-visual.tsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(deck, /pressRetentionOffset/, 'the deck slot keeps the default too');
+});
+
+test('25N1: a text field offers Clear while editing, and a field on a keyboard with no Return key gets the «Listo» bar', () => {
+  const ui = load('components.tsx');
+  const input = (root: Node) => nodes(root).find(node => node.type === 'TextInput')!;
+  const name = ui.render('Field', { label: 'Nombre', value: 'Banco' });
+  assert.equal(input(name).props.clearButtonMode, 'while-editing');
+  assert.equal(input(name).props.inputAccessoryViewID, undefined, 'a Return key already dismisses it');
+  assert.equal(nodes(name).some(node => is(node, 'InputAccessoryView') || node.type === 'InputAccessoryView'), false);
+  assert.equal(input(ui.render('Field', { label: 'Buscar', value: '', clearButtonMode: 'never' })).props.clearButtonMode, 'never', 'a caller may opt out');
+  for (const keyboardType of ['number-pad', 'decimal-pad', 'numeric', 'phone-pad']) {
+    const digits = ui.render('Field', { label: 'Últimos 4 dígitos', value: '', keyboardType });
+    const accessory = nodes(digits).find(node => node.type === 'InputAccessoryView')!;
+    assert.ok(accessory, keyboardType + ' has no Return key');
+    assert.equal(input(digits).props.inputAccessoryViewID, accessory.props.nativeID);
+    const done = nodes(accessory).find(node => is(node, 'PressFeedback') && node.props.onPress)!;
+    assert.equal(done.props.accessibilityLabel, 'Listo');
+    done.props.onPress();
+  }
+  assert.deepEqual(ui.keyboard, ['dismiss', 'dismiss', 'dismiss', 'dismiss']);
+});
+
+test('25N1: a locked field, amount or date row looks disabled (60 %), as a locked selector card does; a live one is full strength', async () => {
+  const ui = load('components.tsx', { '@finanzapp/domain': await import('@finanzapp/domain') });
+  const strength = (root: Node) => flat(root.props.style).opacity;
+  assert.deepEqual([strength(ui.render('Field', { label: 'Comercio', value: 'x' })), strength(ui.render('Field', { label: 'Comercio', value: 'x', editable: false }))], [1, 0.6]);
+  const amount = (editable?: boolean) => strength(ui.render('AmountField', { label: 'Gasto', currency: 'ARS', value: '10', onChangeText: () => {}, editable }));
+  assert.deepEqual([amount(), amount(true), amount(false)], [1, 1, 0.6]);
+  const row = (disabled: boolean) => nodes(ui.render('DetailRow', { label: 'Fecha', value: 'Hoy', onPress: () => {}, disabled })).find(node => is(node, 'PressFeedback'))!;
+  assert.deepEqual([styleOf(row(false)).opacity, styleOf(row(true)).opacity, row(true).props.accessibilityState.disabled], [1, 0.6, true]);
+});
+
+test('25N1: a locked appearance picker draws every icon and colour at 60 % and says each is disabled', async () => {
+  const appearance = await import('../src/ui/appearance.ts');
+  const ui = load('appearance-picker.tsx', { './appearance': appearance, './motion': { duration: { state: 200 }, selectionHaptic: () => {} },
+    './theme': { space: { l: 16 }, usePalette: () => ({ ...lightPalette, isDark: false }), useReduceMotion: () => false } });
+  const options = (disabled: boolean) => nodes(ui.render('IconColorPicker', { icons: appearance.ACCOUNT_ICON_CHOICES, colors: appearance.COLOR_CHOICES,
+    icon: appearance.ACCOUNT_ICON_CHOICES[0].id, color: appearance.COLOR_CHOICES[0].id, onIconChange: () => {}, onColorChange: () => {}, disabled }))
+    .filter(node => node.type === 'PressFeedback' && node.props.accessibilityRole === 'radio');
+  assert.ok(options(true).length > 0);
+  assert.ok(options(true).every(node => flat(node.props.style).opacity === 0.6 && node.props.accessibilityState.disabled === true));
+  assert.ok(options(false).every(node => flat(node.props.style).opacity === undefined));
 });

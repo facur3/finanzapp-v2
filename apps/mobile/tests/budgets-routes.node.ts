@@ -137,6 +137,20 @@ test('editing keeps the kind fixed: a total edits its amount only, a sublimit ke
   assert.equal(editFood.backs(), 1);
 });
 
+test('25N1 review: a save that committed but could not refresh keeps its own scope for the retry when the ledger later shows it', async () => {
+  const data: domain.LedgerArchive = { ...archive, budgets: [food] };
+  const view = harness({ monthISO: '2026-09', currency: 'ARS', scope: 'total' }, data, async () => { throw new Error('database is locked'); });
+  find(view.render(), 'AmountField').props.onChangeText('1');
+  await find(view.render(), 'ActionButton', 'Crear presupuesto').props.onPress();
+  // The write did land: a later refresh (the app back in front) shows the very budget this form is retrying.
+  data.budgets = [food, view.saved[0]!];
+  const root = view.render();
+  assert.equal(nodes(root).some(node => node.type === 'CategoryField'), false, 'still the general budget it was creating, never a category limit');
+  const retry = find(root, 'ActionButton', 'Reintentar guardado');
+  assert.equal(retry.props.disabled ?? false, false, 'the retry stays available');
+  assert.equal(nodes(root).some(node => node.type === 'AppText' && /Para cambiarlo/.test(String(node.props.children))), false, 'never told it is taken by itself');
+});
+
 test('a failed write, a zero amount and a negative one keep the draft, and archiving asks first', async () => {
   // 24UX6E: a duplicate is now refused before the submission freezes (next test); the frozen retry is for a write that
   // failed after the input was valid, here a storage error on a budget nothing else conflicts with.
@@ -175,28 +189,32 @@ test('a failed write, a zero amount and a negative one keep the draft, and archi
 
 test('24UX6E: a second general budget or a second limit for the same category, currency and month is an input error before anything freezes; the draft stays editable and a different choice saves once', async () => {
   // archive: a general ARS budget and a «Comida» sublimit for 2026-09, the rule storage applies (validateBudgetCollection).
+  // 25N1: with a general budget already there «General» is never offered, even when asked for: the form is a category limit.
   const view = harness({ monthISO: '2026-09', currency: 'ARS', scope: 'total' });
-  find(view.render(), 'AmountField').props.onChangeText('1');
-  await find(view.render(), 'ActionButton', 'Crear presupuesto').props.onPress();
   let root = view.render();
-  assert.equal(view.saved.length, 0, 'nothing is written');
-  assert.equal(find(root, 'ErrorMessage').props.message, 'Ya existe un presupuesto general activo para esa moneda y mes.');
-  assert.equal(find(root, 'AmountField').props.editable, true, 'the draft is not frozen');
-  assert.equal(choice(root, 'total').props.disabled, false, 'the kind can still change');
-  assert.equal(nodes(root).some(node => node.type === 'ActionButton' && node.props.label === 'Reintentar guardado'), false, 'no retry that could never succeed');
-  assert.equal(texts(root).some(text => text.includes('congelado')), false);
-  choice(root, 'total').props.onChange('category');
+  assert.equal(nodes(root).some(node => node.type === 'Choices'), false, 'no scope switch: General is taken');
+  assert.ok(texts(root).includes('Límite por categoría'));
+  find(root, 'AmountField').props.onChangeText('1');
   find(view.render(), 'CategoryField').props.onChange(' comida ');
   await find(view.render(), 'ActionButton', 'Crear presupuesto').props.onPress();
   root = view.render();
-  assert.equal(view.saved.length, 0);
+  assert.equal(view.saved.length, 0, 'nothing is written');
   assert.equal(find(root, 'ErrorMessage').props.message, 'Ya existe un presupuesto activo para esa categoría, moneda y mes.', 'the normalised category is the same one');
-  assert.equal(find(root, 'AmountField').props.editable, true);
+  assert.ok(texts(root).includes('Para cambiarlo, tocalo en Presupuestos.'), '25N1: the refusal says where to go');
+  assert.equal(find(root, 'AmountField').props.editable, true, 'the draft is not frozen');
+  assert.equal(nodes(root).some(node => node.type === 'ActionButton' && node.props.label === 'Reintentar guardado'), false, 'no retry that could never succeed');
+  assert.equal(texts(root).some(text => text.includes('congelado')), false);
   find(view.render(), 'CategoryField').props.onChange('Ocio');
-  await find(view.render(), 'ActionButton', 'Crear presupuesto').props.onPress();
+  root = view.render();
+  assert.equal(texts(root).includes('Para cambiarlo, tocalo en Presupuestos.'), false, 'a free category: no pointer');
+  await find(root, 'ActionButton', 'Crear presupuesto').props.onPress();
   assert.deepEqual([view.saved.length, view.saved[0].scope, view.saved[0].category, view.saved[0].amountMinor], [1, 'category', 'Ocio', 100]);
   assert.equal(view.backs(), 1);
-  assert.equal(view.haptics.join(','), 'Error,Error,Success', '25Q4: one Error tap for each refusal before sending, then Success');
+  assert.equal(view.haptics.join(','), 'Error,Success', '25Q4: one Error tap for the refusal before sending, then Success');
+  // Another currency has no general budget: the switch is back and General saves.
+  const other = harness({ monthISO: '2026-09', currency: 'ARS', scope: 'total' });
+  find(other.render(), 'CurrencySwitch').props.onChange('USD');
+  assert.equal(choice(other.render(), 'total').props.value, 'total');
   // Another currency, or an archived general budget, is no conflict.
   const usd = harness({ monthISO: '2026-09', currency: 'USD', scope: 'total' });
   find(usd.render(), 'AmountField').props.onChangeText('1');

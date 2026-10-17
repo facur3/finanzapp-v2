@@ -11,6 +11,7 @@ import * as liabilityPresentation from '../src/ui/liability-presentation.ts';
 import * as installmentPresentation from '../src/ui/installment-presentation.ts';
 import * as moneyInput from '../src/ui/money-input.ts';
 import * as entryPrefill from '../src/ui/entry-prefill.ts';
+import { memoryOf } from './preference-memory.ts';
 import * as purchasePlan from '../src/ui/purchase-plan.ts';
 import * as movementAmount from '../src/ui/movement-amount.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
@@ -115,7 +116,7 @@ function harness(file: string, options: { data?: domain.LedgerArchive; params?: 
     ...ui('components', components), ...ui('theme', theme), ...ui('category-hues', hues),
     ...ui('presentation', presentation), ...ui('operation-presentation', operationPresentation), ...ui('money-input', moneyInput),
     ...ui('budget-presentation', budgetPresentation), ...ui('liability-presentation', liabilityPresentation), ...ui('installment-presentation', installmentPresentation),
-    ...ui('movement-amount', movementAmount), ...ui('entry-prefill', entryPrefill), ...ui('purchase-plan', purchasePlan),
+    ...ui('movement-amount', movementAmount), ...ui('entry-prefill', entryPrefill), ...ui('purchase-plan', purchasePlan), ...ui('last-account', memoryOf({})),
     ...ui('form-controls', { AccountField: 'AccountField', CategoryField: 'CategoryField', DateField: 'DateField', SelectorCard: 'SelectorCard' }),
     ...ui('installment-purchase', { InstallmentPurchase: 'InstallmentPurchase' }), ...ui('entry-list', { EntryList: 'EntryList' }),
     ...ui('motion', { successHaptic: () => { haptics++; }, errorHaptic: () => { failures.push('Error'); }, warningHaptic: () => { failures.push('Warning'); } }),
@@ -365,9 +366,11 @@ test('24T3: a devolución\'s detail: hero, purchase link, what it records, and a
   assert.equal(JSON.stringify(view.pushed.pop()), JSON.stringify({ pathname: '/entry/[id]', params: { id: 'buy' } }));
   assert.equal(find(root, 'DetailRow', 'Categoría').props.value, 'Ropa');
   assert.ok(texts(root).includes(`Acredita $${NB}200,00 en Banco y resta del gasto de Ropa en septiembre de 2026. No es un ingreso.`), texts(root).join(' | '));
+  assert.equal(find(root, 'ActionButton', 'Deshacer devolución').props.icon, undefined, 'the hero\'s undo arrow means devolución; the verb says undo');
   find(root, 'ActionButton', 'Deshacer devolución').props.onPress();
   assert.equal(view.alerts[0].title, '¿Deshacer devolución?');
-  assert.equal(view.alerts[0].message, `Deja de acreditar $${NB}200,00 en Banco y la compra vuelve a contar entera en Ropa. Podés restaurarla después desde Movimientos deshechos.`);
+  assert.equal(view.alerts[0].buttons.map((button: { style?: string }) => button.style ?? '').join(','), 'cancel,default', 'restorable: not red');
+  assert.equal(view.alerts[0].message, `Deja de acreditar $${NB}200,00 en Banco y la compra vuelve a contar entera en Ropa. Podés restaurarla después desde Movimientos deshechos, en Movimientos.`);
   view.alerts[0].buttons[0].onPress?.();
   assert.equal(view.changes.length, 0, 'cancelled: nothing sent');
   find(view.render(), 'ActionButton', 'Deshacer devolución').props.onPress();
@@ -438,6 +441,7 @@ test('24T3: an adelanto\'s detail lists what it brought forward; its undo names 
   assert.equal(view.alerts[0].title, '¿Deshacer adelanto?');
   assert.equal(view.alerts[0].message, `Las cuotas adelantadas ($${NB}400,00 de precio) vuelven a quedar pendientes y dejan de contar con esta fecha. `
     + `Se registra la cuota 9 en su cierre ($${NB}100,00). Este adelanto no podrá restaurarse.`);
+  assert.equal(view.alerts[0].buttons.map((button: { style?: string }) => button.style ?? '').join(','), 'cancel,destructive', 'it cannot come back: the one undo that stays red');
 });
 
 // ---- the movement detail of a purchase with devoluciones ------------------------------------------------------------
@@ -456,6 +460,8 @@ test('24T3: a purchase lists its devoluciones with «Devuelto … de …», offe
   assert.equal(JSON.stringify(view.pushed.pop()), JSON.stringify({ pathname: '/operation/[id]', params: { id: 'r1' } }));
   find(root, 'ActionButton', 'Registrar devolución').props.onPress();
   assert.equal(JSON.stringify(view.pushed.pop()), JSON.stringify({ pathname: '/new-refund', params: { entryId: 'buy' } }));
+  assert.deepEqual([find(root, 'ActionButton', 'Registrar devolución').props.icon, find(root, 'ActionButton', 'Deshacer movimiento').props.icon], ['arrow-undo-outline', undefined],
+    'two adjacent buttons never share a glyph: the undo arrow is the devolución\'s');
   find(root, 'ActionButton', 'Deshacer movimiento').props.onPress();
   assert.equal(JSON.stringify([view.alerts[0].title, view.alerts[0].message, view.alerts[0].buttons.map(button => button.text)]),
     JSON.stringify(['Esta compra tiene devoluciones', 'Para deshacerla, primero deshacé su devolución.', ['Cancelar', 'Ver devoluciones']]));
@@ -635,7 +641,7 @@ test('24T3 (verify): Movimientos deshechos draws an undone adelanto as its price
 // ---- review fixes (COPY) -------------------------------------------------------------------------------------------
 
 test('24T3 (review): undoing one of several live devoluciones says only its amount counts again and the others stay; the last one says «entera»', () => {
-  const restore = 'Podés restaurarla después desde Movimientos deshechos.';
+  const restore = 'Podés restaurarla después desde Movimientos deshechos, en Movimientos.';
   const alertOf = (data: domain.LedgerArchive, id: string, locale?: AppLocale) => {
     const view = harness('app/operation/[id].tsx', { params: { id }, data, locale });
     find(view.render(), 'ActionButton', locale === 'en-US' ? 'Undo refund' : 'Deshacer devolución').props.onPress();
@@ -645,7 +651,7 @@ test('24T3 (review): undoing one of several live devoluciones says only its amou
   const two = refundOf(refundOf(base(), 'r1', 10000, '2026-09-18'), 'r2', 5000, '2026-09-25');
   assert.equal(alertOf(two, 'r1'), `Deja de acreditar $${NB}100,00 en Banco y la compra vuelve a contar $${NB}100,00 más en Ropa. Su otra devolución sigue. ${restore}`);
   assert.equal(alertOf(two, 'r1', 'en-US'), `AR$${NB}100.00 is no longer credited to Banco and the purchase counts AR$${NB}100.00 more in Ropa. Its other refund stays. `
-    + 'You can restore it later from Undone transactions.');
+    + 'You can restore it later from Undone transactions, in Activity.');
   const three = refundOf(two, 'r3', 2000, '2026-09-28');
   assert.equal(alertOf(three, 'r3'), `Deja de acreditar $${NB}20,00 en Banco y la compra vuelve a contar $${NB}20,00 más en Ropa. Sus otras 2 devoluciones siguen. ${restore}`);
   // Once the other is undone, the one left is the last: the purchase counts in full again.
@@ -664,11 +670,11 @@ test('24T3 (review): undoing a plan devolución that reduced a single instalment
     return [op.creditMinor, op.reductions.map(row => row.number), view.alerts[0].message];
   };
   assert.equal(JSON.stringify(alertOf('small', 5000)),
-    JSON.stringify([0, [12], 'La cuota 12 vuelve a su importe. Podés restaurarla después desde Movimientos deshechos.']));
+    JSON.stringify([0, [12], 'La cuota 12 vuelve a su importe. Podés restaurarla después desde Movimientos deshechos, en Movimientos.']));
   assert.equal(JSON.stringify(alertOf('small', 5000, 'en-US')),
-    JSON.stringify([0, [12], 'Installment 12 goes back to its amount. You can restore it later from Undone transactions.']));
+    JSON.stringify([0, [12], 'Installment 12 goes back to its amount. You can restore it later from Undone transactions, in Activity.']));
   assert.equal(JSON.stringify(alertOf('two', 15000)),
-    JSON.stringify([0, [11, 12], 'Las cuotas 11–12 vuelven a su importe. Podés restaurarla después desde Movimientos deshechos.']));
+    JSON.stringify([0, [11, 12], 'Las cuotas 11–12 vuelven a su importe. Podés restaurarla después desde Movimientos deshechos, en Movimientos.']));
 });
 
 // ---- review fixes (ENTRY) ------------------------------------------------------------------------------------------
@@ -743,6 +749,7 @@ test('24T3 (review): an undo storage refuses before writing releases the change:
   // The next tap asks again, about the ledger as it is now, with a new change.
   find(root, 'ActionButton', 'Deshacer movimiento').props.onPress();
   assert.equal(JSON.stringify([view.alerts.length, view.alerts[1].title]), JSON.stringify([2, '¿Deshacer movimiento?']));
+  assert.equal(view.alerts[1].buttons.map((button: { style?: string }) => button.style ?? '').join(','), 'cancel,default', 'an undo comes back from Movimientos deshechos: not red');
   failure = new Error('database is locked');
   view.alerts[1].buttons[1].onPress?.();
   await flush();

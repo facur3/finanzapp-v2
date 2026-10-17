@@ -32,8 +32,8 @@ export { DOCK, tabBarBottomGap } from './dock-geometry';
 
 /** The pill's solid material: the graphite fill, a hairline edge, and a soft lift on the light ground (none on black). */
 export function dockMaterial(p: Palette): ViewStyle {
-  return { backgroundColor: p.dock, borderWidth: StyleSheet.hairlineWidth, borderColor: p.isDark ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.10)',
-    ...(p.isDark ? {} : { shadowColor: p.text, shadowOpacity: 0.14, shadowRadius: 16, shadowOffset: { width: 0, height: 6 } }) };
+  return { backgroundColor: p.dock, borderWidth: StyleSheet.hairlineWidth, borderColor: p.dockEdge,
+    ...(p.isDark ? {} : { shadowColor: p.shadow, shadowOpacity: 0.14, shadowRadius: 16, shadowOffset: { width: 0, height: 6 } }) };
 }
 
 export function FloatingTabBar({ state, descriptors, navigation, insets }: BottomTabBarProps) {

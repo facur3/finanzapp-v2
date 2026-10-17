@@ -128,6 +128,10 @@ function Navigation() {
       <Stack.Screen name="accounts" options={{ title: t('nav.titles.accounts') }} />
       <Stack.Screen name="entry/[id]" options={{ title: t('nav.titles.entry') }} />
       <Stack.Screen name="undone-entries" options={{ title: t('nav.titles.undoneEntries') }} />
+      {/* 25N1: Ajustes, pushed from the gear of Finanzas; Licencias and each notice are pushed from it. */}
+      <Stack.Screen name="preferences" options={{ title: t('nav.titles.settings') }} />
+      <Stack.Screen name="licenses" options={{ title: t('nav.titles.licenses') }} />
+      <Stack.Screen name="license/[id]" options={{ title: t('nav.titles.license') }} />
       <Stack.Screen name="language" options={{ title: t('nav.titles.language') }} />
       <Stack.Screen name="region" options={{ title: t('nav.titles.region') }} />
       <Stack.Screen name="appearance" options={{ title: t('nav.titles.appearance') }} />
@@ -168,7 +172,7 @@ function Navigation() {
       <Stack.Screen name="new-refund" options={{ title: t('operations.titles.refund'), presentation: 'modal' }} />
       <Stack.Screen name="plan-payoff/[id]" options={{ title: t('operations.titles.payoff'), presentation: 'modal' }} />
       <Stack.Screen name="operation/[id]" options={{ title: t('operations.titles.operation') }} />
-      {/* 25A-03, «Para revisar»: the tray and a proposal's detail are pushed from Más; its editor is a modal over the detail. */}
+      {/* 25A-03, «Para revisar»: the tray and a proposal's detail are pushed from Finanzas; its editor is a modal over the detail. */}
       <Stack.Screen name="review" options={{ title: t('nav.titles.review') }} />
       <Stack.Screen name="review/[id]" options={{ title: t('nav.titles.reviewItem') }} />
       <Stack.Screen name="edit-review/[id]" options={{ title: t('nav.titles.editReview'), presentation: 'modal' }} />

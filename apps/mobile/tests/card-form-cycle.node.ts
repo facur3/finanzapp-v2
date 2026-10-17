@@ -44,7 +44,7 @@ function harness(props: { original?: domain.CreditCardProfile } = {}, options: O
     addCard: async (account: domain.Account, profile: domain.CreditCardProfile, rows?: readonly domain.CardCycleDates[]) => { added.push({ account, card: profile, rows }); },
     removeCard: async (id: string) => { removedCards.push(id); },
     saveCard: async (profile: domain.CreditCardProfile, intent?: unknown) => { saved.push({ card: profile, intent }); await options.save?.(); } }) };
-  const components = Object.fromEntries(['ActionButton', 'AmountField', 'AppText', 'DetailRow', 'ErrorMessage', 'Field', 'IconButton', 'Screen', 'Surface'].map(name => [name, name]));
+  const components = Object.fromEntries(['ActionButton', 'AmountField', 'AppText', 'DetailRow', 'ErrorMessage', 'Field', 'IconButton', 'PressFeedback', 'Screen', 'Surface'].map(name => [name, name]));
   const modules: Record<string, unknown> = {
     react: { useState: (initial: unknown) => { const index = cursor++; if (!(index in state)) state[index] = typeof initial === 'function' ? (initial as () => unknown)() : initial;
       return [state[index], (next: unknown) => { state[index] = typeof next === 'function' ? (next as (current: unknown) => unknown)(state[index]) : next; }]; },
@@ -54,7 +54,8 @@ function harness(props: { original?: domain.CreditCardProfile } = {}, options: O
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, router: { canGoBack: () => true, back: () => { backs++; }, push: (to: unknown) => { pushed.push(to); }, replace: (to: unknown) => { replaced.push(to); },
       dismissTo: (to: unknown) => { dismissed.push(to); } } },
     'expo-crypto': { randomUUID: () => 'id-' + (++uuid) },
-    './motion': { successHaptic() { haptics.push('Success'); }, errorHaptic() { haptics.push('Error'); }, warningHaptic() { haptics.push('Warning'); }, selectionHaptic() {} },
+    './motion': { Reflow: 'Reflow', successHaptic() { haptics.push('Success'); }, errorHaptic() { haptics.push('Error'); }, warningHaptic() { haptics.push('Warning'); }, selectionHaptic() {} },
+    '@expo/vector-icons/Ionicons': 'Ionicons',
     '@finanzapp/domain': domain,
     '../i18n/provider': { useI18n: () => bindLocale(locale) },
     '../storage/LedgerProvider': ledger,
@@ -70,7 +71,7 @@ function harness(props: { original?: domain.CreditCardProfile } = {}, options: O
     // The real management hook reads the committed-before-refresh rule from it.
     './presentation': presentation,
     './switch-row': { SwitchRow: 'SwitchRow' },
-    './theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, useCurrentDay: () => day },
+    './theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, useCurrentDay: () => day, usePalette: () => ({ primary: '#2557D6' }) },
   };
   const source = readFileSync(new URL('../src/ui/card-form.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
@@ -105,6 +106,10 @@ const texts = (root: Node) => nodes(root).filter(node => node.type === 'AppText'
 const day = (dateISO: string) => new Date(dateISO + 'T12:00:00');
 const keyOf = (value: Date | null) => value === null ? null : domain.todayKey(value);
 const saveButton = (root: Node) => find(root, 'ActionButton');
+/** What Save refused (the live line under the dates is `announce={false}`). */
+const saveError = (root: Node) => nodes(root).find(node => node.type === 'ErrorMessage' && node.props.announce !== false)!;
+/** 25N1: the line under the dates while the due is not after the closing. */
+const liveError = (root: Node) => nodes(root).find(node => node.type === 'ErrorMessage' && node.props.announce === false)!;
 type View = ReturnType<typeof harness>;
 const pick = (view: View, label: string, dateISO: string) => { find(view.render(), 'DateField', label).props.onChange(day(dateISO)); };
 
@@ -170,6 +175,34 @@ test('24T2: a new card asks its next closing and the due of that closing, both u
   assert.equal(view.backs(), 1);
 });
 
+test('25N1: a new card keeps issuer, last four digits and limit behind «Más datos (opcional)», which opens in place and keeps what was typed; an edit shows them', async () => {
+  const view = harness();
+  let root = view.render();
+  const fields = (node: Node) => nodes(node).filter(item => item.type === 'Field' || item.type === 'AmountField').map(item => item.props.label);
+  assert.deepEqual(fields(root), ['Nombre de la tarjeta', 'Saldo pendiente hoy (opcional)']);
+  assert.ok(texts(root).includes('Elegí el próximo cierre y su vencimiento.'), 'what Save waits for is said above it');
+  const more = nodes(root).find(node => node.type === 'PressFeedback' && node.props.accessibilityLabel === 'Más datos (opcional)')!;
+  assert.deepEqual([more.props.accessibilityRole, more.props.accessibilityState.expanded], ['button', false]);
+  more.props.onPress();
+  root = view.render();
+  assert.deepEqual(fields(root), ['Nombre de la tarjeta', 'Saldo pendiente hoy (opcional)', 'Emisor (opcional)', 'Últimos 4 dígitos (opcional)', 'Límite de crédito (opcional)']);
+  assert.ok(has(root, 'Reflow'), 'the fields arrive with the layout\'s reflow');
+  assert.equal(nodes(root).some(node => node.type === 'PressFeedback' && node.props.accessibilityLabel === 'Más datos (opcional)'), false, 'it stays open: nothing typed is hidden again');
+  find(root, 'Field', 'Nombre de la tarjeta').props.onChangeText('Visa');
+  find(root, 'Field', 'Emisor (opcional)').props.onChangeText('Galicia');
+  find(root, 'Field', 'Últimos 4 dígitos (opcional)').props.onChangeText('40a09');
+  pick(view, 'Próximo cierre', '2026-09-28');
+  pick(view, 'Vencimiento', '2026-10-05');
+  root = view.render();
+  assert.equal(texts(root).includes('Elegí el próximo cierre y su vencimiento.'), false);
+  await saveButton(root).props.onPress();
+  assert.deepEqual([view.added[0].card.issuer, view.added[0].card.last4], ['Galicia', '4009']);
+  const editing = harness({ original: card }).render();
+  assert.ok(fields(editing).includes('Emisor (opcional)') && fields(editing).includes('Límite de crédito (opcional)'), 'an edit shows what the card has');
+  assert.equal(nodes(editing).some(node => node.type === 'PressFeedback'), false);
+  assert.equal(texts(editing).includes('Elegí el próximo cierre y su vencimiento.'), false);
+});
+
 test('24T2: a new card whose dates its days cannot produce is created with the exact rows newCardCycle gives, so the entered pair is its next statement', async () => {
   const view = harness();
   find(view.render(), 'Field', 'Nombre de la tarjeta').props.onChangeText('Naranja');
@@ -192,7 +225,7 @@ test('24T2: a new card refuses a closing before today and a due on or before the
   pick(view, 'Próximo cierre', '2026-09-19');
   pick(view, 'Vencimiento', '2026-10-05');
   await saveButton(view.render()).props.onPress();
-  let message = find(view.render(), 'ErrorMessage').props.message;
+  let message = saveError(view.render()).props.message;
   assert.equal(message, domain.CYCLE_NEXT_CLOSING_MESSAGE);
   assert.equal(bindLocale('en-US').errorText(message), 'The next closing date must be today or later.');
   assert.equal(view.added.length, 0);
@@ -201,13 +234,21 @@ test('24T2: a new card refuses a closing before today and a due on or before the
   for (const dueISO of ['2026-09-28', '2026-09-27']) {
     pick(view, 'Próximo cierre', '2026-09-28');
     pick(view, 'Vencimiento', dueISO);
+    // 25N1: said while the dates are chosen, and Save waits; the due keeps the person's date.
+    assert.deepEqual([liveError(view.render()).props.message, saveButton(view.render()).props.disabled], [domain.CYCLE_DUE_ORDER_MESSAGE, true], dueISO);
+    assert.equal(keyOf(find(view.render(), 'DateField', 'Vencimiento').props.value), dueISO);
     await saveButton(view.render()).props.onPress();
-    message = find(view.render(), 'ErrorMessage').props.message;
+    message = saveError(view.render()).props.message;
     assert.equal(message, domain.CYCLE_DUE_ORDER_MESSAGE, dueISO);
     assert.equal(bindLocale('en-US').errorText(message), 'A statement’s due date must come after its closing date.');
   }
   assert.equal(view.added.length, 0);
   pick(view, 'Vencimiento', '2026-10-05');
+  assert.deepEqual([liveError(view.render()).props.message, saveButton(view.render()).props.disabled], [null, false]);
+  // A closing moved past a due chosen before is flagged at once too, not first at Save.
+  pick(view, 'Próximo cierre', '2026-10-06');
+  assert.deepEqual([liveError(view.render()).props.message, saveButton(view.render()).props.disabled], [domain.CYCLE_DUE_ORDER_MESSAGE, true]);
+  pick(view, 'Próximo cierre', '2026-09-28');
   await saveButton(view.render()).props.onPress();
   assert.equal(view.added.length, 1);
   assert.equal(view.haptics.join(','), 'Error,Error,Error,Success', 'one tap per attempt');
@@ -303,7 +344,7 @@ test('24T2: a form showing a stale statement is refused by the planner with the 
   assert.equal(keyOf(find(late.render(), 'DateField', 'Próximo cierre').props.value), '2026-09-28', 'the form keeps the statement it opened on');
   pick(late, 'Vencimiento', '2026-10-06');
   await saveButton(late.render()).props.onPress();
-  const message = find(late.render(), 'ErrorMessage').props.message;
+  const message = saveError(late.render()).props.message;
   assert.equal(message, domain.CYCLE_STALE_MESSAGE);
   assert.equal(bindLocale('es-AR').errorText(message), 'Las fechas del ciclo cambiaron desde que abriste la tarjeta. Volvé a revisarlas.');
   assert.equal(bindLocale('en-US').errorText(message), 'The card’s cycle dates changed since you opened it. Review them again.');
@@ -318,7 +359,7 @@ test('24T2: a form showing a stale statement is refused by the planner with the 
   elsewhere.setData({ ...base, cardCycleDates: moved.rows });
   pick(elsewhere, 'Vencimiento', '2026-10-06');
   await saveButton(elsewhere.render()).props.onPress();
-  assert.equal(find(elsewhere.render(), 'ErrorMessage').props.message, domain.CYCLE_STALE_MESSAGE);
+  assert.equal(saveError(elsewhere.render()).props.message, domain.CYCLE_STALE_MESSAGE);
   assert.equal(elsewhere.saved.length, 0);
   // Opening and saving without a change writes nothing.
   const unchanged = harness({ original: card });
@@ -346,6 +387,7 @@ test('24T2: a failed save keeps the card and its dates frozen; the retry resends
   root = archiving.render();
   nodes(root).find(node => node.type === 'ActionButton' && node.props.label === 'Archivar tarjeta')!.props.onPress();
   assert.equal(archiving.alerts[0].message, 'Las compras y pagos anteriores siguen en tus registros y reportes. La tarjeta pasa a Archivadas en Tarjetas: podés pagarla y reactivarla.');
+  assert.equal(archiving.alerts[0].buttons.map((button: { text: string; style?: string }) => button.style ?? '').join(','), 'cancel,default', 'archiving is reversible (Reactivar): not the destructive style');
   archiving.alerts[0].buttons[1].onPress!();
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(archiving.saved.length, 1);
@@ -367,7 +409,7 @@ test('24T2: the card form\'s dates read in English, and the statement to pay is 
   assert.ok(texts(moved.render()).some(text => text.includes('These dates correct this statement only.')));
 });
 
-test('24T2 review: the switch row speaks its reason with its label (a hint may be turned off), and ticks once per change', () => {
+test('24T2 review: the switch row speaks its reason with its label (a hint may be turned off); no app tick on top of the system switch\'s own', () => {
   let haptics = 0;
   const jsx = (type: unknown, props: Record<string, unknown>) => ({ type, props });
   const modules: Record<string, unknown> = {
@@ -392,7 +434,7 @@ test('24T2 review: the switch row speaks its reason with its label (a hint may b
   const plain = toggleOf(SwitchRow({ label: 'Con interés', value: false, onValueChange: (value: boolean) => changes.push(value) }));
   assert.equal(plain.props.accessibilityLabel, 'Con interés');
   plain.props.onValueChange(true);
-  assert.deepEqual([changes, haptics], [[true], 1]);
+  assert.deepEqual([changes, haptics], [[true], 0], 'UISwitch plays its own haptic; a second tick would double it');
 });
 
 test('24T2 owner decision: any exact correction may be one-off (+1, +14, +16, +20, across a month); the next normal statement follows; the switch alone makes days usual', () => {

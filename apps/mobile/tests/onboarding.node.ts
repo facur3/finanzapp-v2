@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
@@ -732,7 +732,7 @@ test('the root layout sends a new installation to the setup, which arrives as a 
 /** 25Q4: the root layout's Navigation with its hosts replaced by names. `ledger` and `fonts` are what the provider and
  * expo-font report on the next render; `prefs` is the key-value store the first-opening decision reads; `cache` is what
  * the app's cache folder lists (files and folders by name) and what was deleted from it; `splash` counts the lifts. */
-function rootLayout({ prefs = memory() } = {}) {
+function rootLayout({ prefs = memory(), reduced = false } = {}) {
   const state: unknown[] = [];
   const deps: unknown[][] = [];
   const routes: unknown[] = [];
@@ -775,7 +775,7 @@ function rootLayout({ prefs = memory() } = {}) {
     '../src/ui/components': names('ActionButton', 'AppText', 'ErrorMessage'),
     '../src/ui/geometry': { reviewSheetScrolls: () => false },
     '../src/ui/screen-failure': names('ScreenFailure'),
-    '../src/ui/theme': { UIProvider: 'UIProvider', themePreferenceStore: () => {}, useReduceMotion: () => false,
+    '../src/ui/theme': { UIProvider: 'UIProvider', themePreferenceStore: () => {}, useReduceMotion: () => reduced,
       usePalette: () => ({ isDark: false, background: '#fff', surface: '#fff', primary: '#2557D6', text: '#000', secondary: '#666', line: '#ddd' }) },
     '../src/i18n/provider': { ...names('HeldCurrenciesProvider', 'I18nProvider'), useI18n: () => bindLocale('es-AR') },
     '../src/i18n/preference': { defaultPreferenceStore: prefs.store },
@@ -791,6 +791,40 @@ function rootLayout({ prefs = memory() } = {}) {
   const navigation = nodes(module.exports.default!()).find(node => typeof node.type === 'function' && node.type.name === 'Navigation')!.type as (props: object) => Node;
   return { render: () => { cursor = 0; effectCursor = 0; return navigation({}); }, ledger, fonts, routes, prefs, cache, splash, timers, retries: () => retries };
 }
+
+/** Every route file under app/ as the root stack names it («account/[id]»), the tabs as their group; layouts and the
+ * not-found screen are not stack screens. */
+function routeNames(dir = '', found: string[] = []) {
+  for (const item of readdirSync(new URL('../app/' + dir, import.meta.url), { withFileTypes: true })) {
+    if (item.isDirectory()) { if (item.name === '(tabs)') found.push('(tabs)'); else routeNames(dir + item.name + '/', found); continue; }
+    if (/^[_+]/.test(item.name) || !item.name.endsWith('.tsx')) continue;
+    found.push(dir + item.name.replace(/\.tsx$/, ''));
+  }
+  return found;
+}
+
+test('25N1: the root stack fades with Reduce Motion and pushes otherwise, keeps a minimal back button and the swipe back, and registers every route file once', () => {
+  for (const reduced of [false, true]) {
+    const view = rootLayout({ reduced });
+    view.fonts.loaded = true;
+    view.ledger.snapshot = { accounts: [{ id: 'a', name: 'Pesos', currency: 'ARS', openingMinor: 0, createdAt }], entries: [] };
+    view.render();
+    const stack = nodes(view.render()).find(node => node.props?.screenOptions)!;
+    const options = stack.props.screenOptions;
+    assert.deepEqual([options.animation, options.headerBackButtonDisplayMode, options.gestureEnabled, options.headerShadowVisible],
+      [reduced ? 'fade' : 'default', 'minimal', true, false], 'Reduce Motion ' + reduced + ': a cross-fade in place of the slide; the chevron alone; back by swiping');
+    const screens = nodes(stack).filter(node => node.type === 'Stack.Screen');
+    const byName = Object.fromEntries(screens.map(screen => [screen.props.name, screen.props.options]));
+    assert.deepEqual({ ...byName['(tabs)'] }, { headerShown: false, animation: 'fade' }, 'the tabs are only replaced into: a fade, whatever the setting');
+    assert.deepEqual({ ...byName.onboarding }, { headerShown: false, gestureEnabled: false, animation: 'none' }, 'the first opening arrives as a cut and is not swiped away');
+    const names = screens.map(screen => screen.props.name);
+    assert.equal(new Set(names).size, names.length, 'each route registered once');
+    assert.deepEqual([...names].sort(), routeNames().sort(), 'a route file without a registration would show its file name as its title');
+    assert.equal(screens.every(screen => screen.props.name === '(tabs)' || screen.props.name === 'onboarding' || screen.props.name === 'review-sheet/[id]' || typeof screen.props.options.title === 'string'),
+      true, 'every other screen has a catalogue title');
+    assert.deepEqual([byName.preferences.title, byName.licenses.title, byName['license/[id]'].title], ['Ajustes', 'Licencias', 'Licencia'], '25N1: Ajustes and Licencias, pushed');
+  }
+});
 
 test('25Q4: at launch a ledger from a newer build is said as itself with no «Volver a intentar»; any other open failure keeps it', () => {
   const view = rootLayout();

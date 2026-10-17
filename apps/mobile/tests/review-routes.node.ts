@@ -763,12 +763,16 @@ test('Descartar in the sheet is explicit and asks first; only the destructive an
   const ledger: Ledger = { review: trayOf([item]), calls: [] };
   const view = harness('review-sheet/[id].tsx', ledger, { id: item.id });
   const discard = all(view.render(), 'PressFeedback').find(node => node.props.accessibilityLabel === 'Descartar propuesta')!;
+  const opacity = (node: Node) => Object.assign({}, ...[node.props.style].flat(Infinity).filter(Boolean)).opacity;
+  assert.equal(opacity(discard), 1);
   discard.props.onPress();
   const [alert] = view.alerts;
   assert.equal(alert.title, '¿Descartar esta propuesta?');
   alert.buttons[0].onPress?.();
   assert.equal(ledger.calls.length, 0);
   alert.buttons[1].onPress!();
+  const held = all(view.render(), 'PressFeedback').find(node => node.props.accessibilityLabel === 'Descartar propuesta')!;
+  assert.deepEqual([held.props.disabled, opacity(held)], [true, 0.5], 'while it runs Descartar looks disabled too, not full red');
   await settle();
   assert.deepEqual(ledger.calls, [['dismiss', item.id, 1]]);
   assert.equal(view.nav.back, 1);

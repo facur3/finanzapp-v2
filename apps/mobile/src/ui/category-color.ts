@@ -68,13 +68,6 @@ export function tintOf(color: string, p: Pick<Palette, 'isDark'>): string {
   return color + (p.isDark ? '33' : '24');
 }
 
-/** A wash of the hue behind a whole row (about 11 % dark, 8 % light): enough
- * to read a proportion against the surface, faint enough that the ink on it
- * keeps its contrast and three rows do not become a block of colour. */
-export function washOf(color: string, p: Pick<Palette, 'isDark'>): string {
-  return color + (p.isDark ? '1C' : '14');
-}
-
 /** The grouped tail ("Otras") is not a category: it stays neutral. 25D1: a warm neutral at 3:1 or more on the canvas,
  * the surface and the ring track it shows through (it was 1.54:1 on the light sand, a gap rather than a slice). */
 export function othersColor(p: Pick<Palette, 'isDark'>): string {

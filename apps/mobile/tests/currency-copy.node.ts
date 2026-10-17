@@ -232,6 +232,9 @@ test('24B3: with three or more currencies the switch is a row that opens the cur
   view = es.render({ value: 'USD', currencies: ['ARS', 'USD', 'JPY'], onChange: () => {} });
   assert.equal(nodes(view).find(node => node.type === 'CurrencySheet')!.props.visible, false, 'the sheet closes on a choice');
   assert.equal(nodes(view).find(node => node.type === 'PressFeedback')!.props.accessibilityLabel, 'Moneda: Dólares estadounidenses');
+  const flatStyle = (node: Node) => Object.assign({}, ...[node.props.style].flat(Infinity).filter(Boolean));
+  assert.deepEqual([flatStyle(row).opacity, flatStyle(nodes(es.render({ value: 'USD', currencies: ['ARS', 'USD', 'JPY'], onChange: () => {}, disabled: true })).find(node => node.type === 'PressFeedback')!).opacity], [1, 0.5],
+    'a locked chip looks disabled, as a disabled button does');
   // The bare-code variant (Inicio) keeps the row short; the sheet still names every currency.
   const compact = es.render({ value: 'ARS', currencies: ['ARS', 'USD', 'JPY'], onChange: () => {}, labels: 'code' });
   assert.deepEqual(nodes(compact).filter(node => node.type === 'AppText').map(node => node.props.children), ['ARS']);

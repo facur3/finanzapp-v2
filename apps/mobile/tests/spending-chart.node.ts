@@ -254,10 +254,10 @@ test('24UX6B: idle month bars hold 3:1 on their surface in light and dark; the s
   const bars = flat(chart).filter(node => typeof node.type === 'function').map(node => node.type(node.props));
   const fills = bars.map(bar => bar.props.children.props.style[0].backgroundColor);
   assert.deepEqual(fills, ['#586961B3', '#2557D6'], 'the other month in the idle ink, the shown one in the brand');
-  // The month in progress keeps its outline when it is not the shown one: ink on the idle fill (the secondary edge vanished on it).
-  const past = charts.MonthBars({ points, selected: '2026-08', onSelect: () => {}, currency: 'ARS' });
-  const outline = flat(past).filter(node => typeof node.type === 'function').map(node => node.type(node.props))[1].props.children.props.style[0];
-  assert.deepEqual([outline.backgroundColor, outline.borderColor, outline.borderWidth > 0], ['#586961B3', '#000', true]);
+  // The month in progress is said, not outlined: secondary on the sapphire was 1.09:1 (light) and 1.12:1 (dark). The caption
+  // and its VoiceOver label carry it; no bar draws an edge.
+  for (const bar of bars) assert.equal('borderWidth' in bar.props.children.props.style[0] || 'borderColor' in bar.props.children.props.style[0], false);
+  assert.match(bars[1].props.accessibilityLabel, /curso/);
 });
 
 // 24UX6C2, recomposed in 24UX6D: the category donut. It is the head of Categorías and its centre carries the period's total

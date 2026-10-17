@@ -10,7 +10,7 @@ import { SwipeRow, swipeAccessibility } from '../src/ui/swipe-actions';
 import { labelAmountStacks } from '../src/ui/geometry';
 import { InlineFlag } from '../src/ui/marks';
 import { availableCurrencies } from '../src/ui/presentation';
-import { space, usePalette } from '../src/ui/theme';
+import { radius, space, usePalette } from '../src/ui/theme';
 
 /** What a section header spends around its text: the list's padding (20 + 20) and the header's own (4 + 4). */
 const SECTION_CHROME = 48;
@@ -65,8 +65,8 @@ export default function AccountsScreen() {
         </View>;
       }}
       renderItem={({ item, index, section }) => <View style={{ backgroundColor: p.surface, overflow: 'hidden',
-        borderTopLeftRadius: index === 0 ? 16 : 0, borderTopRightRadius: index === 0 ? 16 : 0,
-        borderBottomLeftRadius: index === section.data.length - 1 ? 16 : 0, borderBottomRightRadius: index === section.data.length - 1 ? 16 : 0 }}>
+        borderTopLeftRadius: index === 0 ? radius.group : 0, borderTopRightRadius: index === 0 ? radius.group : 0,
+        borderBottomLeftRadius: index === section.data.length - 1 ? radius.group : 0, borderBottomRightRadius: index === section.data.length - 1 ? radius.group : 0 }}>
         <SwipeRow actions={manage.actions(item)}>
           <AccountRow account={item} entries={snapshot.entries} transfers={snapshot.transfers} last={index === section.data.length - 1} accessibility={swipeAccessibility(manage.actions(item))} />
         </SwipeRow>

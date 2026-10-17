@@ -237,6 +237,9 @@ test('glass stays on the control layer and behind the adapter: only material.tsx
   assert.equal(theme.includes('AccessibilityInfo.isDarkerSystemColorsEnabled()'), false, 'feature-detected through the policy helper');
   assert.match(theme, /subscribeIncreaseContrast\(AccessibilityInfo as Parameters<typeof subscribeIncreaseContrast>\[0\], setIncreaseContrast\)/);
   assert.match(theme, /createElement\(IncreaseContrastContext\.Provider, \{ value: increaseContrast \}/);
-  assert.match(theme, /return \{ \.\.\.base, isDark, increaseContrast: useContext\(IncreaseContrastContext\),/);
+  // The four palettes (scheme × Increase Contrast) are built once at module scope: a render hands out the same object.
+  assert.match(theme, /const increaseContrast = useContext\(IncreaseContrastContext\);\n  return \(isDark \? DARK : LIGHT\)\[increaseContrast \? 1 : 0\];/);
+  assert.match(theme, /const LIGHT = built\(lightPalette, false\), DARK = built\(darkPalette, true\);/);
+  assert.equal(/positive|negativeSoft/.test(theme), false, 'the income/expense aliases are gone: screens read income and expense');
   assert.match(theme, /const IncreaseContrastContext = createContext\(false\);/, 'off until iOS answers');
 });

@@ -40,7 +40,7 @@ export const lightPalette = {
   thumb: '#FFFFFF',
   /** A quiet section link («Ver todos»): the brand text. */
   link: '#2148C0',
-  /** A switch that is on: the sapphire, its white knob 7.6:1. */
+  /** A switch that is on: the sapphire, its white knob 7.6:1, the track 7.5:1 on the surface. */
   toggle: '#2148C0',
   /** Semantics. `expense` is the negative tone (destructive, overdue, over a limit), not ordinary spending. */
   /** `transfer`: a neutral slate (≈203°, low saturation), 6.6:1 on white; apart from the sapphire by colourfulness. */
@@ -52,7 +52,19 @@ export const lightPalette = {
   /** Trailing swipe actions (24UX4): solid fills under a white label, each 4.5:1 or more. Destructive is the negative
    * tone, the reversible action a quiet warm grey, the forward action (pay, resume) the sapphire. */
   swipeDestructive: '#B3432E', swipeNeutral: '#5E5A52', swipeAccent: '#2148C0',
-  shadow: 'rgba(25, 25, 28, 0.08)',
+  /** The colour of every drop shadow (`shadowColor`); each site sets its own `shadowOpacity`, so this is solid. Light mode only:
+   * the dark theme separates by steps and edges, never a shadow. */
+  shadow: '#19191C',
+  /** The hairline round a control on a ground (movement pills, the composer, the currency chip, the compact thumb, the «+»):
+   * one alpha of the ink for every such edge, so Increase Contrast has one value to tune. */
+  edge: 'rgba(25, 25, 28, 0.10)',
+  /** The dock's own rim, solid so its contrast can be pinned: the drawn white-over-graphite step. */
+  dockEdge: '#353432',
+  /** A highlighted row under the finger (`PressFeedback` «highlight»): a wash of the ink. */
+  pressWash: 'rgba(25, 25, 28, 0.05)',
+  /** A switch that is off: its track. Drawn explicitly on iOS too (`ios_backgroundColor`), where `trackColor.false` alone is
+   * only the tint. The warm line step, 1.4:1 on the surface it sits on; the knob carries the state. */
+  switchTrack: '#DDD6C8',
   /** The dimming behind a sheet or the capture hub: the screen stays legible underneath. */
   scrim: 'rgba(0, 0, 0, 0.40)',
   /** Inicio's financial field (the sapphire hero) and what sits on it: white (7.6:1), a pale sapphire secondary, the
@@ -88,7 +100,7 @@ export const darkPalette: typeof lightPalette = {
   /** Dark: a clear step above the surface track, so the state reads without colour. */
   thumb: '#3C3A35',
   link: '#7E9BF7',
-  /** The white knob holds 4.9:1 and the track 3.2:1 on the inset. */
+  /** The white knob holds 4.9:1 and the track 3.5:1 on the surface it sits on. */
   toggle: '#4568DA',
   expense: '#EE8A72', income: '#5CCB93', transfer: '#A3B5C4', warning: '#E8A94A',
   expenseSoft: '#34201A', incomeSoft: '#13291D', transferSoft: '#1C252D', warningSoft: '#2F2413',
@@ -96,7 +108,13 @@ export const darkPalette: typeof lightPalette = {
   onSemantic: '#19191C',
   /** Dark: deeper than the text tones so white holds 4.5:1 or more (the accent is the filled button's sapphire, 25O1). */
   swipeDestructive: '#B8412D', swipeNeutral: '#524F48', swipeAccent: '#4568DA',
-  shadow: 'rgba(0, 0, 0, 0)',
+  shadow: '#000000',
+  edge: 'rgba(255, 255, 255, 0.12)',
+  /** Dark: the rim is what separates the pill from a surface (the fills differ by 1.06:1); 1.5:1 on both grounds. */
+  dockEdge: '#3B3A37',
+  pressWash: 'rgba(255, 255, 255, 0.07)',
+  /** Dark: the compact thumb's step, 1.5:1 on the surface (the inset was 1.1:1). */
+  switchTrack: '#3C3A35',
   scrim: 'rgba(0, 0, 0, 0.60)',
   /** A step below the light field's sapphire so a large field does not glare on a dark screen; white on it as in light. */
   hero: '#2446AE', heroInk: '#FFFFFF', heroSecondary: '#C9D4F5', heroControl: '#1A3790', heroThumb: '#FFFCF6', heroThumbInk: '#19191C',

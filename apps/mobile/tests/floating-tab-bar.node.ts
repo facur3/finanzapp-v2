@@ -42,7 +42,7 @@ function harness(palette: typeof light = light, material: 'glass' | 'opaque' = '
 }
 
 const names = ['index', 'activity', 'reports', 'settings'];
-const titles = ['Inicio', 'Movimientos', 'Reportes', 'Más'];
+const titles = ['Inicio', 'Movimientos', 'Reportes', 'Finanzas'];
 function navigator(index: number, prevent = false, badges: Record<string, unknown> = {}) {
   const events: { type: string; target: string; canPreventDefault?: boolean }[] = [];
   const navigated: unknown[][] = [];
@@ -73,7 +73,7 @@ test('24UX6A: one tab list with the four destinations in order, each read as the
   assert.equal(items.length, 4, 'exactly four destinations: no Assistant tab, and the «+» is not one');
   // iOS: React Native's `tab` role maps to no trait, so the tab is a button whose name says it is a tab and where it sits.
   assert.equal(items.map((item: any) => item.rendered.props.accessibilityLabel).join(' | '),
-    'Inicio, pestaña, 1 de 4 | Movimientos, pestaña, 2 de 4 | Reportes, pestaña, 3 de 4 | Más, pestaña, 4 de 4');
+    'Inicio, pestaña, 1 de 4 | Movimientos, pestaña, 2 de 4 | Reportes, pestaña, 3 de 4 | Finanzas, pestaña, 4 de 4');
   const android = dockOf(harness(light, 'opaque', 'android').FloatingTabBar(navigator(0).props)).items;
   assert.equal(android.map((item: any) => item.rendered.props.accessibilityRole + ':' + item.rendered.props.accessibilityLabel).join(','),
     titles.map(title => 'tab:' + title).join(','), 'elsewhere the tab role and the plain name');
@@ -244,12 +244,12 @@ test('25UX1: the roots clear the floating dock by its exact height, inside the t
   assert.match(source, /if \(!clearance\) return \{ extraPadding: 0, indicator: undefined \}/, 'off the tabs: nothing');
 });
 
-test('25A-03: Más shows the pending count as a small neutral badge on its glyph, said after the tab\'s name; zero draws nothing', () => {
+test('25A-03: Finanzas (Más before 25N1) shows the pending count as a small neutral badge on its glyph, said after the tab\'s name; zero draws nothing', () => {
   for (const palette of [light, dark]) {
     const { FloatingTabBar } = harness(palette);
     const { items } = dockOf(FloatingTabBar(navigator(0, false, { settings: 3 }).props));
     const more = items[3].rendered;
-    assert.equal(more.props.accessibilityLabel, 'Más, pestaña, 4 de 4, 3 para revisar');
+    assert.equal(more.props.accessibilityLabel, 'Finanzas, pestaña, 4 de 4, 3 para revisar');
     const [glyph, badge] = childrenOf(more.props.children);
     assert.equal(glyph.type, 'Ionicons');
     assert.equal(badge.type, 'View');
@@ -264,5 +264,5 @@ test('25A-03: Más shows the pending count as a small neutral badge on its glyph
   assert.equal(childrenOf(many.props.children)[1].props.children.props.children, '99+');
   const none = dockOf(harness().FloatingTabBar(navigator(0, false, { settings: 0 }).props)).items[3].rendered;
   assert.equal(childrenOf(none.props.children).length, 1);
-  assert.equal(none.props.accessibilityLabel, 'Más, pestaña, 4 de 4');
+  assert.equal(none.props.accessibilityLabel, 'Finanzas, pestaña, 4 de 4');
 });

@@ -67,7 +67,7 @@ function harness(file: string, params: Record<string, unknown> = {}, initial: do
     } }) };
   const componentNames = ['ActionButton', 'AppText', 'DetailRow', 'EmptyState', 'GlyphTile', 'IconButton', 'Money', 'MovementRow', 'PressFeedback',
     'Screen', 'SectionTitle', 'Stat', 'Surface', 'AmountField', 'Field', 'Choices', 'ErrorMessage', 'LifecycleNote'];
-  const components = { ...Object.fromEntries(componentNames.map(name => [name, name])), toneColors: () => ({ color: '#000', soft: '#eee' }), useStacked: () => false };
+  const components = { ...Object.fromEntries(componentNames.map(name => [name, name])), toneColors: () => ({ color: '#000', soft: '#eee' }), useStacked: () => false, rowStyle: { name: 'rowStyle' } };
   const theme = { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, useCurrentDay: () => '2026-09-20', useReduceMotion: () => true,
     usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', line: '#ddd', inset: '#eee', expense: '#c00', income: '#080', warning: '#a60', transfer: '#03c', primary: '#2557D6' }) };
   // 24T2 (stream A): the deck replaces the carousel; the face keeps its width rule.
@@ -288,6 +288,19 @@ test('card detail lists only that card account with card context and links purch
   assert.ok(buttons.every(button => button.containerStyle === undefined), 'both actions span the full width');
   assert.match(find(root, 'SectionTitle').props.caption, /^Este ciclo, desde .* · 1 compra · 1 pago$/);
   assert.equal(find(harness('card/[id].tsx', { id: 'missing' }).render(), 'EmptyState').props.title, 'No encontramos esta tarjeta');
+});
+
+test('25N1: each open debt section lists overdue first, then due soon, then by due date, undated, then settled (storage keeps its own order)', () => {
+  // The harness day is 2026-09-20. Every debt owes 300,00 on its own account but the settled one.
+  const make = (id: string, dueDateISO: string | null, opening = -30000, at = createdAt) => ({
+    account: { ...debtAccount, id: id + '-acc', name: 'Debo · ' + id, openingMinor: opening },
+    debt: { ...debt, id, accountId: id + '-acc', counterparty: id, dueDateISO, createdAt: at } });
+  const items = [make('undated', null, -30000, '2026-08-01T12:00:00.000Z'), make('later', '2026-10-15'), make('settled', '2026-09-05', 0),
+    make('soon', '2026-09-22'), make('overdue', '2026-09-10'), make('dated', '2026-10-01')];
+  const data = { ...archive, accounts: [cash, ...items.map(item => item.account)], debts: items.map(item => item.debt) };
+  const order = nodes(harness('debts.tsx', {}, data).render()).filter(node => node.type === 'DebtRow').map(row => row.props.debt.id);
+  assert.deepEqual(order, ['overdue', 'soon', 'dated', 'later', 'undated', 'settled']);
+  assert.deepEqual(data.debts.map(item => item.id), ['undated', 'later', 'settled', 'soon', 'overdue', 'dated'], 'the ledger\'s list is not reordered');
 });
 
 test('debts screen separates what I owe from what they owe me and never mixes currencies', () => {
@@ -758,9 +771,11 @@ test('24UX6E: a debt row reads its day written out, hints that it opens the deta
   const { press } = rowParts(debt);
   assert.equal(press.props.accessibilityLabel, 'Debo a Juan, 300,00 ARS, Vence 1 de octubre de 2026');
   assert.equal(press.props.accessibilityHint, 'Abre el detalle de la deuda');
-  assert.equal(press.props.style.borderBottomWidth, 0.33, 'StyleSheet.hairlineWidth, never 0.5');
+  // The list row's own geometry (components.tsx `rowStyle`), then the separator.
+  assert.deepEqual(press.props.style[0], { name: 'rowStyle' });
+  assert.equal(press.props.style[1].borderBottomWidth, 0.33, 'StyleSheet.hairlineWidth, never 0.5');
   const last = harness('src/ui/liability-rows.tsx').exports.DebtRow({ debt, last: true });
-  assert.equal(find(last, 'PressFeedback').props.style.borderBottomWidth, 0);
+  assert.equal(find(last, 'PressFeedback').props.style[1].borderBottomWidth, 0);
   assert.equal(rowParts({ ...debt, dueDateISO: '2026-09-19' }).press.props.accessibilityLabel, 'Debo a Juan, 300,00 ARS, Vencida · Ayer');
   activeLocale = 'en-US';
   try {

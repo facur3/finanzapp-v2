@@ -8,6 +8,8 @@ import { useDebtManagement } from '../src/ui/commitment-actions';
 import { withCurrencyCode } from '../src/i18n/format';
 import { useI18n } from '../src/i18n/provider';
 import { DebtRow } from '../src/ui/liability-rows';
+import { debtsByUrgency } from '../src/ui/liability-presentation';
+import { useCurrentDay } from '../src/ui/theme';
 
 /** Open debts and receivables with their totals, then the closed ones (24UX4). Each row settles, closes, reopens
  * or deletes with a trailing swipe; a deleted tracker leaves the screen while its payments stay in Movimientos. */
@@ -15,13 +17,16 @@ export default function DebtsScreen() {
   const { archive, snapshot } = useLedger();
   const { t } = useI18n();
   const manage = useDebtManagement();
+  const day = useCurrentDay();
   const debts = useMemo(() => (archive?.debts ?? []).filter(debt => debt.active), [archive?.debts]);
   const closed = useMemo(() => (archive?.debts ?? []).filter(debt => !debt.active && !debt.deleted), [archive?.debts]);
   // Exact per-currency sums from the domain: every currency present, ARS and USD first, never added together.
   const totals = useMemo(() => snapshot ? debtTotalsByCurrency(debts, snapshot) : [], [debts, snapshot]);
   if (!archive || !snapshot) return null;
-  const owedByMe = debts.filter(debt => debt.direction === 'owed_by_me');
-  const owedToMe = debts.filter(debt => debt.direction === 'owed_to_me');
+  // 25N1: each open section asks for action first: overdue, due soon, then by due date, undated last.
+  const open = debtsByUrgency(debts, snapshot, day);
+  const owedByMe = open.filter(debt => debt.direction === 'owed_by_me');
+  const owedToMe = open.filter(debt => debt.direction === 'owed_to_me');
 
   return <Screen>
     <Stack.Screen options={{ title: t('debts.list.title'),

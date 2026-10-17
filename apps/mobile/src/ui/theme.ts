@@ -1,5 +1,5 @@
 import { createContext, createElement, useContext, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { AccessibilityInfo, AppState, Appearance, useColorScheme, type TextStyle } from 'react-native';
+import { AccessibilityInfo, AppState, Appearance, useColorScheme } from 'react-native';
 import { todayKey } from '@finanzapp/domain';
 
 import { defaultPreferenceStore } from '../i18n/preference';
@@ -12,9 +12,11 @@ export type Palette = PaletteColors & {
   /** 25D1: iOS's Increase Contrast is on: what is drawn quieter for composition (a hero's symbol and cents) is drawn at
    * full strength. Absent where no provider answers (a test palette), which reads as off. */
   increaseContrast?: boolean;
-  /** Aliases kept for existing call sites: income/expense semantics. */
-  positive: string; negative: string; positiveSoft: string; negativeSoft: string;
 };
+
+/** The four palettes a screen can draw (scheme × Increase Contrast), built once, so every render hands out the same object. */
+const built = (base: PaletteColors, isDark: boolean): readonly [Palette, Palette] => [{ ...base, isDark, increaseContrast: false }, { ...base, isDark, increaseContrast: true }];
+const LIGHT = built(lightPalette, false), DARK = built(darkPalette, true);
 
 let themeStore: ThemePreferenceStore | null = null;
 /** The app's one Apariencia preference (24UX6A), created on first use and applied to iOS then: the root layout creates
@@ -36,29 +38,11 @@ export function usePalette(): Palette {
   const store = themePreferenceStore();
   const preference = useSyncExternalStore(store.subscribe, store.getState, store.getState);
   const isDark = effectiveScheme(preference, useColorScheme()) === 'dark';
-  const base = isDark ? darkPalette : lightPalette;
-  return { ...base, isDark, increaseContrast: useContext(IncreaseContrastContext), positive: base.income, negative: base.expense, positiveSoft: base.incomeSoft, negativeSoft: base.expenseSoft };
+  const increaseContrast = useContext(IncreaseContrastContext);
+  return (isDark ? DARK : LIGHT)[increaseContrast ? 1 : 0];
 }
 
-/** System font (SF Pro on iOS). Numbers are always tabular so amounts align. */
-export const type = {
-  hero: { fontSize: 44, lineHeight: 52, fontWeight: '700', letterSpacing: -1.3, fontVariant: ['tabular-nums'] } as TextStyle,
-  /** 25O1: the first opening's story headlines, a step above the Large Title. */
-  display: { fontSize: 40, lineHeight: 46, fontWeight: '700', letterSpacing: -1.1 } as TextStyle,
-  largeTitle: { fontSize: 34, lineHeight: 41, fontWeight: '700', letterSpacing: -0.8 } as TextStyle,
-  title1: { fontSize: 28, lineHeight: 34, fontWeight: '700', letterSpacing: -0.6 } as TextStyle,
-  title2: { fontSize: 22, lineHeight: 28, fontWeight: '700', letterSpacing: -0.4 } as TextStyle,
-  title3: { fontSize: 20, lineHeight: 25, fontWeight: '600', letterSpacing: -0.3 } as TextStyle,
-  headline: { fontSize: 17, lineHeight: 22, fontWeight: '600', letterSpacing: -0.2 } as TextStyle,
-  body: { fontSize: 17, lineHeight: 22 } as TextStyle,
-  subhead: { fontSize: 15, lineHeight: 20 } as TextStyle,
-  footnote: { fontSize: 13, lineHeight: 18 } as TextStyle,
-  caption: { fontSize: 12, lineHeight: 16 } as TextStyle,
-  eyebrow: { fontSize: 12, lineHeight: 16, fontWeight: '600', letterSpacing: 0.7, textTransform: 'uppercase' } as TextStyle,
-};
-
-export const radius = { chip: 14, tile: 12, group: 16, card: 20, sheet: 24, creditCard: 18, button: 14 };
-export const space = { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 };
+export { radius, space, type } from './tokens';
 
 const ReduceMotionContext = createContext(true);
 // Defaults to true: until iOS answers, a control is drawn on its opaque material, never on a missing effect.

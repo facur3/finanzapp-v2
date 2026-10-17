@@ -5,6 +5,7 @@ import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import * as domain from '@finanzapp/domain';
 import * as cardFaces from '../src/ui/card-faces.ts';
+import { deltaE } from './contrast.ts';
 import * as geometry from '../src/ui/geometry.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 
@@ -133,6 +134,18 @@ test('every face tone holds white text at 7:1 (base, sheen and highlight), and t
     const issuer = mix(base, '#FFFFFF', 0.72);
     assert.ok(contrast(issuer, mix(base, '#FFFFFF', 0.05)) >= 4.5, `the issuer on ${base}: ${contrast(issuer, base).toFixed(2)}`);
   }
+});
+
+test('the six hash tones are pairwise distinct (ΔE 12 or more; graphite and slate were 1.6 apart), and every face shares one rim', () => {
+  const faces = cardFaces.HASH_FACES;
+  assert.equal(faces.length, 6);
+  for (let one = 0; one < faces.length; one++) for (let two = one + 1; two < faces.length; two++) {
+    const distance = deltaE(faces[one].base, faces[two].base);
+    assert.ok(distance >= 12, `${faces[one].base} and ${faces[two].base} are ΔE ${distance.toFixed(1)} apart`);
+  }
+  // The index is the stored id's hash, unchanged: a card keeps its slot, only a slot's drawn tone changed.
+  assert.equal(cardFaces.cardFaceIndex('visa'), [...'visa'].reduce((hash, c) => (hash * 31 + c.charCodeAt(0)) >>> 0, 0) % 6);
+  assert.equal(cardFaces.FACE_RIM, 'rgba(255, 255, 255, 0.12)');
 });
 
 test('25D1: a card pressed under Reduce Motion keeps its text legible through the wash: white 6:1, the issuer AA', () => {

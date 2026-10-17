@@ -88,6 +88,8 @@ export const cards: Pick<Messages, 'cards'> = {
       everyMonth: 'Use these days every month',
       frozenNote: 'The submission is locked so Retry won’t create another card or apply changes twice.',
       create: 'Create card',
+      more: 'More details (optional)',
+      datesMissing: 'Choose the next closing and its due date.',
       retry: 'Retry',
       archive: 'Archive card',
       reactivate: 'Reactivate card',
