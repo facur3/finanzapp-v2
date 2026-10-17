@@ -14,6 +14,7 @@ import * as localeOptions from '../src/ui/locale-options.ts';
 import * as operationPresentation from '../src/ui/operation-presentation.ts';
 import * as backupFile from '../src/ui/backup-file.ts';
 import { createLocaleStore } from '../src/i18n/store.ts';
+import { REGION_PREFERENCE_KEY } from '../src/i18n/preference.ts';
 import type { AppLocale, ReleasedSets } from '../src/i18n/locale.ts';
 function localeStore(released?: ReleasedSets) {
   const rows = new Map<string, string>();
@@ -217,6 +218,17 @@ test('Más → App y datos (23.1C2): Idioma and Región say what is in use and w
   const single = rows(harness('(tabs)/settings.tsx', archive, { languages: ['es'], regions: ['AR'] }).render());
   assert.equal(single.some(row => row.props.title === 'Región'), false);
   assert.deepEqual(single.filter(row => row.props.last).map(row => row.props.title), ['Categorías', 'Apariencia']);
+});
+
+test('25O1 review: Más › Región leads with the flag of the region its subtitle names first: one kept from a preview build shows its own, never its stand-in\'s', () => {
+  const view = harness('(tabs)/settings.tsx');
+  // The release gate (Saudi Arabia blocked) reading a choice saved by a development preview: kept, not applied; the
+  // device's United States writes meanwhile.
+  currentLocaleStore = createLocaleStore({ devices: () => ({ source: 'native', locales: [{ languageTag: 'es-AR', regionCode: 'US' }] }),
+    store: () => ({ getItemSync: key => key === REGION_PREFERENCE_KEY ? 'SA' : null, setItemSync() {}, removeItemSync: () => false }) });
+  const region = rows(view.render()).find(row => row.props.title === 'Región')!;
+  assert.equal(region.props.subtitle, 'Arabia Saudí · formatos de Estados Unidos');
+  assert.deepEqual([region.props.leading.type, region.props.leading.props.region, region.props.leading.props.size], ['RegionMark', 'SA', 34]);
 });
 
 test('24UX6C: the Más polish preserves every route, in the same order, in both languages; no «Ajustes» destination', () => {

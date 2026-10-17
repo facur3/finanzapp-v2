@@ -2086,6 +2086,15 @@ test('25Q4: editing a card payment, a debt payment or a collection keeps its car
   find(closed.render(), 'Field').props.onChangeText('nota');
   await find(closed.render(), 'ActionButton', 'Guardar cambios').props.onPress();
   assert.deepEqual(closed.transferChanges.map(change => [change.after.transfer.fromAccountId, change.after.transfer.note]), [['a', 'nota']]);
+  // 25O1 review: a collection whose cash destination was deleted since, with another live account in its currency: the edit
+  // keeps its stored destination, never moves the collected money into one the person did not choose.
+  const collected = storedTransfer('c', 'rec-acc', 'a', 1000);
+  const moved = harness('src/ui/transfer-form.tsx', { original: collected }, { data: { ...withAna,
+    accounts: withAna.accounts.map(item => item.id === 'a' ? { ...item, revision: 1, deletedAt: '2026-09-20T10:00:00.000Z' } : item), transfers: [collected] } });
+  assert.equal(find(moved.render(), 'AccountField', 'Hacia').props.value, 'a', 'the stored destination, never the live «Destino»');
+  find(moved.render(), 'Field').props.onChangeText('nota');
+  await find(moved.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+  assert.deepEqual(moved.transferChanges.map(change => [change.after.transfer.fromAccountId, change.after.transfer.toAccountId, change.after.transfer.note]), [['rec-acc', 'a', 'nota']]);
 });
 
 test('25Q4 review: a payment or a collection stored the other way round (a debt I owe → cash, cash → a receivable) is edited in the generic form, where it is turned back and saved', async () => {
