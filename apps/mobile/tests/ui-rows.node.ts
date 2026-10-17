@@ -990,9 +990,7 @@ test('25VIS2: every segment is a 44 pt target without being drawn taller (the de
   }
   const segment = nodes(ui.render('Choices', { value: 'expense', onChange: () => {}, options })).find(node => node.type === 'Pressable')!;
   assert.equal(JSON.stringify(segment.props.hitSlop), '{"top":6,"bottom":6}', 'vertical only: the neighbour is 2 pt away sideways');
-  // The composer leaves the 4 pt the slop reaches below the 36 pt track clear of the scroller that follows it.
-  const composer = readFileSync(new URL('../src/ui/movement-form.tsx', import.meta.url), 'utf8');
-  assert.match(composer, /paddingTop: space\.m, paddingBottom: 4 \}\}>\s*<Choices<MovementKind>/);
+  // The composer's 4 pt under the track: rendered in tests/recovery-routes.node.ts (the movement modal's own test).
 });
 
 test('25D1: a segment under the finger dims to 60 % until it lifts; the chosen one never dims; nothing moves', () => {
@@ -1040,8 +1038,14 @@ test('25VIS2: under Reduce Motion a pressed scale control dims instead of showin
   assert.deepEqual(press(true, { reducedDim: false }), ['{"transform":[{"scale":1}]}', '{"transform":[{"scale":1}]}'], 'a glass pill keeps no pressed state');
   assert.deepEqual(press(false), ['{"transform":[{"scale":1}]}', '{"transform":[{"scale":0.97}]}'], 'the scale is unchanged without Reduce Motion');
   assert.deepEqual(press(true, { feedback: 'opacity' }), ['{"opacity":1}', '{"opacity":0.4}'], 'a text button dims as before');
-  const quick = readFileSync(new URL('../src/ui/quick-actions.tsx', import.meta.url), 'utf8');
-  assert.match(quick, /<PressFeedback[^>]*reducedDim=\{material !== 'glass'\}[^>]*>\s*<ControlSurface/, 'an account detail\'s pills opt out only while they are glass');
+  // An account detail's pills opt out only while they are glass: rendered with each material.
+  for (const [material, dim] of [['glass', false], ['opaque', true]] as const) {
+    const quick = load('quick-actions.tsx', { './material': { ControlSurface: 'ControlSurface', useMaterial: () => material },
+      './components': { AppText: 'AppText', PressFeedback: 'PressFeedback', toneColors: () => ({ color: '#000' }), useStacked: () => false } });
+    const row = quick.render('QuickActions', {});
+    const pills = row.props.children.map((child: any) => child.type(child.props));
+    assert.equal(JSON.stringify(pills.map((pill: Node) => [pill.type, pill.props.reducedDim, pill.props.children.type])), JSON.stringify(Array(3).fill(['PressFeedback', dim, 'ControlSurface'])), material);
+  }
 });
 
 test('25VIS2: a field\'s caption is not a VoiceOver stop of its own; the amount keyboard\'s Listo is named as it reads', async () => {

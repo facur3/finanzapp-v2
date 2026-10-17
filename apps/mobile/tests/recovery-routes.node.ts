@@ -698,6 +698,9 @@ test('the movement modal switches Gasto / Ingreso / Transferencia as state, neve
   assert.equal(choices.props.options.map((option: { value: string }) => option.value).join(','), 'expense,income,transfer');
   assert.equal(choices.props.value, 'expense');
   assert.equal(find(root, 'EntryForm').props.kind, 'expense');
+  // The 4 pt under the track keep the segments' slop clear of the scroller that follows (a render, not a pattern over source).
+  const track = root.props.children[0];
+  assert.deepEqual([track.type, track.props.style.paddingBottom, track.props.children.type], ['View', 4, 'Choices']);
   assert.equal(find(root, 'EntryForm').props.accountId, 'a');
   find(root, 'EntryForm').props.onAccountChange('b');
   choices.props.onChange('transfer');

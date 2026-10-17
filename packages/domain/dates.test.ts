@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { labelFromISO, todayKey } from './dates.ts';
+import { advanceRecurringDate } from './recurring.ts';
 
 // Regression of the legacy src/domain/dates.js behaviour the native app consumes
 // (its dates.test.js cases for these two functions are kept verbatim below, then
@@ -55,5 +56,26 @@ describe('dates.labelFromISO', () => {
 
   it('follows JavaScript Date overflow for impossible days, as the legacy module did', () => {
     expect(labelFromISO('2026-02-31', ref)).toBe('3 mar');
+  });
+});
+
+// 25R1: what must hold in every zone CI runs the suites in (UTC, Buenos Aires, New York with its daylight saving, Auckland
+// ahead of UTC): the day is the device's local calendar day, and date-only arithmetic never moves across a DST change.
+describe('the local calendar in any zone', () => {
+  it('takes the local day at 23:30 and at 00:30, never the UTC one', () => {
+    expect(todayKey(new Date(2026, 8, 25, 23, 30))).toBe('2026-09-25');
+    expect(todayKey(new Date(2026, 8, 26, 0, 30))).toBe('2026-09-26');
+    expect(todayKey(new Date(2026, 0, 1, 0, 30))).toBe('2026-01-01');
+    expect(todayKey(new Date(2026, 11, 31, 23, 30))).toBe('2026-12-31');
+  });
+  it('steps a weekly rule across the DST changes of New York and Auckland by exactly seven days', () => {
+    for (const [from, to] of [['2026-03-07', '2026-03-14'], ['2026-10-31', '2026-11-07'], ['2027-04-03', '2027-04-10'], ['2026-09-26', '2026-10-03']]) {
+      expect(advanceRecurringDate(from, 'weekly', from)).toBe(to);
+    }
+  });
+  it('keeps a monthly rule anchored on the 31st through February and back', () => {
+    expect(advanceRecurringDate('2026-01-31', 'monthly', '2026-01-31')).toBe('2026-02-28');
+    expect(advanceRecurringDate('2026-02-28', 'monthly', '2026-01-31')).toBe('2026-03-31');
+    expect(advanceRecurringDate('2028-01-31', 'monthly', '2028-01-31')).toBe('2028-02-29');
   });
 });

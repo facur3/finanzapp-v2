@@ -315,6 +315,11 @@ test('25Q2: the export writes one dated compact file in the cache, shares it as 
   assert.equal(domain.parsePilotBackup(share.text!).archive.records.length, exportable.records.length, 'this app restores what it shared');
   assert.equal(exportIo.files.size, 0, 'the plaintext copy is deleted once the sheet closes');
   assert.equal(errorOf(view), null);
+  // A second tap while the first export is still open (the sheet up) shares nothing more and leaves no second file.
+  view = harness('backup.tsx', exportable); exportIo.available = true; exportIo.shares.length = 0;
+  const onPress = nodes(view.render()).find(node => node.type === 'ActionButton')!.props.onPress;
+  await Promise.all([onPress(), onPress()]);
+  assert.deepEqual([exportIo.shares.length, exportIo.created, exportIo.files.size], [1, 1, 0], 'one file and one share: the tap that counted');
   // The sheet fails: its text never reaches the person, and the file still goes.
   view = harness('backup.tsx', exportable); exportIo.available = true; exportIo.failShare = true;
   await press(view);

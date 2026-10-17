@@ -903,6 +903,12 @@ sandbox with daily renewals (§4.5). Sandbox notifications go to the staging bac
   before App Store submission); the per-family iPhone sheet (`docs/region-families.md`); the 24C1, 24M and 24R2B sections; the
   privacy policy naming the exchange-rate provider (`docs/currency.md` §8.2); the encryption key in the config; every
   open device gate "closed or consciously deferred by the owner" (roadmap, «Producto 26»).
+- **Before each `eas submit`:** download the build from EAS, unzip the `.ipa` and run
+  `node scripts/check-bundle-secrets.mjs <unzipped>/Payload/<App>.app` on it. CI scans its own `expo export`, not the
+  artifact people receive: `EXPO_PUBLIC_*` values are inlined by the EAS build with that environment's variables, so a key
+  set there by mistake is seen only by scanning the artifact. The scan fails without its canary (it did not read the
+  bundle) and without the patched URL decoder's pattern (`DECODER_MARKER`, decode-uri-component 0.5.0 from
+  `apps/mobile/compat`). Record the result beside the build number. **A release step, not run by any tool yet.**
 - **Crash and performance validation:** TestFlight collects crash reports and screenshot feedback from testers. The
   roadmap requires "the accessibility and performance pass on a TestFlight build (an optimised build, not development
   mode: cold start, memory, dropped frames, VoiceOver, large text, Reduce Motion)" (Producto 26). A JS export or a
