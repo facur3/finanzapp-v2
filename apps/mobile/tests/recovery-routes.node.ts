@@ -705,6 +705,7 @@ test('25N1: a plain transfer while a card owes points quietly to «Pagar tarjeta
   assert.equal(link.props.accessibilityLabel, '¿Pagás Visa? Usá «Pagar tarjeta».');
   link.props.onPress();
   assert.equal(JSON.stringify(view.pushed.pop()), JSON.stringify({ pathname: '/new-transfer', params: { toAccountId: 'card-acc', maxAmountMinor: '5000' } }));
+  assert.equal(view.replaced.length, 1, 'the payment replaces this form: saving it never returns to an abandoned transfer');
   const english = harness('src/ui/transfer-form.tsx', { accountId: 'a' }, { data: liabilityData, locale: 'en-AR' });
   assert.equal(pointer(english.render())!.props.accessibilityLabel, 'Paying Visa? Use “Pay card”.');
   const second: domain.Account = { ...cardAccount, id: 'card-2', name: 'Master' };

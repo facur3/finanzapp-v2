@@ -865,7 +865,7 @@ export function EntryRow({ entry, account, last = false, showDate = true, showAc
     : component === undefined ? [entry.merchant, t(income ? 'movement.incomeWord' : 'movement.expenseWord')]
       : [t('operations.row.payoffWord'), ...(component === 'principal' ? [] : [t(`operations.row.payoffShareSpoken.${component}`)]), entry.merchant];
   return <PressFeedback feedback="highlight" accessibilityRole="button"
-    accessibilityLabel={[...spokenKind, ...(voided ? [t('rows.undone')] : []), spokenAmount(amount.minor, account.currency), category, account.name, dateLabel].join(', ')}
+    accessibilityLabel={[...spokenKind, ...(voided ? [t(refund ? 'rows.undoneTransfer' : 'rows.undone')] : []), spokenAmount(amount.minor, account.currency), category, account.name, dateLabel].join(', ')}
     onPress={() => router.push(operationId !== undefined ? { pathname: '/operation/[id]', params: { id: operationId } } : { pathname: '/entry/[id]', params: { id: entry.id } })}
     style={[styles.row, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
     {refund ? <GlyphTile icon="arrow-undo-outline" />

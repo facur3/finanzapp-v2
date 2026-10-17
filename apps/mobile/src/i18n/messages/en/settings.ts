@@ -56,7 +56,7 @@ export const settings: Pick<Messages, 'settings' | 'licenses'> = {
     },
   },
   licenses: {
-    intro: 'FinanzApp includes this third-party software and data. Each notice is shown as published.',
+    intro: 'Third-party software and data FinanzApp uses. Each notice is shown as published.',
     software: 'Software',
     data: 'Data and artwork',
     rates: 'Reference exchange rates come from Frankfurter (frankfurter.dev), which gathers them from central banks and official sources. Each rate is subject to its provider’s terms.',

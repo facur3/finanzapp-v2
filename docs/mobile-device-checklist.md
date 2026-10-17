@@ -144,9 +144,9 @@ way round, which opens as a plain transfer and is capped once turned back).
    puede recuperar ahora» with «Ver deuda» (opens the debt); Cancelar changes nothing and the next tap asks again.
 4. **Undo a card purchase and a card payment.** Each alert says how the card will read («saldo pendiente», never «Se
    sumarán … a Visa»). The purchase's says «Este movimiento dejará de contar en tus saldos y reportes. Podés
-   recuperarlo después desde Movimientos deshechos, en Más.»; the payment's names the cash side and ends «Podés
-   recuperar la transferencia después desde Movimientos deshechos, en Más.». Recover both from Más › Movimientos
-   deshechos. Undoing a collection that settled what Ana owed says «Lo que te debe Ana quedará saldado.» when
+   recuperarlo después desde Movimientos deshechos, en Movimientos.»; the payment's names the cash side and ends «Podés
+   recuperar la transferencia después desde Movimientos deshechos, en Movimientos.». Recover both from Movimientos'
+   bar button › Movimientos deshechos (25N1; on #119 alone the alerts say «en Más» and the list is in Más). Undoing a collection that settled what Ana owed says «Lo que te debe Ana quedará saldado.» when
    recovered, never «La deuda con Ana».
 5. **A refused save taps once.** Nuevo presupuesto for a month and category that already has one, and Nueva categoría
    with a name in use: the sentence and one Error tap, nothing saved, the fields editable; the same save done right

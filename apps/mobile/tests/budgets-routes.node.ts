@@ -137,6 +137,20 @@ test('editing keeps the kind fixed: a total edits its amount only, a sublimit ke
   assert.equal(editFood.backs(), 1);
 });
 
+test('25N1 review: a save that committed but could not refresh keeps its own scope for the retry when the ledger later shows it', async () => {
+  const data: domain.LedgerArchive = { ...archive, budgets: [food] };
+  const view = harness({ monthISO: '2026-09', currency: 'ARS', scope: 'total' }, data, async () => { throw new Error('database is locked'); });
+  find(view.render(), 'AmountField').props.onChangeText('1');
+  await find(view.render(), 'ActionButton', 'Crear presupuesto').props.onPress();
+  // The write did land: a later refresh (the app back in front) shows the very budget this form is retrying.
+  data.budgets = [food, view.saved[0]!];
+  const root = view.render();
+  assert.equal(nodes(root).some(node => node.type === 'CategoryField'), false, 'still the general budget it was creating, never a category limit');
+  const retry = find(root, 'ActionButton', 'Reintentar guardado');
+  assert.equal(retry.props.disabled ?? false, false, 'the retry stays available');
+  assert.equal(nodes(root).some(node => node.type === 'AppText' && /Para cambiarlo/.test(String(node.props.children))), false, 'never told it is taken by itself');
+});
+
 test('a failed write, a zero amount and a negative one keep the draft, and archiving asks first', async () => {
   // 24UX6E: a duplicate is now refused before the submission freezes (next test); the frozen retry is for a write that
   // failed after the input was valid, here a storage error on a budget nothing else conflicts with.

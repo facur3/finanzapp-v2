@@ -837,6 +837,9 @@ test('25N1: a row of Movimientos deshechos never looks live: the amount in the t
   assert.deepEqual([moneyOf(live)[0].props.signed, moneyOf(live)[0].props.color], [true, undefined], 'a live row is unchanged');
   const expense = ui.render('EntryRow', { entry: { ...income, kind: 'expense', merchant: 'Café', category: 'Comida' }, account: bank, voided: true });
   assert.equal(pressOf(expense).props.accessibilityLabel, 'Café, gasto, deshecho, 5000,00 ARS, x, Banco, Hoy');
+  // A devolución is feminine: «Devolución, Café, deshecha».
+  const refundRow = ui.render('EntryRow', { entry: { ...income, merchant: 'Café', category: 'Comida', refund: { operationId: 'op' } }, account: bank, voided: true });
+  assert.match(pressOf(refundRow).props.accessibilityLabel, /^Devolución, Café, deshecha, /);
   const transfer = { id: 't', fromAccountId: 'a', toAccountId: 'b', amountMinor: 250000, dateISO: '2026-09-22', createdAt: 't', note: '' };
   const undoneTransfer = ui.render('TransferRow', { transfer, accounts: [bank, cash], voided: true });
   assert.equal(moneyOf(undoneTransfer)[0].props.color, '#8E9098');

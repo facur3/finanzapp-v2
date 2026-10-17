@@ -44,10 +44,11 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency, sc
   const saving = useRef(false);
   const locked = busy || pending !== null || archivePending !== null;
   const close = () => { if (!saving.current) { if (router.canGoBack()) router.back(); else router.replace('/budgets'); } };
-  // 25N1: the active budgets of this month and currency (the edited one aside). A general one already there means the
+  // 25N1: the active budgets of this month and currency (the edited one aside, and the one this form is creating: a save
+  // that committed but could not refresh must keep its own scope for «Reintentar guardado»). A general one already there means the
   // form never offers «General» (it is a category limit); a draft that repeats one says where it is.
   const month = before?.monthISO ?? monthISO;
-  const others = (ledgerArchive?.budgets ?? []).filter(item => item.active && item.id !== before?.id && item.monthISO === month && item.currency === currency);
+  const others = (ledgerArchive?.budgets ?? []).filter(item => item.active && item.id !== before?.id && item.id !== operation.id && item.monthISO === month && item.currency === currency);
   const generalTaken = !before && others.some(item => item.scope === 'total');
   const general = before ? before.scope === 'total' : scope === 'total' && !generalTaken;
   const draftKey = budgetIdentityKey({ currency, monthISO: month, scope: general ? 'total' : 'category', category: general ? undefined : category.trim() });

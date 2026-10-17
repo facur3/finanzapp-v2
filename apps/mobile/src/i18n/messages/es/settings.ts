@@ -68,7 +68,7 @@ export const settings = {
   },
   /** 25N1, Ajustes › Licencias. A notice's name, licence and text are shown as published (in English), never from here. */
   licenses: {
-    intro: 'FinanzApp incluye este software y estos datos de terceros. Cada aviso se muestra como fue publicado, en inglés.',
+    intro: 'Software y datos de terceros que usa FinanzApp. Cada aviso se muestra como fue publicado, en inglés.',
     software: 'Software',
     data: 'Datos e imágenes',
     /** Under the data group: where the reference exchange rates come from, and whose terms apply. */

@@ -330,9 +330,10 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
         {t(obligationKind === 'card' ? 'transferForm.explainCard' : obligationKind === 'debt' ? 'transferForm.explainDebt' : 'transferForm.explainTransfer')}
       </AppText>
       {/* 25N1: a plain transfer never pays a card (only cash accounts are offered); while a card owes, one quiet line points to
-          «Pagar tarjeta»: that card's payment when there is one, Tarjetas when there are several. No step is added. */}
+          «Pagar tarjeta»: that card's payment when there is one (it replaces this form, so saving it never returns to an
+          abandoned transfer), Tarjetas when there are several. No step is added. */}
       {owingCard ? <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('transferForm.cardPointerOne', { name: nameOf(owingCard.account) })} disabled={locked}
-        onPress={() => router.push({ pathname: '/new-transfer', params: { toAccountId: owingCard.account.id, maxAmountMinor: String(owingCard.debtMinor) } })} style={{ alignSelf: 'flex-start' }}>
+        onPress={() => router.replace({ pathname: '/new-transfer', params: { toAccountId: owingCard.account.id, maxAmountMinor: String(owingCard.debtMinor) } })} style={{ alignSelf: 'flex-start' }}>
         <AppText variant="footnote" style={{ color: p.primary, fontWeight: '500' }}>{t('transferForm.cardPointerOne', { name: nameOf(owingCard.account) })}</AppText>
       </PressFeedback> : owing.length > 1 && <AppText secondary variant="footnote">{t('transferForm.cardPointer')}</AppText>}
       {/* 25Q4: an amount over the cap is said while it is typed: shown, not spoken (VoiceOver hears what Save refused), as the
