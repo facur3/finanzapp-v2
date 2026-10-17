@@ -364,7 +364,7 @@ test('24T2: the card form\'s dates read in English, and the statement to pay is 
   assert.ok(texts(moved.render()).some(text => text.includes('These dates correct this statement only.')));
 });
 
-test('24T2 review: the switch row speaks its reason with its label (a hint may be turned off), and ticks once per change', () => {
+test('24T2 review: the switch row speaks its reason with its label (a hint may be turned off); no app tick on top of the system switch\'s own', () => {
   let haptics = 0;
   const jsx = (type: unknown, props: Record<string, unknown>) => ({ type, props });
   const modules: Record<string, unknown> = {
@@ -389,7 +389,7 @@ test('24T2 review: the switch row speaks its reason with its label (a hint may b
   const plain = toggleOf(SwitchRow({ label: 'Con interés', value: false, onValueChange: (value: boolean) => changes.push(value) }));
   assert.equal(plain.props.accessibilityLabel, 'Con interés');
   plain.props.onValueChange(true);
-  assert.deepEqual([changes, haptics], [[true], 1]);
+  assert.deepEqual([changes, haptics], [[true], 0], 'UISwitch plays its own haptic; a second tick would double it');
 });
 
 test('24T2 owner decision: any exact correction may be one-off (+1, +14, +16, +20, across a month); the next normal statement follows; the switch alone makes days usual', () => {

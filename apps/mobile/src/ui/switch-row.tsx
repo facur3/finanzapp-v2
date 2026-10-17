@@ -2,13 +2,12 @@ import { StyleSheet, Switch, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useI18n } from '../i18n/provider';
 import { AppText, type IconName } from './components';
-import { selectionHaptic } from './motion';
 import { usePalette } from './theme';
 
 /** Producto 24T2: one iOS switch row inside a grouped surface, for a secondary choice that reveals fields (the purchase
  * form's «Con interés», the card form's «Usar estos días todos los meses»). The native switch is the one control VoiceOver
  * focuses; its label is the row's text and, when there is one, its detail (why the switch is fixed, for example), read
- * every time rather than as a hint a person may have turned off. A selection haptic on each change; the text scales and
+ * every time rather than as a hint a person may have turned off. No haptic of its own: the system switch plays one. The text scales and
  * wraps at every size, and the row keeps the 54 pt height of a DetailRow. */
 export function SwitchRow({ label, value, onValueChange, detail, icon, disabled = false, last = false }: {
   label: string; value: boolean; onValueChange: (value: boolean) => void; detail?: string; icon?: IconName; disabled?: boolean; last?: boolean;
@@ -23,7 +22,7 @@ export function SwitchRow({ label, value, onValueChange, detail, icon, disabled 
     </View>
     <Switch value={value} disabled={disabled} accessibilityLabel={detail ? label + ', ' + detail : label} accessibilityLanguage={speechLanguage}
       trackColor={{ false: p.inset, true: p.toggle }}
-      onValueChange={next => { selectionHaptic(); onValueChange(next); }} />
+      onValueChange={onValueChange} />
   </View>;
 }
 

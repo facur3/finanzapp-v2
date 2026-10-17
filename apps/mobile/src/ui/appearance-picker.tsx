@@ -68,7 +68,7 @@ export function IconColorPicker({ icons, colors, icon, color, onIconChange, onCo
 function IconOption({ item, name, selected, hex, disabled, onPress, p }: { item: IconChoice; name: string; selected: boolean; hex: string; disabled: boolean; onPress: () => void; p: Palette }) {
   const reduced = useReduceMotion();
   return <PressFeedback accessibilityRole="radio" accessibilityLabel={name} accessibilityState={{ selected, checked: selected, disabled }}
-    disabled={disabled} onPress={onPress} hitSlop={2} style={styles.option}>
+    disabled={disabled} onPress={onPress} hitSlop={2} style={[styles.option, disabled && styles.disabled]}>
     <Animated.View style={[styles.iconTile, { backgroundColor: selected ? tintOf(hex, p) : p.inset, borderColor: selected ? hex : 'transparent',
       transitionProperty: ['backgroundColor', 'borderColor'], transitionDuration: reduced ? 0 : duration.state }]}>
       <Ionicons name={item.glyph} size={20} color={selected ? hex : p.secondary} accessible={false} />
@@ -80,7 +80,7 @@ function ColorOption({ item, name, selected, disabled, onPress, p }: { item: Col
   const reduced = useReduceMotion();
   const hex = appearanceHex(item.id, p);
   return <PressFeedback accessibilityRole="radio" accessibilityLabel={name} accessibilityState={{ selected, checked: selected, disabled }}
-    disabled={disabled} onPress={onPress} hitSlop={2} style={styles.option}>
+    disabled={disabled} onPress={onPress} hitSlop={2} style={[styles.option, disabled && styles.disabled]}>
     <Animated.View style={[styles.ring, { borderColor: selected ? hex : 'transparent', transitionProperty: 'borderColor', transitionDuration: reduced ? 0 : duration.state }]}>
       <View style={[styles.dot, { backgroundColor: hex }]}>
         {/* 25D1: the check takes onSemantic, white in light and ink in dark, where white fell to 2:1 on the brighter dots. */}
@@ -96,6 +96,7 @@ export const PICKER_COLUMNS = 6;
 const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   option: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', minHeight: 44 },
+  disabled: { opacity: 0.6 },
   iconTile: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 2 },
   ring: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   dot: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },

@@ -172,7 +172,7 @@ export function PressFeedback({ children, style, containerStyle, feedback = 'sca
   const active = feedback !== 'scale' || !reduced || dim;
   // The Pressable is the VoiceOver element (its children's languages are not consulted), so it carries the language (see AppText).
   return <Animated.View style={[containerStyle, animatedStyle]}><Pressable {...props} accessibilityLanguage={props.accessibilityLanguage ?? speechLanguage}
-    style={[{ minHeight: 44, justifyContent: 'center' }, style]} pressRetentionOffset={12}
+    style={[{ minHeight: 44, justifyContent: 'center' }, style]}
     onPressIn={event => { pressed.value = active ? withTiming(1, { duration: duration.press, easing: easeOut }) : 0; props.onPressIn?.(event); }}
     onPressOut={event => { pressed.value = withTiming(0, { duration: active ? duration.release : 0, easing: easeOut }); props.onPressOut?.(event); }}>
     {backdrop}
@@ -233,15 +233,37 @@ export function SearchField({ label, ...props }: TextInputProps & { label: strin
   </View>;
 }
 
+/** Keyboards with no Return key: a field on one gets the «Listo» bar the amount field has. */
+const PAD_KEYBOARDS: ReadonlySet<string> = new Set(['number-pad', 'decimal-pad', 'numeric', 'phone-pad']);
+
+/** A text field. Clear while editing (iOS hides it while the field is locked), a «Listo» bar over a keyboard with no
+ * Return key, and a locked field (editable false) drawn at the row family's disabled strength. */
 export function Field({ label, ...props }: TextInputProps & { label: string }) {
   const p = usePalette();
   const { speechLanguage } = useI18n();
+  const accessoryId = useId();
+  const pad = Platform.OS === 'ios' && PAD_KEYBOARDS.has(props.keyboardType ?? '');
   // The caption is the field's accessibility label, so VoiceOver reads it once, on the field, not as a stop of its own.
-  return <View style={{ gap: 8 }}><AppText accessible={false} secondary variant="footnote" style={{ fontWeight: '500' }}>{label}</AppText>
-    <TextInput returnKeyType="done" onSubmitEditing={Keyboard.dismiss} {...props} accessibilityLabel={label}
+  return <View style={{ gap: 8, opacity: props.editable === false ? 0.6 : 1 }}><AppText accessible={false} secondary variant="footnote" style={{ fontWeight: '500' }}>{label}</AppText>
+    <TextInput returnKeyType="done" onSubmitEditing={Keyboard.dismiss} clearButtonMode="while-editing" inputAccessoryViewID={pad ? accessoryId : undefined} {...props} accessibilityLabel={label}
       accessibilityLanguage={props.accessibilityLanguage ?? speechLanguage} placeholderTextColor={p.tertiary}
       selectionColor={p.primary} style={[styles.input, { color: p.text, backgroundColor: p.surface }, props.style]} />
+    {pad && <DoneAccessory id={accessoryId} />}
   </View>;
+}
+
+/** The bar over a keyboard with no Return key: one «Listo» that dismisses it. */
+function DoneAccessory({ id }: { id: string }) {
+  const p = usePalette();
+  const { t } = useI18n();
+  return <InputAccessoryView nativeID={id} backgroundColor={p.surface}>
+    <View style={{ alignItems: 'flex-end', paddingHorizontal: 20 }}>
+      {/* Named as it reads, so Voice Control's «Tocar Listo» finds it. */}
+      <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('common.done')} onPress={Keyboard.dismiss} style={{ paddingHorizontal: 12 }}>
+        <AppText style={{ color: p.primary, fontWeight: '600' }}>{t('common.done')}</AppText>
+      </PressFeedback>
+    </View>
+  </InputAccessoryView>;
 }
 
 type Caret = { start: number; end: number };
@@ -353,7 +375,7 @@ export function AmountField({ label, currency, tone, value = '', onChangeText, s
     setSelection({ start: result.view.caret, end: result.view.caret });
     emit(result.draft);
   };
-  return <View style={{ gap: 6, paddingVertical: 8 }}>
+  return <View style={{ gap: 6, paddingVertical: 8, opacity: props.editable === false ? 0.6 : 1 }}>
     {/* Said by the field itself (`amount.accessibility`: the label and the currency in words), never twice. */}
     {!bare && <AppText accessible={false} secondary variant="footnote" style={{ fontWeight: '500' }}>{title} · {currency}</AppText>}
     <View style={styles.amountRow} onLayout={event => setRowWidth(event.nativeEvent.layout.width)}>
@@ -369,14 +391,7 @@ export function AmountField({ label, currency, tone, value = '', onChangeText, s
         style={[styles.amountInput, { color, fontSize, paddingRight: AMOUNT_FIELD.caret }, props.style]} />
     </View>
     {noticeText && <AppText variant="footnote" style={{ color: p.warning }}>{noticeText}</AppText>}
-    {Platform.OS === 'ios' && <InputAccessoryView nativeID={accessoryId} backgroundColor={p.surface}>
-      <View style={{ alignItems: 'flex-end', paddingHorizontal: 20 }}>
-        {/* Named as it reads, so Voice Control's «Tocar Listo» finds it. */}
-        <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('common.done')} onPress={Keyboard.dismiss} style={{ paddingHorizontal: 12 }}>
-          <AppText style={{ color: p.primary, fontWeight: '600' }}>{t('common.done')}</AppText>
-        </PressFeedback>
-      </View>
-    </InputAccessoryView>}
+    {Platform.OS === 'ios' && <DoneAccessory id={accessoryId} />}
   </View>;
 }
 
@@ -663,7 +678,7 @@ export function DetailRow({ label, value, spokenValue, icon, leading, onPress, l
     </View>
     {onPress && <Ionicons name="chevron-forward" size={16} color={p.tertiary} accessible={false} />}
   </>;
-  const style: StyleProp<ViewStyle> = [styles.detailRow, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }];
+  const style: StyleProp<ViewStyle> = [styles.detailRow, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, opacity: disabled ? 0.6 : 1 }];
   return onPress ? <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={label + ': ' + (spokenValue ?? value)}
     disabled={disabled} accessibilityState={{ disabled }} onPress={onPress} style={style}>{content}</PressFeedback> : <View style={style}>{content}</View>;
 }
