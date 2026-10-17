@@ -9,6 +9,8 @@ import * as liabilityPresentation from '../src/ui/liability-presentation.ts';
 import * as moneyInput from '../src/ui/money-input.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
+/** 25D2: what VoiceOver was told through motion.tsx's `announce`, in order (its iOS-only queue is tested in motion.node.ts). */
+const announced: string[] = [];
 const i18nProvider = { useI18n: () => bindLocale('es-AR') };
 
 // Producto 18 smart amount shortcuts on the actual transfer form: Usar todo,
@@ -56,7 +58,7 @@ function harness(props: any = {}, data: domain.LedgerArchive = archive, options:
     'react-native': { View: 'View', Keyboard: { dismiss() {} } },
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, router: { canGoBack: () => true, back: () => {}, push: () => {}, replace: () => {} } },
     'expo-crypto': { randomUUID: () => 'operation-' + (++uuid) },
-    './motion': { successHaptic() {}, errorHaptic() {}, warningHaptic() {} },
+    './motion': { announce: (text: string, after = 'now') => { announced.push(after === 'leave' ? 'after leaving: ' + text : text); }, successHaptic() {}, errorHaptic() {}, warningHaptic() {} },
     '@finanzapp/domain': domain,
     '../storage/LedgerProvider': ledger,
     './components': components,

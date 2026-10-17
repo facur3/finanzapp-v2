@@ -9,7 +9,7 @@ import { ActionButton, AppText, CheckRow, DetailRow, EmptyState, ErrorMessage, G
 import { DateField } from '../../src/ui/form-controls';
 import { isPlanWriteRefusal, payoffFigures, payoffPreview, planOperationDate } from '../../src/ui/installment-presentation';
 import { numberRanges } from '../../src/ui/operation-presentation';
-import { errorHaptic, successHaptic, warningHaptic } from '../../src/ui/motion';
+import { announce, errorHaptic, successHaptic, warningHaptic } from '../../src/ui/motion';
 import { withCurrencyCode } from '../../src/i18n/format';
 import { useI18n } from '../../src/i18n/provider';
 import { space, useCurrentDay } from '../../src/ui/theme';
@@ -112,6 +112,8 @@ export default function PlanPayoffScreen() {
       successHaptic();
       setPending(null);
       setDone(submission);
+      // 25D2: the form gives way to its done view in place (the focused Guardar is gone): VoiceOver hears the title.
+      announce(t('installments.payoff.doneTitle'));
     } catch (cause) {
       setError(failureMessage(cause, 'installments.payoff.saveFailed'));
       // Refused before anything was written (the instalments changed since the preview, a statement closed, the plan

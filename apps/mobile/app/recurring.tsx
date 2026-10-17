@@ -51,7 +51,6 @@ export default function RecurringScreen() {
       title: account ? account.name : t('nav.titles.recurring'),
       headerRight: () => <IconButton name="add" label={t('recurring.list.add')} onPress={() => router.push({ pathname: '/new-recurring', params: newParams })} />,
     }} />
-    <ErrorMessage message={manage.error} />
     {!rules.length ? <EmptyState title={t('recurring.list.emptyTitle')}
       detail={t(account ? 'recurring.list.emptyDetailAccount' : 'recurring.list.emptyDetail')}
       icon="repeat-outline"
@@ -75,6 +74,10 @@ export default function RecurringScreen() {
               : <AppText key={item.currency} secondary>{withCurrencyCode(t('recurring.list.outOfRange'), item.currency)}</AppText>)}
           </View>
         </View>}
+
+        {/* 25D2: a row action's failure sits next to the rows it is about, not above the 30-day block, out of sight of a
+            person who scrolled down to the row (VoiceOver hears it through ErrorMessage either way). */}
+        <ErrorMessage message={manage.error} />
 
         {!!active.length && <View>
           <SectionTitle>{t('recurring.list.active')}</SectionTitle>

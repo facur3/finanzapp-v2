@@ -18,6 +18,8 @@ import { bindLocale } from '../src/i18n/bind.ts';
 import { translate } from '../src/i18n/messages.ts';
 import type { AppLocale } from '../src/i18n/locale.ts';
 import { realModule } from './real-module.ts';
+/** 25D2: what VoiceOver was told through motion.tsx's `announce`, in order (its iOS-only queue is tested in motion.node.ts). */
+const announced: string[] = [];
 
 // Producto 24T2 (stream B): the entry form's «Pago» section and the restricted edit of an instalment's movement. The
 // real EntryForm (src/ui/entry-form.tsx) runs with the real section (src/ui/installment-purchase.tsx) and the real
@@ -75,7 +77,7 @@ function harness(props: Record<string, unknown> = {}, options: Options = {}) {
     'react-native': { View: 'View', Keyboard: { dismiss() {} } },
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, router: { canGoBack: () => true, back: () => { backs++; }, push: (to: unknown) => pushed.push(to), replace: (to: unknown) => pushed.push(to) } },
     'expo-crypto': { randomUUID: () => 'operation-' + (++uuid) },
-    './motion': { successHaptic() {}, errorHaptic() {}, warningHaptic() {} },
+    './motion': { announce: (text: string, after = 'now') => { announced.push(after === 'leave' ? 'after leaving: ' + text : text); }, successHaptic() {}, errorHaptic() {}, warningHaptic() {} },
     // The real domain, with today read from the fixed clock (the form checks future dates and closed statements with it).
     '@finanzapp/domain': { ...domain, todayKey: (date?: Date) => domain.todayKey(date ?? new FixedDate()) },
     '../storage/LedgerProvider': ledger,

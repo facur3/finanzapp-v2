@@ -82,6 +82,8 @@ function harness(file: string, options: { data?: domain.LedgerArchive; params?: 
   let haptics = 0;
   // 25Q4: a failed write's haptic, by type (Success is counted in `haptics`).
   const failures: string[] = [];
+  // 25D2: what VoiceOver was told through motion.tsx's `announce`, in order (its iOS-only queue is tested in motion.node.ts).
+  const announced: string[] = [];
   let data = options.data ?? base();
   const locale: AppLocale = options.locale ?? 'es-AR';
   const i18nProvider = { useI18n: () => bindLocale(locale) };
@@ -119,7 +121,7 @@ function harness(file: string, options: { data?: domain.LedgerArchive; params?: 
     ...ui('movement-amount', movementAmount), ...ui('entry-prefill', entryPrefill), ...ui('purchase-plan', purchasePlan), ...ui('last-account', memoryOf({})),
     ...ui('form-controls', { AccountField: 'AccountField', CategoryField: 'CategoryField', DateField: 'DateField', SelectorCard: 'SelectorCard' }),
     ...ui('installment-purchase', { InstallmentPurchase: 'InstallmentPurchase' }), ...ui('entry-list', { EntryList: 'EntryList' }),
-    ...ui('motion', { successHaptic: () => { haptics++; }, errorHaptic: () => { failures.push('Error'); }, warningHaptic: () => { failures.push('Warning'); } }),
+    ...ui('motion', { announce: (text: string, after = 'now') => { announced.push(after === 'leave' ? 'after leaving: ' + text : text); }, successHaptic: () => { haptics++; }, errorHaptic: () => { failures.push('Error'); }, warningHaptic: () => { failures.push('Warning'); } }),
   };
   const require = function require(name: string) {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected refund route dependency: ' + name);
@@ -136,7 +138,7 @@ function harness(file: string, options: { data?: domain.LedgerArchive; params?: 
       return node;
     },
     setData: (next: domain.LedgerArchive) => { data = next; },
-    pushed, alerts, refunds, changes, updates, failures, backs: () => backs, haptics: () => haptics,
+    pushed, alerts, refunds, changes, updates, failures, announced, backs: () => backs, haptics: () => haptics,
   };
 }
 function nodes(value: any): Node[] {
@@ -262,6 +264,8 @@ test('24T3: «Registrar devolución» of a purchase: the facts, «Total disponib
     JSON.stringify(['operation-1', 'refund', { entryId: 'buy' }, 'bank', 'ARS', 20000, TODAY, false, 0]));
   assert.equal(view.backs(), 1);
   assert.equal(view.haptics(), 1, 'success haptic once');
+  // 25D2: the sheet closes with the save; VoiceOver hears it, the amount in words, once the screen under it is up.
+  assert.deepEqual(view.announced, ['after leaving: Guardado, 200,00 pesos.']);
 });
 
 test('24T3: the refund form keeps the submission frozen on an unknown outcome and releases it on a refusal storage decided before writing', async () => {
@@ -381,6 +385,8 @@ test('24T3: a devolución\'s detail: hero, purchase link, what it records, and a
   view.setData(domain.applyOperationChange(data, view.changes[0], TODAY).archive);
   root = view.render();
   assert.ok(texts(root).includes('Deshecha · no cuenta en saldos ni reportes'));
+  // 25D2: the status line that replaced «Registrada», told to VoiceOver once (iOS has no live region).
+  assert.deepEqual(view.announced, ['Deshecha · no cuenta en saldos ni reportes']);
   find(root, 'ActionButton', 'Restaurar devolución').props.onPress();
   assert.equal(view.alerts[2].title, '¿Restaurar devolución?');
   assert.equal(view.alerts[2].message, `Vuelve a acreditar $${NB}200,00 en Banco con fecha 20 de septiembre de 2026.`);

@@ -4,7 +4,7 @@ import { useLedger } from '../storage/LedgerProvider';
 import type { ReviewItem } from '../storage/review-database';
 import { useI18n } from '../i18n/provider';
 import type { MessageKey } from '../i18n/messages';
-import { errorHaptic, successHaptic } from './motion';
+import { announce, errorHaptic, successHaptic } from './motion';
 
 /** The shape of a store call `run` takes (an async step). */
 const idle = async () => {};
@@ -50,6 +50,8 @@ export function useReviewActions(item: ReviewItem, options: { leaving: MutableRe
     await confirmReview(item.id, item.revision);
     successHaptic();
     leave();
+    // 25D2: the surface leaves with the write; VoiceOver hears that it was recorded once the screen under it is up.
+    announce(t('review.detail.confirmedSpoken'), 'leave');
   }, 'review.detail.confirmFailed');
   const dismiss = () => {
     if (working.current) return;

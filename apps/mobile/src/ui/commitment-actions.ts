@@ -6,7 +6,7 @@ import { accountBalanceMinor, assertCardDeletable, assertOpenAccount, cardCredit
 import { useLedger } from '../storage/LedgerProvider';
 import { useI18n } from '../i18n/provider';
 import type { MessageKey } from '../i18n/messages';
-import { errorHaptic, selectionHaptic, successHaptic } from './motion';
+import { announce, errorHaptic, selectionHaptic, successHaptic } from './motion';
 import { committedBeforeRefresh } from './presentation';
 import type { SwipeAction } from './swipe-actions';
 
@@ -19,11 +19,19 @@ import type { SwipeAction } from './swipe-actions';
  * (a detail screen closes itself there). */
 export function useRecurringManagement() {
   const { saveRecurring, snapshot, archive } = useLedger();
-  const { t, failureMessage } = useI18n();
+  const { t, formatDate, failureMessage } = useI18n();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const writing = useRef(false);
 
+  /** 25D2: the outcome VoiceOver hears, once per action (the row moves between groups or leaves, the detail's state word
+   * changes): the rule's name and what became of it, a resumed one with its next date written out. A deletion is said
+   * once a detail it closes is gone. */
+  function said(next: RecurringRule) {
+    if (next.deleted) announce(t('recurring.manage.deletedSpoken', { merchant: next.merchant }), 'leave');
+    else announce(next.active ? t('recurring.manage.resumedSpoken', { merchant: next.merchant, date: formatDate(next.nextDateISO, 'long') })
+      : t('recurring.manage.pausedSpoken', { merchant: next.merchant }));
+  }
   async function commit(next: RecurringRule, failure: MessageKey, feedback: 'selection' | 'success', done?: () => void) {
     if (writing.current) return;
     writing.current = true;
@@ -32,10 +40,11 @@ export function useRecurringManagement() {
     try {
       await saveRecurring(next);
       if (feedback === 'success') successHaptic(); else selectionHaptic();
+      said(next);
       done?.();
     } catch (cause) {
       // 25R1: committed, only the view is stale (the banner says so): done, never a failure offered again.
-      if (committedBeforeRefresh(cause)) { done?.(); return; }
+      if (committedBeforeRefresh(cause)) { said(next); done?.(); return; }
       setError(failureMessage(cause, failure));
       errorHaptic();
     } finally {
@@ -185,9 +194,11 @@ export function useAccountManagement() {
     try {
       await removeAccount(account.id);
       successHaptic();
+      // 25D2: the row leaves (or the edit screen closes): VoiceOver hears that the account was deleted.
+      announce(t('accounts.manage.deletedTitle'), 'leave');
       done?.();
     } catch (cause) {
-      if (committedBeforeRefresh(cause)) { done?.(); return; }
+      if (committedBeforeRefresh(cause)) { announce(t('accounts.manage.deletedTitle'), 'leave'); done?.(); return; }
       setError(failureMessage(cause, 'accounts.manage.deleteFailed'));
       errorHaptic();
     } finally {

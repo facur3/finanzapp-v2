@@ -11,7 +11,7 @@ import { useI18n } from '../../src/i18n/provider';
 import { useCategoryLabel } from '../../src/ui/category-hues';
 import { installmentOfEntry } from '../../src/ui/installment-presentation';
 import { balanceAfterSentence } from '../../src/ui/liability-presentation';
-import { errorHaptic, successHaptic, warningHaptic } from '../../src/ui/motion';
+import { announce, errorHaptic, successHaptic, warningHaptic } from '../../src/ui/motion';
 import { canRefundEntry } from '../../src/ui/operation-presentation';
 import { releasesDraft } from '../../src/ui/presentation';
 import { space, usePalette } from '../../src/ui/theme';
@@ -51,6 +51,7 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
   // nothing is left to retry, so «Reintentar cambio» and the locked Editar give way. Set during render, React's pattern for
   // information from previous renders.
   if (pending && !busy && record.revision === pending.after.revision && record.voided === pending.after.voided) { setPending(null); setError(null); }
+  const statusOf = (shown: EntryRecord) => t(shown.voided ? 'entryDetail.statusVoided' : shown.revision > 0 ? 'entryDetail.statusCorrected' : 'entryDetail.statusRecorded');
   const refundable = !!archive && !record.voided && !pending && canRefundEntry(archive, entry.id, todayKey(), new Date().toISOString());
   async function apply(change: EntryChange) {
     if (saving.current) return;
@@ -62,6 +63,8 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
       await updateEntry(change);
       setPending(null);
       successHaptic();
+      // 25D2: the status line under the hero is the outcome; iOS has no live region, so VoiceOver is told it.
+      announce(statusOf(change.after));
     } catch (cause) {
       setError(failureMessage(cause, 'entryDetail.changeUnverified'));
       // A13: a refusal storage decided before writing (an instalment a devolución's credit stands on, …) releases the change:
@@ -158,7 +161,7 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
   // its deletion record stays in storage) leaves a plain movement, unchanged.
   const occurrence = recurringOccurrenceOf(entry.id);
   const rule = occurrence ? archive?.recurring?.find(item => item.id === occurrence.ruleId && !item.deleted) : undefined;
-  const status = t(record.voided ? 'entryDetail.statusVoided' : record.revision > 0 ? 'entryDetail.statusCorrected' : 'entryDetail.statusRecorded');
+  const status = statusOf(record);
   // The budget row on screen (the region's separators) and for VoiceOver (the amount in the language's words).
   const budgetLine = (row: NonNullable<typeof budget>, money: (minor: number) => string) => row.exceeded ? t('entryDetail.budgetExceeded', { amount: money(-row.remainingMinor) })
     : row.refunded ? t('entryDetail.budgetRefunds', { amount: money(row.remainingMinor) })

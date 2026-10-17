@@ -7,7 +7,7 @@ import { PlanProgressSummary, ScheduleRow } from '../../src/ui/card-rows';
 import { useCategoryLabel } from '../../src/ui/category-hues';
 import { isPlanWriteRefusal, planActions, planOperationRows, planScheduleRows, planStateWord, planSummary, scheduleRowOpens, type PlanClosings } from '../../src/ui/installment-presentation';
 import { numberRanges } from '../../src/ui/operation-presentation';
-import { errorHaptic, successHaptic, warningHaptic } from '../../src/ui/motion';
+import { announce, errorHaptic, successHaptic, warningHaptic } from '../../src/ui/motion';
 import { withCurrencyCode } from '../../src/i18n/format';
 import { useI18n } from '../../src/i18n/provider';
 import { space, useCurrentDay, usePalette } from '../../src/ui/theme';
@@ -88,8 +88,10 @@ export default function InstallmentPlanScreen() {
       else await reactivateInstallmentPlan(planId, next.revision);
       setPending(null);
       successHaptic();
-      // A deleted plan leaves; a stopped or reactivated one stays, its new state said under the hero.
+      // A deleted plan leaves; a stopped or reactivated one stays, its new state said under the hero. 25D2: and to VoiceOver
+      // (iOS has no live region): the state word that replaces the pressed button.
       if (next.action === 'delete') back();
+      else announce(t(next.action === 'stop' ? 'installments.detail.cancelled' : 'installments.detail.active'));
     } catch (cause) {
       setError(failureMessage(cause, failure[next.action]));
       // Refused before anything was written (the plan changed, an instalment or an operation was recorded since the screen was

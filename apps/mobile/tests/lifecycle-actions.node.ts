@@ -47,6 +47,8 @@ function harness({ fail = false as boolean | string, language = 'es-AR' as const
   const savedDebts: domain.PersonalDebtProfile[] = [], removedDebts: string[] = [];
   // 25Q4: every haptic comes from motion.tsx; the recorder keeps each one's kind.
   const haptics: string[] = [];
+  // 25D2: what VoiceOver was told through motion.tsx's `announce`, in order (its iOS-only queue is tested in motion.node.ts).
+  const announced: string[] = [];
   const state: unknown[] = [], refs: unknown[] = [];
   let cursor = 0, refCursor = 0;
   const accounts = (deletedAccount ? [{ ...cash, revision: 1, updatedAt: createdAt, deletedAt: createdAt }, other, lonely, cardAccount] : [cash, other, lonely, cardAccount]).concat(owedAccount, lentAccount);
@@ -56,7 +58,7 @@ function harness({ fail = false as boolean | string, language = 'es-AR' as const
       useRef: (initial: unknown) => { const i = refCursor++; return (refs[i] ??= { current: initial }); } },
     'react-native': { Alert: { alert: (title: string, message: string, buttons: any[]) => alerts.push({ title, message, buttons }) } },
     'expo-router': { router: { push: (target: unknown) => pushed.push(target) } },
-    './motion': { successHaptic: () => { haptics.push('Success'); }, selectionHaptic: () => { haptics.push('Selection'); },
+    './motion': { announce: (text: string, after = 'now') => { announced.push(after === 'leave' ? 'after leaving: ' + text : text); }, successHaptic: () => { haptics.push('Success'); }, selectionHaptic: () => { haptics.push('Selection'); },
       errorHaptic: () => { haptics.push('Error'); }, warningHaptic: () => { haptics.push('Warning'); } },
     '@finanzapp/domain': domain,
     '../storage/LedgerProvider': { useLedger: () => ({ snapshot, archive: { accounts: snapshot.accounts, records: entries.map(domain.initialRecord), recurring: rules, cards: [card], installmentPlans: plans },
@@ -75,7 +77,7 @@ function harness({ fail = false as boolean | string, language = 'es-AR' as const
     return modules[name];
   } });
   const render = (hook: 'useAccountManagement' | 'useCardManagement' | 'useRecurringManagement' | 'useDebtManagement') => { cursor = 0; refCursor = 0; return module.exports[hook](); };
-  return { render, alerts, removed, removedCards, savedCards, savedDebts, removedDebts, pushed, haptics };
+  return { render, alerts, removed, removedCards, savedCards, savedDebts, removedDebts, pushed, haptics, announced };
 }
 const settle = () => new Promise(resolve => setTimeout(resolve, 0));
 
@@ -99,6 +101,8 @@ test('deleting an account asks first and names what stays and what stops; Cancel
   assert.equal(JSON.stringify(view.removed), JSON.stringify(['cash']));
   assert.equal(done, 1);
   assert.equal(view.haptics.join(','), 'Success');
+  // 25D2: the row leaves (or the edit screen closes): VoiceOver hears the outcome once the screen is settled.
+  assert.deepEqual(view.announced, ['after leaving: Cuenta eliminada']);
   // A transfer counts as history too; an account with none says so and lists no rule.
   view.render('useAccountManagement').remove(other);
   assert.equal(view.alerts[1].message, 'Deja de aparecer en tus cuentas, en Disponible y en los formularios. Sus movimientos y transferencias siguen en Movimientos con su nombre y su moneda: 0 movimientos y 1 transferencia.'
@@ -404,8 +408,26 @@ test('25R1: a management action that committed but whose view could not be read 
   assert.equal(view.render('useAccountManagement').error, null);
   assert.equal(done, 2, 'a detail closes as after any durable save');
   assert.ok(!view.haptics.includes('Error'), 'never the failure tap');
+  assert.deepEqual(view.announced, ['Gimnasio: pausado.', 'after leaving: Cuenta eliminada'], '25D2: committed, so the outcome is said');
   // An engine failure is still a failure, said and offered again.
   const failing = harness({ fail: true });
   await failing.render('useRecurringManagement').pause(rules[0]);
   assert.equal(failing.render('useRecurringManagement').error, 'recurring.manage.failed');
+  assert.deepEqual(failing.announced, [], 'a failure is said by ErrorMessage, never as done');
+});
+
+test('25D2: pause, resume and delete of a recurring rule are told to VoiceOver once each: the rule, what became of it, a resumed one\'s next date written out', async () => {
+  const view = harness();
+  await view.render('useRecurringManagement').pause(rules[0]);
+  await view.render('useRecurringManagement').resume(rules[1]);
+  view.render('useRecurringManagement').remove(rules[0]);
+  view.alerts.at(-1)!.buttons[1].onPress!();
+  await settle();
+  assert.equal(view.announced.length, 3);
+  assert.equal(view.announced[0], 'Gimnasio: pausado.');
+  assert.match(view.announced[1], /^Pausado: reanudado, próxima fecha \d{1,2} de [a-z]+ de \d{4}\.$/, 'the date in words, never «15/10»');
+  assert.equal(view.announced[2], 'after leaving: Gimnasio: eliminado.', 'said once a detail it closes is gone');
+  const english = harness({ language: 'en-US' as never });
+  await english.render('useRecurringManagement').pause(rules[0]);
+  assert.deepEqual(english.announced, ['Gimnasio: paused.']);
 });

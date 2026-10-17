@@ -5,7 +5,7 @@ import { entryRefundSummary, isEntryRefund, isPlanPayoff, isPlanRefund, makeOper
 import { useLedger } from '../storage/LedgerProvider';
 import { useI18n } from '../i18n/provider';
 import { useAccountNameOf, useCategoryLookOf } from './category-hues';
-import { errorHaptic, successHaptic, warningHaptic } from './motion';
+import { announce, errorHaptic, successHaptic, warningHaptic } from './motion';
 import { checkOperationChange, numberRanges, recordedShares, type OperationCheck } from './operation-presentation';
 import { releasesDraft } from './presentation';
 
@@ -36,6 +36,10 @@ export function useOperationChange() {
     setPending(null);
     if (error?.id === pending.after.id) setError(null);
   }
+
+  /** The status line of an operation's detail, as it reads in this state. */
+  const statusOf = (operation: PurchaseOperation) => t(operation.voided ? (operation.kind === 'refund' ? 'operations.detail.statusVoidedRefund' : 'operations.detail.statusVoidedPayoff')
+    : operation.kind === 'refund' ? 'operations.detail.statusRefund' : 'operations.detail.statusPayoff');
 
   const check = (operation: PurchaseOperation): OperationCheck => archive
     ? checkOperationChange(archive, operation, todayKey(), new Date().toISOString()) : { ok: false, reason: '' };
@@ -84,6 +88,8 @@ export function useOperationChange() {
       await (change.action === 'void' ? voidOperation(change) : restoreOperation(change));
       setPending(null);
       successHaptic();
+      // 25D2: the operation's new status line (its detail shows it; Movimientos deshechos drops the row), told to VoiceOver.
+      announce(statusOf(change.after));
     } catch (cause) {
       const message = failureMessage(cause, 'operations.change.failed');
       setError({ id: change.after.id, message });
@@ -117,5 +123,5 @@ export function useOperationChange() {
     ], { cancelable: true, onDismiss: () => { confirming.current = false; } });
   }
 
-  return { busyId, error, pending, check, ask };
+  return { busyId, error, pending, statusOf, check, ask };
 }

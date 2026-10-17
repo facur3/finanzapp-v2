@@ -84,6 +84,10 @@ export const recurring = {
       deleteConfirm: 'Eliminar',
       failed: 'No pudimos cambiar el recurrente. Sigue como estaba; probá nuevamente.',
       deleteFailed: 'No pudimos eliminar el recurrente. Sigue como estaba; probá nuevamente.',
+      /** 25D2: VoiceOver, after Pausar, Reanudar or Eliminar. `{merchant}` is the person's own text; {date} written out. */
+      pausedSpoken: '{merchant}: pausado.',
+      resumedSpoken: '{merchant}: reanudado, próxima fecha {date}.',
+      deletedSpoken: '{merchant}: eliminado.',
     },
     form: {
       noAccountTitle: 'Primero, una cuenta',

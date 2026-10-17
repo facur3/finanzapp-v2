@@ -20,6 +20,8 @@ import { RELEASED, type AppLocale, type ReleasedSets } from '../src/i18n/locale.
 import { es } from '../src/i18n/messages/es/index.ts';
 import { NEWER_SCHEMA_MESSAGE } from '../src/storage/database.ts';
 import * as backupFile from '../src/ui/backup-file.ts';
+/** 25D2: what VoiceOver was told through motion.tsx's `announce`, in order (its iOS-only queue is tested in motion.node.ts). */
+const announced: string[] = [];
 
 // Producto 25B, redesigned in 25O1: the first opening. The pure rules (when it is shown, what it suggests, its steps, the
 // illustrations' figures) are tested directly; the route and the illustrations run in harnesses with their hosts replaced
@@ -280,7 +282,7 @@ function harness({ accounts = [] as domain.Account[], reading = device('es-AR', 
     '../src/ui/geometry': geometry,
     // 25Q4 review: each notification haptic by its helper's name (tests/motion.node.ts pins the type each one sends).
     '../src/ui/motion': { ValueTransition: 'ValueTransition', duration: { state: 200 },
-      successHaptic() { haptics.push('Success'); }, errorHaptic() { haptics.push('Error'); }, warningHaptic() { haptics.push('Warning'); } },
+      announce: (text: string, after = 'now') => { announced.push(after === 'leave' ? 'after leaving: ' + text : text); }, successHaptic() { haptics.push('Success'); }, errorHaptic() { haptics.push('Error'); }, warningHaptic() { haptics.push('Warning'); } },
     '../src/ui/onboarding-art': names('AccountCard', 'AvailableArt', 'CommitmentsArt', 'RecordArt'),
     '../src/ui/onboarding-flow': onboardingFlow,
     '../src/ui/theme': { radius: { group: 16 }, space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, type: { display: { fontSize: 40 } },

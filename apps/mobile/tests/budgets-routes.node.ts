@@ -11,6 +11,8 @@ import * as i18nFormat from '../src/i18n/format.ts';
 import { PREVIEW_CURRENCIES } from '../src/storage/currency-gate.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 import type { AppLocale } from '../src/i18n/locale.ts';
+/** 25D2: what VoiceOver was told through motion.tsx's `announce`, in order (its iOS-only queue is tested in motion.node.ts). */
+const announced: string[] = [];
 
 // Producto 19: the budget form on the actual module, with native hosts replaced
 // by descriptors. The kind of limit (General / Por categoría) is the first
@@ -48,7 +50,7 @@ function harness(props: any, data: domain.LedgerArchive = archive, save?: (budge
     'react-native': { View: 'View', Keyboard: { dismiss() {} }, Alert: { alert: (title: string, message: string, buttons: any[]) => alerts.push({ title, message, buttons }) } },
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, router: { canGoBack: () => true, back: () => { backs++; }, push: () => {}, replace: () => {} } },
     'expo-crypto': { randomUUID: () => 'budget-' + (++uuid) },
-    './motion': { successHaptic: () => { haptics.push('Success'); }, errorHaptic: () => { haptics.push('Error'); }, warningHaptic: () => { haptics.push('Warning'); } },
+    './motion': { announce: (text: string, after = 'now') => { announced.push(after === 'leave' ? 'after leaving: ' + text : text); }, successHaptic: () => { haptics.push('Success'); }, errorHaptic: () => { haptics.push('Error'); }, warningHaptic: () => { haptics.push('Warning'); } },
     '@finanzapp/domain': domain,
     '../storage/LedgerProvider': ledger,
     './components': components, './money-input': moneyInput, './currencies': currencies, './currency-switch': { CurrencySwitch: 'CurrencySwitch' },

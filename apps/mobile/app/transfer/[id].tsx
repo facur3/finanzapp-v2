@@ -8,7 +8,7 @@ import { AccountBadge, ActionButton, AppText, DetailRow, EmptyState, ErrorMessag
 import { useI18n } from '../../src/i18n/provider';
 import { useAccountNameOf } from '../../src/ui/category-hues';
 import { balanceAfterSentence } from '../../src/ui/liability-presentation';
-import { errorHaptic, successHaptic, warningHaptic } from '../../src/ui/motion';
+import { announce, errorHaptic, successHaptic, warningHaptic } from '../../src/ui/motion';
 import { releasesDraft } from '../../src/ui/presentation';
 import { space, usePalette } from '../../src/ui/theme';
 
@@ -42,6 +42,7 @@ function TransferDetail({ record, accounts }: { record: TransferRecord; accounts
   };
   const fromLink = linkFor(from), toLink = linkFor(to);
   const money = (minor: number) => formatMoneyAmount(minor, from.currency) + ' ' + from.currency;
+  const statusOf = (voided: boolean) => tr(voided ? 'transferDetail.statusVoided' : kindId === 'transfer' ? 'transferDetail.statusBetween' : 'transferDetail.statusObligation');
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<TransferChange | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -55,6 +56,8 @@ function TransferDetail({ record, accounts }: { record: TransferRecord; accounts
     try {
       await updateTransfer(change); setPending(null);
       successHaptic();
+      // 25D2: the status line is the outcome; iOS has no live region, so VoiceOver is told it.
+      announce(statusOf(change.after.voided));
     } catch (cause) {
       setError(failureMessage(cause, 'transferDetail.changeUnverified'));
       // 25Q4: the change stays frozen for «Reintentar cambio» either way (as in TransferForm); a refusal storage decided
@@ -122,7 +125,7 @@ function TransferDetail({ record, accounts }: { record: TransferRecord; accounts
   // First letter only (24UX5 review): a style-level capitalize drew «Martes, 22 De Septiembre De 2026».
   const long = formatDate(t.dateISO, 'weekdayLong');
   const date = long.charAt(0).toLocaleUpperCase() + long.slice(1);
-  const status = tr(record.voided ? 'transferDetail.statusVoided' : kindId === 'transfer' ? 'transferDetail.statusBetween' : 'transferDetail.statusObligation');
+  const status = statusOf(record.voided);
   return <Screen gap={space.xl}>
     <Stack.Screen options={{ title: record.voided ? tr('transferDetail.voidedTitle') : kindTitle, gestureEnabled: !busy, headerBackVisible: !busy }} />
     <View style={{ alignItems: 'center', gap: 14, paddingVertical: 12 }}>

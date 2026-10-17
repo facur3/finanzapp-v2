@@ -8,7 +8,7 @@ import { useLedger } from '../storage/LedgerProvider';
 import { ActionButton, AmountField, AmountShortcut, AppText, DetailRow, EmptyState, ErrorMessage, Field, IconButton, PressFeedback, Screen, Surface } from './components';
 import { amountFromMinor, draftFromMinor } from './money-input';
 import { AccountField, DateField, SelectorCard } from './form-controls';
-import { errorHaptic, successHaptic, warningHaptic } from './motion';
+import { announce, errorHaptic, successHaptic, warningHaptic } from './motion';
 import { initialAccountId, releasesDraft } from './presentation';
 import { space, usePalette } from './theme';
 import { useI18n } from '../i18n/provider';
@@ -216,6 +216,8 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
       if (submission.change) await updateTransfer(submission.change); else await addTransfer(submission.transfer);
       successHaptic();
       saving.current = false; close();
+      // 25D2: the form closes with the save; VoiceOver hears it once the screen under it is up.
+      announce(submission.change ? t('common.changesSaved') : t('common.saved', { amount: spokenMoney(submission.transfer.amountMinor, accounts.find(a => a.id === submission!.transfer.fromAccountId)?.currency ?? 'ARS') }), 'leave');
     } catch (cause) {
       setError(failureMessage(cause, 'transferForm.saveUnverified'));
       // 25VIS2 (V4): a refusal (before the submission froze, or one storage decided before writing) taps Error; an outcome

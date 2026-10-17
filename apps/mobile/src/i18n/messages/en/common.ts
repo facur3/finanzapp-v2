@@ -13,6 +13,8 @@ export const common: Pick<Messages, 'common' | 'movement' | 'accountKinds' | 'se
     retrySave: 'Retry saving',
     retryChange: 'Retry change',
     saveChanges: 'Save changes',
+    saved: 'Saved, {amount}.',
+    changesSaved: 'Changes saved.',
     moreInfoAbout: 'More about {title}',
     whatIs: 'What {title} means',
   },

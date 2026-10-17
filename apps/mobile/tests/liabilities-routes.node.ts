@@ -18,6 +18,8 @@ import type { AppLocale } from '../src/i18n/locale.ts';
 import { realModule, swipeActionsMock } from './real-module.ts';
 // 24T2 (stream B): the card form's statement dates (pure, real in the harness).
 import * as cardCycleForm from '../src/ui/card-cycle-form.ts';
+/** 25D2: what VoiceOver was told through motion.tsx's `announce`, in order (its iOS-only queue is tested in motion.node.ts). */
+const announced: string[] = [];
 // The locale every harness reads on render; an English test switches it and restores Spanish.
 let activeLocale: AppLocale = 'es-AR';
 const i18nProvider = { useI18n: () => bindLocale(activeLocale) };
@@ -76,7 +78,7 @@ function harness(file: string, params: Record<string, unknown> = {}, initial: do
   const defaults = { useDefaultCurrency: ({ accountCurrency, requested }: { accountCurrency?: string | null; requested?: unknown } = {}) => accountCurrency ?? (domain.isLedgerCurrency(requested, GATE) ? requested : 'ARS') };
   // 25Q4 review: each notification haptic by its helper's name (tests/motion.node.ts pins the type each one sends).
   const haptics: string[] = [];
-  const motion = { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, successHaptic: () => { haptics.push('Success'); },
+  const motion = { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, announce: (text: string, after = 'now') => { announced.push(after === 'leave' ? 'after leaving: ' + text : text); }, successHaptic: () => { haptics.push('Success'); },
     errorHaptic: () => { haptics.push('Error'); }, warningHaptic: () => { haptics.push('Warning'); }, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) };
   const modules: Record<string, unknown> = {
     'expo-crypto': { randomUUID: () => 'id-' + Math.random().toString(36).slice(2, 8) },

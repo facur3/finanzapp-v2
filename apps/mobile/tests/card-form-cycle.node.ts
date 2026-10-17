@@ -11,6 +11,8 @@ import * as presentation from '../src/ui/presentation.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 import type { AppLocale } from '../src/i18n/locale.ts';
 import { realModule } from './real-module.ts';
+/** 25D2: what VoiceOver was told through motion.tsx's `announce`, in order (its iOS-only queue is tested in motion.node.ts). */
+const announced: string[] = [];
 
 // Producto 24T2 (stream B): the card form's statement dates. The real CardForm (src/ui/card-form.tsx) runs with the real
 // date model (src/ui/card-cycle-form.ts and the domain's planner) on a harness day (`useCurrentDay`) a test can move, so a
@@ -54,7 +56,7 @@ function harness(props: { original?: domain.CreditCardProfile } = {}, options: O
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, router: { canGoBack: () => true, back: () => { backs++; }, push: (to: unknown) => { pushed.push(to); }, replace: (to: unknown) => { replaced.push(to); },
       dismissTo: (to: unknown) => { dismissed.push(to); } } },
     'expo-crypto': { randomUUID: () => 'id-' + (++uuid) },
-    './motion': { Reflow: 'Reflow', successHaptic() { haptics.push('Success'); }, errorHaptic() { haptics.push('Error'); }, warningHaptic() { haptics.push('Warning'); }, selectionHaptic() {} },
+    './motion': { Reflow: 'Reflow', announce: (text: string, after = 'now') => { announced.push(after === 'leave' ? 'after leaving: ' + text : text); }, successHaptic() { haptics.push('Success'); }, errorHaptic() { haptics.push('Error'); }, warningHaptic() { haptics.push('Warning'); }, selectionHaptic() {} },
     '@expo/vector-icons/Ionicons': 'Ionicons',
     '@finanzapp/domain': domain,
     '../i18n/provider': { useI18n: () => bindLocale(locale) },

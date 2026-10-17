@@ -7,7 +7,7 @@ import { useLedger } from '../src/storage/LedgerProvider';
 import { ActionButton, AmountField, AmountShortcut, AppText, DetailRow, EmptyState, ErrorMessage, FieldNote, IconButton, Money, Screen, SectionTitle, Surface } from '../src/ui/components';
 import { DateField } from '../src/ui/form-controls';
 import { amountFromMinor } from '../src/ui/money-input';
-import { errorHaptic, successHaptic, warningHaptic } from '../src/ui/motion';
+import { announce, errorHaptic, successHaptic, warningHaptic } from '../src/ui/motion';
 import { previewRefund, refundBounds, type RefundPreview, type RefundTarget } from '../src/ui/operation-presentation';
 import { releasesDraft } from '../src/ui/presentation';
 import { useAccountNameOf, useCategoryLookOf } from '../src/ui/category-hues';
@@ -91,6 +91,8 @@ function RefundForm({ target }: { target: RefundTarget | null }) {
       // different one; a retry with the same id and inputs is a no-op.
       await addRefund(submission.refund);
       successHaptic();
+      // 25D2: the sheet closes with the save; VoiceOver hears the outcome once the screen under it is up.
+      announce(t('common.saved', { amount: spokenMoney(submission.refund.amountMinor, submission.refund.currency) }), 'leave');
       saving.current = false;
       close();
     } catch (cause) {

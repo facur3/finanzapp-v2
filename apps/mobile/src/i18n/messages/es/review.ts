@@ -60,6 +60,8 @@ export const review = {
     },
     detail: {
       notFoundTitle: 'Esta propuesta ya no está pendiente',
+      /** 25D2: VoiceOver, once Confirmar recorded the item and its surface closed. */
+      confirmedSpoken: 'Registrado.',
       notFoundDetail: 'Se confirmó, se descartó o no se puede leer.',
       /** What Confirmar writes, said before it is pressed. */
       willExpense: 'Al confirmar se registra un gasto.',

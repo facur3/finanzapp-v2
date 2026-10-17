@@ -52,6 +52,8 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   const refs: any[] = [];
   let cursor = 0, refCursor = 0, uuid = 0, backs = 0;
   // 25O1: a replace is recorded in `pushed` too (as before) and apart in `replaced`, so a test can tell the two.
+  // 25D2: what VoiceOver was told through motion.tsx's `announce`, in order (its iOS-only queue is tested in motion.node.ts).
+  const announced: string[] = [];
   const pushed: any[] = [], replaced: any[] = [], alerts: any[] = [], updates: domain.EntryChange[] = [], additions: domain.Entry[] = [], restores: any[] = [], haptics: string[] = [];
   const transfers: domain.Transfer[] = [], transferChanges: domain.TransferChange[] = [], accountChanges: domain.AccountChange[] = [], newAccounts: domain.Account[] = [], rules: domain.RecurringRule[] = [];
   // null: the ledger has not hydrated yet; setData moves it on.
@@ -80,7 +82,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   const swipe = { SwipeRow: 'SwipeRow', swipeAccessibility: (actions: { key: string; label: string; onPress: () => void }[]) => ({ accessibilityActions: actions.map(action => ({ name: action.key, label: action.label })),
     onAccessibilityAction: (event: { nativeEvent: { actionName: string } }) => actions.find(action => action.key === event.nativeEvent.actionName)?.onPress() }) };
   // 25Q4: every haptic comes from motion.tsx; the recorder keeps each notification's type.
-  const motion = { ValueTransition: 'ValueTransition', successHaptic: () => { haptics.push('Success'); }, errorHaptic: () => { haptics.push('Error'); },
+  const motion = { ValueTransition: 'ValueTransition', announce: (text: string, after = 'now') => { announced.push(after === 'leave' ? 'after leaving: ' + text : text); }, successHaptic: () => { haptics.push('Success'); }, errorHaptic: () => { haptics.push('Error'); },
     warningHaptic: () => { haptics.push('Warning'); }, selectionHaptic: () => {} };
   const modules: Record<string, unknown> = {
     // 24UX6C: the transaction presentation rule, a pure module.
@@ -147,7 +149,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
       return node; },
     setData: (next: domain.LedgerArchive | null) => { data = next as domain.LedgerArchive; },
     setLocale: (next: AppLocale) => { locale = next; },
-    pushed, replaced, alerts, updates, additions, restores, transfers, transferChanges, accountChanges, newAccounts, rules, haptics, backs: () => backs,
+    pushed, replaced, alerts, updates, additions, restores, transfers, transferChanges, accountChanges, newAccounts, rules, haptics, announced, backs: () => backs,
   };
 }
 function nodes(value: any): Node[] {
@@ -242,6 +244,8 @@ test('new-entry mode keeps income/account selection and creates no edit command'
   assert.equal(view.additions[0].amountMinor, 1);
   assert.equal(view.additions[0].accountId, 'u');
   assert.equal(view.updates.length, 0);
+  // 25D2: the form closes with the save; VoiceOver hears what was saved, in words, once the screen under it is up.
+  assert.deepEqual(view.announced, ['after leaving: Guardado, 0,01 dólares.']);
 });
 test('25N1: a new Gasto or Ingreso opens on the account last saved with that kind; a requested account wins, and the rule is today\'s without one', async () => {
   const memory: Record<string, string> = {};
@@ -275,6 +279,7 @@ test('25N1: a new Gasto or Ingreso opens on the account last saved with that kin
   assert.equal(edit.updates.length, 1);
   assert.equal(memory['finanzapp.lastAccount.expense'], 'u');
 });
+const statusLine = (root: Node) => nodes(root).find(node => node.props.accessibilityLiveRegion === 'polite')!.props.children;
 test('detail opens the native edit route; undo requires confirmation and canceled undo does nothing', async () => {
   const view = harness('app/entry/[id].tsx', {}, { params: { id: entry.id } });
   find(view.render(), 'ActionButton', 'Editar movimiento').props.onPress();
@@ -293,6 +298,9 @@ test('detail opens the native edit route; undo requires confirmation and cancele
   assert.equal(view.updates[0].action, 'void');
   assert.equal(view.backs(), 0); // Status updates in place; no redirect through a tab.
   view.setData({ ...archive, records: [view.updates[0].after] });
+  // 25D2: iOS has no live region: VoiceOver is told the status line the screen now shows, once.
+  assert.deepEqual(view.announced, ['Deshecho · no cuenta en saldos ni reportes']);
+  assert.equal(statusLine(view.render()), view.announced[0]);
   assert.equal(nodes(view.render()).some(node => node.props.label === 'Editar movimiento'), false);
   find(view.render(), 'ActionButton', 'Recuperar movimiento').props.onPress();
   assert.match(view.alerts[2].message, /Se descontarán/);
@@ -300,6 +308,10 @@ test('detail opens the native edit route; undo requires confirmation and cancele
   view.alerts[2].buttons[1].onPress();
   await flush();
   assert.equal(view.updates[1].action, 'restore');
+  view.setData({ ...archive, records: [view.updates[1].after] });
+  assert.equal(view.announced.length, 2);
+  assert.equal(view.announced[1], statusLine(view.render()), 'the restored status, as the line reads it');
+  assert.match(view.announced[1], /^Registrado/);
 });
 
 test('choosing/canceling the file picker and invalid backups never mutate the ledger', async () => {
@@ -370,6 +382,7 @@ test('25R1: an import that committed but whose view could not be read again is d
   assert.equal(find(root, 'EmptyState').props.title, 'Copia incorporada');
   assert.equal(nodes(root).some(node => node.props.label === 'Confirmar importación'), false);
   assert.equal(view.restores.length, 1);
+  assert.deepEqual(view.announced, ['Copia incorporada'], '25D2: the copy is in, so VoiceOver hears so');
 });
 test('25R1: a refused import keeps the review: «Volver a revisar» previews the copy again against the stored ledger, and «Elegir otra copia» picks again', async () => {
   const json = JSON.stringify(domain.createRecoveryBackup(archive));
@@ -417,6 +430,8 @@ test('backup preview shows exact totals, cancel stays read-only, confirm waits f
   assert.equal(view.restores[0].baseline, domain.archiveKey({ accounts: [], records: [] }));
   assert.equal(find(view.render(), 'EmptyState').props.title, 'Copia incorporada');
   assert.equal(view.haptics.join(','), 'Success');
+  // 25D2: the review gives way to the done view in place; VoiceOver hears its title once.
+  assert.deepEqual(view.announced, ['Copia incorporada']);
   // 25Q4: a failed import keeps nothing frozen and offers the import again, so it taps Error.
   const failing = harness('app/backup-import.tsx', {}, { data: { accounts: [], records: [] }, restore: async () => { throw new Error('database is locked'); },
     picker: async () => ({ canceled: false, result: { size: json.length, name: 'test.json', text: async () => json } }) });
@@ -426,6 +441,7 @@ test('backup preview shows exact totals, cancel stays read-only, confirm waits f
   await flush();
   assert.deepEqual([failing.restores.length, failing.haptics.join(',')], [1, 'Error']);
   assert.equal(nodes(failing.render()).some(node => node.type === 'EmptyState' && node.props.title === 'Copia incorporada'), false);
+  assert.deepEqual(failing.announced, [], 'a failure is said by ErrorMessage, never as done');
 });
 test('identical or conflicting backups cannot show an enabled import action', async () => {
   const json = JSON.stringify(domain.createRecoveryBackup(archive));
@@ -516,10 +532,13 @@ test('a transfer submission freezes across failed refresh and ignores duplicate 
   assert.equal(view.backs(), 0);
   finish(); await saving;
   assert.equal(find(view.render(), 'AmountField').props.editable, false);
+  assert.deepEqual(view.announced, [], '25D2: a failed save is said by its error, never as saved');
   view.setData({ ...transferData, transfers: [domain.initialTransferRecord(view.transfers[0])] });
   await find(view.render(), 'ActionButton', 'Reintentar guardado').props.onPress();
   assert.deepEqual(view.transfers[0], view.transfers[1]);
   assert.equal(view.backs(), 1);
+  // 25D2: saved by the retry: VoiceOver hears it once, in words, after the form has gone.
+  assert.deepEqual(view.announced, ['after leaving: Guardado, ' + bindLocale('es-AR').spokenMoney(view.transfers[1].amountMinor, 'ARS') + '.']);
 });
 test('editing a transfer removes its previous effect in preview and retains its identity', async () => {
   const original = domain.initialTransferRecord(transfer);
@@ -547,6 +566,9 @@ test('transfer undo requires confirmation, affects both sides, and updates detai
   view.alerts[1].buttons[1].onPress(); await flush();
   view.setData({ ...transferData, transfers: [view.transferChanges[0].after] });
   assert.equal(find(view.render(), 'ActionButton', 'Recuperar transferencia').props.disabled, undefined);
+  // 25D2: the new status line, told to VoiceOver once.
+  assert.deepEqual(view.announced, ['Deshecha · no afecta los saldos']);
+  assert.equal(statusLine(view.render()), view.announced[0]);
   assert.equal(view.backs(), 0);
   assert.equal(view.pushed.length, 0);
 });

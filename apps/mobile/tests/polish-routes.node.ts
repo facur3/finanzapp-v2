@@ -14,6 +14,8 @@ import { realModule, swipeActionsMock } from './real-module.ts';
 import * as movementAmount from '../src/ui/movement-amount.ts';
 import * as geometry from '../src/ui/geometry.ts';
 import * as flags from '../src/i18n/flags.ts';
+/** 25D2: what VoiceOver was told through motion.tsx's `announce`, in order (its iOS-only queue is tested in motion.node.ts). */
+const announced: string[] = [];
 
 // Budgets, Recurrentes, Cuentas and account detail handlers with native hosts
 // replaced by descriptors. Not a rendered iOS screen or gesture test.
@@ -94,7 +96,7 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
     '../src/ui/entry-list': { EntryList: 'EntryList' }, '../../src/ui/entry-list': { EntryList: 'EntryList' },
     '../src/ui/currency-switch': { CurrencySwitch: 'CurrencySwitch' }, '../../src/ui/currency-switch': { CurrencySwitch: 'CurrencySwitch' },
     '../src/ui/quick-actions': { QuickActions: 'QuickActions', AssistantEntry: 'AssistantEntry' }, '../../src/ui/quick-actions': { QuickActions: 'QuickActions', AssistantEntry: 'AssistantEntry' },
-    '../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, successHaptic: () => {}, errorHaptic: () => {}, warningHaptic: () => {}, duration: { press: 100, release: 160, state: 200, data: 260, enter: 200, exit: 100, reveal: 480 }, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) }, '../../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, successHaptic: () => {}, errorHaptic: () => {}, warningHaptic: () => {}, duration: { press: 100, release: 160, state: 200, data: 260, enter: 200, exit: 100, reveal: 480 }, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
+    '../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, announce: (text: string, after = 'now') => { announced.push(after === 'leave' ? 'after leaving: ' + text : text); }, successHaptic: () => {}, errorHaptic: () => {}, warningHaptic: () => {}, duration: { press: 100, release: 160, state: 200, data: 260, enter: 200, exit: 100, reveal: 480 }, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) }, '../../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, announce: (text: string) => { announced.push(text); }, successHaptic: () => {}, errorHaptic: () => {}, warningHaptic: () => {}, duration: { press: 100, release: 160, state: 200, data: 260, enter: 200, exit: 100, reveal: 480 }, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
     './presentation': presentation, '../src/ui/presentation': presentation, '../../src/ui/presentation': presentation, '../src/ui/report-presentation': reportPresentation,
     '../src/ui/budget-presentation': budgetPresentation, '../../src/ui/budget-presentation': budgetPresentation,
     './theme': theme, '../src/ui/theme': theme, '../../src/ui/theme': theme,
@@ -717,6 +719,10 @@ test('24UX4: a failed pause keeps the rule as it was and says so; a retry writes
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(view.saved.length, 0);
   assert.equal(find(view.render(), 'ErrorMessage').props.message, 'recurring.manage.failed', '25Q4: the action\'s own sentence, never the engine\'s text');
+  // 25D2: the line sits next to the rows it is about, after the 30-day block (out of sight above it for a person who
+  // scrolled down to the row), right before «Activos».
+  const order = nodes(view.render()).filter(node => node.type === 'ErrorMessage' || node.type === 'SectionTitle').map(node => node.type === 'ErrorMessage' ? 'error' : [node.props.children].flat().join(''));
+  assert.deepEqual(order.slice(0, 3), ['Próximos 30 días', 'error', 'Activos']);
   await swipe(view.render(), 'pause').onPress();
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(view.saved.length, 1);

@@ -12,7 +12,7 @@ export type { EntryPrefill } from './entry-prefill';
 import { AccountField, CategoryField, DateField } from './form-controls';
 import { InstallmentPurchase } from './installment-purchase';
 import { accountKindLabel, postingAccounts } from './liability-presentation';
-import { errorHaptic, successHaptic, warningHaptic } from './motion';
+import { announce, errorHaptic, successHaptic, warningHaptic } from './motion';
 import { readLastAccount, writeLastAccount } from './last-account';
 import { initialAccountId, releasesDraft } from './presentation';
 import { installmentOfEntry } from './installment-presentation';
@@ -222,6 +222,11 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
       successHaptic();
       saving.current = false;
       close();
+      // 25D2: the form closes with the save; VoiceOver hears what was saved once the screen under it is up (a new movement
+      // with its amount in words, the way Save echoed it; an edit, that the changes were saved).
+      const saved = submission.plan ? { minor: submission.plan.principalMinor, currency: submission.plan.currency }
+        : submission.change ? null : { minor: submission.entry.amountMinor, currency: accounts.find(item => item.id === submission!.entry.accountId)?.currency ?? 'ARS' };
+      announce(saved ? t('common.saved', { amount: spokenMoney(saved.minor, saved.currency) }) : t('common.changesSaved'), 'leave');
     } catch (cause) {
       setError(failureMessage(cause, 'entryForm.saveUnverified'));
       // A plan built from a calendar the card no longer has is refused before anything is written: the submission is released

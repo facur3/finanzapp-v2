@@ -56,6 +56,7 @@ export const review: Pick<Messages, 'review'> = {
     },
     detail: {
       notFoundTitle: 'This proposal is no longer pending',
+      confirmedSpoken: 'Recorded.',
       notFoundDetail: 'It was confirmed, discarded or can’t be read.',
       willExpense: 'Confirming records an expense.',
       willCardOnce: 'Confirming records an expense on the card.',

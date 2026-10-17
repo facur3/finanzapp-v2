@@ -49,8 +49,7 @@ function OperationDetail({ operation }: { operation: PurchaseOperation }) {
   const month = formatMonth(operation.dateISO.slice(0, 7), 'monthYear');
   const long = formatDate(operation.dateISO, 'weekdayLong');
   const date = long.charAt(0).toLocaleUpperCase() + long.slice(1);
-  const status = t(voided ? (refund ? 'operations.detail.statusVoidedRefund' : 'operations.detail.statusVoidedPayoff')
-    : refund ? 'operations.detail.statusRefund' : 'operations.detail.statusPayoff');
+  const status = changes.statusOf(operation);
   const name = account ? accountName(account) : '';
 
   // What it records, with the region's separators on screen and in the spoken form for VoiceOver.

@@ -79,7 +79,9 @@ function harness(file: string, ledger: Ledger, params: Record<string, string> = 
   const nav = { back: 0, replaced: [] as unknown[] };
   // 25Q4: every haptic comes from motion.tsx; the recorder keeps each one's kind.
   const haptics: string[] = [];
-  const motion = { successHaptic: () => { haptics.push('Success'); }, errorHaptic: () => { haptics.push('Error'); } };
+  // 25D2: what VoiceOver was told through motion.tsx's `announce`, in order (its iOS-only queue is tested in motion.node.ts).
+  const announced: string[] = [];
+  const motion = { announce: (text: string, after = 'now') => { announced.push(after === 'leave' ? 'after leaving: ' + text : text); }, successHaptic: () => { haptics.push('Success'); }, errorHaptic: () => { haptics.push('Error'); } };
   const i18n = { useI18n: () => bindLocale(options.locale ?? 'es-AR') };
   const opened = ledger.archive === undefined ? archive : ledger.archive;
   const useLedger = () => ({
@@ -160,7 +162,7 @@ function harness(file: string, ledger: Ledger, params: Record<string, string> = 
   const blur = () => { for (const cell of focusCells) if (typeof cell.cleanup === 'function') (cell.cleanup as () => void)(); };
   /** Focus regained (the screen in front again): each focus effect runs again, as React Navigation does. */
   const refocus = () => { for (const [index, effect] of focusEffects.entries()) focusCells[index] = { cleanup: effect() }; };
-  return { render: () => { cursor = 0; refCursor = 0; effectCursor = 0; focusCursor = 0; return module.exports.default!(); }, pushed, alerts, nav, blur, refocus, haptics };
+  return { render: () => { cursor = 0; refCursor = 0; effectCursor = 0; focusCursor = 0; return module.exports.default!(); }, pushed, alerts, nav, blur, refocus, haptics, announced };
 }
 /** Every node, local components rendered once per element (their hooks run in traversal order, as React would). */
 function nodes(value: any): Node[] {
@@ -277,6 +279,8 @@ test('a complete, current proposal: what will be recorded, where and when, and C
   assert.deepEqual(ledger.calls, [['confirm', item.id, 3]]);
   assert.equal(view.nav.back, 1, 'back to the tray once recorded');
   assert.equal(view.haptics.join(','), 'Success', 'one Success tap; the double tap adds nothing');
+  // 25D2: the detail closes with the write; VoiceOver hears that it was recorded once the tray is back.
+  assert.deepEqual(view.announced, ['after leaving: Registrado.']);
   root = view.render();
   assert.equal(all(root, 'ErrorMessage')[0].props.message, null);
 });

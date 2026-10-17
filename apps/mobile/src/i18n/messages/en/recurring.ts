@@ -63,6 +63,9 @@ export const recurring: Pick<Messages, 'recurring'> = {
       deleteConfirm: 'Delete',
       failed: 'We couldn’t change this recurring item. It’s unchanged; please try again.',
       deleteFailed: 'We couldn’t delete this recurring item. It’s unchanged; please try again.',
+      pausedSpoken: '{merchant}: paused.',
+      resumedSpoken: '{merchant}: resumed, next on {date}.',
+      deletedSpoken: '{merchant}: deleted.',
     },
     form: {
       noAccountTitle: 'First, an account',

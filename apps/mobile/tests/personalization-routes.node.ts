@@ -12,6 +12,8 @@ import * as i18nFormat from '../src/i18n/format.ts';
 import { PREVIEW_CURRENCIES } from '../src/storage/currency-gate.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 import type { AppLocale } from '../src/i18n/locale.ts';
+/** 25D2: what VoiceOver was told through motion.tsx's `announce`, in order (its iOS-only queue is tested in motion.node.ts). */
+const announced: string[] = [];
 
 // Producto 20: the account forms, the category form and the selectors, with
 // native hosts replaced by descriptors. Handler logic only; not a rendered
@@ -65,7 +67,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   const defaults = { useDefaultCurrency: ({ accountCurrency, requested }: { accountCurrency?: string | null; requested?: unknown } = {}) => accountCurrency ?? (domain.isLedgerCurrency(requested, GATE) ? requested : 'ARS') };
   // 25Q4 review: each notification haptic by its helper's name (tests/motion.node.ts pins the type each one sends).
   const haptics: string[] = [];
-  const motion = { selectionHaptic: () => {}, successHaptic: () => { haptics.push('Success'); }, errorHaptic: () => { haptics.push('Error'); }, warningHaptic: () => { haptics.push('Warning'); },
+  const motion = { selectionHaptic: () => {}, announce: (text: string, after = 'now') => { announced.push(after === 'leave' ? 'after leaving: ' + text : text); }, successHaptic: () => { haptics.push('Success'); }, errorHaptic: () => { haptics.push('Error'); }, warningHaptic: () => { haptics.push('Warning'); },
     timing: () => ({ duration: 0 }) };
   const modules: Record<string, unknown> = {
     '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,

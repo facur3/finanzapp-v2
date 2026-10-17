@@ -74,7 +74,9 @@ function harness(file: string, options: { params?: Record<string, string>; data?
     useCurrentDay: () => day, useReduceMotion: () => true, usePalette: () => palette };
   // 25Q4: a failed write's haptic, by type (Success is counted in `haptics`).
   const failures: string[] = [];
-  const motion = { ValueTransition: 'ValueTransition', Reflow: 'Reflow', timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }), successHaptic: () => { haptics++; }, selectionHaptic: () => {},
+  // 25D2: what VoiceOver was told through motion.tsx's `announce`, in order (its iOS-only queue is tested in motion.node.ts).
+  const announced: string[] = [];
+  const motion = { ValueTransition: 'ValueTransition', Reflow: 'Reflow', timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }), announce: (text: string, after = 'now') => { announced.push(after === 'leave' ? 'after leaving: ' + text : text); }, successHaptic: () => { haptics++; }, selectionHaptic: () => {},
     errorHaptic: () => { failures.push('Error'); }, warningHaptic: () => { failures.push('Warning'); } };
   const hues = { useCategoryLabel: (stored: string) => stored };
   const cardVisual = { CardDeck: 'CardDeck', CardFace: 'CardFace', cardFaceWidth: (width: number) => Math.min(width - 40, 420), cardFaceHeight: (width: number) => Math.round(width / 1.586) };
@@ -125,7 +127,7 @@ function harness(file: string, options: { params?: Record<string, string>; data?
     render: () => { cursor = 0; refCursor = 0; return module.exports.default(); },
     setData: (next: domain.LedgerArchive | null) => { data = next as domain.LedgerArchive; },
     setLocale: (next: AppLocale) => { locale = next; },
-    pushed, alerts, updates, removals, writes, failures, backs: () => backs, haptics: () => haptics,
+    pushed, alerts, updates, removals, writes, failures, announced, backs: () => backs, haptics: () => haptics,
   };
 }
 
@@ -812,12 +814,15 @@ test('24T3: «Dejar de seguir el plan» says what stops, what stays and what it 
   assert.equal(find(failed, 'ErrorMessage').props.message, 'installments.detail.stopFailed');
   assert.equal(find(failed, 'ActionButton', 'Registrar devolución').props.disabled, true, 'nothing else starts while the outcome is unknown');
   assert.equal(view.failures.join(','), 'Warning', '25Q4: it may have been written, so Warning while it stays frozen');
+  assert.deepEqual(view.announced, [], '25D2: a failure is said by its error, never as done');
   find(failed, 'ActionButton', 'Reintentar cambio').props.onPress();
   assert.equal(view.alerts.length, 1, 'the retry asks nothing new');
   await settle();
   assert.deepEqual(view.writes.map(item => JSON.stringify(item.arg)), [JSON.stringify({ planId: 'tv', expectedRevision: 0 }), JSON.stringify({ planId: 'tv', expectedRevision: 0 })],
     'the same stop, with the revision the person saw');
   assert.equal(JSON.stringify([view.backs(), view.haptics()]), JSON.stringify([0, 1]), 'a stopped plan stays on screen');
+  // 25D2: the pressed button is gone and the state word changed: VoiceOver hears the new state once.
+  assert.deepEqual(view.announced, ['Sin seguimiento']);
   assert.equal(nodes(view.render()).some(node => node.type === 'ErrorMessage' && node.props.message), false);
 });
 
@@ -879,6 +884,7 @@ test('24T3: «Reactivar plan» names the closings recorded now, on their own dat
   await settle();
   assert.deepEqual(view.writes.map(item => [item.action, JSON.stringify(item.arg)]), [['reactivate', JSON.stringify({ planId: 'tv', expectedRevision: 1 })]]);
   assert.equal(view.haptics(), 1);
+  assert.deepEqual(view.announced, ['Activo'], '25D2: the new state, told to VoiceOver');
   // Nothing closed in between: the alert says only that it follows again.
   const calm = harness('installment/[id].tsx', { params: { id: 'tv' }, data: stopped });
   find(calm.render(), 'ActionButton', 'Reactivar plan').props.onPress();
@@ -961,6 +967,8 @@ test('24T3 adelanto: a write with an unknown outcome is retried unchanged; recor
   assert.equal(view.writes.length, 2);
   assert.equal(view.writes[1].arg, view.writes[0].arg, 'the same adelanto, the same id');
   assert.equal(JSON.stringify([view.failures.join(','), view.haptics()]), JSON.stringify(['Warning', 1]));
+  // 25D2: the form gives way to its done view in place: VoiceOver hears its title once, only for the write that landed.
+  assert.deepEqual(view.announced, ['Adelanto registrado']);
   // The provider refreshed: the card now owes the instalments brought forward ($ 120.000,00 + $ 1.000.000,00).
   view.setData({ ...withPlans, purchaseOperations: [view.writes[0].arg as domain.PlanPayoff] });
   root = view.render();
