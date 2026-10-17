@@ -42,6 +42,8 @@ function provider(change: Partial<Script> = {}) {
   };
   let listener: ((state: string) => void) | null = null;
   let reads = 0;
+  /** The UI's day (useCurrentDay): a test moves it as midnight or a return to the foreground would. */
+  const clock = { day: domain.todayKey() };
   const modules: Record<string, unknown> = {
     react: {
       useState: (initial: unknown) => {
@@ -65,11 +67,13 @@ function provider(change: Partial<Script> = {}) {
     'react/jsx-runtime': { jsx: (type: unknown, props: Record<string, unknown>) => ({ type, props }) },
     'react-native': { AppState: { addEventListener: (_: string, fn: (state: string) => void) => { listener = fn; return { remove() {} }; } } },
     '@finanzapp/domain': domain,
+    '../ui/theme': { useCurrentDay: () => clock.day },
     './currency-gate': { currencyGateForBuild: () => domain.LEDGER_CURRENCIES },
-    './database': { readArchive: () => { reads++; return script.read(); }, processRecurring: () => script.recurring(), catchUpInstallments: async () => 0,
-      createEntry: async () => {}, saveRecurringRule: async () => {} },
+    './database': { readArchive: () => { reads++; return script.read(); }, catchUpInstallments: async () => 0, createEntry: async () => {} },
     './ledger-session': { ...ledgerSession, openLedger: () => script.open(), refreshLedger: () => script.refresh(), savePurchasePlan: () => script.plan(),
-      restoreFromBackup: () => script.restore() },
+      restoreFromBackup: () => script.restore(),
+      // The composite's own contract (a failing catch-up returned, never thrown) runs on real SQLite in tests/recurring-audit.node.ts.
+      saveRecurring: async () => { try { await script.recurring(); return { recurringError: false }; } catch { return { recurringError: true }; } } },
     // 25Q4 review: the review file opens to a scripted store with an empty tray, so Confirmar reaches the provider's rule.
     './nativeDatabase': { openLedgerDatabase: async () => ({}), openReviewDatabase: async () => ({}) },
     './review-database': { openReviewStore: async () => ({ confirm: () => script.confirm() }),
@@ -82,7 +86,9 @@ function provider(change: Partial<Script> = {}) {
   } });
   const value = () => { for (const kind in cursor) cursor[kind] = 0; return module.exports.LedgerProvider!({ children: null }).props.value; };
   return {
-    script, value, reads: () => reads,
+    script, value, reads: () => reads, clock,
+    /** An AppState change as iOS sends it (`inactive` for Control Center, `background` when the app leaves). */
+    appState: async (state: string) => { listener?.(state); await settle(); },
     /** The first render opens the ledger; the second, with the archive set, registers the foreground listener. */
     start: async () => { value(); await settle(); return value(); },
     foreground: async () => { listener?.('active'); await settle(); },
@@ -164,4 +170,54 @@ test('25Q4: an open refused for a newer file or a migration rolled back whole sa
     const value = await provider({ open: async () => { throw new Error(cause); } }).start();
     assert.deepEqual([value.error, value.snapshot], [expected, null], cause);
   }
+});
+
+test('25R1: the catch-up runs once per change of day and on a real return, never for a Control Center pull on a day already caught up', async () => {
+  let refreshes = 0;
+  const view = provider({ refresh: async () => { refreshes++; return session(); } });
+  const today = view.clock.day;
+  assert.equal((await view.start()).asOfISO, today, 'the archive is current to the day the open ran its passes');
+  await view.appState('inactive');
+  await view.appState('active');
+  assert.equal(refreshes, 0, 'Control Center, Notification Center, a system alert: nothing is due');
+  await view.appState('background');
+  await view.appState('active');
+  assert.equal(refreshes, 1, 'a return from the background always runs the pass');
+  // A pass that failed is run again on the next return, even from inactive.
+  view.script.refresh = async () => { refreshes++; return session({ recurringError: true }); };
+  await view.appState('background');
+  await view.appState('active');
+  await view.appState('inactive');
+  await view.appState('active');
+  assert.equal(refreshes, 3);
+  view.script.refresh = async () => { refreshes++; return session(); };
+  await view.appState('background');
+  await view.appState('active');
+  assert.equal(refreshes, 4);
+  // Midnight with the app open: the UI's day changes; the ledger runs the pass for it once, however often it renders.
+  view.clock.day = '2099-01-01';
+  view.value();
+  view.value();
+  await settle();
+  view.value();
+  assert.equal(refreshes, 5);
+});
+
+test('25R1: a foreground return and a change of day on the same new day run one pass, and returns that arrive while one is queued add nothing', async () => {
+  let refreshes = 0, release: () => void = () => {};
+  const view = provider({ refresh: async () => { refreshes++; await new Promise<void>(resolve => { release = resolve; }); return session(); } });
+  await view.start();
+  await view.appState('background');
+  view.clock.day = '2099-01-01';
+  view.value();
+  await view.appState('active');
+  await view.appState('active');
+  view.value();
+  await settle();
+  assert.equal(refreshes, 1, 'one pass is running; nothing else queued behind it');
+  release();
+  await settle();
+  view.value();
+  await settle();
+  assert.equal(refreshes, 1);
 });

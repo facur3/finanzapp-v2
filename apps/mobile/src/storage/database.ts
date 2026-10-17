@@ -960,7 +960,7 @@ export async function saveRecurringRule(db: LedgerDatabase, input: RecurringRule
       await insertRecurringRule(tx, rule);
       return;
     }
-    if (sameRecurringRule(existing, rule)) return;
+    if (sameRecurringRule(existing, rule) || advancedSince(existing, rule)) return;
     validateRecurringRuleChange(existing, rule, archive.accounts);
     validateArchive({ ...archive, recurring: archive.recurring!.map(item => item.id === rule.id ? rule : item) });
     // A deletion is this same UPDATE with deleted = 1: the row stays, and no entry it recorded is touched.
@@ -969,6 +969,14 @@ export async function saveRecurringRule(db: LedgerDatabase, input: RecurringRule
     rule.accountId, rule.kind, rule.amountMinor, rule.merchant, rule.category, rule.frequency, rule.anchorDateISO,
     rule.nextDateISO, rule.active ? 1 : 0, rule.deleted ? 1 : 0, rule.revision, rule.updatedAt, rule.id);
   });
+}
+
+/** The submitted rule committed before and the catch-up has since advanced it (a retry after a view refresh that failed): the
+ * stored row is the same rule with a later revision, only its next date moved forward. A no-op, never a «changed» refusal
+ * that would invite entering the rule a second time. */
+function advancedSince(existing: RecurringRule, submitted: RecurringRule): boolean {
+  return existing.revision > submitted.revision && existing.nextDateISO >= submitted.nextDateISO
+    && sameRecurringRule({ ...submitted, nextDateISO: existing.nextDateISO, revision: existing.revision, updatedAt: existing.updatedAt }, existing);
 }
 
 /** What one catch-up did: the movements it recorded, the rules it could not record (their ids, left unchanged), and
@@ -1419,13 +1427,16 @@ export async function reactivateInstallmentPlan(db: LedgerDatabase, planId: stri
 
 /** The deletion record of a plan that recorded nothing (created by mistake); one with history is cancelled instead. The
  * row and its schedule stay. A retry on a plan already deleted is a no-op. */
-export async function deleteInstallmentPlan(db: LedgerDatabase, planId: string, nowISO: string): Promise<void> {
+export async function deleteInstallmentPlan(db: LedgerDatabase, planId: string, nowISO: string, todayISO: string): Promise<void> {
   await db.withExclusiveTransactionAsync(async tx => {
     const archive = await readArchive(tx);
     const plan = archive.installmentPlans?.find(item => item.id === planId);
     if (!plan) throw new Error(PLAN_MISSING_MESSAGE);
     if (plan.deleted) return; // Committed already; a refresh failed.
-    assertInstallmentPlanDeletable(plan, archive.records, archive.purchaseOperations ?? []); // 24T3: any operation, undone included, is history too.
+    // Judged on the caught-up plan, as every other plan action: an instalment whose statement closed since the last pass is
+    // history too, so the plan is refused (and the refusal's catch-up records that instalment), never deleted with it owed.
+    const { archive: caughtUp } = withPlanCatchUp(archive, planId, todayISO);
+    assertInstallmentPlanDeletable(plan, caughtUp.records, archive.purchaseOperations ?? []); // 24T3: any operation, undone included, is history too.
     const tombstone = deleteInstallmentPlanRecord(plan, nowISO);
     validateInstallmentPlanChange(plan, tombstone);
     validateArchive({ ...archive, installmentPlans: archive.installmentPlans!.map(item => item.id === planId ? tombstone : item) });

@@ -13,6 +13,7 @@ import { DATABASE_VERSION, SCHEMA_SCRIPTS, cancelInstallmentPlan, catchUpInstall
   saveRecurringRule, type LedgerDatabase } from '../src/storage/database.ts';
 import { openLedger, refreshLedger } from '../src/storage/ledger-session.ts';
 import { restoreCatchUp } from '../src/ui/backup-file.ts';
+import { planActions } from '../src/ui/installment-presentation.ts';
 import { runExclusiveTransaction, runSchemaMigration, type TransactionConnection } from '../src/storage/transaction.ts';
 
 // Producto 24T1 on real SQLite: schema 12, a purchase in instalments recognised statement by statement, exactly once,
@@ -211,7 +212,7 @@ test('a card payment lowers the balance due and assigns no instalment; the movem
   const undone = installmentPlanFigures(archive.installmentPlans![0], archive.records, archive.purchaseOperations ?? []);
   assert.deepEqual([undone.recognisedMinor, undone.undoneMinor, undone.remainingMinor, undone.status], [10000, 10000, 110000, 'active']);
   assert.equal(cardDebtMinor(card, await readSnapshot(db)), 23100 + 10000 - 30000);
-  await assert.rejects(deleteInstallmentPlan(db, 'tv', now), new RegExp(PLAN_HISTORY_MESSAGE), 'an undone instalment is history too');
+  await assert.rejects(deleteInstallmentPlan(db, 'tv', now, '2026-10-25'), new RegExp(PLAN_HISTORY_MESSAGE), 'an undone instalment is history too');
   // Restore brings it back; a plain new movement can never take an instalment id.
   const voided = archive.records.find(item => item.entry.id === 'inst_tv_002')!;
   await changeEntry(db, makeEntryChange('op5', voided, 'restore', now));
@@ -236,16 +237,16 @@ test('the plan lifecycle: cancelled keeps the recognised instalments and stops t
   // 24T3 (A15): a retry names the revision the screen showed: one revision on and already stopped is a no-op.
   await cancelInstallmentPlan(db, 'tv', 0, '2026-10-25', '2026-09-29T10:00:00.000Z');
   assert.deepEqual(await planOf(db, 'tv'), cancelled, 'a retry changes nothing');
-  await assert.rejects(deleteInstallmentPlan(db, 'tv', now), new RegExp(PLAN_HISTORY_MESSAGE));
-  await assert.rejects(deleteInstallmentPlan(db, 'fin', now), new RegExp(PLAN_HISTORY_MESSAGE));
+  await assert.rejects(deleteInstallmentPlan(db, 'tv', now, '2026-10-25'), new RegExp(PLAN_HISTORY_MESSAGE));
+  await assert.rejects(deleteInstallmentPlan(db, 'fin', now, '2026-10-25'), new RegExp(PLAN_HISTORY_MESSAGE));
   await assert.rejects(cancelInstallmentPlan(db, 'nope', 0, '2026-10-25', now), new RegExp(PLAN_MISSING_MESSAGE));
   // A plan created by mistake, nothing recorded yet: deleted (a tombstone; the row and its schedule stay); twice is a no-op.
   const mistake = newInstallmentPlan({ id: 'oops', card, cardAccount, merchant: 'Error', category: 'Otros', purchaseDateISO: '2026-11-01', principalMinor: 900, count: 3, placement: 'next', createdAt: now });
   await createInstallmentPlan(db, mistake);
-  await deleteInstallmentPlan(db, 'oops', now);
+  await deleteInstallmentPlan(db, 'oops', now, '2026-10-25');
   const gone = await planOf(db, 'oops');
   assert.deepEqual([gone.deleted, gone.cancelledAt, gone.revision, gone.schedule.length], [true, null, 1, 3]);
-  await deleteInstallmentPlan(db, 'oops', '2026-09-30T10:00:00.000Z');
+  await deleteInstallmentPlan(db, 'oops', '2026-09-30T10:00:00.000Z', '2026-10-25');
   assert.deepEqual(await planOf(db, 'oops'), gone);
   assert.equal(await catchUpInstallments(db, '2030-01-01'), 0);
   assert.equal((await db.getFirstAsync<{ n: number }>('SELECT count(*) AS n FROM installments'))?.n, 12 + 3 + 3, 'no row is ever DELETEd');
@@ -604,4 +605,17 @@ test('an archived card refuses a new purchase, a new plan, a new recurring rule 
   await saveCreditCard(db, { ...card, active: true, revision: 2, updatedAt: now });
   await createEntry(db, expense('after', 'card-account', 100, '2026-10-27'));
   await createInstallmentPlan(db, { ...financed, id: 'after-plan' });
+});
+
+test('25R1: a plan whose first statement closed since the last catch-up has history: its deletion is refused on the caught-up plan, and the instalment is then recorded, never lost', async () => {
+  const { db } = await seeded();
+  // tv's first instalment closes on 2026-09-20; no pass ran since. On the 21st the stored ledger shows nothing recorded.
+  assert.deepEqual(await instalmentIds(db), []);
+  const before = await readArchive(db);
+  assert.equal(planActions(before, 'tv', '2026-09-21', now).remove, false, 'the screen offers no deletion on the caught-up plan');
+  assert.equal(planActions(before, 'tv', '2026-09-19', now).remove, true, 'the day before the closing it still does');
+  await assert.rejects(deleteInstallmentPlan(db, 'tv', now, '2026-09-21'), new RegExp(PLAN_HISTORY_MESSAGE));
+  assert.equal((await planOf(db, 'tv')).deleted, false, 'nothing written');
+  await catchUpInstallments(db, '2026-09-21');
+  assert.deepEqual(await instalmentIds(db), ['inst_tv_001'], 'the instalment owed is recorded, the plan stays');
 });

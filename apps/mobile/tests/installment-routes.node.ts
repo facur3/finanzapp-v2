@@ -567,9 +567,14 @@ test('plan detail: a failed deletion keeps the plan and the error; Reintentar se
 });
 
 test('25Q4: a deletion storage refuses before writing (an instalment or an operation recorded since the screen was drawn) releases it; the plan is read again and offers «Dejar de seguir el plan», never «Eliminar plan» or «Reintentar cambio»', async () => {
-  // Oct 29: the first instalment billed on Oct 28 and the foreground has not recorded it, so the screen still offers the deletion.
+  // 25R1: Oct 29, the first instalment billed on Oct 28 and the foreground has not recorded it yet: the plan already has
+  // history, judged on the caught-up plan as every other action, so the screen offers the stop, never the deletion.
+  const due = harness('installment/[id].tsx', { params: { id: 'nb' }, data: withPlans, day: '2026-10-29' }).render();
+  assert.equal(nodes(due).some(node => node.type === 'ActionButton' && node.props.label === 'Eliminar plan'), false);
+  assert.ok(find(due, 'ActionButton', 'Dejar de seguir el plan'));
+  // Oct 27, nothing due: the deletion is offered; storage, which reads the ledger itself, can still refuse it.
   for (const refusal of [domain.PLAN_HISTORY_MESSAGE, domain.PLAN_OPERATION_HISTORY_MESSAGE]) {
-    const view = harness('installment/[id].tsx', { params: { id: 'nb' }, data: withPlans, day: '2026-10-29',
+    const view = harness('installment/[id].tsx', { params: { id: 'nb' }, data: withPlans, day: '2026-10-27',
       // Storage refuses before writing and re-reads (rereadOnRefusal): the instalment is in the view before the refusal arrives.
       remove: async () => { view.setData({ ...withPlans, records: [...withPlans.records, ...recognised(nb, [1])] }); throw new Error(refusal); } });
     find(view.render(), 'ActionButton', 'Eliminar plan').props.onPress();

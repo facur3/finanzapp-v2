@@ -621,7 +621,8 @@ test('canConfirm follows the domain and the store: gaps, a stale basis, a confli
 
 test('no second write path: the review screens never build or send a ledger write; the provider confirms only through the store, in the ledger\'s queue', () => {
   const read = (path: string) => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
-  for (const file of ['app/review.tsx', 'app/review/[id].tsx', 'app/edit-review/[id].tsx', 'src/ui/review-presentation.ts']) {
+  // The sheet the Assistant presents and the actions both confirmation surfaces share are where Confirmar and Descartar live.
+  for (const file of ['app/review.tsx', 'app/review/[id].tsx', 'app/edit-review/[id].tsx', 'app/review-sheet/[id].tsx', 'src/ui/review-presentation.ts', 'src/ui/review-actions.ts']) {
     assert.doesNotMatch(read(file), /writeForReviewDraft|createEntry|createInstallmentPlan|savePurchasePlan|addEntry|addInstallmentPlan|newInstallmentPlan|openReviewStore/, file);
     assert.doesNotMatch(read(file), /^import \{[^}]*\} from '[^']*storage\/(review-database|database)'/m, file + ': types only from storage');
   }
@@ -629,7 +630,8 @@ test('no second write path: the review screens never build or send a ledger writ
   assert.match(provider, /const reviewOperation = [\s\S]*?return rereadOnRefusal\(async db => \{[\s\S]*?finally \{\s*await loadReview\(db\);\s*if \(mounted\.current\) setReviewVersion\(value => value \+ 1\);/, 'every review operation runs in the ledger\'s queue (re-reading it on a refusal) and reloads the tray');
   assert.match(provider, /confirmReview: \(id, expectedRevision\) => reviewOperation\(async store => \{\s*const result = await store\.confirm\(id, \{ expectedRevision, todayISO: todayKey\(\), at: new Date\(\)\.toISOString\(\) \}\);/);
   // A review file that cannot be opened never stops the ledger: its failure is caught and the ledger's archive is already set.
-  assert.match(provider, /setArchive\(session\.archive\);\s*setError\(sessionWarning\(session\)\);\s*await loadReview\(db\);/);
+  assert.match(provider, /adopt\(session, today\);\s*await loadReview\(db\);/);
+  assert.match(provider, /function adopt\([\s\S]*?setArchive\(session\.archive\);[\s\S]*?setError\(sessionWarning\(session\)\);/);
   assert.match(provider, /const loadReview = async \(db: LedgerDatabase\) => \{\s*try \{[\s\S]*?\} catch \{/);
 });
 

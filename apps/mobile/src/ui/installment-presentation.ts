@@ -236,7 +236,8 @@ export function planActions(archive: LedgerArchive, planId: string, todayISO: st
   if (!plan || plan.deleted) return none;
   const operations = archive.purchaseOperations ?? [];
   const caught = planCaughtUp(archive, planId, todayISO);
-  const remove = planSummary(plan, archive.records, operations).deletable;
+  // Judged after the catch-up, like storage: a plan whose first statement closed since the last pass has history.
+  const remove = planSummary(plan, caught.records, operations).deletable;
   const draft = { id: 'dry-run', dateISO: todayISO, todayISO, createdAt: nowISO };
   let refund = false;
   try {
