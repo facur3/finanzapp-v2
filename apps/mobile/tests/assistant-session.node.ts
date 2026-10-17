@@ -29,7 +29,7 @@ test('dispatch goes through the real conversation reducer and notifies every sub
   session.dispatch({ type: 'send', text: '  ¿Cuánto gasté en comida? ' });
   const state = session.getState().conversation;
   assert.equal(state.phase, 'thinking');
-  assert.equal(state.messages.length, 1);
+  assert.equal(state.messages.length, 2, 'the question and the place of its reply («Pensando…»)');
   assert.equal(state.messages[0].id, 'u-1');
   assert.equal(state.messages[0].text, '¿Cuánto gasté en comida?', 'the reducer trims, exactly as on screen');
   assert.equal(calls.join(), 'a,b');

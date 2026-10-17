@@ -56,7 +56,7 @@ function load(file: string, { reduced = false, fontScale = 1, dark = false, bott
     '@expo/vector-icons/Ionicons': 'Ionicons',
     './components': { ...Object.fromEntries(['AccountBadge', 'ActionButton', 'AppText', 'CategoryBadge', 'Money', 'PressFeedback', 'Surface'].map(name => [name, name])),
       useStacked: () => fontScale > 1.2 },
-    './motion': { Appear: 'Appear', Reflow: 'Reflow', selectionHaptic: () => haptics.push('selection') },
+    './motion': { Appear: 'Appear', Reflow: 'Reflow', selectionHaptic: () => haptics.push('selection'), WAIT_REVEAL_MS: 400 },
     './presentation': presentation,
     './theme': { radius: { chip: 14, tile: 12, group: 16, card: 20, sheet: 24, creditCard: 18, button: 14 }, space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
       usePalette: () => palette, useReduceMotion: () => reduced, useCurrentDay: () => '2026-09-21' },
@@ -67,11 +67,16 @@ function load(file: string, { reduced = false, fontScale = 1, dark = false, bott
       useCategoryLookOf: (kind?: 'expense' | 'income') => (stored: string) => ({ label: categoryLabel(stored, kind) }) },
   };
   const module = { exports: {} as Record<string, (props: any) => Node> };
-  runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
+  // Timers are the test's: `elapse(ms)` runs every timer due by then (a component's delay is observed, never waited for).
+  const timers: { at: number; fn: () => void; cleared: boolean }[] = [];
+  const setTimeout = (fn: () => void, ms: number) => { timers.push({ at: ms, fn, cleared: false }); return timers.length; };
+  const clearTimeout = (handle: number) => { if (timers[handle - 1]) timers[handle - 1].cleared = true; };
+  const elapse = (ms: number) => { for (const timer of timers.splice(0)) if (!timer.cleared && timer.at <= ms) timer.fn(); else if (!timer.cleared) timers.push(timer); };
+  runInNewContext(code, { module, exports: module.exports, setTimeout, clearTimeout, require: (name: string) => {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected ' + file + ' dependency: ' + name);
     return modules[name];
   } });
-  return { exports: module.exports, render: (component: string, props: any) => { cursor = 0; return module.exports[component](props); }, shared, haptics };
+  return { exports: module.exports, render: (component: string, props: any) => { cursor = 0; return module.exports[component](props); }, shared, haptics, elapse };
 }
 function nodes(value: any): Node[] {
   if (!value || typeof value !== 'object') return [];
@@ -113,6 +118,16 @@ test('the composer labels its field and send (no microphone until dictation exis
   assert.equal(flat(nodes(ready).find(node => node.type === 'View')!.props.style).backgroundColor, '#2557D6', 'the filled cobalt send');
   ready.props.onPress();
   assert.deepEqual(events, ['send']);
+  // The protocol's bound is the field's: a longer paste is cut where the person sees it, never refused as a failure later.
+  assert.equal(input.props.maxLength, 2000);
+  assert.equal(input.props.maxLength, conversation.MESSAGE_MAX_CHARS);
+  // Waiting: for the first WAIT_REVEAL_MS the slot stays a disabled Enviar, so a quick second tap cancels nothing; then Detener.
+  root = ui.render('AssistantComposer', { ...props, value: 'Gasté 500', busy: true });
+  assert.equal(byLabel(root, 'Detener respuesta'), undefined, 'no Detener under a finger that just tapped Enviar');
+  assert.equal(byLabel(root, 'Enviar')!.props.disabled, true);
+  ui.elapse(399);
+  assert.equal(byLabel(ui.render('AssistantComposer', { ...props, value: 'Gasté 500', busy: true }), 'Detener respuesta'), undefined);
+  ui.elapse(400);
   root = ui.render('AssistantComposer', { ...props, value: 'Gasté 500', busy: true });
   assert.equal(byLabel(root, 'Enviar'), undefined);
   byLabel(root, 'Detener respuesta')!.props.onPress();
@@ -291,6 +306,9 @@ test('assistant text, thinking and system notes are said in words; the pulse sto
   assert.equal(done.props.accessibilityLabel, 'Asistente: Gastaste más.');
   const stopped = ui.render('AssistantText', { text: 'Gastaste', status: 'stopped' });
   assert.ok(nodes(stopped).some(node => node.type === 'AppText' && node.props.children === 'Respuesta interrumpida.'));
+  // «Pensando…» waits WAIT_REVEAL_MS before it shows, so a reply (or a note) that is already there never flashes it.
+  assert.equal(nodes(ui.render('AssistantText', { text: '', status: 'streaming' })).some(node => node.props.accessibilityLabel === 'Asistente: pensando'), false);
+  ui.elapse(400);
   const thinking = ui.render('AssistantText', { text: '', status: 'streaming' });
   const pulse = nodes(thinking).find(node => node.props.accessibilityLabel === 'Asistente: pensando')!;
   assert.equal(pulse.props.accessibilityState.busy, true);
@@ -298,6 +316,8 @@ test('assistant text, thinking and system notes are said in words; the pulse sto
   assert.equal(ui.shared.at(-1)!.value, 0.3, 'the dot pulses');
   const still = load('assistant-messages.tsx', { reduced: true });
   nodes(still.render('AssistantText', { text: '', status: 'streaming' }));
+  still.elapse(400);
+  assert.ok(nodes(still.render('AssistantText', { text: '', status: 'streaming' })).some(node => node.props.accessibilityLabel === 'Asistente: pensando'), 'the delay is not motion: Reduce Motion keeps it');
   assert.equal(still.shared.at(-1)!.value, 1, 'Reduce Motion: no pulse, the words carry the state');
   const user = ui.render('UserMessage', { text: 'Gasté 500' });
   assert.equal(nodes(user).find(node => node.props.accessibilityLabel)!.props.accessibilityLabel, 'Vos: Gasté 500');
@@ -373,6 +393,8 @@ test('English: every word the Assistant UI says is English; account names, merch
   assert.equal(answer.props.accessibilityLabel, 'Assistant: Gastaste más.');
   assert.ok(nodes(answer).some(node => node.type === 'AppText' && node.props.children === 'Response stopped.'));
   assert.equal(nodes(ui.render('UserMessage', { text: 'Gasté 500' })).find(node => node.props.accessibilityLabel)!.props.accessibilityLabel, 'You: Gasté 500');
+  nodes(ui.render('AssistantText', { text: '', status: 'streaming' }));
+  ui.elapse(400);
   const thinking = nodes(ui.render('AssistantText', { text: '', status: 'streaming' }));
   assert.ok(thinking.some(node => node.props.accessibilityLabel === 'Assistant: thinking'));
   assert.ok(thinking.some(node => node.type === 'AppText' && node.props.children === 'Thinking…'));
@@ -424,6 +446,8 @@ test('English: every word the Assistant UI says is English; account names, merch
   assert.equal(input.props.accessibilityLabel, 'Message for the Assistant');
   assert.equal(byLabel(bar, 'Dictate'), undefined, 'no microphone in English either');
   assert.ok(byLabel(bar, 'Send'));
+  composer.render('AssistantComposer', { value: 'x', onChange: () => {}, onSend: () => {}, onStop: () => {}, busy: true });
+  composer.elapse(400);
   bar = composer.render('AssistantComposer', { value: 'x', onChange: () => {}, onSend: () => {}, onStop: () => {}, busy: true });
   assert.ok(byLabel(bar, 'Stop response'));
   assert.equal(nodes(bar).some(node => node.type === 'AppText'), false, 'no dictation note');
@@ -436,7 +460,7 @@ test('VoiceOver: with an interface language that differs from the device\'s, eve
   const content = conversation.answerContent({ evidenceIds: ['current.category.1', 'previous.category.1'] },
     [{ id: 'current.category.1', label: 'Categoría de gasto: Supermercado', amountMinor: 12120000, count: 11, startISO: '2026-09-01', endISO: '2026-09-21' },
       { id: 'previous.category.1', label: 'Categoría de gasto: Supermercado', amountMinor: 12200000, count: 10, startISO: '2026-08-01', endISO: '2026-08-21' }], 'ARS');
-  const rendered = (ui: ReturnType<typeof load>) => [
+  const views = (ui: ReturnType<typeof load>) => [
     ui.render('UserMessage', { text: 'Spent 500' }),
     ui.render('AssistantText', { text: 'Gastaste más.', status: 'done', language: 'es' }),
     ui.render('AssistantText', { text: '', status: 'streaming', language: 'en' }),
@@ -444,7 +468,9 @@ test('VoiceOver: with an interface language that differs from the device\'s, eve
     ui.render('AnswerEvidence', { content, currency: 'ARS', onOpen: () => {} }),
     ui.render('ProposalCard', { content: proposal(), state: { kind: 'pending', item: itemOf(reviewDraft()), conflict: false, writable: true }, ...handlers }),
     ui.render('ProposalCard', { content: proposal(), state: { kind: 'dismissed' }, ...handlers }),
-  ].flatMap(nodes).filter(node => node.type === 'View' && node.props.accessible);
+  ];
+  // Drawn once, then again once «Pensando…» has waited its WAIT_REVEAL_MS.
+  const rendered = (ui: ReturnType<typeof load>) => { views(ui).flatMap(nodes); ui.elapse(400); return views(ui).flatMap(nodes).filter(node => node.type === 'View' && node.props.accessible); };
   const elements = rendered(english);
   assert.equal(elements.length, 10, 'user, answer, thinking, note, one evidence row, four proposal rows, the collapsed card');
   const answerLabel = (node: { props: { accessibilityLabel?: string } }) => /^Assistant: /.test(String(node.props.accessibilityLabel));

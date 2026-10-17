@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -10,7 +10,7 @@ import type { LanguageCode } from '../i18n/locale';
 import { useI18n } from '../i18n/provider';
 import { useCategoryLook, useCategoryLookOf } from './category-hues';
 import { AccountBadge, ActionButton, AppText, CategoryBadge, Money, PressFeedback, Surface, useStacked, type IconName } from './components';
-import { Appear, Reflow, pulseTiming, selectionHaptic } from './motion';
+import { Appear, Reflow, WAIT_REVEAL_MS, pulseTiming, selectionHaptic } from './motion';
 import { activityDateLabel } from './presentation';
 import { reviewFacts } from './review-presentation';
 import { radius, space, useCurrentDay, usePalette, useReduceMotion } from './theme';
@@ -36,7 +36,8 @@ export function UserMessage({ text }: { text: string }) {
 }
 
 /** Streaming shows the words as they arrive, or "Pensando…" with a pulse
- * before the first one; a stopped answer says so under its partial text.
+ * before the first one (shown once the wait has lasted `WAIT_REVEAL_MS`, so a fast reply never flashes it); a stopped
+ * answer says so under its partial text.
  * The model's words are content in the language they were asked in: protocol v3
  * sends the interface language with each ask (docs/i18n.md §11) and the message
  * keeps it as `language`, so VoiceOver reads a reply with the voice of that language
@@ -60,12 +61,19 @@ function Thinking() {
   const reduced = useReduceMotion();
   const { t, speechLanguage } = useI18n();
   const pulse = useSharedValue(1);
+  const [shown, setShown] = useState(false);
   useEffect(() => {
+    const timer = setTimeout(() => setShown(true), WAIT_REVEAL_MS);
+    return () => clearTimeout(timer);
+  }, []);
+  useEffect(() => {
+    if (!shown) return;
     if (reduced) { pulse.value = 1; return; }
     pulse.value = withRepeat(withSequence(withTiming(0.3, pulseTiming), withTiming(1, pulseTiming)), -1, false);
     return () => { pulse.value = 1; };
-  }, [reduced, pulse]);
+  }, [shown, reduced, pulse]);
   const style = useAnimatedStyle(() => ({ opacity: pulse.value }));
+  if (!shown) return null;
   return <View accessible accessibilityLabel={t('assistant.message.thinkingLabel')} accessibilityLanguage={speechLanguage} accessibilityState={{ busy: true }} style={[styles.assistantRow, { flexDirection: 'row', alignItems: 'center', gap: 8 }]}>
     <Animated.View style={[{ width: 8, height: 8, borderRadius: 4, backgroundColor: p.primary }, style]} />
     <AppText secondary>{t('assistant.message.thinking')}</AppText>

@@ -44,6 +44,11 @@ export type Duration = keyof typeof duration;
  * has no ease-out end). Static under Reduce Motion: the caller does not start it. */
 export const pulseTiming: WithTimingConfig = { duration: 600, easing: Easing.inOut(Easing.quad) };
 
+/** How long the Assistant waits before it shows that it is waiting: «Pensando…» appears, and Enviar becomes Detener, only
+ * after this, so an instant reply (or the disconnected note) never flashes them and a second tap on Enviar never lands on
+ * a Detener that just took its place. A delay, not a motion: Reduce Motion keeps it. */
+export const WAIT_REVEAL_MS = 400;
+
 /** Timing config for a data or state change; zero-length when motion is reduced. */
 export function timing(kind: Duration, reduced: boolean): WithTimingConfig {
   return { duration: reduced ? 0 : duration[kind], easing: easeOut };

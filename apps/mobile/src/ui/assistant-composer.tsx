@@ -1,12 +1,14 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Platform, StyleSheet, TextInput, View, useWindowDimensions } from 'react-native';
 import Animated, { useAnimatedKeyboard, useAnimatedStyle } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { MESSAGE_MAX_CHARS } from '../assistant/conversation';
 import { useI18n } from '../i18n/provider';
 import { PressFeedback } from './components';
 import { ControlSurface, useMaterial } from './material';
 import { composerBottomPadding } from './material-policy';
+import { WAIT_REVEAL_MS } from './motion';
 import { space, usePalette } from './theme';
 
 /** The placeholder's catalogue key. */
@@ -21,7 +23,8 @@ const LINE_HEIGHT = 22;
  * rather than show a control that does nothing.
  *
  * Send is disabled on an empty message and becomes Stop while the Assistant is
- * answering. The whole bar rides the keyboard through Reanimated's keyboard
+ * answering, once the wait has lasted `WAIT_REVEAL_MS` (until then it stays a disabled Send, so a quick second tap never
+ * cancels the request it just sent). The field takes at most the protocol's characters (`MESSAGE_MAX_CHARS`). The whole bar rides the keyboard through Reanimated's keyboard
  * tracker (UI thread, exact frame, interactive dismissal included) and keeps
  * the home indicator clear when the keyboard is down. As a tab root the
  * screen ends above the tab bar, so the bar measures what sits below it and
@@ -42,16 +45,22 @@ export function AssistantComposer({ value, onChange, onSend, onStop, busy, disab
   const insets = useSafeAreaInsets();
   const { fontScale } = useWindowDimensions();
   const canSend = value.trim().length > 0 && !busy && !disabled;
+  const [stoppable, setStoppable] = useState(false);
+  useEffect(() => {
+    if (!busy) { setStoppable(false); return; }
+    const timer = setTimeout(() => setStoppable(true), WAIT_REVEAL_MS);
+    return () => clearTimeout(timer);
+  }, [busy]);
   const maxHeight = Math.round(LINE_HEIGHT * Math.min(fontScale, 1.6) * COMPOSER_MAX_LINES);
   const opaque = { backgroundColor: p.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: p.edge,
     ...(p.isDark ? {} : { ...styles.barShadow, shadowColor: p.shadow }) };
   return <KeyboardSpace bottomInset={insets.bottom}>
     <ControlSurface material={material} style={styles.bar} opaque={opaque}>
-      <TextInput value={value} onChangeText={onChange} multiline editable={!disabled} placeholder={t(COMPOSER_PLACEHOLDER)} placeholderTextColor={p.tertiary}
+      <TextInput value={value} onChangeText={onChange} multiline editable={!disabled} maxLength={MESSAGE_MAX_CHARS} placeholder={t(COMPOSER_PLACEHOLDER)} placeholderTextColor={p.tertiary}
         accessibilityLabel={t('assistant.composer.label')} accessibilityHint={t('assistant.composer.hint')} accessibilityLanguage={speechLanguage}
         selectionColor={p.primary} keyboardAppearance={p.isDark ? 'dark' : 'light'} textAlignVertical="center"
         style={[styles.input, { color: p.text, maxHeight, lineHeight: LINE_HEIGHT }]} />
-      {busy
+      {busy && stoppable
         ? <PressFeedback accessibilityRole="button" accessibilityLabel={t('assistant.composer.stop')} onPress={onStop} containerStyle={styles.roundSlot} style={styles.round}>
           <View style={[styles.send, { backgroundColor: p.inset }]}><Ionicons name="stop" size={14} color={p.text} accessible={false} /></View>
         </PressFeedback>

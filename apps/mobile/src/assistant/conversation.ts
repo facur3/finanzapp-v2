@@ -1,6 +1,6 @@
 import { isLedgerCurrency, majorStringToMinor, type Account, type Currency, type Entry, type EntryKind, type ReviewDraft } from '@finanzapp/domain';
 import type { AssistantFact } from '../../../../packages/integrations/contracts.js';
-import type { AssistantResultV2, ClarificationField, DroppableField, NavigationIntent, ProposalDraft } from '../../../../packages/integrations/assistant-protocol.js';
+import { PROTOCOL_LIMITS, type AssistantResultV2, type ClarificationField, type DroppableField, type NavigationIntent, type ProposalDraft } from '../../../../packages/integrations/assistant-protocol.js';
 import { factCategory } from '../integrations/evidence.ts';
 import type { LanguageCode } from '../i18n/locale.ts';
 import { translator, type MessageKey, type Translate } from '../i18n/messages.ts';
@@ -23,6 +23,10 @@ import { translator, type MessageKey, type Translate } from '../i18n/messages.ts
  * a thread already on screen follows a language change. The model's words
  * (`AssistantResultV2.message`) and the user's words are content: stored and
  * shown exactly as they arrived, never translated. */
+
+/** The longest message the composer takes: the protocol's own bound on a request's text (UTF-16 units, the validator's),
+ * so a pasted receipt is cut where the person sees it, never refused later as a failure that Reintentar cannot fix. */
+export const MESSAGE_MAX_CHARS: number = PROTOCOL_LIMITS.textChars;
 
 export type AssistantReason = 'unavailable' | 'session' | 'offline' | 'limit' | 'failed' | 'info';
 
@@ -151,7 +155,10 @@ export function conversationReducer(state: ConversationState, action: Conversati
     case 'send': {
       const text = action.text.trim();
       if (!text || state.phase !== 'idle') return state;
-      return { ...state, messages: [...state.messages, { id: id(state, 'u'), role: 'user', text }], composer: '', phase: 'thinking', nextId: state.nextId + 1 };
+      // The reply's place is taken at once, empty and streaming: «Pensando…» until its first word (delta), replaced by the
+      // answer, dropped by a failure or a Stop that arrive before any word.
+      return { ...state, composer: '', phase: 'thinking', nextId: state.nextId + 2, messages: [...state.messages, { id: id(state, 'u'), role: 'user', text },
+        { id: `a-${state.nextId + 1}`, role: 'assistant', status: 'streaming', text: '', content: null }] };
     }
     case 'delta': {
       if (state.phase === 'idle') return state;
@@ -189,9 +196,12 @@ export function conversationReducer(state: ConversationState, action: Conversati
     case 'stop': {
       if (state.phase === 'idle') return state;
       const last = state.messages.at(-1);
-      const messages = last?.role === 'assistant' && last.status === 'streaming'
-        ? last.text ? [...state.messages.slice(0, -1), { ...last, status: 'stopped' as const }] : state.messages.slice(0, -1)
-        : state.messages;
+      if (last?.role === 'assistant' && last.status === 'streaming' && last.text) return { ...state, phase: 'idle', messages: [...state.messages.slice(0, -1), { ...last, status: 'stopped' }] };
+      // Stopped before the first word: nothing of the reply exists, so the question goes back to the composer, as typed, and
+      // its bubble leaves (never an orphan with no answer, note or Reintentar), unless the person has typed since.
+      const messages = last?.role === 'assistant' && last.status === 'streaming' ? state.messages.slice(0, -1) : state.messages;
+      const asked = messages.at(-1);
+      if (asked?.role === 'user' && !state.composer.trim()) return { ...state, phase: 'idle', composer: asked.text, messages: messages.slice(0, -1) };
       return { ...state, phase: 'idle', messages };
     }
     case 'choose': {
@@ -232,8 +242,10 @@ export const SUGGESTIONS = ['assistant.suggestions.whySpentMore', 'assistant.sug
  * knows the question openers of every interface language. */
 export function classifyIntent(text: string): 'explain' | 'parse' {
   const t = text.trim().toLowerCase();
-  if (/[?¿]/.test(t)) return 'explain';
-  return /^(cu[aá]nt[oa]s?|por qu[eé]|c[oó]mo voy|cu[aá]l|qu[eé] tal|how (much|many|am i|is|are)|why|what)\b/.test(t) ? 'explain' : 'parse';
+  if (/^(?:¿|(?:cu[aá]nt[oa]s?|por qu[eé]|c[oó]mo voy|cu[aá]l|qu[eé] tal|how (?:much|many|am i|is|are)|why|what)\b)/.test(t)) return 'explain';
+  // A question mark elsewhere asks only when the sentence states no amount: «Gasté 3.000 en Carrefour, ¿está bien?» is a
+  // movement to record (and sends no facts), «En comida gasté más que en agosto?» a question.
+  return /[?¿]/.test(t) && !/\d/.test(t) ? 'explain' : 'parse';
 }
 
 /** Whether new content should pull the list to its end: only when the reader is already near it. */

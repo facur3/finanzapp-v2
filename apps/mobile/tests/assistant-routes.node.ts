@@ -289,8 +289,9 @@ test('the composer is busy while a request is in flight, streaming grows one mes
   screen = view.render();
   assert.equal(screen.composer.props.busy, true);
   assert.equal(screen.composer.props.value, '');
-  assert.equal(screen.messages.length, 1, 'the user message is in the thread while thinking');
+  assert.equal(screen.messages.length, 2, 'the user message is in the thread while thinking, and the reply\'s place («Pensando…») under it');
   assert.equal(screen.messages[0].text, '¿Por qué gasté más este mes?');
+  assert.deepEqual(find([screen.items[1]], 'AssistantText').map(node => [node.props.text, node.props.status]), [['', 'streaming']], 'the waiting state is reachable');
   assert.equal(scripted.asks[0].action, 'explain', 'a question is explained');
   assert.ok(Array.isArray(scripted.asks[0].facts), 'with on-device evidence');
   assert.equal(scripted.asks[0].currency, 'ARS');
@@ -318,6 +319,23 @@ test('the composer is busy while a request is in flight, streaming grows one mes
   assert.equal(find([screen.items[1]], 'AssistantText')[0].props.status, 'stopped');
   assert.equal(find([screen.items[1]], 'AssistantText')[0].props.text, 'Gastaste más ');
   assert.equal(screen.messages.length, 2);
+});
+
+test('Stop before the first word gives the question back: no orphaned bubble, the words in the composer, the request aborted', async () => {
+  const scripted = scriptedClient();
+  const view = harness({ client: scripted.client });
+  view.render().composer.props.onChange('Gasté 3.000 en el kiosco');
+  view.render().composer.props.onSend();
+  await tick();
+  view.render().composer.props.onStop();
+  assert.equal(scripted.signals[0]?.aborted, true);
+  const screen = view.render();
+  assert.equal(screen.messages.length, 0, 'nothing of the cancelled exchange stays in the thread');
+  assert.equal(screen.composer.props.value, 'Gasté 3.000 en el kiosco', 'the question is back in the composer, as typed');
+  assert.equal(screen.composer.props.busy, false);
+  scripted.reply([{ type: 'result', result: FIXTURE_ANSWER, facts: FIXTURE_FACTS }]);
+  await settle();
+  assert.equal(view.render().messages.length, 0, 'a late reply of the cancelled request is ignored');
 });
 
 test('an answer renders its text and evidence rows/links from the cited facts, and a link opens the FinanzApp screen (a tab root by dismissTo, anything else by push)', async () => {
@@ -1068,7 +1086,7 @@ test('New chat (session.reset) aborts the request in flight and empties the conv
   view.render().composer.props.onSend();
   await tick();
   assert.equal(scripted.asks.length, 2);
-  assert.equal(view.render().messages.map(message => message.id).join(), 'u-2');
+  assert.equal(view.render().messages.map(message => message.id).join(), 'u-3,a-4');
 });
 
 test('leaving the screen does not lose the conversation: mounted again over the same session it shows the thread and the draft words, and opens at the last exchange once', async () => {

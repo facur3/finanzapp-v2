@@ -50,8 +50,10 @@ test('send adds the user message, clears the composer and enters thinking; a bla
   const composed = run([{ type: 'compose', text: '  ' }, { type: 'send', text: '  ' }]);
   assert.equal(composed.messages.length, 0);
   const sent = run([{ type: 'compose', text: 'Gasté 18.500 en Carrefour' }, { type: 'send', text: 'Gasté 18.500 en Carrefour' }]);
-  assert.equal(sent.messages.length, 1);
+  assert.equal(sent.messages.length, 2);
   assert.equal(sent.messages[0].role, 'user');
+  // The reply's place is taken at once: an empty streaming message the screen draws as «Pensando…».
+  assert.deepEqual(sent.messages[1], { id: 'a-2', role: 'assistant', status: 'streaming', text: '', content: null });
   assert.equal(sent.composer, '');
   assert.equal(sent.phase, 'thinking');
   // A second send while the first is in flight does nothing.
@@ -74,9 +76,17 @@ test('streaming grows one assistant message in place, the answer finalizes it an
   assert.equal(stopped.phase, 'idle');
   assert.equal(stopped.messages[1].role === 'assistant' && stopped.messages[1].status, 'stopped');
   assert.equal(stopped.messages[1].text, 'Gastaste $84.300 más');
-  // Stopping before any token arrived leaves no empty bubble behind.
+  // Stopping before any token arrived leaves no empty bubble and no orphaned question: the words go back to the composer.
   const early = run([{ type: 'send', text: 'hola' }, { type: 'stop' }]);
-  assert.equal(early.messages.length, 1);
+  assert.equal(early.messages.length, 0);
+  assert.equal(early.composer, 'hola');
+  assert.equal(early.phase, 'idle');
+  const thread = run([{ type: 'send', text: 'primera' }, { type: 'answer', text: 'ok', content: null }, { type: 'send', text: 'segunda' }, { type: 'stop' }]);
+  assert.deepEqual(thread.messages.map(message => message.text), ['primera', 'ok'], 'only the stopped question leaves');
+  assert.equal(thread.composer, 'segunda');
+  // Typed since: the new words are never overwritten; the question stays in the thread.
+  const typed = run([{ type: 'send', text: 'hola' }, { type: 'compose', text: 'otra cosa' }, { type: 'stop' }]);
+  assert.deepEqual([typed.messages.map(message => message.role).join(), typed.composer], ['user', 'otra cosa']);
 });
 
 test('a disconnected build keeps the exact text in the composer and shows one calm note; a remote failure keeps the message and offers retry', () => {
@@ -110,6 +120,14 @@ test('questions are explained against evidence; sentences are parsed as actions'
   assert.equal(classifyIntent('Cómo voy con el presupuesto'), 'explain');
   assert.equal(classifyIntent('Registrar un gasto'), 'parse');
   assert.equal(classifyIntent('Gasté 18.500 en Carrefour con la Visa'), 'parse');
+  // A question mark alone does not make a question: a movement with an amount stays a movement (and sends no facts).
+  assert.equal(classifyIntent('Gasté 3.000 en Carrefour con la Visa, ¿está bien?'), 'parse');
+  assert.equal(classifyIntent('Spent 3000 at Carrefour, right?'), 'parse');
+  assert.equal(classifyIntent('¿Cuánto gasté en comida?'), 'explain');
+  assert.equal(classifyIntent('¿Gasté más de 50000 en comida?'), 'explain', 'an opening ¿ asks, amount or not');
+  assert.equal(classifyIntent('Did I spend more on food?'), 'explain');
+  assert.equal(classifyIntent('En comida gasté más que en agosto?'), 'explain');
+  assert.equal(classifyIntent('What did I spend in 2026?'), 'explain');
 });
 
 test('autoscroll follows new content only when the reader is already near the end', () => {
