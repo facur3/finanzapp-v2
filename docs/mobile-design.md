@@ -135,9 +135,9 @@ título grande 34, título 22, encabezado 17/600, cuerpo 17, subtítulo 15, nota
 etiqueta 12. Números siempre tabulares. **Importes responsivos:** un importe es
 siempre una sola línea; uno corto queda grande y uno largo se achica para caber,
 nunca se corta ni se parte. El héroe calcula su tamaño en JavaScript, con un piso de
-la mitad; una fila deja el ajuste a iOS, que achica hasta 4 pt (el piso nativo de
-React Native: `minimumFontScale` solo se lee en Android), por eso una fila se apila
-antes de achicarse (`rowStacks`). Dynamic Type: un importe de fila hasta 53 pt (el cuerpo
+la mitad; desde 25T una fila también se ajusta en JavaScript, con un piso de 13 pt (y un
+segmento con uno de 11 pt), en lugar del piso nativo de 4 pt de iOS (`minimumFontScale`
+solo se lee en Android); una fila se apila antes de achicarse (`rowStacks`). Dynamic Type: un importe de fila hasta 53 pt (el cuerpo
 en AX5); un héroe hasta 1,4× o 53 pt, lo que sea mayor, ajustado al ancho, así que desde
 AX3 un importe largo puede verse tan grande como el mes de Inicio; todo otro texto hasta
 el tamaño que iOS da a su estilo en AX5 (25D1, `geometry.ts`). El campo
@@ -889,6 +889,22 @@ La selección de porciones dentro de la dona (solo visual, dentro del reporte) *
 barras de Día a día y una cabecera fija sólida. Siguen permitidos para una pasada siguiente; no hay ruta de detalle por comercio. El orden
 vinculante del roadmap no cambia: la próxima entrega de producto es 24T3; 24UX6C (Movimientos y Más) y 24UX6D
 (Tarjetas) siguen a 24UX6B en el carril UX, y su lugar frente a 24T3 lo decide el dueño (ver `docs/mobile-roadmap.md`).
+
+## Producto 25T — textos y el pulido restante (en su rama, sobre 25A-UI)
+
+- **Una palabra, un significado.** «Disponible» es solo el dinero registrado de Inicio (lo que resta de un presupuesto es
+  «Queda», el de una tarjeta «Crédito disponible»); «Pago» es saldar una tarjeta o una deuda (cómo se paga una compra es
+  «Cómo se paga»); los botones guardan («Guardar …»), los títulos nombran («Nuevo …», «Registrar …») y las acciones de
+  alta agregan («Agregar …»), nunca «Crear». La voz del sistema es impersonal («No se pudo…»), nunca «nosotros». Un
+  solo texto para reintentar. Glosario en `apps/mobile/i18n/glossary.json`.
+- **Menos texto.** Las notas fijas bajo los campos de presupuestos, recurrentes y categorías pasan a una línea o detrás
+  de ⓘ; Deudas dice una sola vez que un pago no es gasto ni ingreso; Copia de seguridad, dos líneas.
+- **Aumentar contraste.** Las líneas, los bordes de controles, el borde del dock, la pista del switch apagado y el texto
+  terciario suben a 3:1 o más cuando está activado; rellenos, marca y semánticos no cambian.
+- **Tamaños extremos.** Los importes de fila y las etiquetas de segmentos se ajustan con pisos legibles; los totales de
+  Deudas se apilan antes de achicarse; un segmento nunca es más ancho que su parte de la pista a 320 pt.
+- **Movimiento.** Presupuestos funde el mes como Reportes; las secciones de Deudas reacomodan sus filas; la dona barre
+  solo si se monta con Reportes al frente; el héroe nace ajustado a su ancho.
 
 ## Producto 25A-UI — la interfaz del Asistente (en su rama, sobre 25D2)
 
@@ -3447,6 +3463,8 @@ crédito, marca elegida) y los filetes de las píldoras, el chip y el compositor
 color propio.
 
 ## Pendiente de revisión en iPhone
+
+- Producto 25T, en el hito M2: Aumentar contraste, AX3/AX5, 320 pt, el movimiento nuevo y los textos (docs/mobile-device-checklist.md, «Producto 25T»).
 
 - Producto 25A-UI, en el hito M2: la espera, Detener, el teclado, el build desconectado y la revisión (docs/mobile-device-checklist.md, «Producto 25A-UI»).
 

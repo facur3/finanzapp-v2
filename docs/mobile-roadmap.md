@@ -1,6 +1,8 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-17 (**25A-UI — the Assistant's interface**, on its branch stacked on #122: a visible and safe wait,
+Updated: 2026-10-17 (**25T — copy and the remaining polish**, on its branch stacked on #123: one meaning per term,
+impersonal system messages, less standing text, Increase Contrast, legible extremes, one motion language; «Producto
+25T»). Before (**25A-UI — the Assistant's interface**, PR #123, stacked on #122: a visible and safe wait,
 a thread that follows the keyboard, a disconnected build that says what is true, answers that say what they cover;
 «Producto 25A-UI»). Before (**25D2 — VoiceOver and Voice Control**, PR #122, stacked on #121: the Assistant and every
 ledger outcome spoken on iOS, in-place changes announced, names that match the visible words, one stop per row;
@@ -449,7 +451,9 @@ history file keeps the evidence of when and why.
 
 ## 1. Implemented (current state)
 
-- **25A-UI — the Assistant's interface (on its branch, stacked on #122).** «Producto 25A-UI». The wait, Stop, the
+- **25T — copy and the remaining polish (on its branch, stacked on #123).** «Producto 25T». The glossary applied,
+  impersonal messages, less text, Increase Contrast, extremes and motion.
+- **25A-UI — the Assistant's interface (PR #123, stacked on #122).** «Producto 25A-UI». The wait, Stop, the
   keyboard follow, the disconnected build, coverage captions and the review editor's states.
 - **25D2 — VoiceOver and Voice Control (PR #122, stacked on #121).** «Producto 25D2». The Assistant and the
   outcomes of writes spoken on iOS, in-place changes announced, Voice Control names, one stop per row.
@@ -1031,7 +1035,8 @@ item unless a section says a new native build is needed. The checklist sections 
   symbol and cents on the sand, «Otras», the chosen colour's check, Enviar/Detener, the currency chips and the date
   sheet. Device QA no longer follows each change: the steps below accumulate for a milestone session over the critical
   journeys, then a final regression. A test that passes never counts as a device result.
-- **25A-UI (on its branch, stacked on #122):** the checklist's «Producto 25A-UI», in M2.
+- **25T (on its branch, stacked on #123):** the checklist's «Producto 25T», in M2.
+- **25A-UI (PR #123, stacked on #122):** the checklist's «Producto 25A-UI», in M2.
 - **25D2 (PR #122, stacked on #121):** the checklist's «Producto 25D2», in M2 (VoiceOver and Voice Control).
 - **25R1 (PR #121, stacked on #120):** the checklist's «Producto 25R1», in M2.
 - **25N1 (PR #120, stacked on #119):** the checklist's «Producto 25N1», in milestone **M2** (with 25D2), in a QA
@@ -4688,7 +4693,30 @@ nothing of it is on a screen yet.
   passed, 0 failed; `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0 errors, 0 stale; `check` OK;
   `export:ios` OK. No account, handle, ad account or campaign created.
 
-### Producto 25A-UI — the Assistant's interface (this PR, stacked on #122)
+### Producto 25T — copy and the remaining polish (this PR, stacked on #123)
+
+- **Why.** The register's copy group and the remaining visual polish: one meaning per term, impersonal system messages,
+  less standing text, Increase Contrast, legible amounts and segments at the extremes, motion as one language.
+- **Copy.** The glossary (`apps/mobile/i18n/glossary.json`, docs/mobile-design.md «Una palabra, un significado»):
+  «Disponible» only for Inicio's recorded money («Queda», «Crédito disponible», «Devolver todo» elsewhere); «Pago» only
+  settling a card or a debt («Cómo se paga» for a purchase); «Guardar …» / «Nuevo …», «Registrar …» / «Agregar …», never
+  «Crear»; about 75 Spanish and 77 English strings made impersonal; one shared retry note; developer vocabulary out;
+  standing notes reduced to one line or behind ⓘ; the debt screens say once that a payment is not spending or income;
+  the comparison footer behind ⓘ; the no-match line names «comercio». Tests pin the glossary, the impersonal voice and
+  the banned words.
+- **Deliberate changes.** A debt's payments show the counterparty's current name (nothing stored is rewritten; a test's
+  golden flipped on purpose); the domain's thrown sentences changed wording («obligación» → «tarjeta o deuda», «No
+  encontramos…» → «No se encontró…») with the errors catalogue and their tests updated together, behaviour unchanged.
+- **Polish.** Increase Contrast variants (lines, edges, the dock rim, the off switch track, tertiary text ≥ 3:1); row
+  amounts and segment labels fitted in JavaScript with 13 pt and 11 pt floors; Deudas' totals stack; segments never wider
+  than their share at 320 pt; the Assistant's draft card stacks above 1.2×; Presupuestos fades its month; Deudas'
+  sections reflow; the donut sweeps only when mounted in front; the hero is fitted before its first measurement; the
+  recurring wheel starts at today; the first opening's sample figures scale for small-unit currencies.
+- **Not in this delivery.** Bold Text and Smart Invert (device first); a visible rate-age cue and the paused rule's date
+  initialisation (owner decisions); an action sheet for the blocked-delete choices; «Principal» (an es-AR reader); drag
+  to dismiss the date sheet.
+
+### Producto 25A-UI — the Assistant's interface (PR #123, stacked on #122)
 
 - **Why.** The register's Assistant-interface group: a wait that was invisible and a Stop that shared Send's place, a
   thread that lost its end under the keyboard, a disconnected build that promised more than it kept, answers that did

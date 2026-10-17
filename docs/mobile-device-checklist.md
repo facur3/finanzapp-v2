@@ -57,6 +57,26 @@ copies' locations (25Q4 step 9 needs Xcode's Devices window), the cold links of 
 merges `master` and keeps its CI green before its own merge; never a force-push). A failure fixes forward on the branch
 it belongs to and the stack above merges it in.
 
+## Producto 25T — copy and the remaining polish (on its branch, stacked on 25A-UI; milestone M2)
+
+Metro from this branch in a QA profile. The version line reads «FinanzApp 0.1.0 (25T)».
+
+1. **Increase Contrast on, light and dark:** hairlines in Movimientos and Cuentas, field edges in Nuevo gasto, grouped
+   surfaces and cards, the segmented thumb, an off switch, the dock rim, placeholders and chevrons: visible, never drawn
+   twice where iOS already strengthens them.
+2. **AX3 and AX5 on a 375 pt iPhone:** the Assistant's draft card puts each value under its label; «Para revisar» rows
+   are inset; a 13-digit row amount stays at 13 pt or more and never ends in «…»; Deudas with two 8-digit totals shows
+   both at 22 pt, stacked.
+3. **320 pt (SE or Display Zoom › Larger Text):** Movimientos' four filters sit inside the track with the thumb under
+   the chosen one (English too); «Otra» in En cuotas is whole and tappable; segment labels read at 11 pt or more.
+4. **Motion:** Presupuestos' arrows fade the month and nothing below moves; closing or reopening a debt moves its row
+   between sections; launch on Inicio, then open Reportes: the donut is already complete, and switching Día a día ›
+   Categorías sweeps once; Inicio with a seven-digit hero: Gastado ⇄ Disponible with no size step.
+5. **Copy:** a failed save shows the shared retry line; a debt's swipe says «Saldar», a receivable's «Cobrar»; a card
+   reads «Crédito disponible»; a card purchase «Cómo se paga»; renaming a counterparty renames its payment rows; Comparar's
+   ⓘ holds the footer text; Copia de seguridad shows two lines; the «Próxima fecha» wheel stops at today; no «Crear»
+   and no «No pudimos…» anywhere.
+
 ## Producto 25A-UI — the Assistant's interface (on its branch, stacked on 25D2; milestone M2)
 
 Metro from this branch in a QA profile; steps 1–6 with `EXPO_PUBLIC_ASSISTANT_FIXTURES=1`, step 7 without it. The
