@@ -126,6 +126,10 @@ function harness({ client, accounts = [visa, cash, usd], cards = [], data = entr
   const dismissed: any[] = [];
   let uuids = 0;
   const subscriptions: unknown[] = [];
+  // What the screen component itself reads from the session (not its local components): React re-renders it only when one
+  // of these changes identity.
+  const screenReads: (() => unknown)[] = [];
+  let drawingScreen = false;
   const scrolled: any[] = [];
   const haptics: string[] = [];
   const announced: string[] = [];
@@ -141,7 +145,7 @@ function harness({ client, accounts = [visa, cash, usd], cards = [], data = entr
       useRef: (initial: unknown) => { const index = slot(() => ({ current: initial })); return state[index]; },
       useMemo: (fn: () => unknown) => fn(), useCallback: (fn: unknown) => fn,
       // The screen reads the app session through useSyncExternalStore: every render reads its current state.
-      useSyncExternalStore: (subscribe: unknown, getSnapshot: () => unknown) => { subscriptions.push(subscribe); return getSnapshot(); },
+      useSyncExternalStore: (subscribe: unknown, getSnapshot: () => unknown) => { subscriptions.push(subscribe); if (drawingScreen) screenReads.push(getSnapshot); return getSnapshot(); },
       // Like React: an effect runs on mount and again only when a dependency changed, after its previous
       // cleanup. So an effect that aborted the request on a language change (deps [t]) would really abort here.
       useEffect: (fn: () => unknown, deps?: unknown[]) => {
@@ -187,7 +191,7 @@ function harness({ client, accounts = [visa, cash, usd], cards = [], data = entr
     '../src/ui/liability-presentation': liabilityPresentation,
     '../src/ui/money-input': moneyInput,
     // 25D2: what VoiceOver is told, in order (motion.tsx's `announce`; its iOS-only queue is tested in motion.node.ts).
-    '../src/ui/motion': { Appear: 'Appear', impactHaptic: () => haptics.push('impact'), announce: (text: string) => announced.push(text) },
+    '../src/ui/motion': { Appear: 'Appear', Restored: 'Restored', impactHaptic: () => haptics.push('impact'), announce: (text: string) => announced.push(text) },
     '../src/ui/presentation': presentation,
     '../src/ui/theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, useCurrentDay: () => '2026-09-21', useReduceMotion: () => reduced,
       usePalette: () => ({ background: '#F2F2F6', warning: '#B45309', warningSoft: '#FCF1E0', isDark: false }) },
@@ -199,7 +203,10 @@ function harness({ client, accounts = [visa, cash, usd], cards = [], data = entr
   } });
   const render = () => {
     cursor = 0;
+    screenReads.length = 0;
+    drawingScreen = true;
     const root = module.exports.default!();
+    drawingScreen = false;
     const list = nodes(root).find(node => node.type === 'FlatList')!;
     // Give the list a ref so scrollToEnd can be observed, then render each message through renderItem.
     list.props.ref.current = { scrollToEnd: (options: unknown) => scrolled.push(options) };
@@ -211,13 +218,15 @@ function harness({ client, accounts = [visa, cash, usd], cards = [], data = entr
   /** Leave the screen: React runs the effects' cleanups and drops the component's state; the app session stays. */
   const unmount = () => { for (const cleanup of effects.splice(0)) cleanup(); state.length = 0; };
   const refocus = () => { for (const effect of focusEffects) { const cleanup = effect(); if (typeof cleanup === 'function') effects.push(cleanup as () => void); } };
-  return { render, unmount, refocus, session, review, subscriptions, pushed, storeAtPush, navigated, dismissed, scrolled, haptics, announced, effects, setLocale: (next: AppLocale) => { i18n = bindLocale(next, 'none', deviceLanguage); } };
+  return { render, unmount, refocus, session, review, subscriptions, screenReads, pushed, storeAtPush, navigated, dismissed, scrolled, haptics, announced, effects, setLocale: (next: AppLocale) => { i18n = bindLocale(next, 'none', deviceLanguage); } };
 }
 function nodes(value: any): Node[] {
   if (!value || typeof value !== 'object') return [];
   if (Array.isArray(value)) return value.flatMap(nodes);
   if (!value.props) return [];
-  return [value, ...nodes(value.props.children), ...nodes(value.props.ListEmptyComponent), ...nodes(value.props.note)];
+  // A local component of the screen (the composer's own subscription) is drawn in place, as React would.
+  const own = typeof value.type === 'function' ? nodes(value.type(value.props)) : [];
+  return [value, ...own, ...nodes(value.props.children), ...nodes(value.props.ListEmptyComponent), ...nodes(value.props.note)];
 }
 const tick = () => new Promise(resolve => setTimeout(resolve, 0));
 const settle = async () => { for (let i = 0; i < 6; i++) await tick(); };
@@ -902,7 +911,9 @@ test('a draft without a payment method asks with the accounts of that currency; 
   choices.props.onChoose(choices.props.options[1]);
   screen = view.render();
   assert.deepEqual(screen.messages.map(message => message.role), ['user', 'assistant', 'user', 'assistant']);
-  assert.equal(find([screen.items[1]], 'ClarificationChoices')[0].props.chosen, 'cash');
+  const asked = screen.messages[1];
+  assert.equal(asked.role === 'assistant' && asked.content?.kind === 'clarification' && asked.content.chosen, 'cash');
+  assert.equal(find([screen.items[1]], 'ClarificationChoices').length, 0, 'an answered question offers no chips');
   assert.equal(find([screen.items[2]], 'UserMessage')[0].props.text, 'Efectivo');
   await settle();
   const card = find([view.render().items[3]], 'ProposalCard')[0];
@@ -920,7 +931,21 @@ test('a draft without a payment method asks with the accounts of that currency; 
   await settle();
   const item = view2.render().items[1];
   assert.equal(find([item], 'AssistantText')[0].props.text, '¿Este mes o el año?');
-  assert.deepEqual(find([item], 'ClarificationChoices')[0].props.options, []);
+  assert.equal(find([item], 'ClarificationChoices').length, 0);
+  // Even with candidates the device sent, a chip of the model's question would only echo its label (a request carries no
+  // previous turn), so it offers none: the person answers by typing.
+  const third = scriptedClient();
+  const view3 = harness({ client: third.client });
+  view3.render().empty.props.onPick('¿Cuánto gasté en eso?');
+  await tick();
+  third.reply([{ type: 'result', facts: FIXTURE_FACTS, result: { type: 'clarification', message: '¿En cuál de estas?', evidenceIds: [], navigation: null, proposals: [],
+    clarification: { field: 'category', candidateIds: FIXTURE_FACTS.filter(fact => fact.id.includes('category')).map(fact => fact.id).slice(0, 2) } } }]);
+  await settle();
+  const modelAsked = view3.render();
+  const content = modelAsked.messages[1].role === 'assistant' ? modelAsked.messages[1].content : null;
+  assert.ok(content?.kind === 'clarification' && content.options.length > 0, 'the candidates are known');
+  assert.equal(find([modelAsked.items[1]], 'ClarificationChoices').length, 0, 'but no echo-only chips are drawn');
+  assert.equal(third.asks.length, 1);
 });
 
 test('25A-05: an out-of-scope reply is the model\'s words alone, and the region is the interface\'s when the ask is sent', async () => {
@@ -1035,23 +1060,66 @@ test('the fixture client shows a visible test banner, and its proposal is a prev
   assert.equal(find([view.render().items[1]], 'ProposalCard')[0].props.content.status, 'preview');
 });
 
-test('autoscroll follows only a reader who is near the end, and Reduce Motion scrolls without animation', () => {
+/** A scroll event as the list reports it: the offset, the content and the viewport of that moment. */
+const scrolledTo = (y: number, content: number, viewport: number) => ({ nativeEvent: { contentOffset: { y }, contentSize: { height: content }, layoutMeasurement: { height: viewport } } });
+
+test('autoscroll follows only a reader who is at the end, decided by their own scrolls; Reduce Motion scrolls without animation', () => {
   const view = harness({ client: disconnectedAssistant() });
   const { list } = view.render();
   list.props.onLayout({ nativeEvent: { layout: { height: 600 } } });
   list.props.onContentSizeChange(0, 400);
-  assert.equal(view.scrolled.length, 2, 'short content: always at the end');
-  list.props.onScroll({ nativeEvent: { contentOffset: { y: 200 } } });
+  assert.equal(view.scrolled.length, 1, 'short content: always at the end');
+  // The reader drags up to read: a new message does not pull the list down.
+  list.props.onScrollBeginDrag(scrolledTo(150, 1600, 600));
+  list.props.onScroll(scrolledTo(200, 1600, 600));
+  list.props.onScrollEndDrag(scrolledTo(200, 1600, 600));
   list.props.onContentSizeChange(0, 1700);
-  assert.equal(view.scrolled.length, 2, 'scrolled up to read: a new message does not pull the list down');
-  list.props.onScroll({ nativeEvent: { contentOffset: { y: 1150 } } });
+  assert.equal(view.scrolled.length, 1, 'scrolled up to read: a new message does not pull the list down');
+  // A scroll the list makes on its own (no drag) never decides: only the reader's own scrolls do.
+  list.props.onScroll(scrolledTo(1100, 1700, 600));
+  list.props.onContentSizeChange(0, 1750);
+  assert.equal(view.scrolled.length, 1);
+  // Back at the end with a flick (its momentum ends there): followed again, animated.
+  list.props.onScrollBeginDrag(scrolledTo(600, 1750, 600));
+  list.props.onScrollEndDrag(scrolledTo(900, 1750, 600));
+  list.props.onMomentumScrollBegin(scrolledTo(900, 1750, 600));
+  list.props.onMomentumScrollEnd(scrolledTo(1150, 1750, 600));
   list.props.onContentSizeChange(0, 1800);
-  assert.equal(view.scrolled.length, 3);
+  assert.equal(view.scrolled.length, 2);
   assert.equal(JSON.stringify(view.scrolled.at(-1)), JSON.stringify({ animated: true }));
   const still = harness({ client: disconnectedAssistant(), reduced: true });
   const reducedList = still.render().list;
   reducedList.props.onLayout({ nativeEvent: { layout: { height: 600 } } });
+  reducedList.props.onContentSizeChange(0, 900);
   assert.equal(JSON.stringify(still.scrolled.at(-1)), JSON.stringify({ animated: false }));
+});
+
+test('the keyboard rising keeps a reader at the end at the end, in lockstep and never animated; a reader who scrolled up stays put', () => {
+  const view = harness({ client: disconnectedAssistant() });
+  const { list } = view.render();
+  list.props.onLayout({ nativeEvent: { layout: { height: 600 } } });
+  list.props.onContentSizeChange(0, 1700);
+  list.props.onScrollBeginDrag(scrolledTo(1000, 1700, 600));
+  list.props.onScrollEndDrag(scrolledTo(1100, 1700, 600));
+  const before = view.scrolled.length;
+  // The keyboard rises: the viewport shrinks frame by frame (600 → 298). The old rule measured the shrunk viewport against
+  // the old offset (1700 − 298 − 1100 = 302 > 80) and left the newest reply under the composer.
+  for (const height of [560, 470, 380, 298]) list.props.onLayout({ nativeEvent: { layout: { height } } });
+  assert.equal(view.scrolled.length - before, 4, 'one scroll per viewport change');
+  assert.ok(view.scrolled.slice(before).every(options => JSON.stringify(options) === JSON.stringify({ animated: false })), 'in lockstep with the keyboard, never animated');
+  // The same layout again (nothing changed) does not scroll.
+  list.props.onLayout({ nativeEvent: { layout: { height: 298 } } });
+  assert.equal(view.scrolled.length - before, 4);
+  // A reader who scrolled up to read is never pulled down by the keyboard.
+  const reader = harness({ client: disconnectedAssistant() });
+  const other = reader.render().list;
+  other.props.onLayout({ nativeEvent: { layout: { height: 600 } } });
+  other.props.onContentSizeChange(0, 1700);
+  other.props.onScrollBeginDrag(scrolledTo(500, 1700, 600));
+  other.props.onScrollEndDrag(scrolledTo(300, 1700, 600));
+  const count = reader.scrolled.length;
+  for (const height of [470, 298]) other.props.onLayout({ nativeEvent: { layout: { height } } });
+  assert.equal(reader.scrolled.length, count);
 });
 
 test('New chat (session.reset) aborts the request in flight and empties the conversation; a late event from it is ignored', async () => {
@@ -1114,7 +1182,8 @@ test('leaving the screen does not lose the conversation: mounted again over the 
   assert.equal(again.scrolled.length, 0, 'the viewport is not measured yet: no jump and no animated follow of a long thread');
   screen.list.props.onLayout({ nativeEvent: { layout: { height: 600 } } });
   assert.equal(JSON.stringify(again.scrolled), JSON.stringify([{ animated: false }]), 'one jump to the last exchange, not an animated scroll');
-  screen.list.props.onScroll({ nativeEvent: { contentOffset: { y: 200 } } });
+  screen.list.props.onScrollBeginDrag(scrolledTo(400, 2000, 600));
+  screen.list.props.onScrollEndDrag(scrolledTo(200, 2000, 600));
   screen.list.props.onContentSizeChange(0, 2100);
   assert.equal(again.scrolled.length, 1, 'the jump happens once: a reader who scrolled up is not pulled down again');
   // Measured the other way round (layout first, over a list whose content is not measured yet), the jump is still the one non-animated scroll of the long thread.
@@ -1123,9 +1192,10 @@ test('leaving the screen does not lose the conversation: mounted again over the 
   otherList.props.onLayout({ nativeEvent: { layout: { height: 600 } } });
   otherList.props.onContentSizeChange(0, 2000);
   assert.equal(JSON.stringify(other.scrolled.at(-1)), JSON.stringify({ animated: false }));
+  assert.equal(other.scrolled.length, 1, 'one non-animated jump');
+  // After the jump the reader is at the end: new content is followed as usual.
   otherList.props.onContentSizeChange(0, 2100);
-  assert.equal(JSON.stringify(other.scrolled.at(-1)), JSON.stringify({ animated: false }), 'no further scroll after the jump for a reader at the top');
-  assert.equal(other.scrolled.filter(options => JSON.stringify(options) === JSON.stringify({ animated: false })).length, 1);
+  assert.equal(JSON.stringify(other.scrolled.slice(1)), JSON.stringify([{ animated: true }]));
   // A first visit never jumps: the list starts empty.
   const first = harness({ client: disconnectedAssistant() });
   const list = first.render().list;
@@ -1133,6 +1203,43 @@ test('leaving the screen does not lose the conversation: mounted again over the 
   list.props.onContentSizeChange(0, 2000);
   assert.equal(first.scrolled.length, 1);
   assert.equal(JSON.stringify(first.scrolled[0]), JSON.stringify({ animated: true }), 'the short empty content followed as usual, not the returning jump');
+});
+
+test('typing re-renders only the composer: a keystroke changes nothing the screen reads, so the thread and its cells stay as they are', async () => {
+  const scripted = scriptedClient();
+  const view = harness({ client: scripted.client });
+  view.render().empty.props.onPick('¿Por qué gasté más este mes?');
+  await tick();
+  scripted.reply([{ type: 'result', result: FIXTURE_ANSWER, facts: FIXTURE_FACTS }]);
+  await settle();
+  view.render();
+  const reads = [...view.screenReads];
+  const before = reads.map(read => read());
+  assert.ok(reads.length > 0);
+  view.render().composer.props.onChange('Y en comida');
+  assert.ok(reads.every((read, index) => Object.is(read(), before[index])), 'no snapshot of the screen changed identity on a keystroke');
+  assert.equal(view.render().composer.props.value, 'Y en comida', 'the composer reads the words itself');
+  view.render().composer.props.onSend();
+  assert.ok(reads.some((read, index) => !Object.is(read(), before[index])), 'a send does change what the screen reads');
+});
+
+test('a reopened conversation does not replay its entrances: rows already there skip them, a new message still arrives', async () => {
+  const scripted = scriptedClient();
+  const view = harness({ client: scripted.client });
+  view.render().empty.props.onPick('Gasté 18 mil en el súper');
+  await tick();
+  scripted.reply([{ type: 'result', result: FIXTURE_ANSWER, facts: FIXTURE_FACTS }]);
+  await settle();
+  assert.deepEqual(view.render().items.map(item => item.type), ['Appear', 'View'], 'the first visit: arrivals animate');
+  view.unmount();
+  const again = harness({ client: scripted.client, session: view.session });
+  assert.deepEqual(again.render().items.map(item => item.type), ['Restored', 'Restored'], 'history is wrapped so it skips its entrance');
+  again.render().composer.props.onChange('Y en comida?');
+  again.render().composer.props.onSend();
+  await tick();
+  const items = again.render().items;
+  assert.deepEqual(items.map(item => item.type), ['Restored', 'Restored', 'Appear', 'View'], 'what arrives after the mount still animates');
+  assert.equal(items[0].props.children.type, 'Appear', 'the row itself is unchanged inside the wrapper');
 });
 
 test('an answer streaming while the screen is closed still lands in the session, and a capture that finishes while it is closed lands once', async () => {

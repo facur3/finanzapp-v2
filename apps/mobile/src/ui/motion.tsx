@@ -1,6 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { AccessibilityInfo, Platform, type StyleProp, type ViewStyle } from 'react-native';
-import Animated, { Easing, FadeIn, FadeInUp, FadeOut, LinearTransition, ReduceMotion, cubicBezier, type WithTimingConfig } from 'react-native-reanimated';
+import Animated, { Easing, FadeIn, FadeInUp, FadeOut, LayoutAnimationConfig, LinearTransition, ReduceMotion, cubicBezier, type WithTimingConfig } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useReduceMotion } from './theme';
 
@@ -158,4 +158,10 @@ export function Reflow({ children, style, fade = false }: { children: ReactNode;
 export function Appear({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
   const reduced = useReduceMotion();
   return <Animated.View style={style} entering={reduced ? fadeIn : rise} exiting={fadeOut}>{children}</Animated.View>;
+}
+
+/** Content that was already there when its screen mounted (a conversation reopened): whatever arrives inside it skips its
+ * entrance, since nothing is arriving. Exits and later changes still animate. */
+export function Restored({ children }: { children: ReactNode }) {
+  return <LayoutAnimationConfig skipEntering>{children}</LayoutAnimationConfig>;
 }

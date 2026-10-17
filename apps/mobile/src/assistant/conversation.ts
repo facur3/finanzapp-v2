@@ -144,7 +144,7 @@ const id = (state: ConversationState, prefix: string) => `${prefix}-${state.next
 /** 25A-05: whether a tapped clarification owns the parked draft. The draft is parked by the newest assistant message
  * (an answer or a chosen option always replaces it), so a chip on an older clarification only repeats its words: it
  * never completes, clears or changes the draft parked behind a newer question. */
-export function ownsPending(state: ConversationState, messageId: string): boolean {
+export function ownsPending(state: Pick<ConversationState, 'messages' | 'pending'>, messageId: string): boolean {
   return state.pending !== null && state.messages.findLast(message => message.role === 'assistant')?.id === messageId;
 }
 
