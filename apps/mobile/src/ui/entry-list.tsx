@@ -4,7 +4,7 @@ import { type Account, type Entry, type Transfer } from '@finanzapp/domain';
 import { AppText, MovementRow, type RowContext } from './components';
 import { useI18n } from '../i18n/provider';
 import { activityDateLabel, dayNetMinor, groupActivity, mergeActivity, type ActivityItem } from './presentation';
-import { useCurrentDay, usePalette } from './theme';
+import { radius, useCurrentDay, usePalette } from './theme';
 import { useDockInset } from './dock-clearance';
 
 export function EntryList({ entries, transfers, accounts, accountId, header, empty, footer, context, dayNet = true }: {
@@ -47,8 +47,8 @@ export function EntryList({ entries, transfers, accounts, accountId, header, emp
       </View>;
     }}
     renderItem={({ item, index, section }) => <View style={{ backgroundColor: p.surface, overflow: 'hidden',
-      borderTopLeftRadius: index === 0 ? 16 : 0, borderTopRightRadius: index === 0 ? 16 : 0,
-      borderBottomLeftRadius: index === section.data.length - 1 ? 16 : 0, borderBottomRightRadius: index === section.data.length - 1 ? 16 : 0 }}>
+      borderTopLeftRadius: index === 0 ? radius.group : 0, borderTopRightRadius: index === 0 ? radius.group : 0,
+      borderBottomLeftRadius: index === section.data.length - 1 ? radius.group : 0, borderBottomRightRadius: index === section.data.length - 1 ? radius.group : 0 }}>
       <MovementRow item={item} accounts={accounts} accountId={accountId} showDate={false} last={index === section.data.length - 1} context={context} />
     </View>} />;
 }

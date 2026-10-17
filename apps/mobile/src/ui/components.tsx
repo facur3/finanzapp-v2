@@ -969,3 +969,6 @@ const styles = StyleSheet.create({
   navigationGlyph: { width: 30, alignItems: 'center' },
   selectionRow: { minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 10 },
 });
+
+/** The geometry of a list row (EntryRow, AccountRow, TransferRow), for a row drawn elsewhere (DebtRow). */
+export const rowStyle = styles.row;

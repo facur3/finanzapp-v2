@@ -243,3 +243,18 @@ test('the type scale, radii and spacing are pure tokens, pinned: the scale desce
   assert.deepEqual(radius, { chip: 14, tile: 12, group: 16, card: 20, sheet: 24, creditCard: 18, button: 14 });
   assert.deepEqual(space, { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 });
 });
+
+test('the account, debt and recurring screens draw the scale and the radii from tokens, and DebtRow shares the list row', () => {
+  const read = (path: string) => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
+  for (const file of ['app/accounts.tsx', 'src/ui/entry-list.tsx']) {
+    assert.equal(/Radius: [^,}]*\? 16 :/.test(read(file)), false, `${file}: a grouped corner is radius.group`);
+    assert.equal((read(file).match(/\? radius\.group : 0/g) ?? []).length, 4, `${file}: the four corners of a grouped section`);
+  }
+  // A note under a form is a footnote (13/18), the same as the debt form's; a caption over a control is footnote at 500, as Field's.
+  for (const file of ['app/new-account.tsx', 'app/edit-account/[id].tsx', 'src/ui/recurring-form.tsx']) {
+    assert.equal(/fontSize: 1[34]\b/.test(read(file)), false, `${file}: no raw 13 or 14 pt beside the type scale`);
+  }
+  assert.match(read('src/ui/recurring-form.tsx'), /<AppText secondary variant="footnote" style=\{\{ fontWeight: '500' \}\}>\{t\('recurring\.form\.frequency'\)\}/);
+  assert.match(read('src/ui/liability-rows.tsx'), /style=\{\[rowStyle, \{ borderBottomWidth/, 'DebtRow reuses the list row geometry');
+  assert.equal(/paddingVertical: 12, paddingHorizontal: 16, minHeight: 64/.test(read('src/ui/liability-rows.tsx')), false, 'no copied row geometry');
+});

@@ -67,7 +67,7 @@ function harness(file: string, params: Record<string, unknown> = {}, initial: do
     } }) };
   const componentNames = ['ActionButton', 'AppText', 'DetailRow', 'EmptyState', 'GlyphTile', 'IconButton', 'Money', 'MovementRow', 'PressFeedback',
     'Screen', 'SectionTitle', 'Stat', 'Surface', 'AmountField', 'Field', 'Choices', 'ErrorMessage', 'LifecycleNote'];
-  const components = { ...Object.fromEntries(componentNames.map(name => [name, name])), toneColors: () => ({ color: '#000', soft: '#eee' }), useStacked: () => false };
+  const components = { ...Object.fromEntries(componentNames.map(name => [name, name])), toneColors: () => ({ color: '#000', soft: '#eee' }), useStacked: () => false, rowStyle: { name: 'rowStyle' } };
   const theme = { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, useCurrentDay: () => '2026-09-20', useReduceMotion: () => true,
     usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', line: '#ddd', inset: '#eee', expense: '#c00', income: '#080', warning: '#a60', transfer: '#03c', primary: '#2557D6' }) };
   // 24T2 (stream A): the deck replaces the carousel; the face keeps its width rule.
@@ -758,9 +758,11 @@ test('24UX6E: a debt row reads its day written out, hints that it opens the deta
   const { press } = rowParts(debt);
   assert.equal(press.props.accessibilityLabel, 'Debo a Juan, 300,00 ARS, Vence 1 de octubre de 2026');
   assert.equal(press.props.accessibilityHint, 'Abre el detalle de la deuda');
-  assert.equal(press.props.style.borderBottomWidth, 0.33, 'StyleSheet.hairlineWidth, never 0.5');
+  // The list row's own geometry (components.tsx `rowStyle`), then the separator.
+  assert.deepEqual(press.props.style[0], { name: 'rowStyle' });
+  assert.equal(press.props.style[1].borderBottomWidth, 0.33, 'StyleSheet.hairlineWidth, never 0.5');
   const last = harness('src/ui/liability-rows.tsx').exports.DebtRow({ debt, last: true });
-  assert.equal(find(last, 'PressFeedback').props.style.borderBottomWidth, 0);
+  assert.equal(find(last, 'PressFeedback').props.style[1].borderBottomWidth, 0);
   assert.equal(rowParts({ ...debt, dueDateISO: '2026-09-19' }).press.props.accessibilityLabel, 'Debo a Juan, 300,00 ARS, Vencida · Ayer');
   activeLocale = 'en-US';
   try {
