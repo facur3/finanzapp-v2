@@ -1091,10 +1091,10 @@ export async function saveMonthlyBudget(db: LedgerDatabase, input: MonthlyBudget
       throw new Error('El presupuesto cambió desde que lo abriste. Volvé a revisarlo.');
     }
     if (budget.currency !== existing.currency) {
-      throw new Error('Para cambiar la moneda, creá otro presupuesto.');
+      throw new Error('Para cambiar la moneda, agregá otro presupuesto.');
     }
     if (budget.scope !== existing.scope) {
-      throw new Error('Para cambiar entre presupuesto general y por categoría, creá otro presupuesto.');
+      throw new Error('Para cambiar entre presupuesto general y por categoría, agregá otro presupuesto.');
     }
     const budgets = (archive.budgets ?? []).map(item => item.id === budget.id ? budget : item);
     validateArchive({ ...archive, budgets });

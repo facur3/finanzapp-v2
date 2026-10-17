@@ -5,7 +5,7 @@ import { useLedger } from '../../src/storage/LedgerProvider';
 import { ActionButton, AppText, Choices, EmptyState, IconButton, SearchField } from '../../src/ui/components';
 import { EntryList } from '../../src/ui/entry-list';
 import { selectEntries, selectTransfers, type EntryFilter } from '../../src/ui/presentation';
-import { useCategoryLookOf } from '../../src/ui/category-hues';
+import { useAccountNameOf, useCategoryLookOf } from '../../src/ui/category-hues';
 import { useI18n } from '../../src/i18n/provider';
 
 /** Movimientos: everything recorded, newest first, by day (Producto 24UX6C, Forest). The search pill, the kind filter
@@ -37,8 +37,10 @@ export default function ActivityScreen() {
   const entries = useMemo(() => snapshot ? selectEntries(snapshot.entries, snapshot.accounts, filter, query, undefined,
     entry => (entry.kind === 'income' ? incomeLook : expenseLook)(entry.category).label) : [], [snapshot, filter, query, expenseLook, incomeLook]);
   const transferWord = t('rows.transfer');
-  const transfers = useMemo(() => snapshot && (filter === 'all' || filter === 'transfer') ? selectTransfers(snapshot.transfers ?? [], snapshot.accounts, query, undefined, transferWord) : [],
-    [snapshot, filter, query, transferWord]);
+  // 25T review: a side is searched by the name its row shows (a renamed debt's counterparty), never by the stored one.
+  const nameOf = useAccountNameOf();
+  const transfers = useMemo(() => snapshot && (filter === 'all' || filter === 'transfer') ? selectTransfers(snapshot.transfers ?? [], snapshot.accounts, query, undefined, transferWord, nameOf) : [],
+    [snapshot, filter, query, transferWord, nameOf]);
   const count = entries.length + transfers.length;
   // VoiceOver hears the new count once the search or the filter settles (iOS has no live regions): after a short pause
   // while typing, at once for a filter; never on the first render or when only the ledger changes. The tab stays mounted

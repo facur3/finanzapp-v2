@@ -16,7 +16,7 @@ export const recurring: Pick<Messages, 'recurring'> = {
     list: {
       add: 'Add recurring item',
       emptyTitle: 'Nothing recurring yet',
-      emptyDetailAccount: 'Create a recurring expense or income for this account.',
+      emptyDetailAccount: 'Add a recurring expense or income for this account.',
       emptyDetail: 'Rent, subscriptions, salary: whatever repeats.',
       create: 'Add recurring item',
       next30: 'Next 30 days',

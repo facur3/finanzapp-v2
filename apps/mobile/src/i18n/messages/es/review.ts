@@ -82,7 +82,7 @@ export const review = {
       missingTitle: 'Para confirmar falta',
       staleNote: 'La cuenta, la tarjeta o la categoría cambió desde la propuesta. Abrí Editar y revisala antes de confirmar.',
       interruptedNote: 'Un intento anterior de registrarla no se pudo verificar. Confirmar lo busca en tus datos y lo completa una sola vez.',
-      conflictNote: 'Tus datos ya tienen otro registro igual a esta propuesta. Para no duplicar nada, no se puede confirmar ni editar; tus movimientos no cambian.',
+      conflictNote: 'Tus datos ya tienen otro registro, distinto, en el lugar de esta propuesta. Para no reemplazarlo, no se puede confirmar ni editar; tus movimientos no cambian.',
       confirm: 'Confirmar',
       retryConfirm: 'Reintentar confirmación',
       edit: 'Editar',

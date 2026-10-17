@@ -127,9 +127,11 @@ export function historyCurrencies(accounts: Account[]): Currency[] {
 }
 
 export type ActivityItem = { type: 'entry'; key: string; value: Entry } | { type: 'transfer'; key: string; value: Transfer };
-/** `transferWord` is the word a transfer answers to in the interface language, besides the Spanish one. */
-export function selectTransfers(transfers: Transfer[], accounts: Account[], query = '', accountId?: string, transferWord = ''): Transfer[] {
-  const names = new Map(accounts.map(a => [a.id, a.name]));
+/** `transferWord` is the word a transfer answers to in the interface language, besides the Spanish one. `nameOf` is the
+ * name a row shows for each side (25T review: a debt's live counterparty, `useAccountNameOf`), so the search finds what is on screen. */
+export function selectTransfers(transfers: Transfer[], accounts: Account[], query = '', accountId?: string, transferWord = '',
+  nameOf: (account: Account) => string = account => account.name): Transfer[] {
+  const names = new Map(accounts.map(a => [a.id, nameOf(a)]));
   const terms = searchable(query).trim().split(/\s+/).filter(Boolean);
   return transfers.filter(t => (!accountId || t.fromAccountId === accountId || t.toAccountId === accountId)
     && terms.every(term => searchable(['transferencia', transferWord, t.note, names.get(t.fromAccountId), names.get(t.toAccountId)].join(' ')).includes(term)));

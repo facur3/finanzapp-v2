@@ -68,7 +68,7 @@ Metro from this branch in a QA profile. The version line reads «FinanzApp 0.1.0
    are inset; a 13-digit row amount stays at 13 pt or more and never ends in «…»; Deudas with two 8-digit totals shows
    both at 22 pt, stacked.
 3. **320 pt (SE or Display Zoom › Larger Text):** Movimientos' four filters sit inside the track with the thumb under
-   the chosen one (English too); «Otra» in En cuotas is whole and tappable; segment labels read at 11 pt or more.
+   the chosen one (English too); «Otra» in En cuotas is whole and tappable; no segment label ends in «…» («Transferencia» at one Dynamic Type step; «Transfers», «Expenses» in English at 1.3×).
 4. **Motion:** Presupuestos' arrows fade the month and nothing below moves; closing or reopening a debt moves its row
    between sections; launch on Inicio, then open Reportes: the donut is already complete, and switching Día a día ›
    Categorías sweeps once; Inicio with a seven-digit hero: Gastado ⇄ Disponible with no size step.

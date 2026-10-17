@@ -3,7 +3,7 @@ export const accounts = {
   accounts: {
     list: {
       emptyTitle: 'Empezá por una cuenta',
-      emptyDetail: 'Creá una cuenta para agrupar tus movimientos. El saldo inicial es opcional.',
+      emptyDetail: 'Agregá una cuenta para agrupar tus movimientos. El saldo inicial es opcional.',
       /** 24UX6E: what VoiceOver reads for a currency's section header: its name and its recorded total, spoken. */
       sectionLabel: '{currency}, saldo registrado {amount}',
     },

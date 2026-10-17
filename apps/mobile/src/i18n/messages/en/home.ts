@@ -7,7 +7,7 @@ export const home: Pick<Messages, 'home' | 'quickActions'> = {
   home: {
     firstSteps: {
       title: 'First steps',
-      account: 'Create your first account',
+      account: 'Add your first account',
       accountDetail: 'Cash, bank or wallet',
       expense: 'Log your first purchase',
       expenseDetail: 'A coffee, groceries, anything',

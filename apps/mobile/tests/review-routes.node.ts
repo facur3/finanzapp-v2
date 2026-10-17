@@ -336,6 +336,11 @@ test('a stale basis keeps Confirmar disabled and asks to review it in Editar; a 
   root = harness('review/[id].tsx', { review: trayOf([conflict], { conflicts: [conflict.id] }), calls: [] }, { id: conflict.id }).render();
   assert.equal(all(root, 'ActionButton').map(node => node.props.label).join(','), 'Descartar', 'the store refuses a confirmation or an edit; a dismissal stays possible');
   assert.match(all(root, 'LifecycleNote')[0].props.detail, /no se puede confirmar ni editar/);
+  // 25T review: a conflict is a different record where the proposal would go (an identical one is already recorded), never «igual».
+  assert.equal(all(root, 'LifecycleNote')[0].props.detail,
+    'Tus datos ya tienen otro registro, distinto, en el lugar de esta propuesta. Para no reemplazarlo, no se puede confirmar ni editar; tus movimientos no cambian.');
+  assert.equal(bindLocale('en-US').t('review.detail.conflictNote'),
+    'Your data already has a different record in this proposal’s place. To keep it from being replaced, this can’t be confirmed or edited; your transactions don’t change.');
   // With a frozen write on it the store refuses the dismissal too (it must settle first): nothing is offered.
   const frozen = itemOf(drafted(), { attempt: domain.writeForReviewDraft(drafted(), archive as domain.ReviewArchive, { writeId: 'w', createdAt, todayISO: today }) });
   root = harness('review/[id].tsx', { review: trayOf([frozen], { conflicts: [frozen.id] }), calls: [] }, { id: frozen.id }).render();

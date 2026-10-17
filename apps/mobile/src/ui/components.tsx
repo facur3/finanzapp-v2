@@ -446,7 +446,8 @@ function Choice({ label, spokenLabel, selected, disabled, onPress, compact = fal
   const { speechLanguage } = useI18n();
   const { width: windowWidth, fontScale } = useWindowDimensions();
   // 25T: a segment is never wider than its share of the track (72/64 pt overflowed a 320 pt screen), with tighter padding
-  // when the share is small, and its label is fitted here with an 11 pt floor instead of iOS's 4 pt shrink-to-fit.
+  // when the share is small, and its label is fitted here to that share (`segmentFontSize`). iOS's shrink-to-fit stays only as
+  // the net under the estimate (as `Money` keeps it), so a label is never cut with «…».
   const padding = slot === 0 || slot >= 72 ? 8 : 4;
   const fit = slot > 0 ? { minWidth: Math.min(compact ? 64 : 72, slot), paddingHorizontal: padding } : null;
   const narrow = windowWidth > 0 && NARROW_WINDOW > windowWidth;
@@ -467,7 +468,7 @@ function Choice({ label, spokenLabel, selected, disabled, onPress, compact = fal
     {prominent ? <Animated.Text numberOfLines={1} maxFontSizeMultiplier={PROMINENT_SEGMENT.maxScale}
       style={{ fontSize: PROMINENT_SEGMENT.fontSize, lineHeight: PROMINENT_SEGMENT.lineHeight, textAlign: 'center', fontWeight: selected ? '600' : '500',
         color, transitionProperty: 'color', transitionDuration: reduced ? 0 : duration.state, transitionTimingFunction: easeOutCss }}>{label}</Animated.Text>
-    : <Animated.Text numberOfLines={1} maxFontSizeMultiplier={SEGMENT_MAX_SCALE}
+    : <Animated.Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} maxFontSizeMultiplier={SEGMENT_MAX_SCALE}
       style={{ fontSize, lineHeight: onField ? 20 : 18, textAlign: 'center', fontWeight: (compact || onField) && !selected ? '500' : '600',
         color, transitionProperty: 'color', transitionDuration: reduced ? 0 : duration.state, transitionTimingFunction: easeOutCss }}>{label}</Animated.Text>}
   </Pressable>;
@@ -620,9 +621,12 @@ const AMOUNT_COLUMN = '56%';
  * measured height and collapsed long amounts to a few points. Row amounts keep
  * the native fit with a 3/4 floor and no fixed line height. Dynamic Type still
  * applies, capped so a hero cannot outgrow the screen. */
-export function Money({ minor, currency, large = false, color, signed = false, size, tone = 'neutral', weight, align = 'left', onField = false, spokenLabel }: {
+export function Money({ minor, currency, large = false, color, signed = false, size, tone = 'neutral', weight, align = 'left', onField = false, spokenLabel, fit = 'row' }: {
   minor: number; currency: Currency; large?: boolean; color?: string; signed?: boolean; size?: number; tone?: Tone; weight?: '500' | '600' | '700';
   align?: 'left' | 'center';
+  /** 25T review: the width a non-hero amount is fitted to before it is drawn: a row's text column (`row`, the default), or
+   * the screen's whole content width (`content`: a `Stat`'s total, which a stacked `StatRow` gives the full line). */
+  fit?: 'row' | 'content';
   /** 25D2: what VoiceOver says instead of the bare amount when the number needs its name to mean anything (Inicio's hero:
    * «Gastado en octubre, 1234,50 pesos»). Built with the spoken formatters; the visible amount is unchanged. */
   spokenLabel?: string;
@@ -647,7 +651,7 @@ export function Money({ minor, currency, large = false, color, signed = false, s
   // 25T: before its first measurement a hero is fitted to the screen's content width (the width a hero gets, less at most an
   // info button), not drawn at its base size for a frame and then stepped down while its crossfade is already visible.
   const fontSize = hero ? fitFontSize(text, width > 0 ? width : windowWidth - 2 * space.xl, base, Math.round(base / 2), Math.min(fontScale, scaleCap))
-    : fitFontSize(text, windowWidth - ROW_CHROME, base, Math.min(base, ROW_MIN_FONT), Math.min(fontScale, scaleCap));
+    : fitFontSize(text, windowWidth - (fit === 'row' ? ROW_CHROME : 2 * space.xl), base, Math.min(base, ROW_MIN_FONT), Math.min(fontScale, scaleCap));
   // An unrepresentable value shows a dash and says so: never NaN, Infinity or a misleading zero (24B3).
   const label = safe ? spokenLabel ?? spokenMoney(minor, currency) : t('amount.unavailable');
   const ink = color ?? semantic;

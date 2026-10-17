@@ -184,8 +184,8 @@ function TotalPanel({ total, currency, spoken }: { total: BudgetProgress<TotalMo
       </View>
     </View>
     <StatRow>
-      <Stat label={t('budgets.total.spent')}><Money minor={total.spentMinor} currency={currency} size={17} /></Stat>
-      <Stat label={t('budgets.total.limit')}><Money minor={total.budget.amountMinor} currency={currency} size={17} /></Stat>
+      <Stat label={t('budgets.total.spent')}><Money minor={total.spentMinor} currency={currency} size={17} fit="content" /></Stat>
+      <Stat label={t('budgets.total.limit')}><Money minor={total.budget.amountMinor} currency={currency} size={17} fit="content" /></Stat>
     </StatRow>
   </View>;
 }

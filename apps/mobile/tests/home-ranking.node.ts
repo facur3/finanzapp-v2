@@ -641,7 +641,7 @@ test('25O1: Primeros pasos for a new person: «Primeros pasos», three pending s
   assert.equal(all.some(node => node.type === 'ActionButton' || node.type === 'PressFeedback'), false, 'no filled button: the dock\'s «+» is Inicio\'s bright object');
   const steps = stepsOf(section);
   assert.equal(JSON.stringify(steps.map(step => [step.type, step.props.title, step.props.subtitle, step.props.leading.props.icon, step.props.leading.props.color, !!step.props.last])),
-    JSON.stringify([['NavigationRow', 'Creá tu primera cuenta', 'Efectivo, banco o billetera', 'wallet-outline', palette.primary, false],
+    JSON.stringify([['NavigationRow', 'Agregá tu primera cuenta', 'Efectivo, banco o billetera', 'wallet-outline', palette.primary, false],
       ['NavigationRow', 'Anotá tu primer gasto', 'Un café, el súper, lo que sea', 'receipt-outline', palette.primary, false],
       ['NavigationRow', 'Sumá tu tarjeta', 'Opcional · para seguir sus cuotas', 'card-outline', palette.primary, true]]),
     'the glyph in the brand text on its tint (GlyphTile), the hairline under all but the last');
@@ -661,7 +661,7 @@ test('25O1: a done step is quiet text, not a control: a check on a quiet tile, t
     const steps = stepsOf(exports.FirstSteps({ account: 'Caja de ahorro', card: 'Visa Galicia' }));
     assert.deepEqual(steps.map(step => step.type), ['View', 'NavigationRow', 'View'], 'the account and the card done; the first expense is never drawn done');
     const [account, , card] = steps;
-    assert.equal(account.props.accessibilityLabel, 'Creá tu primera cuenta, Caja de ahorro, hecho');
+    assert.equal(account.props.accessibilityLabel, 'Agregá tu primera cuenta, Caja de ahorro, hecho');
     assert.equal(card.props.accessibilityLabel, 'Sumá tu tarjeta, Visa Galicia, hecho');
     assert.equal(account.props.accessibilityLanguage, undefined, 'the interface language (es-AR here is the device\'s)');
     for (const done of [account, card]) {
@@ -680,7 +680,7 @@ test('25O1: a done step is quiet text, not a control: a check on a quiet tile, t
     assert.deepEqual(rendered(stepsOf(exports.FirstSteps({ account: 'Caja de ahorro', card: null }))[0]).filter(node => node.type === 'AppText').map(node => node.props.numberOfLines), [undefined, undefined]);
     current = 'en-US';
     const english = stepsOf(exports.FirstSteps({ account: 'Cash', card: null }));
-    assert.equal(english[0].props.accessibilityLabel, 'Create your first account, Cash, done');
+    assert.equal(english[0].props.accessibilityLabel, 'Add your first account, Cash, done');
     assert.deepEqual(english.slice(1).map(step => step.props.title + ' / ' + step.props.subtitle), ['Log your first purchase / A coffee, groceries, anything',
       'Add your credit card / Optional · to follow its installments']);
   } finally { current = 'es-AR'; env.stacked = false; }

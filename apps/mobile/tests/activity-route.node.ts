@@ -5,6 +5,7 @@ import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import * as domain from '@finanzapp/domain';
 import * as presentation from '../src/ui/presentation.ts';
+import { accountDisplayName } from '../src/ui/liability-presentation.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 
 // Producto 24UX6C: Movimientos over the actual route, host components as descriptors, effects run in place and a fake
@@ -69,7 +70,7 @@ function harness(data: domain.LedgerSnapshot = snapshot, archive?: domain.Ledger
     '../../src/ui/components': { ActionButton: 'ActionButton', AppText: 'AppText', Choices: 'Choices', EmptyState: 'EmptyState', IconButton: 'IconButton', SearchField: 'SearchField' },
     '../../src/ui/entry-list': { EntryList: 'EntryList' },
     '../../src/ui/presentation': presentation,
-    '../../src/ui/category-hues': { useCategoryLookOf: () => (stored: string) => ({ label: stored }) },
+    '../../src/ui/category-hues': { useCategoryLookOf: () => (stored: string) => ({ label: stored }), useAccountNameOf: () => (account: domain.Account) => accountDisplayName(account, archive?.debts ?? []) },
     '../../src/i18n/provider': { useI18n: () => bindLocale('es-AR') },
   };
   const module = { exports: {} as { default?: () => Node } };
@@ -221,4 +222,15 @@ test('25N1: Movimientos deshechos is a button of Movimientos\' bar while a movem
   assert.equal(buttonOf({ ...base, purchaseOperations: [refund] }).right, undefined, 'a live devolución is not undone');
   const undoneRefund = domain.makeOperationChange('undo', refund, 'void', createdAt).after;
   assert.equal(typeof buttonOf({ ...base, purchaseOperations: [undoneRefund] }).right, 'function', 'an undone devolución is listed there too');
+});
+
+test('25T review: the search finds a debt\'s payment by the counterparty its row shows («Juan Pérez»), not only by the stored «Debo · Juan»', () => {
+  const owed: domain.Account = { id: 'owed', name: 'Debo · Juan', currency: 'ARS', openingMinor: 0, createdAt, hidden: true } as domain.Account;
+  const debt: domain.PersonalDebtProfile = { id: 'debt', accountId: owed.id, direction: 'owed_by_me', counterparty: 'Juan Pérez', dueDateISO: null,
+    note: '', active: true, deleted: false, createdAt, revision: 1, updatedAt: createdAt };
+  const payment: domain.Transfer = { id: 'pay', fromAccountId: 'a', toAccountId: owed.id, amountMinor: 2000, note: '', dateISO: '2026-09-11', createdAt };
+  const data = { ...snapshot, accounts: [...snapshot.accounts, owed], transfers: [payment] };
+  const view = harness(data, { accounts: data.accounts, records: [], transfers: [payment], debts: [debt] } as unknown as domain.LedgerArchive);
+  header(view.render()).find(node => node.type === 'SearchField')!.props.onChangeText('pérez');
+  assert.deepEqual(view.render().props.transfers.map((transfer: domain.Transfer) => transfer.id), ['pay']);
 });

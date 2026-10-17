@@ -404,4 +404,8 @@ test('25T glossary: «Disponible» is Inicio\'s recorded money only; «Pago» se
   const adds = ['common.addAccount', 'cards.list.add', 'debts.list.add', 'budgets.screen.add', 'budgets.screen.create', 'recurring.list.add', 'recurring.list.create'] as const;
   for (const key of adds) for (const language of ['es', 'en'] as const) assert.match(translate(language, key), language === 'es' ? /^Agregar / : /^Add /, key);
   assert.deepEqual(spanish.filter(({ text }) => /^Crear /.test(text)).map(item => item.key), [], 'no button says «Crear»: a form saves, a list adds');
+  // 25T review: nor does a sentence ask for it (Inicio's first steps, an empty list, an error): «Agregá…», "Add…", never «Creá…», "Create…".
+  assert.deepEqual(spanish.filter(({ text }) => /(^|[\s¿¡«(])creá(?!\p{L})/iu.test(text)).map(item => item.key), [], 'no «Creá»');
+  assert.deepEqual(textsOf(en).filter(({ text }) => /(^|[.!?,;:]\s+)create\b/i.test(text)).map(item => item.key), [], 'no "Create"');
+  for (const language of ['es', 'en'] as const) assert.equal(translate(language, 'home.firstSteps.account'), language === 'es' ? 'Agregá tu primera cuenta' : 'Add your first account');
 });

@@ -135,9 +135,10 @@ título grande 34, título 22, encabezado 17/600, cuerpo 17, subtítulo 15, nota
 etiqueta 12. Números siempre tabulares. **Importes responsivos:** un importe es
 siempre una sola línea; uno corto queda grande y uno largo se achica para caber,
 nunca se corta ni se parte. El héroe calcula su tamaño en JavaScript, con un piso de
-la mitad; desde 25T una fila también se ajusta en JavaScript, con un piso de 13 pt (y un
-segmento con uno de 11 pt), en lugar del piso nativo de 4 pt de iOS (`minimumFontScale`
-solo se lee en Android); una fila se apila antes de achicarse (`rowStacks`). Dynamic Type: un importe de fila hasta 53 pt (el cuerpo
+la mitad; desde 25T una fila también se ajusta en JavaScript, con un piso de 13 pt, a la
+columna de una fila (un total de `Stat` al ancho del contenido), y la etiqueta de un segmento
+a su segmento, sin un piso que la corte; el ajuste nativo de iOS (con su piso de 4 pt;
+`minimumFontScale` solo se lee en Android) queda solo como red; una fila se apila antes de achicarse (`rowStacks`). Dynamic Type: un importe de fila hasta 53 pt (el cuerpo
 en AX5); un héroe hasta 1,4× o 53 pt, lo que sea mayor, ajustado al ancho, así que desde
 AX3 un importe largo puede verse tan grande como el mes de Inicio; todo otro texto hasta
 el tamaño que iOS da a su estilo en AX5 (25D1, `geometry.ts`). El campo
@@ -1013,7 +1014,7 @@ vinculante del roadmap no cambia: la próxima entrega de producto es 24T3; 24UX6
   sin nota. Un guardado rechazado se dice con una alerta, siempre a la vista, y la elección actual encabeza Recientes.
   Desde el texto grande, la bandera de una fila de Región deja su lugar al nombre, que entra entero. La nota de almacenamiento local de Más se fue.
 - **Inicio: Primeros pasos.** Mientras el registro no tiene movimientos, transferencias ni planes en cuotas, Inicio
-  muestra «Primeros pasos»: Creá tu primera cuenta, Anotá tu primer gasto y Sumá tu tarjeta (opcional). Un paso hecho
+  muestra «Primeros pasos»: Agregá tu primera cuenta, Anotá tu primer gasto y Sumá tu tarjeta (opcional). Un paso hecho
   queda con un tilde gris y deja de ser botón. Sin botones llenos: debajo del campo, el «+» es el único objeto brillante.
   Movimientos vacío, con cuentas, usa un botón secundario.
 - **Estados vacíos y formularios.** Tarjetas, Deudas y cobros y Recurrentes: un título y una línea; las reglas viven en

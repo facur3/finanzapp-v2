@@ -7,7 +7,7 @@ export const home = {
      * step shows what was created (the account's or the card's name) and VoiceOver hears «hecho». */
     firstSteps: {
       title: 'Primeros pasos',
-      account: 'Creá tu primera cuenta',
+      account: 'Agregá tu primera cuenta',
       accountDetail: 'Efectivo, banco o billetera',
       expense: 'Anotá tu primer gasto',
       expenseDetail: 'Un café, el súper, lo que sea',

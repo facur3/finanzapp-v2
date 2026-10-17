@@ -65,9 +65,9 @@ export default function RecurringScreen() {
           <SectionTitle>{t('recurring.list.next30')}</SectionTitle>
           <View style={{ gap: space.xl }}>
             {forecast.map(item => item.status === 'ready' ? <View key={item.currency} style={{ gap: 14 }}>
-              <Stat label={withCurrencyCode(t('recurring.list.payments'), item.currency)}><Money minor={item.expenseMinor} currency={item.currency} size={22} weight="700" /></Stat>
+              <Stat label={withCurrencyCode(t('recurring.list.payments'), item.currency)}><Money minor={item.expenseMinor} currency={item.currency} size={22} weight="700" fit="content" /></Stat>
               <StatRow>
-                {item.incomeMinor > 0 && <Stat label={t('recurring.list.income')}><Money minor={item.incomeMinor} currency={item.currency} size={17} tone="income" signed /></Stat>}
+                {item.incomeMinor > 0 && <Stat label={t('recurring.list.income')}><Money minor={item.incomeMinor} currency={item.currency} size={17} tone="income" signed fit="content" /></Stat>}
                 <Stat label={t('recurring.list.dueCount')}><AppText style={{ fontWeight: '600', fontVariant: ['tabular-nums'] }}>{item.count}</AppText></Stat>
               </StatRow>
             </View>

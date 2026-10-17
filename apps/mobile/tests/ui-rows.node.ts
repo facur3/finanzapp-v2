@@ -354,14 +354,14 @@ test('EntryRow gives the merchant two lines beside a bounded amount column at no
   assert.equal(texts(ui.render('TransferRow', { transfer: { ...transfer, amountMinor: 150000 }, accounts: [account, usd] }))[0].props.numberOfLines, 2);
 });
 
-test('segmented labels cap their scaling at 1.3× and are fitted in JavaScript with an 11 pt floor, never by iOS\'s 4 pt shrink', () => {
+test('segmented labels cap their scaling at 1.3×, are fitted to their segment in JavaScript and keep the native shrink as the net', () => {
   const ui = load('components.tsx');
   const props = { value: 'expense', onChange: () => {}, options: [{ value: 'expense', label: 'Gasto' }, { value: 'income', label: 'Ingreso' }, { value: 'transfer', label: 'Transferencia' }] };
   let labels = nodes(ui.render('Choices', props)).filter(node => node.type === 'Animated.Text');
   assert.equal(labels.length, 3);
   for (const label of labels) {
-    assert.equal(label.props.adjustsFontSizeToFit, undefined);
-    assert.equal(label.props.minimumFontScale, undefined);
+    assert.equal(label.props.numberOfLines, 1);
+    assert.equal(label.props.adjustsFontSizeToFit, true, 'the native shrink is the net under the estimate, never «…»');
     assert.equal(label.props.maxFontSizeMultiplier, 1.3);
     assert.equal(flat(label.props.style).fontSize, 13, 'before the track is measured, the default size');
   }
@@ -369,7 +369,29 @@ test('segmented labels cap their scaling at 1.3× and are fitted in JavaScript w
   labels = nodes(ui.render('Choices', props)).filter(node => node.type === 'Animated.Text');
   const sizes = labels.map(label => flat(label.props.style).fontSize);
   assert.deepEqual(sizes.slice(0, 2), [13, 13], 'a label that fits keeps its size');
-  assert.ok(sizes[2] < 13 && sizes[2] >= geometry.SEGMENT_MIN_FONT, '«Transferencia» in a 77 pt segment is fitted, not below 11 pt: ' + sizes[2]);
+  assert.ok(sizes[2] < 13, '«Transferencia» in a 77 pt segment is fitted: ' + sizes[2]);
+});
+
+test('25T review: at 320 pt a segment label always fits its segment\'s text room (Nuevo movimiento at one Dynamic Type step, Movimientos in English at 1.3×)', () => {
+  const cases = [
+    { options: ['Gasto', 'Ingreso', 'Transferencia'], scales: [1, 1.12, 1.3] },
+    { options: ['All', 'Expenses', 'Income', 'Transfers'], scales: [1, 1.12, 1.3] },
+    { options: ['Todos', 'Gastos', 'Ingresos', 'Transf.'], scales: [1, 1.12, 1.3] },
+  ];
+  for (const { options, scales } of cases) for (const scale of scales) {
+    const ui = load('components.tsx', {}, scale, 320);
+    const props = { value: options[0], onChange: () => {}, options: options.map(label => ({ value: label, label })) };
+    ui.render('Choices', props).props.onLayout({ nativeEvent: { layout: { width: 280 } } });
+    const control = ui.render('Choices', props);
+    const segments = [...new Set(nodes(control).filter(node => node.type === 'Pressable'))];
+    const slot = geometry.segmentSlot(280, options.length);
+    segments.forEach((segment, index) => {
+      const label = nodes(segment).find(node => node.type === 'Animated.Text')!;
+      const room = slot - 2 * styleOf(segment).paddingHorizontal;
+      const drawn = geometry.labelWidthEm(options[index]) * geometry.WEIGHT_WIDTH.semibold * flat(label.props.style).fontSize * Math.min(scale, 1.3);
+      assert.ok(drawn <= room, `«${options[index]}» at ${scale}×: ${drawn.toFixed(1)} pt in ${room} pt of room (${flat(label.props.style).fontSize} pt)`);
+    });
+  }
 });
 
 test('25T: at 320 pt every segment fits its share of the track (the five instalment counts, Movimientos\' four filters) with 12 pt labels', () => {
@@ -383,7 +405,7 @@ test('25T: at 320 pt every segment fits its share of the track (the five instalm
     for (const segment of segments) assert.ok(styleOf(segment).minWidth <= slot, `${options.join('|')}: ${styleOf(segment).minWidth} pt in a ${slot} pt share`);
     assert.ok(segments.length * styleOf(segments[0]).minWidth + (segments.length - 1) * geometry.SEGMENT_GAP + 2 * geometry.SEGMENT_PADDING <= track, 'the row fits the track');
     const sizes = nodes(control).filter(node => node.type === 'Animated.Text').map(label => flat(label.props.style).fontSize);
-    assert.ok(sizes.every(size => size <= 12 && size >= geometry.SEGMENT_MIN_FONT), sizes.join(','));
+    assert.ok(sizes.every(size => size <= 12), sizes.join(','));
     // The thumb is as wide as each segment, so it sits under its label.
     assert.equal(Math.floor(flat(nodes(control).find(node => node.type === 'Animated.View')!.props.style).width), slot);
   }
@@ -1268,4 +1290,14 @@ test('25T: a row amount is fitted in JavaScript to the widest column a row gives
   // The drawn size times the capped scale fits the column (the native fit is only a net).
   const text = bindLocale('es-AR').moneyText(1_234_567_890_123, 'ARS');
   assert.ok(geometry.amountWidthEm(text) * long * (53 / 17) <= 375 - geometry.ROW_CHROME || long === geometry.ROW_MIN_FONT);
+});
+
+test('25T review: a full-width amount (Deudas\' stacked totals at AX5 on a 375 pt screen) is fitted to the content width, not to a row\'s column', () => {
+  const size = (fit?: 'row' | 'content') => flat(load('components.tsx', {}, 3.571, 375).render('Money', { minor: 12_345_678, currency: 'ARS', size: 22, weight: '700', fit }).props.style).fontSize;
+  const text = bindLocale('es-AR').moneyText(12_345_678, 'ARS');
+  const content = size('content'), row = size();
+  assert.ok(content > row, `«${text}»: ${content} pt on the whole line, ${row} pt in a row's column`);
+  // The drawn size at the 53/22 cap fits the 335 pt line, and nothing smaller is chosen than the line needs.
+  assert.ok(geometry.amountWidthEm(text) * content * (53 / 22) <= 375 - 40, String(content));
+  assert.deepEqual([content, row], [21, 15.5], 'the 21 pt that fits the line, not the 15.5 pt of a row column');
 });

@@ -4708,9 +4708,10 @@ nothing of it is on a screen yet.
   golden flipped on purpose); the domain's thrown sentences changed wording («obligación» → «tarjeta o deuda», «No
   encontramos…» → «No se encontró…») with the errors catalogue and their tests updated together, behaviour unchanged.
 - **Polish.** Increase Contrast variants (lines, edges, the dock rim, the off switch track, tertiary text ≥ 3:1); row
-  amounts and segment labels fitted in JavaScript with 13 pt and 11 pt floors; Deudas' totals stack; segments never wider
+  amounts fitted in JavaScript with a 13 pt floor (a `Stat` total to the content width), segment labels to their segment
+  with no floor that cuts them (the native shrink stays as the net); Deudas' totals stack; segments never wider
   than their share at 320 pt; the Assistant's draft card stacks above 1.2×; Presupuestos fades its month; Deudas'
-  sections reflow; the donut sweeps only when mounted in front; the hero is fitted before its first measurement; the
+  sections reflow (never on opening); the donut sweeps only when mounted in front; the hero is fitted before its first measurement; the
   recurring wheel starts at today; the first opening's sample figures scale for small-unit currencies.
 - **Not in this delivery.** Bold Text and Smart Invert (device first); a visible rate-age cue and the paused rule's date
   initialisation (owner decisions); an action sheet for the blocked-delete choices; «Principal» (an es-AR reader); drag

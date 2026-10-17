@@ -54,6 +54,9 @@ function harness(file: string, params: Record<string, unknown> = {}, initial: do
   const state: unknown[] = [];
   const pushed: any[] = [];
   let cursor = 0;
+  const refs: { current: unknown }[] = [], effects: (() => unknown)[] = [];
+  let refCursor = 0;
+  const after = (node: Node) => { for (const effect of effects.splice(0)) effect(); return node; };
   const cards: { account: domain.Account; card: domain.CreditCardProfile }[] = [], debts: { account: domain.Account; debt: domain.PersonalDebtProfile }[] = [];
   const savedDebts: domain.PersonalDebtProfile[] = [], removedDebts: string[] = [], alerts: { title: string; message: string; buttons: any[] }[] = [];
   let backs = 0;
@@ -88,7 +91,10 @@ function harness(file: string, params: Record<string, unknown> = {}, initial: do
     './commitment-actions': { useCardManagement: () => ({ busyId: null, error: null, remove: () => {} }), useDebtManagement: () => ({ busyId: null, error: null, actions: () => [], remove: () => {}, settle: () => {}, close: () => {}, reopen: () => {} }), useRecurringManagement: () => ({ busyId: null, error: null, actions: () => [], remove: () => {} }), useAccountManagement: () => ({ busyId: null, error: null, actions: () => [], remove: () => {} }) },
     './money-input': moneyInput,
     '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
-    react: { useRef: (initial: unknown) => ({ current: initial }), useEffect: (fn: () => unknown) => { fn(); }, useMemo: (fn: () => unknown) => fn(), useState: (initial: unknown) => {
+    // 25T review: a ref keeps its value across renders and an effect runs after the render that scheduled it, as in React,
+    // so a screen can tell its first render (nothing animates on mount) from a later one.
+    react: { useRef: (initial: unknown) => { const index = refCursor++; if (!(index in refs)) refs[index] = { current: initial }; return refs[index]; },
+      useEffect: (fn: () => unknown) => { effects.push(fn); }, useMemo: (fn: () => unknown) => fn(), useState: (initial: unknown) => {
       const index = cursor++;
       if (!(index in state)) state[index] = typeof initial === 'function' ? (initial as () => unknown)() : initial;
       return [state[index], (value: unknown) => { state[index] = typeof value === 'function' ? (value as (current: unknown) => unknown)(state[index]) : value; }];
@@ -134,7 +140,7 @@ function harness(file: string, params: Record<string, unknown> = {}, initial: do
   modules['../src/ui/card-panel'] = panel; modules['../../src/ui/card-panel'] = panel;
   const module = { exports: {} as { default?: () => Node } & Record<string, (props: any) => Node> };
   runInNewContext(code, { module, exports: module.exports, require, Error });
-  return { render: () => { cursor = 0; return module.exports.default!(); }, renderExport: (name: string, props: any = {}) => { cursor = 0; return module.exports[name](props); },
+  return { render: () => { cursor = 0; refCursor = 0; return after(module.exports.default!()); }, renderExport: (name: string, props: any = {}) => { cursor = 0; refCursor = 0; return after(module.exports[name](props)); },
     pushed, cards, debts, savedDebts, removedDebts, alerts, haptics, backs: () => backs, exports: module.exports,
     setData: (next: domain.LedgerArchive | null) => { data = next as domain.LedgerArchive; } };
 }
@@ -314,10 +320,16 @@ test('debts screen separates what I owe from what they owe me and never mixes cu
   assert.deepEqual(rows.map(row => row.props.debt.id), ['debt', 'receivable']);
   const totals = nodes(root).filter(node => node.type === 'Money').map(node => [node.props.currency, node.props.minor]);
   assert.deepEqual(totals, [['ARS', 30000], ['ARS', 0], ['USD', 0], ['USD', 4000]]);
+  // 25T review: a total spans the content width once its pair stacks, so it is fitted to that line, never to a row's column.
+  assert.deepEqual(nodes(root).filter(node => node.type === 'Money').map(node => node.props.fit), ['content', 'content', 'content', 'content']);
   assert.equal(find(harness('debts.tsx', {}, empty).render(), 'EmptyState').props.title, 'Sin deudas ni cobros');
   // 25T: each section is a Reflow block that fades: closing, reopening or deleting moves a row between them with a transition.
-  const blocks = nodes(root).filter(node => node.type === 'Reflow');
-  assert.deepEqual(blocks.map(block => [block.props.fade, nodes(block).find(node => node.type === 'SectionTitle')!.props.children]), [[true, 'Debo'], [true, 'Me deben']]);
+  // 25T review: never on the first render, so opening Deudas fades nothing; a later render (a row moved) fades.
+  const sections = (node: Node) => nodes(node).filter(item => item.type === 'Reflow').map(block => [block.props.fade, nodes(block).find(item => item.type === 'SectionTitle')!.props.children]);
+  assert.deepEqual(sections(root), [[false, 'Debo'], [false, 'Me deben']]);
+  const view = harness('debts.tsx', {}, data);
+  assert.deepEqual(sections(view.render()), [[false, 'Debo'], [false, 'Me deben']]);
+  assert.deepEqual(sections(view.render()), [[true, 'Debo'], [true, 'Me deben']]);
   // 25T: short totals share the row; an eight-figure peso total gives the pair a line each at 393 pt instead of shrinking.
   assert.deepEqual(nodes(root).filter(node => node.type === 'StatRow').map(node => node.props.stacked), [false, false]);
   const large = { ...data, accounts: data.accounts.map(account => account.id === debtAccount.id ? { ...account, openingMinor: -1_234_567_890 } : account) };

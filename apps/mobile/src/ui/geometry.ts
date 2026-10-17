@@ -15,16 +15,15 @@ export function segmentSlot(trackWidth: number, count: number): number {
   if (!(trackWidth > 0) || !(count > 0)) return 0;
   return Math.floor((trackWidth - SEGMENT_PADDING * 2 - SEGMENT_GAP * (count - 1)) / count);
 }
-/** 25T: a segment label never shrinks below this (iOS's own shrink-to-fit floors at 4 pt on the new architecture). */
-export const SEGMENT_MIN_FONT = 11;
 /** Below this window width (an iPhone SE, or Display Zoom on a 375 pt one) a segment label starts at 12 pt instead of 13. */
 export const NARROW_WINDOW = 340;
-/** 25T: a segment label's size, fitted in JavaScript to its `room` at the text scale: `base` when it fits, smaller in half
- * points as far as `SEGMENT_MIN_FONT`, never further (measured as semibold, the chosen weight). Before layout, `base`. */
+/** 25T: a segment label's size, fitted in JavaScript to its `room` at the text scale: `base` when it fits, otherwise the
+ * largest half point at which the whole label fits (measured as semibold, the chosen weight; the estimate errs wide). There
+ * is no floor a label is cut at: a label is never truncated. Before layout, `base`. */
 export function segmentFontSize(label: string, room: number, base: number, fontScale = 1): number {
   if (!(room > 0)) return base;
   const fitting = room / (labelWidthEm(label) * WEIGHT_WIDTH.semibold * Math.max(fontScale, 0.5));
-  return Math.max(SEGMENT_MIN_FONT, Math.min(base, Math.floor(fitting * 2) / 2));
+  return Math.min(base, Math.floor(fitting * 2) / 2);
 }
 
 /** Geometry of a segmented control's sliding thumb: equal segments inside the padded track. */

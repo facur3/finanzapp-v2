@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { View, useWindowDimensions } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { debtTotalsByCurrency } from '@finanzapp/domain';
@@ -25,6 +25,9 @@ export default function DebtsScreen() {
   const closed = useMemo(() => (archive?.debts ?? []).filter(debt => !debt.active && !debt.deleted), [archive?.debts]);
   // Exact per-currency sums from the domain: every currency present, ARS and USD first, never added together.
   const totals = useMemo(() => snapshot ? debtTotalsByCurrency(debts, snapshot) : [], [debts, snapshot]);
+  // 25T review: the sections fade only once the screen is on screen (as Tarjetas does): opening Deudas animates nothing.
+  const mounted = useRef(false);
+  useEffect(() => { mounted.current = true; }, []);
   if (!archive || !snapshot) return null;
   // 25N1: each open section asks for action first: overdue, due soon, then by due date, undated last.
   const open = debtsByUrgency(debts, snapshot, day);
@@ -44,23 +47,23 @@ export default function DebtsScreen() {
         {/* 25T: both totals keep their 22 pt; a pair too wide for half the row each goes one under the other, never shrunk. */}
         {totals.map(item => item.status === 'ready' ? <StatRow key={item.currency}
           stacked={pairStacks(width, fontScale, [moneyText(item.owedMinor, item.currency), moneyText(item.receivableMinor, item.currency)], 22)}>
-          <Stat label={withCurrencyCode(t('debts.list.owed'), item.currency)}><Money minor={item.owedMinor} currency={item.currency} size={22} weight="700" /></Stat>
-          <Stat label={withCurrencyCode(t('debts.list.receivable'), item.currency)}><Money minor={item.receivableMinor} currency={item.currency} size={22} weight="700" /></Stat>
+          <Stat label={withCurrencyCode(t('debts.list.owed'), item.currency)}><Money minor={item.owedMinor} currency={item.currency} size={22} weight="700" fit="content" /></Stat>
+          <Stat label={withCurrencyCode(t('debts.list.receivable'), item.currency)}><Money minor={item.receivableMinor} currency={item.currency} size={22} weight="700" fit="content" /></Stat>
         </StatRow>
           // A sum beyond the safe range is said for that currency, never rounded, dropped or shown as zero.
           : <AppText key={item.currency} secondary variant="subhead">{withCurrencyCode(t('debts.list.outOfRange'), item.currency)}</AppText>)}
       </View>}
       {/* 25T: closing, reopening or deleting moves a row between these blocks: each slides to its new size and a block that
-          appears or empties fades (Reflow, as Tarjetas does); Reduce Motion keeps only the fade. */}
-      {!!owedByMe.length && <Reflow fade>
+          appears or empties fades (Reflow, as Tarjetas does), never on the first render; Reduce Motion keeps only the fade. */}
+      {!!owedByMe.length && <Reflow fade={mounted.current}>
         <SectionTitle>{t('debts.list.owed')}</SectionTitle>
         <Surface grouped>{owedByMe.map((debt, index) => <DebtRow key={debt.id} debt={debt} last={index === owedByMe.length - 1} actions={manage.actions(debt)} />)}</Surface>
       </Reflow>}
-      {!!owedToMe.length && <Reflow fade>
+      {!!owedToMe.length && <Reflow fade={mounted.current}>
         <SectionTitle>{t('debts.list.receivable')}</SectionTitle>
         <Surface grouped>{owedToMe.map((debt, index) => <DebtRow key={debt.id} debt={debt} last={index === owedToMe.length - 1} actions={manage.actions(debt)} />)}</Surface>
       </Reflow>}
-      {!!closed.length && <Reflow fade>
+      {!!closed.length && <Reflow fade={mounted.current}>
         <SectionTitle caption={t('debts.list.closedCaption')}>{t('debts.list.closed')}</SectionTitle>
         <Surface grouped>{closed.map((debt, index) => <DebtRow key={debt.id} debt={debt} last={index === closed.length - 1} actions={manage.actions(debt)} />)}</Surface>
       </Reflow>}

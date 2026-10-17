@@ -64,10 +64,10 @@ export default function AccountScreen() {
           {month.spending.kind === 'netRefunds'
             ? <View accessible accessibilityLanguage={speechLanguage}
               accessibilityLabel={t('accounts.detail.monthNetRefundsSpoken', { amount: spokenMoney(month.spending.minor, account.currency) })}>
-              <Stat label={t('accounts.detail.monthNetRefunds')}><Money minor={month.spending.minor} currency={account.currency} size={17} /></Stat>
+              <Stat label={t('accounts.detail.monthNetRefunds')}><Money minor={month.spending.minor} currency={account.currency} size={17} fit="content" /></Stat>
             </View>
-            : <Stat label={t('accounts.detail.monthExpenses')}><Money minor={month.spending.minor} currency={account.currency} size={17} /></Stat>}
-          <Stat label={t('accounts.detail.monthIncome')}><Money minor={month.incomeMinor} currency={account.currency} size={17} tone={month.incomeMinor ? 'income' : 'neutral'} signed={month.incomeMinor > 0} /></Stat>
+            : <Stat label={t('accounts.detail.monthExpenses')}><Money minor={month.spending.minor} currency={account.currency} size={17} fit="content" /></Stat>}
+          <Stat label={t('accounts.detail.monthIncome')}><Money minor={month.incomeMinor} currency={account.currency} size={17} tone={month.incomeMinor ? 'income' : 'neutral'} signed={month.incomeMinor > 0} fit="content" /></Stat>
         </StatRow>}
       </View>
       {live && <QuickActions accountId={id} currency={account.currency} />}

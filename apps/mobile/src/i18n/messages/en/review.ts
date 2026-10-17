@@ -72,7 +72,7 @@ export const review: Pick<Messages, 'review'> = {
       missingTitle: 'Still needed to confirm',
       staleNote: 'The account, card or category changed since the proposal. Open Edit and review it before confirming.',
       interruptedNote: 'An earlier attempt to record it couldn’t be verified. Confirm looks for it in your data and completes it only once.',
-      conflictNote: 'Your data already has another record matching this proposal. To avoid a duplicate, it can’t be confirmed or edited; your transactions don’t change.',
+      conflictNote: 'Your data already has a different record in this proposal’s place. To keep it from being replaced, this can’t be confirmed or edited; your transactions don’t change.',
       confirm: 'Confirm',
       retryConfirm: 'Retry confirmation',
       edit: 'Edit',

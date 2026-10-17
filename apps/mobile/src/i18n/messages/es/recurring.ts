@@ -16,7 +16,7 @@ export const recurring = {
     list: {
       add: 'Agregar recurrente',
       emptyTitle: 'Nada recurrente todavía',
-      emptyDetailAccount: 'Creá un gasto o ingreso recurrente para esta cuenta.',
+      emptyDetailAccount: 'Agregá un gasto o ingreso recurrente para esta cuenta.',
       /** 25O1: one line; how a rule records (and that it never pays or collects) is the form's note. */
       emptyDetail: 'Alquiler, suscripciones, sueldo: lo que se repite.',
       create: 'Agregar recurrente',

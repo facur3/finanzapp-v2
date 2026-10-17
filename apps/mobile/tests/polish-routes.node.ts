@@ -256,8 +256,8 @@ test('accounts list shows liquid totals per currency and hides card accounts', (
 
 test('25O1 review: Cuentas with no account asks to create one, never to choose from an empty list, in one supporting line of 12 words at most', () => {
   const empty = { ...archive, accounts: [], records: [], cards: [], recurring: [], budgets: [] };
-  for (const [locale, detail, button] of [['es-AR', 'Creá una cuenta para agrupar tus movimientos. El saldo inicial es opcional.', 'Agregar cuenta'],
-    ['en-US', 'Create an account to group your transactions. The opening balance is optional.', 'Add account']] as const) {
+  for (const [locale, detail, button] of [['es-AR', 'Agregá una cuenta para agrupar tus movimientos. El saldo inicial es opcional.', 'Agregar cuenta'],
+    ['en-US', 'Add an account to group your transactions. The opening balance is optional.', 'Add account']] as const) {
     const state = find(harness('accounts.tsx', {}, empty, locale).render(), 'SectionList').props.ListEmptyComponent;
     assert.deepEqual([state.type, state.props.detail, state.props.action.props.label], ['EmptyState', detail, button], locale);
     assert.equal(state.props.action.props.icon, 'add-outline', 'the same «+» glyph as Tarjetas\' and Deudas\' empty-state button');
@@ -1166,7 +1166,7 @@ test('24UX6E: opened for one account, the rows leave its name out (the header sa
   assert.equal(texts(root).some(text => text.includes('· Banco')), false);
   assert.ok(texts(harness('recurring.tsx').render()).includes('Mensual · Hogar · Banco'), 'the full list still names it');
   const empty = harness('recurring.tsx', { accountId: 'wallet' }).render();
-  assert.equal(find(empty, 'EmptyState').props.detail, 'Creá un gasto o ingreso recurrente para esta cuenta.');
+  assert.equal(find(empty, 'EmptyState').props.detail, 'Agregá un gasto o ingreso recurrente para esta cuenta.');
 });
 
 test('24UX6E: a rule on a deleted account or card says so on its row (calm, never amber) and offers Eliminar only; an active rule on a live account is unchanged', () => {
