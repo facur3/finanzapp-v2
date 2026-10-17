@@ -72,7 +72,10 @@ function harness(file: string, options: { params?: Record<string, string>; data?
     transfer: '#03c', primary: '#2557D6' };
   const theme = { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, radius: { tile: 12, group: 16, creditCard: 18 },
     useCurrentDay: () => day, useReduceMotion: () => true, usePalette: () => palette };
-  const motion = { ValueTransition: 'ValueTransition', Reflow: 'Reflow', timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }), successHaptic: () => { haptics++; }, selectionHaptic: () => {} };
+  // 25Q4: a failed write's haptic, by type (Success is counted in `haptics`).
+  const failures: string[] = [];
+  const motion = { ValueTransition: 'ValueTransition', Reflow: 'Reflow', timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }), successHaptic: () => { haptics++; }, selectionHaptic: () => {},
+    errorHaptic: () => { failures.push('Error'); }, warningHaptic: () => { failures.push('Warning'); } };
   const hues = { useCategoryLabel: (stored: string) => stored };
   const cardVisual = { CardDeck: 'CardDeck', CardFace: 'CardFace', cardFaceWidth: (width: number) => Math.min(width - 40, 420), cardFaceHeight: (width: number) => Math.round(width / 1.586) };
   const both = (path: string, value: unknown) => ({ ['../src/' + path]: value, ['../../src/' + path]: value });
@@ -95,7 +98,6 @@ function harness(file: string, options: { params?: Record<string, string>; data?
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, useLocalSearchParams: () => options.params ?? {},
       router: { push: (to: unknown) => pushed.push(to), navigate: (to: unknown) => pushed.push(to), replace: (to: unknown) => pushed.push(to), back: () => { backs++; }, canGoBack: () => true } },
     'expo-crypto': { randomUUID: () => 'op-' + (++uuid) },
-    'expo-haptics': { NotificationFeedbackType: { Success: 'Success' }, notificationAsync: async () => {}, selectionAsync: async () => {} },
     '@finanzapp/domain': domain,
     ...both('storage/LedgerProvider', ledger), ...both('ui/components', components), ...both('ui/card-visual', cardVisual), ...both('ui/entry-list', { EntryList: 'EntryList' }),
     ...both('ui/geometry', geometry), ...both('ui/movement-amount', movementAmount),
@@ -123,7 +125,7 @@ function harness(file: string, options: { params?: Record<string, string>; data?
     render: () => { cursor = 0; refCursor = 0; return module.exports.default(); },
     setData: (next: domain.LedgerArchive | null) => { data = next as domain.LedgerArchive; },
     setLocale: (next: AppLocale) => { locale = next; },
-    pushed, alerts, updates, removals, writes, backs: () => backs, haptics: () => haptics,
+    pushed, alerts, updates, removals, writes, failures, backs: () => backs, haptics: () => haptics,
   };
 }
 
@@ -263,8 +265,8 @@ test('Tarjetas: archived cards stay reachable under Archivadas with their balanc
   assert.equal(byName(onlyArchived, 'ArchivedCardRow').length, 1);
   // No card at all: the first invitation; an empty Archivadas never shows.
   const none = harness('cards.tsx', { data: { accounts: [cash], records: [], cards: [gone], } }).render();
-  assert.equal(find(none, 'EmptyState').props.title, 'Tus tarjetas, como en la billetera');
-  assert.match(find(none, 'EmptyState').props.detail, /en cuotas, cada cuota cuenta cuando cierra su resumen/);
+  // 25O1: a title and one line; how instalments count is said in the composer, where a purchase is recorded.
+  assert.deepEqual([find(none, 'EmptyState').props.title, find(none, 'EmptyState').props.detail], ['Tus tarjetas de crédito', 'Agregá una para ver su saldo pendiente, cierres y cuotas.']);
   assert.equal(nodes(none).some(node => node.type === 'SectionTitle'), false);
   // An archived card with nothing owed says so.
   const clear = harness('cards.tsx', { data: { ...data, accounts: [...archive.accounts, { ...oldAccount, openingMinor: 0 }, goneAccount] } }).render();
@@ -402,10 +404,11 @@ test('plan detail: the price first, then only its figures (recorded, future, rem
     'Tarjeta=Visa Gold', 'Categoría=Hogar', 'Fecha de compra=10 ago 2026 (10 de agosto de 2026)', 'Precio=$ 1.200.000,00 (1200000,00 pesos)',
     'Ya registrado=$ 200.000,00 (200000,00 pesos)', 'Cuotas futuras=$ 1.000.000,00 (1000000,00 pesos)',
   ].map(row => row.replace(/\$ /g, '$' + NBSP)));
-  // The hero, then the progress, then the facts, then the Calendario.
+  // The hero, then the progress, then the facts, then (25N1) the actions, then the Calendario.
   const order = nodes(root).map(node => node.type === 'Money' && node.props.minor === 120000000 ? 'hero' : typeof node.type === 'function' && node.type.name === 'PlanProgressSummary' ? 'progress'
-    : node.type === 'DetailRow' ? 'facts' : node.type === 'SectionTitle' ? 'schedule' : null).filter((item, index, all) => item && all.indexOf(item) === index);
-  assert.deepEqual(order, ['hero', 'progress', 'facts', 'schedule'])
+    : node.type === 'DetailRow' ? 'facts' : node.type === 'ActionButton' ? 'actions' : node.type === 'SectionTitle' ? 'schedule' : null).filter((item, index, all) => item && all.indexOf(item) === index);
+  assert.deepEqual(order, ['hero', 'progress', 'facts', 'actions', 'schedule'], 'the actions above a calendar of up to 120 rows')
+  assert.deepEqual(nodes(root).filter(node => node.type === 'ActionButton').map(node => node.props.tone ?? 'plain'), ['plain', 'plain', 'expense'], 'refund, adelanto, then the destructive one last')
   find(root, 'DetailRow', 'Tarjeta').props.onPress();
   assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/card/[id]', params: { id: 'card' } }));
   // The calendar: one row per instalment, its statement's closing and due, its state.
@@ -553,13 +556,38 @@ test('plan detail: a failed deletion keeps the plan and the error; Reintentar se
   view.alerts[0].buttons[1].onPress();
   await settle();
   const failed = view.render();
-  assert.equal(find(failed, 'ErrorMessage').props.message, 'No pudimos guardar: disco lleno.');
+  assert.equal(find(failed, 'ErrorMessage').props.message, 'installments.detail.deleteFailed', '25Q4: the action\'s own sentence, never the engine\'s text');
   const retry = find(failed, 'ActionButton', 'Reintentar cambio');
   assert.equal(view.backs(), 0, 'nothing was deleted: the screen stays');
+  assert.equal(view.failures.join(','), 'Warning', '25Q4: it may have been written, so Warning while it stays frozen');
   retry.props.onPress();
   assert.equal(view.alerts.length, 1, 'the retry asks nothing new');
   await settle();
   assert.equal(JSON.stringify([attempts, view.removals.join(','), view.backs()]), JSON.stringify([2, 'nb,nb', 1]));
+  assert.equal(JSON.stringify([view.failures.join(','), view.haptics()]), JSON.stringify(['Warning', 1]));
+});
+
+test('25Q4: a deletion storage refuses before writing (an instalment or an operation recorded since the screen was drawn) releases it; the plan is read again and offers «Dejar de seguir el plan», never «Eliminar plan» or «Reintentar cambio»', async () => {
+  // Oct 29: the first instalment billed on Oct 28 and the foreground has not recorded it, so the screen still offers the deletion.
+  for (const refusal of [domain.PLAN_HISTORY_MESSAGE, domain.PLAN_OPERATION_HISTORY_MESSAGE]) {
+    const view = harness('installment/[id].tsx', { params: { id: 'nb' }, data: withPlans, day: '2026-10-29',
+      // Storage refuses before writing and re-reads (rereadOnRefusal): the instalment is in the view before the refusal arrives.
+      remove: async () => { view.setData({ ...withPlans, records: [...withPlans.records, ...recognised(nb, [1])] }); throw new Error(refusal); } });
+    find(view.render(), 'ActionButton', 'Eliminar plan').props.onPress();
+    view.alerts[0].buttons[1].onPress();
+    await settle();
+    const root = view.render();
+    assert.equal(find(root, 'ErrorMessage').props.message, refusal);
+    assert.equal(nodes(root).some(node => node.type === 'ActionButton' && ['Eliminar plan', 'Reintentar cambio'].includes(node.props.label)), false, refusal);
+    const stop = find(root, 'ActionButton', 'Dejar de seguir el plan');
+    assert.equal(stop.props.disabled, false, 'the error says «Dejá de seguirlo»: that button is live');
+    assert.equal(view.failures.join(','), 'Error', '25Q4: nothing was written, so Error');
+    stop.props.onPress();
+    assert.equal(view.alerts[1].title, '¿Dejar de seguir este plan?');
+    assert.equal(JSON.stringify(view.removals), JSON.stringify(['nb']));
+  }
+  // The live provider re-reads the plan after a refused deletion, as it does for a stop or a reactivation.
+  assert.ok(readFileSync(new URL('../src/storage/LedgerProvider.tsx', import.meta.url), 'utf8').includes('removeInstallmentPlan: planId => rereadOnRefusal(db => deleteInstallmentPlan('));
 });
 
 test('plan detail in English: the same figures and calendar words', () => {
@@ -770,14 +798,15 @@ test('24T3: «Dejar de seguir el plan» says what stops, what stays and what it 
   assert.equal(alert.title, '¿Dejar de seguir este plan?');
   assert.equal(alert.message, 'Las cuotas que faltan ($' + NBSP + '1.000.000,00) dejan de registrarse. Las ya registradas siguen en Movimientos. No es una devolución ni un pago: '
     + 'si devolviste la compra, usá Registrar devolución; si adelantaste las cuotas, Registrar adelanto de cuotas.');
-  assert.equal(alert.buttons.map((item: { text: string; style?: string }) => item.text + ':' + item.style).join(','), 'Cancelar:cancel,Dejar de seguir:destructive');
+  assert.equal(alert.buttons.map((item: { text: string; style?: string }) => item.text + ':' + item.style).join(','), 'Cancelar:cancel,Dejar de seguir:default');
   assert.equal(view.writes.length, 0, 'asking writes nothing');
   alert.buttons[1].onPress();
   assert.deepEqual(view.writes.map(item => [item.action, JSON.stringify(item.arg)]), [['stop', JSON.stringify({ planId: 'tv', expectedRevision: 0 })]]);
   await settle();
   const failed = view.render();
-  assert.equal(find(failed, 'ErrorMessage').props.message, 'No pudimos guardar: disco lleno.');
+  assert.equal(find(failed, 'ErrorMessage').props.message, 'installments.detail.stopFailed');
   assert.equal(find(failed, 'ActionButton', 'Registrar devolución').props.disabled, true, 'nothing else starts while the outcome is unknown');
+  assert.equal(view.failures.join(','), 'Warning', '25Q4: it may have been written, so Warning while it stays frozen');
   find(failed, 'ActionButton', 'Reintentar cambio').props.onPress();
   assert.equal(view.alerts.length, 1, 'the retry asks nothing new');
   await settle();
@@ -796,6 +825,7 @@ test('24T3: a stop storage refuses before writing (the plan changed) releases it
   const refused = view.render();
   assert.equal(find(refused, 'ErrorMessage').props.message, 'El plan de cuotas cambió desde que lo abriste. Volvé a revisarlo.');
   assert.equal(find(refused, 'ActionButton', 'Registrar devolución').props.disabled, false);
+  assert.equal(view.failures.join(','), 'Error', '25Q4: nothing was written, so Error');
   find(refused, 'ActionButton', 'Dejar de seguir el plan').props.onPress();
   assert.equal(view.alerts.length, 2, 'released: asked again');
   // In English the message is the catalogue's.
@@ -917,14 +947,15 @@ test('24T3 adelanto: a write with an unknown outcome is retried unchanged; recor
   find(view.render(), 'ActionButton').props.onPress();
   await settle();
   let root = view.render();
-  assert.equal(find(root, 'ErrorMessage').props.message, 'No pudimos guardar: disco lleno.');
+  assert.equal(find(root, 'ErrorMessage').props.message, 'installments.payoff.saveFailed');
   assert.ok(texts(root).includes('Conservamos el envío: Reintentar nunca registra el adelanto dos veces. Para cambiarlo, cerrá y revisá primero el plan.'));
   assert.equal(find(root, 'DateField').props.disabled, true, 'frozen: nothing changes under the retry');
+  assert.equal(view.failures.join(','), 'Warning', '25Q4: it may have been written, so Warning while it stays frozen');
   find(root, 'ActionButton', 'Reintentar guardado').props.onPress();
   await settle();
   assert.equal(view.writes.length, 2);
   assert.equal(view.writes[1].arg, view.writes[0].arg, 'the same adelanto, the same id');
-  assert.equal(view.haptics(), 1);
+  assert.equal(JSON.stringify([view.failures.join(','), view.haptics()]), JSON.stringify(['Warning', 1]));
   // The provider refreshed: the card now owes the instalments brought forward ($ 120.000,00 + $ 1.000.000,00).
   view.setData({ ...withPlans, purchaseOperations: [view.writes[0].arg as domain.PlanPayoff] });
   root = view.render();
@@ -954,6 +985,7 @@ test('24T3 adelanto: a refusal storage gave before writing (the instalments chan
   const view = harness('plan-payoff/[id].tsx', { params: { id: 'tv' }, data: withPlans, write: async () => { throw new Error(domain.OPERATION_CHANGED_MESSAGE); } });
   find(view.render(), 'ActionButton').props.onPress();
   await settle();
+  assert.equal(view.failures.join(','), 'Error', '25Q4: nothing was written, so Error');
   // Meanwhile a devolución recorded elsewhere lowered instalment 12 by $ 50.000,00 (the provider read the ledger again).
   const refund = domain.newPlanRefund(withPlans, { id: 'rf3', planId: 'tv', amountMinor: 25000000, dateISO: '2026-10-01', todayISO: '2026-10-01', createdAt: opNow });
   view.setData({ ...withPlans, purchaseOperations: [refund] });
@@ -1035,8 +1067,9 @@ test('movement detail of an instalment: «Cuota de tarjeta», a «Cuota 2 de 12�
   find(root, 'ActionButton', 'Editar movimiento').props.onPress();
   assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/edit-entry/[id]', params: { id: 'inst_tv_002' } }));
   find(root, 'ActionButton', 'Deshacer movimiento').props.onPress();
-  assert.equal(view.alerts[0].message, 'Se sumarán 100.000,00 ARS a Visa Gold. Dejará de contar en tus saldos y reportes. Podés recuperarlo después. '
-    + 'La cuota queda deshecha: no se vuelve a registrar sola y sigue pendiente en su plan.');
+  // 25Q4: the card says how it will read afterwards (it owes $ 120.000,00; this instalment is $ 100.000,00 of it), never «Se sumarán … a Visa Gold».
+  assert.equal(view.alerts[0].message, 'Visa Gold quedará con un saldo pendiente de 20.000,00 ARS. Este movimiento dejará de contar en tus saldos y reportes. '
+    + 'Podés recuperarlo después desde Movimientos deshechos, en Movimientos. La cuota queda deshecha: no se vuelve a registrar sola y sigue pendiente en su plan.');
   view.alerts[0].buttons[1].onPress();
   await settle();
   assert.equal(view.updates[0].action, 'void');

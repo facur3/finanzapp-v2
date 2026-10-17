@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { CARD_DELETED_MESSAGE, CARD_PLAN_MESSAGE, INSTALLMENT_DRIFT_MESSAGE, INSTALLMENT_ENTRY_MESSAGE, INSTALLMENT_ID_MESSAGE, PLAN_CHANGE_MESSAGE, PLAN_DELETE_PATH_MESSAGE,
@@ -12,6 +12,7 @@ import { DATABASE_VERSION, SCHEMA_SCRIPTS, cancelInstallmentPlan, catchUpInstall
   createTransfer, deleteCreditCard, deleteInstallmentPlan, importArchive, initializeDatabase, processRecurring, readArchive, readSnapshot, saveCreditCard, saveInstallmentPlan, saveMonthlyBudget,
   saveRecurringRule, type LedgerDatabase } from '../src/storage/database.ts';
 import { openLedger, refreshLedger } from '../src/storage/ledger-session.ts';
+import { restoreCatchUp } from '../src/ui/backup-file.ts';
 import { runExclusiveTransaction, runSchemaMigration, type TransactionConnection } from '../src/storage/transaction.ts';
 
 // Producto 24T1 on real SQLite: schema 12, a purchase in instalments recognised statement by statement, exactly once,
@@ -453,6 +454,67 @@ test('a real lock held by another connection fails both passes (each reported), 
   const session = await refreshLedger(db, '2026-10-25');
   assert.deepEqual([session.recurringError, session.installmentError], [false, false]);
   assert.deepEqual(await instalmentIds(db), ['inst_tv_001', 'inst_tv_002']);
+});
+
+test('25Q4: a restore records what fell due since the copy; a failing recurring catch-up keeps the import and returns its flag; the retry records each date once', async () => {
+  const { restoreFromBackup } = await import('../src/storage/ledger-session.ts');
+  const { db } = await seeded();
+  await saveRecurringRule(db, { id: 'gym', accountId: 'bank', kind: 'expense', amountMinor: 700, merchant: 'Gimnasio', category: 'Salud', frequency: 'monthly',
+    anchorDateISO: '2026-09-15', nextDateISO: '2026-09-15', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt });
+  const copy = parsePilotBackup(JSON.stringify(createRecoveryBackup(await readArchive(db), new Date(now)))).archive;
+  const fresh = setup().db;
+  await initializeDatabase(fresh);
+  const broken = failingOn(fresh, insertOf('rec_'), 'disk I/O error');
+  const preview = previewBackupImport(await readArchive(fresh), copy);
+  assert.deepEqual(await restoreFromBackup(broken.db, copy, preview.baseline, '2026-10-25'), { recurringError: true, installmentError: false },
+    'the import committed: a failing catch-up after it is its banner, never a failed import');
+  const restored = await readArchive(fresh);
+  assert.deepEqual(restored.accounts.map(account => account.id).sort(), ['bank', 'card-account']);
+  assert.deepEqual(restored.installmentPlans!.map(plan => plan.id), ['tv']);
+  assert.equal(restored.recurring!.find(rule => rule.id === 'gym')!.nextDateISO, '2026-09-15', 'the failed pass rolled back whole');
+  const due = async (target: LedgerDatabase) => (await readArchive(target)).records.map(record => record.entry.id).filter(id => /^(rec|inst)_/.test(id)).sort();
+  assert.deepEqual(await due(fresh), ['inst_tv_001', 'inst_tv_002']);
+  // The banner's retry (or the next foreground) records each date once.
+  broken.heal();
+  await refreshLedger(broken.db, '2026-10-25');
+  assert.deepEqual(await due(fresh), ['inst_tv_001', 'inst_tv_002', 'rec_gym_20260915', 'rec_gym_20261015']);
+  await refreshLedger(broken.db, '2026-10-25');
+  assert.deepEqual(await due(fresh), ['inst_tv_001', 'inst_tv_002', 'rec_gym_20260915', 'rec_gym_20261015'], 'nothing twice');
+  // A healthy restore on another device records the same four movements and leaves no banner.
+  const other = setup().db;
+  await initializeDatabase(other);
+  assert.deepEqual(await restoreFromBackup(other, copy, previewBackupImport(await readArchive(other), copy).baseline, '2026-10-25'),
+    { recurringError: false, installmentError: false });
+  assert.deepEqual(await due(other), ['inst_tv_001', 'inst_tv_002', 'rec_gym_20260915', 'rec_gym_20261015']);
+});
+
+test('25Q4: the review counts what a real restore\'s catch-ups record: the copy\'s rule and plan on a new device, only its rule where the plan was already caught up', async () => {
+  const { restoreFromBackup } = await import('../src/storage/ledger-session.ts');
+  const { db } = await seeded();
+  await saveRecurringRule(db, { id: 'gym', accountId: 'bank', kind: 'expense', amountMinor: 700, merchant: 'Gimnasio', category: 'Salud', frequency: 'monthly',
+    anchorDateISO: '2026-09-15', nextDateISO: '2026-09-15', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt });
+  const copy = parsePilotBackup(JSON.stringify(createRecoveryBackup(await readArchive(db), new Date(now)))).archive;
+  const fresh = setup().db;
+  await initializeDatabase(fresh);
+  // The same card and plan, its instalments recorded by its own foreground pass, and no gym yet.
+  const caughtUp = (await seeded()).db;
+  await catchUpInstallments(caughtUp, '2026-10-25');
+  const due = async (target: LedgerDatabase) => (await readArchive(target)).records.filter(record => /^(rec|inst)_/.test(record.entry.id)).length;
+  for (const [target, expected] of [[fresh, 4], [caughtUp, 2]] as const) {
+    const current = await readArchive(target);
+    const preview = previewBackupImport(current, copy);
+    const counted = restoreCatchUp(current, preview, '2026-10-25');
+    assert.equal(counted, expected);
+    const before = await due(target);
+    assert.deepEqual(await restoreFromBackup(target, copy, preview.baseline, '2026-10-25'), { recurringError: false, installmentError: false });
+    assert.equal(await due(target) - before, counted, 'what the review said is what the restore recorded');
+  }
+});
+
+test('25Q4: the provider restores through restoreFromBackup inside rereadOnRefusal', () => {
+  const provider = readFileSync(new URL('../src/storage/LedgerProvider.tsx', import.meta.url), 'utf8');
+  assert.match(provider, /restoreBackup: \(incoming, baseline\) => rereadOnRefusal\(async db => \{\s*catchUps\.current = await restoreFromBackup\(db, incoming, baseline, todayKey\(\)\);/);
+  assert.ok(!provider.includes('await importArchive(db, incoming, baseline);'), 'the import is restoreFromBackup\'s, never the provider\'s own');
 });
 
 // ---- 24T1 review: interest, fee and financing tax as independent components on real SQLite ---------------------------

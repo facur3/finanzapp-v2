@@ -5,7 +5,7 @@ export const accounts: Pick<Messages, 'accounts'> = {
   accounts: {
     list: {
       emptyTitle: 'Start with an account',
-      emptyDetail: 'Choose an account to group your transactions. Entering an opening balance is optional.',
+      emptyDetail: 'Create an account to group your transactions. The opening balance is optional.',
       /** 24UX6E: what VoiceOver reads for a currency's section header: its name and its recorded total, spoken. */
       sectionLabel: '{currency}, recorded balance {amount}',
     },
@@ -34,6 +34,7 @@ export const accounts: Pick<Messages, 'accounts'> = {
       retryNote: 'Retry the same submission to avoid duplicates. To change it, close and check your accounts first.',
       save: 'Save account',
       saveFailed: 'Couldn’t save. We kept what you entered so you can try again.',
+      appearance: 'Appearance',
     },
     manage: {
       delete: 'Delete',

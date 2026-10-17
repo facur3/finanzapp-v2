@@ -93,7 +93,7 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
     '@finanzapp/domain': domain,
     '../src/storage/LedgerProvider': { useLedger: () => ({ snapshot: data, archive: { accounts: data.accounts, records: [], ...archive } }) },
     '../src/ui/geometry': geometry,
-    '../src/ui/charts': { DonutChart: 'DonutChart', MonthBars: 'MonthBars', OTHERS_KEY: ' others', MONEY_MAX_SCALE: 1.8,
+    '../src/ui/charts': { DonutChart: 'DonutChart', MonthBars: 'MonthBars', OTHERS_KEY: ' others',
       // Like the real one: at most five slices, the tail grouped into one neutral «Otras» slice keyed OTHERS_KEY.
       donutSlices: (items: { key: string; label: string; value: number }[], _p: unknown, _hues: unknown, othersLabel: string) => {
         const head = items.slice(0, items.length > 5 ? 4 : 5).map((item, index) => ({ ...item, color: 'c' + index }));
@@ -208,12 +208,50 @@ test('daily view opens only expenses in the selected date and currency', () => {
   nodes(view.render()).find(n => n.type === 'Choices' && n.props.value === 'categories')!.props.onChange('days');
   const list = view.render();
   assert.equal(list.props.data.length, 2);
+  // 25D1: one anatomy for every day, the date and count over the amount, whatever their lengths (the 30-character rule drew
+  // a short day beside its amount and a long one under it, in the same list).
+  const days = list.props.data.map((item: unknown, index: number) => find(list.props.renderItem({ item, index }), 'DetailRow'));
+  assert.deepEqual(days.map((day: Node) => day.props.layout), ['stacked', 'stacked']);
+  assert.ok(days.some((day: Node) => day.props.label.length + day.props.value.length <= 30), 'a short day is stacked too');
   const row = list.props.renderItem({ item: list.props.data[1], index: 1 });
   find(row, 'DetailRow').props.onPress();
   const detail = routeHarness('report-day.tsx', view.pushed[0].params).render();
   assert.deepEqual(detail.props.entries.map((e: domain.Entry) => e.id).sort(), ['b', 'c']);
   assert.equal(find(detail, 'Money').props.minor, 505);
 });
+test('25D1: the month title grows to Title 3\'s iOS size; beside the arrows while its longest word fits, else on its own line with the arrows under it', () => {
+  const titleOf = (root: Node) => nodes(root).find(n => n.type === 'AppText' && n.props.accessibilityRole === 'header' && n.props.variant === 'title3')!;
+  const titles = Array.from({ length: 12 }, (_, i) => bindLocale('es-AR').formatMonthTitle('2026-' + String(i + 1).padStart(2, '0')));
+  const wordEm = geometry.widestWordEm(titles);
+  for (const [width, fontScale] of [[393, 1], [320, 1], [393, 1.786], [393, 3.571], [375, 3.571], [320, 3.571]] as const) {
+    const root = routeHarness('(tabs)/reports.tsx', { currency: 'ARS', month: '2026-08' }, snapshot, { window: { width, height: 852, fontScale, scale: 3 } }).render();
+    const title = titleOf(root);
+    const expected = geometry.titleFit(fontScale, 55 / 20, wordEm, 20 * 1.06, width - 144, width - 40);
+    const at = `${width} pt ×${fontScale}`;
+    assert.deepEqual([title.props.maxFontSizeMultiplier, title.props.numberOfLines], [expected.maxScale, 2], at);
+    const drawn = 20 * Math.min(fontScale, expected.maxScale);
+    // «Septiembre» stays whole on its line: beside the arrows (2 × 44 pt and two 8 pt gaps) or alone on the screen's width.
+    assert.ok(wordEm * 20 * 1.06 * Math.min(fontScale, expected.maxScale) <= (expected.stacked ? width - 40 : width - 144) + 1e-9, at);
+    const stepper = nodes(root).find(n => n.type === 'View' && [n.props.children].flat().some((child: any) => child?.type === 'ValueTransition'))!;
+    const arrows = nodes(stepper).filter(n => n.type === 'IconButton').map(n => n.props.label);
+    assert.equal(JSON.stringify(arrows), JSON.stringify(['Mes anterior', 'Mes siguiente']), at);
+    const first = [stepper.props.children].flat().filter(Boolean)[0];
+    if (expected.stacked) {
+      assert.equal(first.type, 'ValueTransition', at + ': the title first, the arrows under it');
+      assert.ok(fontScale >= 1.786, at);
+    } else assert.equal(first.type, 'IconButton', at + ': the arrows beside the title');
+    // The captions under it (August is past, so «Este mes» shows) take Caption 1\'s own ceiling, through AppText: never
+    // larger than the title at any setting.
+    const captions = nodes(stepper).filter(n => n.type === 'AppText' && n.props.variant === 'caption');
+    assert.equal(captions.length, 2, at);
+    for (const caption of captions) assert.equal(caption.props.maxFontSizeMultiplier, undefined, at);
+    assert.ok(12 * Math.min(fontScale, 43 / 12) <= drawn, `${at}: caption ${12 * Math.min(fontScale, 43 / 12)} pt under the title's ${drawn.toFixed(1)}`);
+  }
+  // At AX5 the title is far larger than the 28 pt it was capped at, and on a 393 pt screen it reaches iOS's own 55 pt.
+  const ax5 = geometry.titleFit(3.571, 55 / 20, wordEm, 20 * 1.06, 393 - 144, 393 - 40);
+  assert.deepEqual([ax5.stacked, Math.round(20 * Math.min(3.571, ax5.maxScale))], [true, 55]);
+});
+
 test('day and comparison cutoff reject malformed or future scope', () => {
   for (const date of [['2026-08-10'], '2026-02-30', '2026-09-13', undefined]) {
     assert.equal(find(routeHarness('report-day.tsx', { currency: 'ARS', date }).render(), 'EmptyState').props.title, 'Día no válido');

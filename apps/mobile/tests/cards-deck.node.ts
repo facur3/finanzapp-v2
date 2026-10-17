@@ -5,6 +5,7 @@ import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import * as domain from '@finanzapp/domain';
 import * as cardFaces from '../src/ui/card-faces.ts';
+import { deltaE } from './contrast.ts';
 import * as geometry from '../src/ui/geometry.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 
@@ -135,6 +136,30 @@ test('every face tone holds white text at 7:1 (base, sheen and highlight), and t
   }
 });
 
+test('the six hash tones are pairwise distinct (ΔE 12 or more; graphite and slate were 1.6 apart), and every face shares one rim', () => {
+  const faces = cardFaces.HASH_FACES;
+  assert.equal(faces.length, 6);
+  for (let one = 0; one < faces.length; one++) for (let two = one + 1; two < faces.length; two++) {
+    const distance = deltaE(faces[one].base, faces[two].base);
+    assert.ok(distance >= 12, `${faces[one].base} and ${faces[two].base} are ΔE ${distance.toFixed(1)} apart`);
+  }
+  // The index is the stored id's hash, unchanged: a card keeps its slot, only a slot's drawn tone changed.
+  assert.equal(cardFaces.cardFaceIndex('visa'), [...'visa'].reduce((hash, c) => (hash * 31 + c.charCodeAt(0)) >>> 0, 0) % 6);
+  assert.equal(cardFaces.FACE_RIM, 'rgba(255, 255, 255, 0.12)');
+});
+
+test('25D1: a card pressed under Reduce Motion keeps its text legible through the wash: white 6:1, the issuer AA', () => {
+  assert.equal(cardFaces.DECK_PRESSED_WASH, 0.12);
+  const washed = (color: string) => mix(color, '#000000', cardFaces.DECK_PRESSED_WASH);
+  for (const { base, highlight } of [...cardFaces.HASH_FACES, ...Object.values(cardFaces.COLOR_FACES)]) {
+    for (const ground of [base, highlight, mix(base, '#FFFFFF', 0.05)]) {
+      assert.ok(contrast(washed('#FFFFFF'), washed(ground)) >= 6, `white on ${ground} pressed: ${contrast(washed('#FFFFFF'), washed(ground)).toFixed(2)}`);
+    }
+    const issuer = washed(mix(base, '#FFFFFF', 0.72));
+    assert.ok(contrast(issuer, washed(mix(base, '#FFFFFF', 0.05))) >= 4.5, `the issuer on ${base} pressed`);
+  }
+});
+
 test('a card takes the deep tone of the colour its account chose, and its stable hash tone otherwise', () => {
   // Every appearance colour of the domain has its deep face, and nothing else does.
   assert.deepEqual(Object.keys(cardFaces.COLOR_FACES).sort(), domain.APPEARANCE_COLORS.map(color => color.id).sort());
@@ -202,11 +227,18 @@ function slots(deck: Node) {
   return (deck.props.children as Node[]).map(slot => {
     const view = slot.type(slot.props) as Node;
     const style = view.props.style as any[];
-    const animated = style.find(item => typeof item === 'function')();
-    const [face, hit] = view.props.children as Node[];
+    const restyle = () => style.find(item => typeof item === 'function')();
+    const animated = restyle();
+    // 25D1: the slot's children are the face, under Reduce Motion a wash, and the touch target.
+    const children = (view.props.children as (Node | false)[]).filter(Boolean) as Node[];
+    const [face] = children;
+    const hit = children.find(child => child.type === 'Pressable')!;
+    const wash = children.find(child => child.props?.pointerEvents === 'none') ?? null;
     const target = Object.assign({}, ...(hit.props.style as object[]));
     return { id: face.props.id, zIndex: style.find(item => item && 'zIndex' in item).zIndex, top: animated.transform[0].translateY, scale: animated.transform[1].scale, face,
-      hit: { ...hit.props, height: target.height, position: target.position } as Record<string, any> };
+      hit: { ...hit.props, height: target.height, position: target.position } as Record<string, any>, restyle, wash,
+      washOpacity: () => wash ? (wash.props.style as any[]).find(item => typeof item === 'function')().opacity : null,
+      washStyle: wash ? Object.assign({}, ...(wash.props.style as any[]).filter(item => typeof item !== 'function')) : null };
   });
 }
 
@@ -266,13 +298,15 @@ test('24T2 review: in dark mode the deck separates its cards by the faces\' rims
     JSON.stringify(slots(visual().CardDeck(props)).map(card => [card.top, card.hit.accessibilityLabel])));
 });
 
-test('the cards move to their places in 260 ms, press like any card, and jump without movement under Reduce Motion', () => {
+test('the cards move to their places in 260 ms, press like any card, and under Reduce Motion jump, and show a press as a dark wash instead of a scale', () => {
   const moving = visual();
   const cards = slots(moving.CardDeck({ cards: [visa, amex], selectedId: 'visa', onSelect: () => {}, onOpen: () => {} }));
   assert.equal(JSON.stringify(moving.timings.map(item => [item.value, item.duration])), JSON.stringify([[50, 260], [0, 260]]), 'each card animates to its target with timing(data)');
   moving.timings.length = 0;
   cards[1].hit.onPressIn();
-  assert.equal(JSON.stringify(moving.timings.map(item => [item.value, item.duration])), JSON.stringify([[1, 100]]), 'pressed in 100 ms (0.97)');
+  assert.equal(JSON.stringify(moving.timings.map(item => [item.value, item.duration])), JSON.stringify([[1, 100]]), 'pressed in 100 ms');
+  assert.equal(cards[1].restyle().transform[1].scale, 0.97);
+  assert.equal(cards[1].wash, null, 'no wash with motion: the scale is the press');
   cards[1].hit.onPressOut();
   assert.equal(JSON.stringify(moving.timings.at(-1)), JSON.stringify({ value: 0, duration: 160 }));
 
@@ -280,8 +314,16 @@ test('the cards move to their places in 260 ms, press like any card, and jump wi
   const flat = slots(still.CardDeck({ cards: [visa, amex], selectedId: 'amex', onSelect: () => {}, onOpen: () => {} }));
   assert.ok(still.timings.every(item => item.duration === 0), 'Reduce Motion: the positions change without movement');
   still.timings.length = 0;
+  // 25D1: before, a press under Reduce Motion showed nothing at all; now a dark wash, at once, and no scale.
+  assert.equal(JSON.stringify(flat[0].washStyle), JSON.stringify({ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 18, backgroundColor: '#000000' }));
+  assert.equal(flat[0].washOpacity(), 0);
   flat[0].hit.onPressIn();
-  assert.equal(still.timings.length, 0, 'and a press never scales');
+  assert.equal(JSON.stringify(still.timings), JSON.stringify([{ value: 1, duration: 0 }]), 'instant');
+  assert.equal(flat[0].restyle().transform[1].scale, 1, 'never scales');
+  assert.equal(flat[0].washOpacity(), cardFaces.DECK_PRESSED_WASH);
+  flat[0].hit.onPressOut();
+  assert.equal(JSON.stringify(still.timings.at(-1)), JSON.stringify({ value: 0, duration: 0 }));
+  assert.equal(flat[0].washOpacity(), 0);
   assert.equal(JSON.stringify(flat.map(card => card.top)), '[0,50]');
 });
 

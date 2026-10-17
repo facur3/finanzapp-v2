@@ -23,7 +23,7 @@ import { useI18n } from '../../src/i18n/provider';
  * tray is stale) and shows what Confirmar records, compactly: kind and amount, merchant, category, account or card, the
  * card's purchase mode, the date, and every missing fact by name.
  *
- * - Confirmar (the one lime action) is enabled only when the domain finds no gap and a current basis, and calls the same
+ * - Confirmar (the one brand-filled action) is enabled only when the domain finds no gap and a current basis, and calls the same
  *   dispatcher as «Para revisar» (`useReviewActions` → `confirmReview` → the store's frozen write): one write at most.
  * - Editar opens the «Para revisar» editor over the sheet; saving returns here, to the edited item.
  * - Descartar asks first, then pending → dismissed; the ledger is never touched.
@@ -150,7 +150,7 @@ function ReviewSheet({ item, leaving, reload, leave, refreshing, onHeld }: {
       {/* Descartar is explicit and asks first; closing the sheet is not discarding. A conflict with a frozen write cannot be
           dismissed (the store refuses it). */}
       {(!conflict || item.attempt === null) && <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('review.sheet.discard')}
-        accessibilityState={{ disabled: idle }} disabled={idle} onPress={dismiss} style={{ alignSelf: 'center', minHeight: 44, justifyContent: 'center', paddingHorizontal: space.m }}>
+        accessibilityState={{ disabled: idle }} disabled={idle} onPress={dismiss} style={{ alignSelf: 'center', minHeight: 44, justifyContent: 'center', paddingHorizontal: space.m, opacity: idle ? 0.5 : 1 }}>
         <AppText variant="subhead" style={{ color: p.expense, fontWeight: '500' }}>{t('review.sheet.discard')}</AppText>
       </PressFeedback>}
     </View>}

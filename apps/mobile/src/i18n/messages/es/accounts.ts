@@ -3,7 +3,7 @@ export const accounts = {
   accounts: {
     list: {
       emptyTitle: 'Empezá por una cuenta',
-      emptyDetail: 'Elegí una cuenta para agrupar movimientos. Cargar el saldo inicial es opcional.',
+      emptyDetail: 'Creá una cuenta para agrupar tus movimientos. El saldo inicial es opcional.',
       /** 24UX6E: what VoiceOver reads for a currency's section header: its name and its recorded total, spoken. */
       sectionLabel: '{currency}, saldo registrado {amount}',
     },
@@ -36,6 +36,8 @@ export const accounts = {
       retryNote: 'Reintentá el mismo envío para evitar duplicados. Para cambiarlo, cerrá y revisá primero tus cuentas.',
       save: 'Guardar cuenta',
       saveFailed: 'No se pudo guardar. Conservamos lo que escribiste para que puedas reintentar.',
+      /** 25O1: the section of Nueva cuenta and Editar cuenta that holds the icon and colour picker, last, after the money. */
+      appearance: 'Apariencia',
     },
     /** Producto 25B2: the lifecycle of a normal account. Deleting keeps every movement and transfer; the row only
      * leaves the lists, the totals and the forms. */

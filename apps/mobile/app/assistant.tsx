@@ -209,7 +209,10 @@ export default function AssistantScreen() {
   };
 
   const open = useCallback((href: EvidenceLink['href']) => {
-    const to = href.params ? { pathname: href.pathname, params: href.params } : href.pathname;
+    // 25Q4: Movimientos opens whole and from the top on a fresh `reset`, made at the tap, so the same evidence followed twice
+    // resets twice (the dock keeps a search, a filter and the scroll).
+    const params = href.pathname === '/activity' ? { ...href.params, reset: String(Date.now()) } : href.params;
+    const to = params ? { pathname: href.pathname, params } : href.pathname;
     if (TAB_ROOTS.has(href.pathname)) router.dismissTo(to);
     else router.push(to);
   }, []);

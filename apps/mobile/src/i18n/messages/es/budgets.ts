@@ -84,6 +84,8 @@ export const budgets = {
       categoryNote: 'Se compara con los gastos registrados en esta categoría durante ese mes. Es un sublímite: no se suma al presupuesto general. Las devoluciones restan en su mes y su categoría.',
       retryNote: 'El envío quedó congelado para que Reintentar no cree otro presupuesto.',
       create: 'Crear presupuesto',
+      /** Under the refusal of a budget that already exists: where to change it. */
+      takenHint: 'Para cambiarlo, tocalo en Presupuestos.',
       delete: 'Eliminar presupuesto',
       retryDelete: 'Reintentar eliminación',
       deleteTitle: '¿Eliminar este presupuesto?',

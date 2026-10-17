@@ -12,6 +12,7 @@ import type { AppLocale } from '../src/i18n/locale.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
 import * as i18nLocale from '../src/i18n/locale.ts';
 import * as movementAmount from '../src/ui/movement-amount.ts';
+import * as paletteModule from '../src/ui/palette.ts';
 
 const { AMOUNT_FIELD, amountFieldLayout, amountWidthEm, fitFontSize } = geometry;
 const { displayAmount } = moneyInput;
@@ -126,6 +127,14 @@ test('AmountField anchors the symbol before a left-aligned input that fills the 
   assert.equal(flatten(rowOf(dollars).props.children[1].props.style).color, '#03c', 'the tone colours the digits');
   const untitled = render('AmountField', { currency: 'ARS', value: '', onChangeText: () => {} });
   assert.equal(untitled.props.children[0].props.children.join(''), 'Monto · ARS', 'the default label comes from the catalogue');
+  // 25O1: `bare` (the first opening's opening balance, under its question and beside its currency chip) drops the caption
+  // only: the row, the input and what VoiceOver hears are the same.
+  const captioned = render('AmountField', { label: 'Saldo inicial', currency: 'ARS', value: '', onChangeText: () => {} });
+  const bare = render('AmountField', { label: 'Saldo inicial', currency: 'ARS', value: '', onChangeText: () => {}, bare: true });
+  assert.equal(captioned.props.children[0].props.children.join(''), 'Saldo inicial · ARS');
+  assert.equal(bare.props.children[0], false, 'no caption');
+  assert.equal(rowOf(bare).props.children[1].props.accessibilityLabel, 'Saldo inicial en pesos argentinos');
+  assert.equal(JSON.stringify(rowOf(bare).props.children[1].props.style), JSON.stringify(rowOf(captioned).props.children[1].props.style));
 });
 
 // A row that puts a name beside an amount: the amount gets the whole row
@@ -153,7 +162,7 @@ test('rowStacks: large text always stacks; otherwise a long amount stacks on a n
 
 // The Money component itself: heroes measure their container and size from it;
 // rows keep the native fit without a fixed line height.
-function loadComponents(locale: AppLocale = 'es-AR', deviceLanguage: string | null = null, held: readonly domain.Currency[] = []) {
+function loadComponents(locale: AppLocale = 'es-AR', deviceLanguage: string | null = null, held: readonly domain.Currency[] = [], palette: Record<string, unknown> = {}) {
   const source = readFileSync(new URL('../src/ui/components.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: any, props: any) => ({ type, props });
@@ -175,9 +184,9 @@ function loadComponents(locale: AppLocale = 'es-AR', deviceLanguage: string | nu
     '@finanzapp/domain': { formatMinorUnits: (minor: number) => (minor / 100).toLocaleString('es-AR', { minimumFractionDigits: 2 }), accountBalanceMinor: () => 0, labelFromISO: () => '',
       draftFitsCurrency: domain.draftFitsCurrency, editedDraftFits: domain.editedDraftFits },
     'expo-router': { router: {} },
-    './theme': { radius: {}, space: {}, type: { body: { fontSize: 17, lineHeight: 22 } }, useCurrentDay: () => '2026-09-20', useReduceMotion: () => true, usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', income: '#008800', transfer: '#03c', warning: '#a60', heroInk: '#131411', heroMoneySymbol: '#3A3C3F', heroMoneyCents: '#505255' }) },
+    './theme': { radius: {}, space: {}, type: { body: { fontSize: 17, lineHeight: 22 } }, useCurrentDay: () => '2026-09-20', useReduceMotion: () => true, usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', income: '#008800', transfer: '#03c', warning: '#a60', heroInk: '#131411', heroMoneySymbol: '#3A3C3F', heroMoneyCents: '#505255', ...palette }) },
     './categories': { categoryIcon: () => 'pricetag-outline' },
-    './dock-clearance': { useDockInset: () => ({ extraPadding: 0, indicator: undefined }) }, './category-color': { tintOf: (c: string) => c }, './category-hues': { useCategoryColor: () => '#111', useCategoryLook: (label: string) => ({ label, hex: '#111', glyph: 'pricetag-outline' }), useAccountLook: () => ({ glyph: 'wallet-outline', hex: '#2557D6' }) },
+    './palette': paletteModule, './dock-clearance': { useDockInset: () => ({ extraPadding: 0, indicator: undefined }) }, './category-color': { tintOf: (c: string) => c }, './category-hues': { useCategoryColor: () => '#111', useCategoryLook: (label: string) => ({ label, hex: '#111', glyph: 'pricetag-outline' }), useAccountLook: () => ({ glyph: 'wallet-outline', hex: '#2557D6' }) },
     './geometry': geometry, './merchant-mark': merchantMark, './money-input': moneyInput, './motion': { duration: {}, easeOut: {}, selectionHaptic: () => {}, timing: () => ({}) },
     '../i18n/provider': { useI18n: () => bindLocale(locale, 'native', deviceLanguage, held) }, '../i18n/format': i18nFormat, '../i18n/locale': i18nLocale, '../i18n/messages': {},
   };
@@ -214,10 +223,20 @@ test('Money sizes a hero from its measured width and leaves rows to the native f
   assert.equal(text.props.style.fontSize, 40, 'sized from the measured width');
   assert.equal(text.props.style.lineHeight, Math.round(40 * 1.18));
   assert.equal(text.props.maxFontSizeMultiplier, 1.4);
+  // 25D1 (deliberate golden change): an amount is never smaller than body text can be. A row amount stops at Body's AX5
+  // size, 53 pt, whatever its own size (it stopped at 1.8×: 30.6 pt under 53 pt names, while a 24 pt total reached 43);
+  // a hero at 1.4× or 53 pt, whichever is larger (a 28 pt total reached 39); each still shrinks to fit its line.
+  const rowAmount = render({ minor: 1234, currency: 'ARS' });
+  assert.deepEqual([rowAmount.props.maxFontSizeMultiplier, rowAmount.props.adjustsFontSizeToFit, rowAmount.props.numberOfLines], [53 / 17, true, 1]);
+  const ceiling = (size: number) => { const node = render({ minor: 1234, currency: 'ARS', size }); return (node.type === 'View' ? node.props.children : node).props.maxFontSizeMultiplier as number; };
+  for (const size of [15, 17, 20, 22, 24, 26]) assert.equal(Math.round(size * ceiling(size)), 53, size + ' pt row amount: 53 pt at most');
+  for (const [size, top] of [[28, 53], [40, 56], [46, 64.4]] as const) assert.equal(Math.round(size * ceiling(size) * 10) / 10, top, size + ' pt hero');
   const income = render({ minor: 1234, currency: 'USD', large: true, signed: true, tone: 'income' }).props.children;
   const [greenSymbol, greenWhole, greenCents] = income.props.children.props.children;
   assert.equal(greenSymbol.props.children + greenWhole + greenCents.props.children, '+US$\u00A012,34');
-  assert.equal(greenSymbol.props.style.color, '#008800B3', 'a coloured hero keeps its hue and only lowers the alpha');
+  // 25D1 (deliberate golden change): in light the symbol keeps 90 % and the cents 80 % of the hue (were 70 % / 55 %,
+  // 2.2:1 on the sand); QUIET_ALPHA in palette.ts, floors in tests/contrast-floors.node.ts.
+  assert.equal(greenSymbol.props.style.color, '#008800E6', 'a coloured hero keeps its hue and only lowers the alpha');
   assert.equal(income.props.style.color, '#008800');
   // Regression for the clipped category title: a larger fontSize on the body variant must not keep the 22 pt line box.
   const heading = flatten(module.exports.AppText!({ children: 'Comida', style: { fontSize: 26, fontWeight: '700' } }).props.style);
@@ -246,9 +265,92 @@ test('25A-03: a hero on Inicio\'s field takes the solid graphite symbol and cent
   assert.deepEqual([symbol.props.style.fontWeight, cents.props.style.fontWeight], ['600', '600']);
   // Without the flag nothing changes: another coloured hero keeps its own hue at an alpha, an ink one the canvas greys.
   const [plainSymbol, , plainCents] = plain.props.children.props.children;
-  assert.deepEqual([plainSymbol.props.style.color, plainCents.props.style.color], ['#131411B3', '#1314118C']);
+  assert.deepEqual([plainSymbol.props.style.color, plainCents.props.style.color], ['#131411E6', '#131411CC']);
   const canvas = render('Money', { minor: 123456, currency: 'ARS', large: true }).props.children.props.children.props.children;
   assert.deepEqual([canvas[0].props.style.color, canvas[2].props.style.color], ['#666', '#999']);
+  // 25N1: the zero month draws its units quieter (heroSecondary, luminance 0.72) than the grey symbol (0.76): the quiet
+  // hero is one tone throughout, so the symbol is never brighter than the number.
+  const zero = render('Money', { minor: 0, currency: 'ARS', large: true, size: 46, color: '#D3DCF6', onField: true }).props.children;
+  const [zeroSymbol, , zeroCents] = zero.props.children.props.children;
+  assert.deepEqual([zero.props.style.color, zeroSymbol.props.style.color, zeroCents.props.style.color], ['#D3DCF6', '#D3DCF6', '#D3DCF6']);
+});
+
+test('25D1: AppText stops every style at the size iOS gives it at AX5, which keeps iOS\'s order at every setting; an explicit cap wins', () => {
+  const { render } = loadComponents();
+  const cap = (props: Record<string, unknown>) => render('AppText', { children: 'x', ...props }).props.maxFontSizeMultiplier as number;
+  // The HIG's AX5 table (Larger Accessibility Sizes), over each style's default size.
+  const AX5: Record<string, [number, number]> = { largeTitle: [34, 60], title1: [28, 58], title2: [22, 56], title3: [20, 55], headline: [17, 53], body: [17, 53],
+    subhead: [15, 49], footnote: [13, 44], caption: [12, 43] };
+  for (const [variant, [base, ax5]] of Object.entries(AX5)) assert.equal(Math.round(base * cap({ variant })), ax5, variant);
+  assert.equal(cap({}), cap({ variant: 'body' }), 'the default style is Body');
+  assert.equal(cap({ variant: 'eyebrow' }), cap({ variant: 'caption' }), 'the eyebrow is a Caption 1');
+  // React Native multiplies every style by one factor per setting (xS … AX5); a larger style is never drawn smaller.
+  const order = ['largeTitle', 'title1', 'title2', 'title3', 'headline', 'subhead', 'footnote', 'caption'];
+  for (const factor of [0.823, 1, 1.118, 1.235, 1.353, 1.786, 2.143, 2.643, 3.143, 3.571]) {
+    const sizes = order.map(variant => AX5[variant][0] * Math.min(factor, cap({ variant })));
+    for (let i = 1; i < sizes.length; i++) assert.ok(sizes[i - 1] >= sizes[i], `×${factor}: ${order[i - 1]} ${sizes[i - 1]} ≥ ${order[i]} ${sizes[i]}`);
+  }
+  assert.equal(cap({ variant: 'largeTitle', maxFontSizeMultiplier: 1.2 }), 1.2);
+  assert.equal(cap({ variant: 'body', maxFontSizeMultiplier: 1.4 }), 1.4);
+});
+
+test('25D1: with iOS\'s Increase Contrast on, a hero\'s symbol and cents are drawn at the units\' full strength, on the canvas, in colour and on the field', () => {
+  const quiet = (palette: Record<string, unknown>, props: Record<string, unknown>) => {
+    const { render } = loadComponents('es-AR', null, [], palette);
+    const [symbol, , cents] = render('Money', { minor: 123456, currency: 'ARS', large: true, ...props }).props.children.props.children.props.children;
+    return [symbol.props.style.color, cents.props.style.color];
+  };
+  assert.deepEqual(quiet({}, {}), ['#666', '#999'], 'off: the quiet pair, as drawn');
+  assert.deepEqual(quiet({ increaseContrast: true }, {}), ['#000', '#000'], 'the canvas ink');
+  assert.deepEqual(quiet({ increaseContrast: true }, { tone: 'income', signed: true }), ['#008800', '#008800'], 'a coloured hero keeps its hue at full strength');
+  assert.deepEqual(quiet({ increaseContrast: true }, { color: '#131411', onField: true, size: 46 }), ['#131411', '#131411'], 'on the field');
+  assert.deepEqual(quiet({}, { color: '#131411', onField: true, size: 46 }), ['#3A3C3F', '#505255'], 'off: the field\'s solid greys');
+});
+
+test('25O1 review: the close\'s sand-white card draws the light palette\'s symbol and cents in both themes, never its ink at an alpha', () => {
+  const { lightPalette, darkPalette } = paletteModule;
+  const quiet = (palette: Record<string, unknown>) => {
+    const { render } = loadComponents('es-AR', null, [], palette);
+    const [symbol, , cents] = render('Money', { minor: 5_000_000, currency: 'ARS', large: true, size: 44, align: 'center', color: lightPalette.heroThumbInk })
+      .props.children.props.children.props.children;
+    return [symbol.props.style.color, cents.props.style.color];
+  };
+  const light = [lightPalette.secondary, lightPalette.tertiary];
+  assert.deepEqual(quiet({ ...lightPalette, isDark: false }), light);
+  assert.deepEqual(quiet({ ...darkPalette, isDark: true }), light, 'never #19191CB3 / #19191C99, the alphas of a coloured hero');
+  assert.deepEqual(quiet({ ...darkPalette, isDark: true, increaseContrast: true }), [lightPalette.heroThumbInk, lightPalette.heroThumbInk], 'Increase Contrast still comes first');
+});
+
+test('25D1, 25O1: the first opening\'s titles keep every word whole at AX5 on 375 and 393 pt (they drew about 120 pt before)', () => {
+  // 25O1: the story's headlines (display, 40 pt) take their own fit: the Large Title's 60 pt, or less where their longest
+  // word would not fit the page whole; the other steps' titles are Large Titles under AppText's own cap.
+  const onboarding = readFileSync(new URL('../app/onboarding.tsx', import.meta.url), 'utf8');
+  assert.match(onboarding, /accessibilityRole="header" variant="display" maxFontSizeMultiplier=\{scale\}/);
+  assert.match(onboarding, /titleFit\(fontScale, TEXT_STYLE_MAX_SCALE\.display!, widestWordEm\(\[text\]\), \(type\.display\.fontSize \?\? 40\) \* WEIGHT_WIDTH\.bold,\s+width - 2 \* space\.xxl, width - 2 \* space\.xxl\)\.maxScale/);
+  for (const key of ['start', 'account', 'done']) assert.match(onboarding, new RegExp(`ref=\\{titleRef\\('${key}'\\)\\} accessibilityRole="header" variant="largeTitle"`));
+  const { render } = loadComponents();
+  const capOf = (variant: string) => render('AppText', { variant, children: 'x' }).props.maxFontSizeMultiplier as number;
+  assert.equal(Math.round(40 * capOf('display')), 60, 'the display style stops where the Large Title does');
+  // A headline's page is the screen less 2 × 24 pt, a Large Title's step less 2 × 20; a word is bold (+10 % for the Large
+  // Titles, WEIGHT_WIDTH.bold for the fit the screen computes). React Native multiplies every style by 3.571 at AX5.
+  for (const locale of ['es-AR', 'en-US'] as const) {
+    const { t } = bindLocale(locale);
+    for (const width of [375, 393]) {
+      for (const page of ['record', 'commitments', 'available'] as const) {
+        const text = t(`onboarding.story.${page}.lead`) + ' ' + t(`onboarding.story.${page}.emphasis`);
+        const wordEm = geometry.widestWordEm([text]), size = 40 * geometry.WEIGHT_WIDTH.bold;
+        const { maxScale } = geometry.titleFit(3.571, capOf('display'), wordEm, size, width - 48, width - 48);
+        assert.ok(maxScale >= 1 && maxScale <= capOf('display'), `${locale} ${page}: between its own size and 60 pt`);
+        assert.ok(wordEm * size * maxScale <= width - 48, `${locale} ${page} at ${width} pt`);
+      }
+      for (const key of ['onboarding.start.title', 'onboarding.presets.cash.question', 'onboarding.presets.bank.question', 'onboarding.presets.digital.question', 'onboarding.done.title'] as const) {
+        const words = t(key).split(' ').map(word => geometry.labelWidthEm(word) * 34 * 1.1);
+        assert.ok(Math.max(...words) * capOf('largeTitle') <= width - 40, `${locale} ${key} at ${width} pt`);
+      }
+    }
+    // Uncapped (60 pt), the longest headline word would break on a 375 pt iPhone in English: the fit is what keeps it whole.
+    if (locale === 'en-US') assert.ok(geometry.widestWordEm([t('onboarding.story.commitments.lead')]) * 40 * geometry.WEIGHT_WIDTH.bold * capOf('display') > 375 - 48);
+  }
 });
 
 test('Money in the four language × region combinations: the region writes the number and the symbol, the language speaks it', () => {

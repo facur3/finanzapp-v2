@@ -17,6 +17,7 @@
  * searched, and are one grouped card under the pinned row. Rows carry their position
  * inside their group so a virtualized list can draw grouped corners. */
 import { foldText } from '../i18n/intl-support.ts';
+import type { IconName } from './appearance.ts';
 
 export interface ChoiceOption<T extends string = string> {
   value: T;
@@ -26,6 +27,10 @@ export interface ChoiceOption<T extends string = string> {
   language?: string;
   /** Folded text a search matches; the folded title when absent. */
   searchText?: string;
+  /** 25O1: the row's mark, as data the screen draws: the region whose round flag leads it (a region's own, a language's
+   * variety, `flags.ts`), or a neutral glyph on the same circle («Según el dispositivo»). Neither: no mark. */
+  flag?: string;
+  glyph?: IconName;
 }
 
 export type GroupPosition = 'only' | 'first' | 'middle' | 'last';

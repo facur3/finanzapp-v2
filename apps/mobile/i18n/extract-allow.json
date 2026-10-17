@@ -17,6 +17,7 @@
     "src/fx/frankfurter.ts": "The rate provider's client (24C1): its source name is a proper noun passed into catalogue sentences, and its errors are internal (the screens say why from fx.reason.*), never shown.",
     "src/fx/rates-store.ts": "The rate cache's bookkeeping (24C1): types and timing only, no interface copy.",
     "src/storage/rates-database.ts": "The rate cache's SQLite schema (24C1): SQL and types, no interface copy.",
+    "src/ui/licenses.ts": "Third-party notices (25N1): each licence's name and full text exactly as published, in English in every language; the screen's own words are in the catalogue.",
     "src/storage/review-database.ts": "The review store (25A-02): its errors are translated at display time by src/i18n/errors.ts from their exact text; the rest is SQL and types."
   }
 }

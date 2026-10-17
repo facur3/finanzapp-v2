@@ -5,8 +5,8 @@ import Svg, { Circle, Path } from 'react-native-svg';
 import { AppText, Money, PressFeedback } from './components';
 import { useI18n } from '../i18n/provider';
 import { categoryColor, othersColor } from './category-color';
-import { ROW_STACK_SCALE, amountWidthEm, labelWidthEm } from './geometry';
-import { ValueTransition, duration, timing } from './motion';
+import { AMOUNT_AX5_SIZE, ROW_STACK_SCALE, TEXT_STYLE_MAX_SCALE, WEIGHT_WIDTH, amountWidthEm, labelWidthEm } from './geometry';
+import { ValueTransition, duration, easeOutCss, timing } from './motion';
 import { usePalette, useReduceMotion, type Palette } from './theme';
 import type { Currency } from '@finanzapp/domain';
 
@@ -126,14 +126,24 @@ export function donutRoom(size: number, thickness: number): number {
  * never below 18 pt. An amount that does not fit at 18 pt moves under the donut instead (never shrunk further, never
  * truncated, never approximated). */
 export const CENTRE_AMOUNT_STEPS = [26, 24, 22, 20, 18] as const;
-/** Money's own cap on Dynamic Type for an amount that is not a hero (`ROW_MAX_SCALE` in components.tsx). */
-export const MONEY_MAX_SCALE = 1.8;
+/** 25D1: the month axis under the bars. The short month («sep») while the widest of them fits its column at the person's
+ * text size; past that the month's initial («S», as Apple's charts do when space is short). Either is as large as its
+ * column allows, up to Caption 1's AX5 size, never smaller than the default: legibility decides, not a fixed cap. The
+ * column comes from the window: the chart sits in a card (2 × 16 pt) on a screen (2 × 20 pt), 6 pt between columns. The
+ * chosen month is semibold, so widths carry that weight. */
+export function axisLabels(shorts: readonly string[], width: number, fontScale: number): { labels: string[]; maxScale: number } {
+  if (!shorts.length) return { labels: [], maxScale: 1 };
+  const column = (width - 72 - 6 * (shorts.length - 1)) / shorts.length;
+  const widest = (labels: readonly string[]) => Math.max(...labels.map(labelWidthEm)) * 12 * WEIGHT_WIDTH.semibold;
+  const labels = widest(shorts) * Math.max(fontScale, 1) <= column ? [...shorts] : shorts.map(label => label.charAt(0).toUpperCase());
+  return { labels, maxScale: Math.max(1, Math.min(TEXT_STYLE_MAX_SCALE.caption!, column / widest(labels))) };
+}
 
 /** The largest step of `CENTRE_AMOUNT_STEPS` at which `amountText` fits `room` at this text scale, or null when not even
  * the smallest does. */
-export function centreAmountSize(amountText: string, room: number, fontScale: number): number | null {
+export function centreAmountSize(amountText: string, room: number, fontScale: number, maxSize = Infinity): number | null {
   const scale = Math.max(Number.isFinite(fontScale) ? fontScale : 1, 0.5);
-  return CENTRE_AMOUNT_STEPS.find(step => amountWidthEm(amountText) * step * scale <= room) ?? null;
+  return CENTRE_AMOUNT_STEPS.find(step => amountWidthEm(amountText) * Math.min(step * scale, maxSize) <= room) ?? null;
 }
 
 /** Category donut (24UX6C2, recomposed in 24UX6D). It is the head of Categorías: the period's total lives in its centre
@@ -204,7 +214,7 @@ export function DonutChart({ slices, currency, total, size: sizeProp, thickness:
   const fitted = fontScale <= ROW_STACK_SCALE ? centreAmountSize(amountText, room, fontScale) : null;
   const centreFits = fitted !== null && labelWidthEm(heading) * 13 * scale <= room * 2 * 0.85;
   // Under the donut the amount has the row's whole width and follows Dynamic Type (up to Money's own cap).
-  const belowSize = centreAmountSize(amountText, Math.max(0, width - DONUT_GUTTER), Math.min(fontScale, MONEY_MAX_SCALE)) ?? CENTRE_AMOUNT_STEPS[CENTRE_AMOUNT_STEPS.length - 1];
+  const belowSize = centreAmountSize(amountText, Math.max(0, width - DONUT_GUTTER), fontScale, AMOUNT_AX5_SIZE) ?? CENTRE_AMOUNT_STEPS[CENTRE_AMOUNT_STEPS.length - 1];
   const readout = <>
     <AppText numberOfLines={centreFits ? 2 : undefined} maxFontSizeMultiplier={centreFits ? ROW_STACK_SCALE : undefined} variant="footnote" secondary={!selected}
       style={selected ? { fontWeight: '600', textAlign: 'center' } : { textAlign: 'center' }}>{heading}</AppText>
@@ -272,7 +282,7 @@ function Sweep({ arcs, size, thickness, ring, reveal, chosen }: {
 }
 
 /** The locale's short month name ("sep", "Sep"): its short date of the first, without the day. For the
- * axis only: VoiceOver gets the full name, since a voice may read "mar" or "may" as a word. */
+ * axis only, which VoiceOver skips: each bar speaks the full name, since a voice may read "mar" or "may" as a word. */
 export function shortMonth(monthISO: string, formatDate: (dateISO: string, style: 'day') => string): string {
   return formatDate(monthISO.slice(0, 7) + '-01', 'day').replace(/(^1\s+|\s+1$)/, '');
 }
@@ -289,7 +299,8 @@ export function idleBarColor(p: Palette): string {
 export type MonthPoint = { monthISO: string; amountMinor: number; partial: boolean; count?: number };
 
 /** Six monthly bars on a common zero-to-max scale. The selected month is the
- * brand primary, the rest the idle ink (`idleBarColor`); a partial (current) month is outlined.
+ * brand primary, the rest the idle ink (`idleBarColor`). The month in progress is always the last bar and the shown one; the
+ * caption («Mes en curso hasta hoy») and VoiceOver say it is partial (25N1: its outline, secondary on the sapphire, was 1.1:1).
  * Tapping a bar selects that month. Bars animate between data sets, never from zero.
  * 24T3 (A24): the scale is zero to the largest positive net; a month whose net is zero or less is drawn at zero (never a
  * bar below the axis), VoiceOver says «sin gasto neto» when the month has records, and when the shown month nets below
@@ -299,18 +310,22 @@ export function MonthBars({ points, selected, onSelect, currency, height = 120 }
 }) {
   const p = usePalette();
   const reduced = useReduceMotion();
-  const { t, formatDate, currencySymbol, formatWholeUnits, speechLanguage, moneyText, spokenMoney } = useI18n();
+  const { t, formatDate, currencySymbol, formatWholeUnits, moneyText, spokenMoney } = useI18n();
+  const { width, fontScale } = useWindowDimensions();
   const max = Math.max(...points.map(point => Math.max(0, point.amountMinor)), 1);
   const current = points.find(point => point.monthISO === selected);
+  const axis = axisLabels(points.map(point => shortMonth(point.monthISO, formatDate)), width, fontScale);
   return <View style={{ gap: 8 }}>
     <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6, height }}>
       {points.map(point => <Bar key={point.monthISO} point={point} fraction={Math.max(0, point.amountMinor) / max} selected={point.monthISO === selected}
         onPress={() => onSelect(point.monthISO)} currency={currency} height={height} />)}
     </View>
-    <View style={{ flexDirection: 'row', gap: 6 }}>
-      {points.map(point => <Animated.Text key={point.monthISO} accessibilityLanguage={speechLanguage} style={{ flex: 1, fontSize: 12, lineHeight: 16, textAlign: 'center', fontWeight: point.monthISO === selected ? '600' : '400',
-        color: point.monthISO === selected ? p.primary : p.secondary, transitionProperty: 'color', transitionDuration: reduced ? 0 : duration.state }}>
-        {shortMonth(point.monthISO, formatDate)}
+    {/* 25D1: the axis is for the eye only. Each bar already says its month, year and amount, so VoiceOver skips the six
+        ticks (HIG, charts: hide axis labels from assistive technology), and a tick stays one line inside its column. */}
+    <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{ flexDirection: 'row', gap: 6 }}>
+      {points.map((point, index) => <Animated.Text key={point.monthISO} numberOfLines={1} maxFontSizeMultiplier={axis.maxScale} style={{ flex: 1, fontSize: 12, lineHeight: 16, textAlign: 'center', fontWeight: point.monthISO === selected ? '600' : '400',
+        color: point.monthISO === selected ? p.primary : p.secondary, transitionProperty: 'color', transitionDuration: reduced ? 0 : duration.state, transitionTimingFunction: easeOutCss }}>
+        {axis.labels[index]}
       </Animated.Text>)}
     </View>
     {current && <AppText secondary variant="caption" style={{ textAlign: 'center' }}>
@@ -346,9 +361,7 @@ function Bar({ point, fraction, selected, onPress, currency, height }: {
     accessibilityLabel={t(noNetSpending(point) ? point.partial ? 'reports.chart.barPartialNoNet' : 'reports.chart.barNoNet' : point.partial ? 'reports.chart.barPartial' : 'reports.chart.bar',
       { month: formatDate(point.monthISO.slice(0, 7) + '-01', 'month'), year: point.monthISO.slice(0, 4), amount: spokenMoney(point.amountMinor, currency) })}
     onPress={onPress} containerStyle={{ flex: 1 }} style={{ height, justifyContent: 'flex-end', minHeight: undefined }}>
-    <Animated.View style={[{ borderRadius: 6, backgroundColor: selected ? p.primary : idleBarColor(p), borderWidth: point.partial ? StyleSheet.hairlineWidth * 2 : 0,
-      // The month in progress stays outlined: ink on an idle bar (the idle fill is too close to the secondary ink), secondary on the shown one.
-      borderColor: selected ? p.secondary : p.text,
-      transitionProperty: 'backgroundColor', transitionDuration: reduced ? 0 : duration.state }, style]} />
+    <Animated.View style={[{ borderRadius: 6, backgroundColor: selected ? p.primary : idleBarColor(p),
+      transitionProperty: 'backgroundColor', transitionDuration: reduced ? 0 : duration.state, transitionTimingFunction: easeOutCss }, style]} />
   </PressFeedback>;
 }

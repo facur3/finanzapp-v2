@@ -38,8 +38,8 @@ export function SwipeRow({ actions, children, background }: { actions: SwipeActi
         onPress={() => { swipeable.close(); action.onPress(); }}
         style={({ pressed }) => ({ minWidth: ACTION_WIDTH, paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center', gap: 4,
           backgroundColor: fill(action.tone), opacity: pressed ? 0.8 : 1 })}>
-        <Ionicons name={action.icon} size={20} color="#FFFFFF" accessible={false} />
-        <AppText variant="caption" numberOfLines={1} style={{ color: '#FFFFFF', fontWeight: '600' }}>{action.label}</AppText>
+        <Ionicons name={action.icon} size={20} color={p.onPrimary} accessible={false} />
+        <AppText variant="caption" numberOfLines={1} style={{ color: p.onPrimary, fontWeight: '600' }}>{action.label}</AppText>
       </Pressable>)}
     </View>}>
     {children}

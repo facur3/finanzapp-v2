@@ -1,14 +1,16 @@
 import { SectionList, View, useWindowDimensions } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { hiddenLiabilityAccountIds, isLiveAccount, liquidTotalsByCurrency, type Account, type Currency } from '@finanzapp/domain';
+import { currencyFlag } from '../src/i18n/flags';
 import { useI18n } from '../src/i18n/provider';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { useAccountManagement } from '../src/ui/commitment-actions';
 import { AccountRow, ActionButton, AppText, EmptyState, ErrorMessage, IconButton, Money } from '../src/ui/components';
 import { SwipeRow, swipeAccessibility } from '../src/ui/swipe-actions';
 import { labelAmountStacks } from '../src/ui/geometry';
+import { InlineFlag } from '../src/ui/marks';
 import { availableCurrencies } from '../src/ui/presentation';
-import { space, usePalette } from '../src/ui/theme';
+import { radius, space, usePalette } from '../src/ui/theme';
 
 /** What a section header spends around its text: the list's padding (20 + 20) and the header's own (4 + 4). */
 const SECTION_CHROME = 48;
@@ -21,7 +23,10 @@ const SECTION_CHROME = 48;
  * 24UX6E: a section header is the currency's name as a heading (ink, subhead weight, like a Movimientos day) and its
  * recorded total, secondary (the expense tone and its minus only when negative). VoiceOver reads it as one header with
  * what the figure is («Pesos argentinos, saldo registrado 1423,00 pesos»), and the total goes under the name at large text
- * or when both would not fit on one line, so the money is never shrunk or cut. */
+ * or when both would not fit on one line, so the money is never shrunk or cut.
+ *
+ * 25O1: the name follows its currency's mark, the issuer's flag at the text's size (none for a supranational code). An
+ * account row has no flag: an account has no country, only a currency, and its section already says which. */
 export default function AccountsScreen() {
   const { snapshot, archive } = useLedger();
   const p = usePalette();
@@ -44,20 +49,24 @@ export default function AccountsScreen() {
         action={<ActionButton label={t('common.addAccount')} onPress={() => router.push('/new-account')} />} />}
       renderSectionHeader={({ section }) => {
         const name = currencyName(section.currency);
+        const flag = currencyFlag(section.currency);
         const total = totals[section.currency];
-        // The visible amount only measures the line; VoiceOver hears the spoken twin.
-        const stacked = total !== undefined && labelAmountStacks(width, fontScale, name, moneyText(total, section.currency), SECTION_CHROME);
+        // The visible amount only measures the line (the flag with the name); VoiceOver hears the spoken twin, never the flag.
+        const stacked = total !== undefined && labelAmountStacks(width, fontScale, (flag ? 'MM ' : '') + name, moneyText(total, section.currency), SECTION_CHROME);
         return <View accessible accessibilityRole="header" accessibilityLanguage={speechLanguage}
           accessibilityLabel={total === undefined ? name : t('accounts.list.sectionLabel', { currency: name, amount: spokenMoney(total, section.currency) })}
-          style={{ flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'baseline', justifyContent: 'space-between', gap: stacked ? 2 : 12,
+          style={{ flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center', justifyContent: 'space-between', gap: stacked ? 2 : 12,
             paddingTop: 20, paddingBottom: 8, paddingHorizontal: 4 }}>
-          <AppText variant="subhead" style={{ fontWeight: '600', flexShrink: 1 }}>{name}</AppText>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 }}>
+            <InlineFlag flag={flag} size={15} />
+            <AppText variant="subhead" style={{ fontWeight: '600', flexShrink: 1 }}>{name}</AppText>
+          </View>
           {total !== undefined && <Money minor={total} currency={section.currency} size={15} weight="600" color={total < 0 ? p.expense : p.secondary} />}
         </View>;
       }}
       renderItem={({ item, index, section }) => <View style={{ backgroundColor: p.surface, overflow: 'hidden',
-        borderTopLeftRadius: index === 0 ? 16 : 0, borderTopRightRadius: index === 0 ? 16 : 0,
-        borderBottomLeftRadius: index === section.data.length - 1 ? 16 : 0, borderBottomRightRadius: index === section.data.length - 1 ? 16 : 0 }}>
+        borderTopLeftRadius: index === 0 ? radius.group : 0, borderTopRightRadius: index === 0 ? radius.group : 0,
+        borderBottomLeftRadius: index === section.data.length - 1 ? radius.group : 0, borderBottomRightRadius: index === section.data.length - 1 ? radius.group : 0 }}>
         <SwipeRow actions={manage.actions(item)}>
           <AccountRow account={item} entries={snapshot.entries} transfers={snapshot.transfers} last={index === section.data.length - 1} accessibility={swipeAccessibility(manage.actions(item))} />
         </SwipeRow>

@@ -71,6 +71,8 @@ export const review: Pick<Messages, 'review'> = {
       dismiss: 'Discard',
       dismissQuestion: 'Discard this proposal?',
       dismissDetail: 'Nothing is recorded and it won’t appear again. Your transactions don’t change.',
+      confirmFailed: 'We couldn’t confirm the proposal. You can retry: it’s recorded only once.',
+      dismissFailed: 'We couldn’t discard the proposal. It’s still pending.',
       recordedLater: 'Recorded. The proposal will be marked as confirmed the next time the app opens.',
     },
     sheet: {
@@ -90,6 +92,7 @@ export const review: Pick<Messages, 'review'> = {
       placementNext: 'The next one',
       noInterest: 'No interest. A financed purchase is recorded from the purchase form.',
       categoryNote: 'Only a category you already use: a new one is created from the expense or income form.',
+      saveFailed: 'We couldn’t save your changes. The proposal is unchanged.',
     },
   },
 };

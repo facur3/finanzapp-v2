@@ -31,6 +31,8 @@ function harness(props: any, data: domain.LedgerArchive = archive, save?: (budge
   let cursor = 0, refCursor = 0, uuid = 0, backs = 0;
   const saved: domain.MonthlyBudget[] = [];
   const alerts: any[] = [];
+  // 25Q4: every haptic comes from motion.tsx; the recorder keeps each notification's type.
+  const haptics: string[] = [];
   const jsx = (type: Node['type'], props: Node['props']) => ({ type, props });
   const ledger = { useLedger: () => ({ archive: data, snapshot: domain.snapshotFromArchive(data), ...(gate ? { gate } : {}),
     saveBudget: async (budget: domain.MonthlyBudget) => { saved.push(budget); await save?.(budget); } }) };
@@ -46,7 +48,7 @@ function harness(props: any, data: domain.LedgerArchive = archive, save?: (budge
     'react-native': { View: 'View', Keyboard: { dismiss() {} }, Alert: { alert: (title: string, message: string, buttons: any[]) => alerts.push({ title, message, buttons }) } },
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, router: { canGoBack: () => true, back: () => { backs++; }, push: () => {}, replace: () => {} } },
     'expo-crypto': { randomUUID: () => 'budget-' + (++uuid) },
-    'expo-haptics': { NotificationFeedbackType: { Success: 'Success' }, notificationAsync: async () => {} },
+    './motion': { successHaptic: () => { haptics.push('Success'); }, errorHaptic: () => { haptics.push('Error'); }, warningHaptic: () => { haptics.push('Warning'); } },
     '@finanzapp/domain': domain,
     '../storage/LedgerProvider': ledger,
     './components': components, './money-input': moneyInput, './currencies': currencies, './currency-switch': { CurrencySwitch: 'CurrencySwitch' },
@@ -58,7 +60,7 @@ function harness(props: any, data: domain.LedgerArchive = archive, save?: (budge
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected budget-form dependency: ' + name);
     return modules[name];
   } });
-  return { render: () => { cursor = 0; refCursor = 0; return module.exports.BudgetForm(props); }, saved, alerts, backs: () => backs };
+  return { render: () => { cursor = 0; refCursor = 0; return module.exports.BudgetForm(props); }, saved, alerts, haptics, backs: () => backs };
 }
 function nodes(value: any): Node[] {
   if (!value || typeof value !== 'object') return [];
@@ -135,6 +137,20 @@ test('editing keeps the kind fixed: a total edits its amount only, a sublimit ke
   assert.equal(editFood.backs(), 1);
 });
 
+test('25N1 review: a save that committed but could not refresh keeps its own scope for the retry when the ledger later shows it', async () => {
+  const data: domain.LedgerArchive = { ...archive, budgets: [food] };
+  const view = harness({ monthISO: '2026-09', currency: 'ARS', scope: 'total' }, data, async () => { throw new Error('database is locked'); });
+  find(view.render(), 'AmountField').props.onChangeText('1');
+  await find(view.render(), 'ActionButton', 'Crear presupuesto').props.onPress();
+  // The write did land: a later refresh (the app back in front) shows the very budget this form is retrying.
+  data.budgets = [food, view.saved[0]!];
+  const root = view.render();
+  assert.equal(nodes(root).some(node => node.type === 'CategoryField'), false, 'still the general budget it was creating, never a category limit');
+  const retry = find(root, 'ActionButton', 'Reintentar guardado');
+  assert.equal(retry.props.disabled ?? false, false, 'the retry stays available');
+  assert.equal(nodes(root).some(node => node.type === 'AppText' && /Para cambiarlo/.test(String(node.props.children))), false, 'never told it is taken by itself');
+});
+
 test('a failed write, a zero amount and a negative one keep the draft, and archiving asks first', async () => {
   // 24UX6E: a duplicate is now refused before the submission freezes (next test); the frozen retry is for a write that
   // failed after the input was valid, here a storage error on a budget nothing else conflicts with.
@@ -143,9 +159,10 @@ test('a failed write, a zero amount and a negative one keep the draft, and archi
   await find(failed.render(), 'ActionButton', 'Crear presupuesto').props.onPress();
   let root = failed.render();
   assert.equal(failed.saved.length, 1, 'the write was attempted');
-  assert.match(find(root, 'ErrorMessage').props.message, /database is locked/);
+  assert.equal(find(root, 'ErrorMessage').props.message, 'budgets.form.saveFailed', '25Q4: the form\'s own sentence, never the engine\'s text');
   assert.equal(find(root, 'AmountField').props.editable, false, 'the same submission stays frozen for retry');
   assert.equal(find(root, 'ActionButton', 'Reintentar guardado').props.label, 'Reintentar guardado');
+  assert.equal(failed.haptics.join(','), 'Warning', '25Q4: sent and frozen for «Reintentar guardado», so Warning');
   const zero = harness({ monthISO: '2026-09', currency: 'ARS', scope: 'total' }, { ...archive, budgets: [] });
   find(zero.render(), 'AmountField').props.onChangeText('0');
   await find(zero.render(), 'ActionButton', 'Crear presupuesto').props.onPress();
@@ -153,11 +170,13 @@ test('a failed write, a zero amount and a negative one keep the draft, and archi
   assert.match(find(root, 'ErrorMessage').props.message, /mayor que cero/);
   assert.equal(zero.saved.length, 0);
   assert.equal(find(root, 'AmountField').props.editable, true, 'invalid input never freezes the draft');
+  assert.equal(zero.haptics.join(','), 'Error', '25Q4: refused before sending, so Error');
   const negative = harness({ monthISO: '2026-09', currency: 'ARS', scope: 'total' }, { ...archive, budgets: [] });
   find(negative.render(), 'AmountField').props.onChangeText('-5');
   await find(negative.render(), 'ActionButton', 'Crear presupuesto').props.onPress();
   assert.ok(find(negative.render(), 'ErrorMessage').props.message, 'a negative limit is refused');
   assert.equal(negative.saved.length, 0);
+  assert.equal(negative.haptics.join(','), 'Error');
   const archiving = harness({ original: total, monthISO: total.monthISO });
   await find(archiving.render(), 'ActionButton', 'Eliminar presupuesto').props.onPress();
   assert.equal(archiving.alerts.length, 1);
@@ -165,31 +184,37 @@ test('a failed write, a zero amount and a negative one keep the draft, and archi
   archiving.alerts[0].buttons[1].onPress();
   await new Promise(resolve => setImmediate(resolve));
   assert.deepEqual([archiving.saved[0].scope, archiving.saved[0].active, archiving.saved[0].revision], ['total', false, 1]);
+  assert.equal(archiving.haptics.join(','), 'Success');
 });
 
 test('24UX6E: a second general budget or a second limit for the same category, currency and month is an input error before anything freezes; the draft stays editable and a different choice saves once', async () => {
   // archive: a general ARS budget and a «Comida» sublimit for 2026-09, the rule storage applies (validateBudgetCollection).
+  // 25N1: with a general budget already there «General» is never offered, even when asked for: the form is a category limit.
   const view = harness({ monthISO: '2026-09', currency: 'ARS', scope: 'total' });
-  find(view.render(), 'AmountField').props.onChangeText('1');
-  await find(view.render(), 'ActionButton', 'Crear presupuesto').props.onPress();
   let root = view.render();
-  assert.equal(view.saved.length, 0, 'nothing is written');
-  assert.equal(find(root, 'ErrorMessage').props.message, 'Ya existe un presupuesto general activo para esa moneda y mes.');
-  assert.equal(find(root, 'AmountField').props.editable, true, 'the draft is not frozen');
-  assert.equal(choice(root, 'total').props.disabled, false, 'the kind can still change');
-  assert.equal(nodes(root).some(node => node.type === 'ActionButton' && node.props.label === 'Reintentar guardado'), false, 'no retry that could never succeed');
-  assert.equal(texts(root).some(text => text.includes('congelado')), false);
-  choice(root, 'total').props.onChange('category');
+  assert.equal(nodes(root).some(node => node.type === 'Choices'), false, 'no scope switch: General is taken');
+  assert.ok(texts(root).includes('Límite por categoría'));
+  find(root, 'AmountField').props.onChangeText('1');
   find(view.render(), 'CategoryField').props.onChange(' comida ');
   await find(view.render(), 'ActionButton', 'Crear presupuesto').props.onPress();
   root = view.render();
-  assert.equal(view.saved.length, 0);
+  assert.equal(view.saved.length, 0, 'nothing is written');
   assert.equal(find(root, 'ErrorMessage').props.message, 'Ya existe un presupuesto activo para esa categoría, moneda y mes.', 'the normalised category is the same one');
-  assert.equal(find(root, 'AmountField').props.editable, true);
+  assert.ok(texts(root).includes('Para cambiarlo, tocalo en Presupuestos.'), '25N1: the refusal says where to go');
+  assert.equal(find(root, 'AmountField').props.editable, true, 'the draft is not frozen');
+  assert.equal(nodes(root).some(node => node.type === 'ActionButton' && node.props.label === 'Reintentar guardado'), false, 'no retry that could never succeed');
+  assert.equal(texts(root).some(text => text.includes('congelado')), false);
   find(view.render(), 'CategoryField').props.onChange('Ocio');
-  await find(view.render(), 'ActionButton', 'Crear presupuesto').props.onPress();
+  root = view.render();
+  assert.equal(texts(root).includes('Para cambiarlo, tocalo en Presupuestos.'), false, 'a free category: no pointer');
+  await find(root, 'ActionButton', 'Crear presupuesto').props.onPress();
   assert.deepEqual([view.saved.length, view.saved[0].scope, view.saved[0].category, view.saved[0].amountMinor], [1, 'category', 'Ocio', 100]);
   assert.equal(view.backs(), 1);
+  assert.equal(view.haptics.join(','), 'Error,Success', '25Q4: one Error tap for the refusal before sending, then Success');
+  // Another currency has no general budget: the switch is back and General saves.
+  const other = harness({ monthISO: '2026-09', currency: 'ARS', scope: 'total' });
+  find(other.render(), 'CurrencySwitch').props.onChange('USD');
+  assert.equal(choice(other.render(), 'total').props.value, 'total');
   // Another currency, or an archived general budget, is no conflict.
   const usd = harness({ monthISO: '2026-09', currency: 'USD', scope: 'total' });
   find(usd.render(), 'AmountField').props.onChangeText('1');
@@ -299,7 +324,7 @@ test('24B5: the budget form offers the gate\'s currencies before the amount; wit
 
 // Producto 24T3 (A24): the Presupuestos screen when devoluciones leave the month (or a category) below zero. The actual
 // route with its hosts as descriptors and the real projection (`snapshotFromArchive`) of a purchase operation.
-async function budgetsScreen(data: domain.LedgerArchive, locale: AppLocale = 'es-AR', route: Record<string, string> = { currency: 'ARS', month: '2026-09' }) {
+async function budgetsScreen(data: domain.LedgerArchive, locale: AppLocale = 'es-AR', window = { width: 390, height: 844, scale: 3, fontScale: 1 }, route: Record<string, string> = { currency: 'ARS', month: '2026-09' }) {
   const presentation = await import('../src/ui/presentation.ts');
   const reportPresentation = await import('../src/ui/report-presentation.ts');
   const budgetPresentation = await import('../src/ui/budget-presentation.ts');
@@ -318,7 +343,7 @@ async function budgetsScreen(data: domain.LedgerArchive, locale: AppLocale = 'es
       return [state[index], (value: unknown) => { state[index] = value; }];
     } },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
-    'react-native': { View: 'View', StyleSheet: { hairlineWidth: 0.5 }, useWindowDimensions: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }) },
+    'react-native': { View: 'View', StyleSheet: { hairlineWidth: 0.5 }, useWindowDimensions: () => window },
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, useLocalSearchParams: () => route, router: { push: () => {} } },
     'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View' }, useSharedValue: (value: number) => ({ value }), withTiming: (value: number) => value, useAnimatedStyle: (fn: () => unknown) => fn() },
     '@expo/vector-icons/Ionicons': 'Ionicons',
@@ -367,7 +392,7 @@ test('25Q1 (BUDGETS-02): a budget in a currency no account holds stays reachable
   assert.equal(read.filter(node => node.type === 'AppText').map(textOf).includes(note), false);
   assert.equal(read.filter(node => node.type === 'Stat').map(node => (node.props.children as Node).props.minor)[0], 700, 'Gastado reads the deleted account\'s euros');
   // Codex (#114): Reportes' «Administrar» names the budget's currency; Presupuestos opens on it although no account holds it.
-  const routed = (await budgetsScreen({ ...archive, budgets: [total, food, eur] }, 'es-AR', { currency: 'EUR', month: '2026-09' }))();
+  const routed = (await budgetsScreen({ ...archive, budgets: [total, food, eur] }, 'es-AR', undefined, { currency: 'EUR', month: '2026-09' }))();
   assert.equal(routed.find(node => node.type === 'CurrencySwitch')!.props.value, 'EUR');
   assert.ok(routed.filter(node => node.type === 'AppText').map(textOf).includes(note));
   // In a month with no EUR budget the note does not speak of «este presupuesto».
@@ -393,6 +418,24 @@ test('24T3 (A24): devoluciones above a month\'s purchases leave the whole limit 
   const tree = (await budgetsScreen(data))();
   const textOf = (node: Node) => [node.props.children].flat().join('');
   const shown = tree.filter(node => node.type === 'AppText').map(textOf);
+  const month = tree.find(node => node.type === 'AppText' && node.props.accessibilityRole === 'header' && node.props.variant === 'title3')!;
+  // 25D1: Reportes' rule (Title 3's iOS size; beside the arrows while the year's longest word fits there).
+  const geometry = await import('../src/ui/geometry.ts');
+  const wordEm = geometry.widestWordEm(Array.from({ length: 12 }, (_, i) => bindLocale('es-AR').formatMonthTitle('2026-' + String(i + 1).padStart(2, '0'))));
+  const fit = geometry.titleFit(1, 55 / 20, wordEm, 20 * 1.06, 390 - 144, 390 - 40);
+  assert.equal(fit.stacked, false);
+  assert.deepEqual([textOf(month), month.props.maxFontSizeMultiplier, month.props.numberOfLines], ['Septiembre de 2026', fit.maxScale, 2]);
+  const state = tree.find(node => node.type === 'AppText' && node.props.variant === 'caption' && textOf(node) === 'Mes en curso')!;
+  assert.equal(state.props.maxFontSizeMultiplier, undefined, 'its caption follows Caption 1\'s own ceiling, through AppText');
+  // At AX5 the title takes the screen's width and the arrows move under it.
+  const large = (await budgetsScreen(data, 'es-AR', { width: 390, height: 844, scale: 3, fontScale: 3.571 }))();
+  const largeTitle = large.find(node => node.type === 'AppText' && node.props.accessibilityRole === 'header' && node.props.variant === 'title3')!;
+  const ax5 = geometry.titleFit(3.571, 55 / 20, wordEm, 20 * 1.06, 390 - 144, 390 - 40);
+  assert.deepEqual([ax5.stacked, largeTitle.props.maxFontSizeMultiplier], [true, ax5.maxScale]);
+  const stepper = large.find(node => node.type === 'View' && [node.props.children].flat().some((child: any) => child === largeTitle || [child?.props?.children].flat().includes(largeTitle)))!;
+  const steps = large.filter(node => node.type === 'View' && [node.props.children].flat().filter(Boolean).every((child: any) => child?.type === 'IconButton') && [node.props.children].flat().filter(Boolean).length === 2);
+  assert.equal(steps.length, 1, 'the two arrows share a row of their own');
+  assert.ok(stepper, 'the title is found');
   const hero = tree.find(node => node.type === 'Money' && node.props.large)!;
   assert.equal(hero.props.minor, 500000, 'Disponible is the limit, never above it');
   assert.ok(shown.includes('Las devoluciones superan lo gastado'));

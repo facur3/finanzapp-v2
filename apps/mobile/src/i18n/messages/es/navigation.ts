@@ -6,7 +6,7 @@ export const navigation = {
       home: 'Inicio',
       activity: 'Movimientos',
       reports: 'Reportes',
-      more: 'Más',
+      finances: 'Finanzas',
     },
     /** What VoiceOver hears for a tab of the floating bar (24UX6A): its name, that it is a tab, and where it sits («Inicio, pestaña, 1 de 4»; the «+» beside the tabs is not one). */
     tabPosition: '{name}, pestaña, {index} de {count}',
@@ -20,6 +20,10 @@ export const navigation = {
       accounts: 'Cuentas',
       entry: 'Movimiento',
       undoneEntries: 'Movimientos deshechos',
+      settings: 'Ajustes',
+      licenses: 'Licencias',
+      /** 25N1: one notice; the screen replaces it with the notice's name. */
+      license: 'Licencia',
       language: 'Idioma',
       region: 'Región',
       appearance: 'Apariencia',

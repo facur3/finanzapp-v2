@@ -19,8 +19,8 @@ import { displayCurrencyForRoute } from '../../src/ui/display-currency';
 import { useI18n } from '../../src/i18n/provider';
 import type { Translate } from '../../src/i18n/messages';
 import { useCategoryColor, useCategoryLookOf } from '../../src/ui/category-hues';
-import { DonutChart, MONEY_MAX_SCALE, MonthBars, OTHERS_KEY, donutSlices } from '../../src/ui/charts';
-import { amountWidthEm } from '../../src/ui/geometry';
+import { DonutChart, MonthBars, OTHERS_KEY, donutSlices } from '../../src/ui/charts';
+import { AMOUNT_AX5_SIZE, TEXT_STYLE_MAX_SCALE, WEIGHT_WIDTH, amountWidthEm, titleFit, widestWordEm } from '../../src/ui/geometry';
 import { ValueTransition, rowReorder, selectionHaptic } from '../../src/ui/motion';
 import { activityDateLabel, historyCurrencies } from '../../src/ui/presentation';
 import { changePercent, earliestRecordedMonth, insightsBesideRanking, promoteChosen, reportPeriodLabel, reportSelection, requestedReportMonth, shiftReportMonth, spendingShare } from '../../src/ui/report-presentation';
@@ -182,6 +182,14 @@ export default function ReportsScreen() {
   const countOf = (match: (entry: Entry) => boolean) => recordedCountLabel(lineCounts(lines.filter(match)), t, true);
   // A month or currency change clears the donut's choice (24UX6C2): coming back starts with none, like any new view.
   const goToMonth = (month: string | undefined) => { selectionHaptic(); setChosen(null); setMonth(month); };
+  // 25D1: the month (Title 3, semibold) grows to the size iOS gives Title 3 at the person's setting. While its longest
+  // word fits between the two 44 pt arrows it stays there; past that the title and its captions take the full width and
+  // the arrows move under them. The longest of the year's twelve titles decides, so stepping months never reflows.
+  // (Computed, not memoised: this runs after the screen's early return, where no hook may be added.)
+  const monthWordEm = widestWordEm(Array.from({ length: 12 }, (_, i) => formatMonthTitle(monthISO.slice(0, 4) + '-' + String(i + 1).padStart(2, '0'))));
+  const monthTitle = titleFit(fontScale, TEXT_STYLE_MAX_SCALE.title3!, monthWordEm, 20 * WEIGHT_WIDTH.semibold, windowWidth - 2 * space.xl - 2 * 44 - 2 * 8, windowWidth - 2 * space.xl);
+  const monthArrow = (step: -1 | 1) => <IconButton name={step === -1 ? 'chevron-back' : 'chevron-forward'} label={t(step === -1 ? 'reports.previousMonth' : 'reports.nextMonth')}
+    disabled={step === -1 ? !canPrevious : !canNext} onPress={() => { if (step === -1 ? canPrevious : canNext) goToMonth(shiftReportMonth(monthISO, step)); }} />;
   // Categorías | Día a día clears the choice too (24UX6D): coming back to the donut starts with the total in its centre.
   const goToTab = (next: 'categories' | 'days') => { setChosen(null); setTab(next); };
   // The change against last month (24UX6D: a row of the lower facts, since the KPI line that carried it is gone).
@@ -201,8 +209,8 @@ export default function ReportsScreen() {
   const onlyThisMonth = recordedMonths.length === 1 && recordedMonths[0].monthISO === monthISO;
   const showTrend = ready && recordedMonths.length > 0 && !onlyThisMonth;
   const days = tab === 'days';
-  // Día a día's total at 20 pt fits the content width (Money caps a row amount's text scale at 1.8), or it takes its own line.
-  const dayTotalFits = !ready || !Number.isSafeInteger(report.expenseMinor) || amountWidthEm(moneyText(report.expenseMinor, currency)) * 20 * Math.min(Math.max(fontScale, 0.5), MONEY_MAX_SCALE) <= windowWidth - 2 * space.xl;
+  // Día a día's total at 20 pt fits the content width (Money stops a row amount at 53 pt, Body's AX5 size), or it takes its own line.
+  const dayTotalFits = !ready || !Number.isSafeInteger(report.expenseMinor) || amountWidthEm(moneyText(report.expenseMinor, currency)) * Math.min(20 * Math.max(fontScale, 0.5), AMOUNT_AX5_SIZE) <= windowWidth - 2 * space.xl;
 
   return <Animated.FlatList<CategorySpending | DailySpending> ref={list} data={shown} keyExtractor={item => 'key' in item ? item.key : item.dateISO}
     itemLayoutAnimation={reorder ? rowReorder : undefined}
@@ -216,11 +224,11 @@ export default function ReportsScreen() {
     ListHeaderComponent={<View style={{ gap: space.xxl, paddingBottom: space.m }}>
       <View style={{ gap: space.m }}>
         {held.length > 1 && <DisplayCurrencyButton compact={false} mode={view.mode} currency={currency} held={held} gate={gate} onMode={mode => { setChosen(null); setMode(mode); }} onCurrency={code => { setChosen(null); setCurrency(code); }} />}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <IconButton name="chevron-back" label={t('reports.previousMonth')} disabled={!canPrevious}
-            onPress={() => { if (canPrevious) goToMonth(shiftReportMonth(monthISO, -1)); }} />
-          <ValueTransition id={monthISO + '|' + currency} variant="fade" style={{ flex: 1, alignItems: 'center', gap: 2 }}>
-            <AppText accessibilityRole="header" variant="title3" style={{ textAlign: 'center' }}>{formatMonthTitle(monthISO)}</AppText>
+        <View style={monthTitle.stacked ? { gap: 8 } : { flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          {!monthTitle.stacked && monthArrow(-1)}
+          <ValueTransition id={monthISO + '|' + currency} variant="fade" style={[!monthTitle.stacked && { flex: 1 }, { alignItems: 'center', gap: 2 }]}>
+            <AppText accessibilityRole="header" variant="title3" maxFontSizeMultiplier={monthTitle.maxScale} numberOfLines={2}
+              style={{ textAlign: 'center' }}>{formatMonthTitle(monthISO)}</AppText>
             {/* 24UX6D review: the caption gives way and the row wraps, centred, so at larger text «Este mes» moves under the
                 period instead of spilling over the forward chevron, and the info button stays reachable. */}
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', columnGap: 10, rowGap: 2, maxWidth: '100%' }}>
@@ -235,8 +243,7 @@ export default function ReportsScreen() {
               </PressFeedback>}
             </View>
           </ValueTransition>
-          <IconButton name="chevron-forward" label={t('reports.nextMonth')} disabled={!canNext}
-            onPress={() => { if (canNext) goToMonth(shiftReportMonth(monthISO, 1)); }} />
+          {monthTitle.stacked ? <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>{monthArrow(-1)}{monthArrow(1)}</View> : monthArrow(1)}
         </View>
       </View>
 
@@ -252,8 +259,8 @@ export default function ReportsScreen() {
             <View accessible accessibilityLabel={t('reports.periodTotalSpoken', { amount: spoken(report.expenseMinor) })} accessibilityLanguage={speechLanguage}
               style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 8, rowGap: 2 }}>
               <AppText secondary variant="subhead">{t('reports.dayTotal')}</AppText>
-              {/* 24UX6D review: a row amount shrinks at most to 75 % and then truncates; when the exact amount would not fit
-                  the content width at 20 pt it renders as a hero that fits its own line (never truncated). */}
+              {/* 24UX6D review: a row amount is shrunk natively (iOS goes as low as 4 pt, 25D1); when the exact amount would not
+                  fit the content width at 20 pt it renders as a hero, sized in JavaScript to fit its own line. */}
               {dayTotalFits ? <Money minor={report.expenseMinor} currency={currency} size={20} weight="600" />
                 : <View style={{ flexBasis: '100%' }}><Money minor={report.expenseMinor} currency={currency} large size={28} weight="600" /></View>}
             </View>
@@ -292,7 +299,7 @@ export default function ReportsScreen() {
         currency={currency} last={index === report.categories.length - 1}
         onPress={() => router.push({ pathname: '/report-category', params: { currency, month: monthISO, category: item.key } })} />
         : <DetailRow label={t('reports.dayRow', { date: activityDateLabel(item.dateISO, day, locale), count: countOf(entry => entry.dateISO === item.dateISO) })}
-          value={money(item.amountMinor)} spokenValue={spoken(item.amountMinor)} last={index === shown.length - 1}
+          value={money(item.amountMinor)} spokenValue={spoken(item.amountMinor)} last={index === shown.length - 1} layout="stacked"
           onPress={() => router.push({ pathname: '/report-day', params: { currency, date: item.dateISO } })} />}
     </View>}
     ListEmptyComponent={ready ? <EmptyState title={t('reports.emptyTitle')} icon={days ? 'calendar-outline' : 'pie-chart-outline'}

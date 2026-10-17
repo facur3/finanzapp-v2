@@ -10,6 +10,7 @@ import { QUICK_COUNTS, type CountChoice } from '../../src/ui/purchase-plan';
 import { parseInstallmentCount, placementOptions } from '../../src/ui/installment-presentation';
 import { accountKindLabel } from '../../src/ui/liability-presentation';
 import { draftFromMinor } from '../../src/ui/money-input';
+import { errorHaptic, successHaptic } from '../../src/ui/motion';
 import { editedReviewDraft, editorDestinations } from '../../src/ui/review-presentation';
 import { useReviewItem } from '../../src/ui/use-review-item';
 import { space } from '../../src/ui/theme';
@@ -26,9 +27,17 @@ export default function EditReviewScreen() {
   const { t } = useI18n();
   const { item: found, tray, resolving } = useReviewItem(id);
   const item = tray?.writable ? found : undefined;
-  if (!item && resolving) return <Screen>{null}</Screen>;
-  if (!item) return <Screen><EmptyState icon="file-tray-outline" title={t('review.detail.notFoundTitle')} detail={t('review.detail.notFoundDetail')} /></Screen>;
+  // 25Q4: the modal keeps a close button while the proposal resolves and when it is no longer pending (the editor's close).
+  const closeButton = closeOnly(t('common.close'));
+  if (!item && resolving) return <Screen>{closeButton}</Screen>;
+  if (!item) return <Screen>{closeButton}<EmptyState icon="file-tray-outline" title={t('review.detail.notFoundTitle')} detail={t('review.detail.notFoundDetail')} /></Screen>;
   return <ReviewEditor key={item.id} item={item} />;
+}
+
+/** 25Q4: the editor's close where there is nothing to edit (nothing is saving there): back, or Para revisar with nothing behind. */
+function closeOnly(label: string) {
+  return <Stack.Screen options={{ headerLeft: () => <IconButton name="close" label={label}
+    onPress={() => { if (router.canGoBack()) router.back(); else router.replace('/review'); }} /> }} />;
 }
 
 /** The count segment a stored count shows: one of the quick counts, «Otra» with the number typed, or nothing chosen. */
@@ -39,7 +48,7 @@ function countChoiceOf(count: number | null): { choice: CountChoice | null; type
 
 function ReviewEditor({ item }: { item: ReviewItem }) {
   const { archive, snapshot, updateReview } = useLedger();
-  const { t, formatDate } = useI18n();
+  const { t, formatDate, failureMessage } = useI18n();
   // The revision this editor opened: a proposal changed since (another edit, a reconciliation) is refused, never overwritten.
   const [opened] = useState(item);
   const draft = opened.draft;
@@ -60,7 +69,8 @@ function ReviewEditor({ item }: { item: ReviewItem }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const saving = useRef(false);
-  if (!archive) return <Screen>{null}</Screen>;
+  // 25Q4 review: before the ledger opens, the same close as every other branch.
+  if (!archive) return <Screen>{closeOnly(t('common.close'))}</Screen>;
   const reviewArchive = archive as ReviewArchive;
   const cards = archive.cards ?? [], debts = archive.debts ?? [];
 
@@ -90,10 +100,14 @@ function ReviewEditor({ item }: { item: ReviewItem }) {
         kind, amountMinor, currency: amountMinor === null ? draft.currency : currency, merchant, category, dateISO, destinationId, purchase,
       }, reviewArchive);
       await updateReview(opened.id, opened.revision, next);
+      // 25Q4 review: a saved edit taps Success, as every other «Guardar cambios» does.
+      successHaptic();
       saving.current = false;
       close();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'review.unavailable');
+      setError(failureMessage(cause, 'review.edit.saveFailed'));
+      // 25Q4: nothing stays frozen here; Guardar cambios is offered again.
+      errorHaptic();
     } finally {
       saving.current = false;
       setBusy(false);
