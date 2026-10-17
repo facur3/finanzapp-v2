@@ -43,7 +43,7 @@ export const onboarding = {
     account: {
       zero: 'Not sure? Leave it at zero.',
       name: 'Name',
-      create: 'Create account',
+      create: 'Save account',
     },
     done: {
       title: 'You’re all set.',

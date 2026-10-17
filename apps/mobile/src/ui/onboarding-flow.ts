@@ -72,10 +72,18 @@ const OWN_FIGURES: Partial<Record<string, readonly number[]>> = { ARS: [2_500, 1
 /** Every other currency, in hundredths of a dollar-like unit: 4.50, 38.90, 2.75, 184, 3 240, 964. */
 const HUNDREDTHS = [450, 3_890, 275, 18_400, 324_000, 96_400];
 /** How many units of these currencies make a dollar-like figure look real (a coffee is about 680 yen). A presentation
- * factor for an illustration, never an exchange rate. Every currency of the gate without decimals is here, so none draws a
- * five-franc coffee. */
+ * factor for an illustration, rough and rounded, never an exchange rate. Every currency of the gate without decimals is
+ * here, so none draws a five-franc coffee; so is every two-decimal one whose unit is worth about a fifth of a dollar or
+ * less, so a naira or rupee coffee never reads «4,50». */
 const LARGE_UNITS: Partial<Record<string, number>> = { JPY: 150, KRW: 1_500, CLP: 1_000, COP: 4_000, PYG: 7_000, IDR: 15_000, VND: 25_000, HUF: 400, ISK: 150,
-  BIF: 2_900, DJF: 180, GNF: 8_600, KMF: 450, RWF: 1_400, UGX: 3_700, VUV: 120, XAF: 600, XOF: 600, XPF: 110 };
+  BIF: 2_900, DJF: 180, GNF: 8_600, KMF: 450, RWF: 1_400, UGX: 3_700, VUV: 120, XAF: 600, XOF: 600, XPF: 110,
+  AFN: 70, ALL: 92, AMD: 390, AOA: 900, BDT: 120, BOB: 7, BRL: 5, BTN: 85, BWP: 14, CDF: 2_800, CNY: 7, CRC: 510, CUP: 24, CVE: 100, CZK: 23,
+  DKK: 7, DOP: 60, DZD: 135, EGP: 48, ERN: 15, ETB: 120, GHS: 15, GMD: 70, GTQ: 8, GYD: 210, HKD: 8, HNL: 25, HTG: 130, INR: 85, IRR: 42_000,
+  JMD: 155, KES: 130, KGS: 87, KHR: 4_000, KPW: 900, KZT: 480, LAK: 21_000, LBP: 89_000, LKR: 300, LRD: 190, LSL: 18, MAD: 10, MDL: 18,
+  MGA: 4_500, MKD: 57, MMK: 2_100, MNT: 3_400, MOP: 8, MRU: 40, MUR: 46, MVR: 15, MWK: 1_700, MXN: 18, MZN: 64, NAD: 18, NGN: 1_500,
+  NIO: 37, NOK: 11, NPR: 135, PHP: 57, PKR: 280, RSD: 107, RUB: 90, SCR: 14, SDG: 600, SEK: 11, SLE: 23, SOS: 570, SRD: 35, SSP: 1_000,
+  STN: 23, SYP: 13_000, SZL: 18, THB: 35, TJS: 11, TRY: 34, TTD: 7, TWD: 32, TZS: 2_600, UAH: 41, UYU: 40, UZS: 12_700, VES: 40, YER: 250,
+  ZAR: 18, ZMW: 26, ZWG: 27 };
 
 /** Two significant digits, half up: 41 250 → 41 000, 67 500 → 68 000. */
 const twoSignificant = (value: number) => {

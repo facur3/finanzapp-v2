@@ -46,7 +46,7 @@ export default function AccountsScreen() {
       contentInsetAdjustmentBehavior="automatic" stickySectionHeadersEnabled={false} removeClippedSubviews={false}
       ListHeaderComponent={manage.error ? <View style={{ paddingBottom: space.m }}><ErrorMessage message={manage.error} /></View> : null}
       ListEmptyComponent={<EmptyState title={t('accounts.list.emptyTitle')} detail={t('accounts.list.emptyDetail')}
-        action={<ActionButton label={t('common.addAccount')} onPress={() => router.push('/new-account')} />} />}
+        action={<ActionButton label={t('common.addAccount')} icon="add-outline" onPress={() => router.push('/new-account')} />} />}
       renderSectionHeader={({ section }) => {
         const name = currencyName(section.currency);
         const flag = currencyFlag(section.currency);

@@ -47,7 +47,7 @@ export const navigation: Pick<Messages, 'nav' | 'boot'> = {
       newEntry: 'New transaction',
       editEntry: 'Edit transaction',
       editAccount: 'Edit account',
-      newTransfer: 'Between my accounts',
+      newTransfer: 'Record a transfer',
       newRecurring: 'New recurring item',
       editRecurring: 'Edit recurring item',
       newBudget: 'New budget',
@@ -61,12 +61,12 @@ export const navigation: Pick<Messages, 'nav' | 'boot'> = {
       notFound: 'Screen not found',
     },
     notFound: {
-      title: 'We couldn’t find that screen',
+      title: 'Screen not found',
       detail: 'That link doesn’t lead to a FinanzApp screen.',
       action: 'Go to Home',
     },
     screenFailure: {
-      title: 'We couldn’t show this screen',
+      title: 'This screen couldn’t be shown',
       detail: 'What you already saved is still there. You can go back or open another tab.',
     },
   },

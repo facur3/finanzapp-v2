@@ -236,7 +236,7 @@ test('category form: create adds a definition available at once; a taken name is
   find(root, 'IconColorPicker').props.onIconChange('cafe');
   find(root, 'IconColorPicker').props.onColorChange('ochre');
   root = view.render();
-  await find(root, 'ActionButton', 'Crear categoría').props.onPress();
+  await find(root, 'ActionButton', 'Guardar categoría').props.onPress();
   assert.equal(view.definitions.length, 1);
   assert.deepEqual(view.definitions[0], { kind: 'expense', key: 'kiosco', storedLabel: 'Kiosco', label: 'Kiosco', icon: 'cafe', color: 'ochre', archived: false,
     createdAt: view.definitions[0].createdAt, revision: 0, updatedAt: view.definitions[0].createdAt });
@@ -516,7 +516,7 @@ test('23.1B2 English category form: a typed name is a real rename; custom and re
   assert.equal(find(root, 'Field').props.placeholder, 'e.g. Snacks');
   assert.match(texts(root), /available right away when recording expenses/);
   find(root, 'Field').props.onChangeText('Kiosco');
-  await find(create.render(), 'ActionButton', 'Create category').props.onPress();
+  await find(create.render(), 'ActionButton', 'Save category').props.onPress();
   assert.deepEqual([create.definitions[0].storedLabel, create.definitions[0].label], ['Kiosco', 'Kiosco']);
   const taken = harness('src/ui/category-form.tsx', {}, { locale: 'en-AR' });
   find(taken.render(), 'Field').props.onChangeText('comida');
@@ -764,7 +764,7 @@ test('24UX6E: an archived category\'s editor opens with the lifecycle note; an a
   assert.match(note.props.detail, /^No se ofrece al registrar\. .*desarchivala para volver a ofrecerla\.$/);
   assert.ok(order.indexOf('LifecycleNote') < order.indexOf('Field'), 'first, above the name');
   assert.doesNotMatch(texts(root), /Archivada:/, 'the bottom paragraph no longer repeats the state');
-  assert.match(texts(root), /no modifica ningún movimiento/);
+  assert.doesNotMatch(texts(root), /no modifica ningún movimiento/, '«Menos texto»: no standing reassurance under the editor');
   const english = harness('src/ui/category-form.tsx', { original: domain.resolveCategory('expense', 'sjsjn', [archived]) }, { data, locale: 'en-AR' }).render();
   assert.equal(find(english, 'LifecycleNote').props.title, 'Archived');
   const active = harness('src/ui/category-form.tsx', { original: domain.resolveCategory('expense', 'Comida') });

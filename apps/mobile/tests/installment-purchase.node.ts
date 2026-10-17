@@ -492,7 +492,7 @@ test('24T2: the interest is recorded under the Intereses category\'s stored spel
 
 test('24T2: a failed save keeps the exact plan frozen and the retry resends it; a double tap or Close during the save posts once and waits', async () => {
   let attempts = 0;
-  const view = harness({ accountId: 'card-acc', kind: 'expense' }, { addPlan: async () => { if (++attempts === 1) throw new Error('El guardado terminó, pero no pudimos actualizar la vista. Verificá de nuevo antes de registrar otro movimiento; no lo cargues otra vez.'); } });
+  const view = harness({ accountId: 'card-acc', kind: 'expense' }, { addPlan: async () => { if (++attempts === 1) throw new Error('El guardado terminó, pero la vista no se pudo actualizar. Verificá de nuevo antes de registrar otro movimiento; no lo cargues otra vez.'); } });
   purchase(view);
   inInstallments(view);
   count(view, '6');
@@ -503,8 +503,9 @@ test('24T2: a failed save keeps the exact plan frozen and the retry resends it; 
   assert.equal(section(root)!.props.disabled, true, 'and so is the section');
   assert.equal(saveButton(root).props.label, 'Reintentar guardado');
   // A plan records no movement until a statement closes: the note points to the card's instalments, never to Movimientos.
-  assert.ok(texts(root).includes(translate('es', 'entryForm.plan.retryNote')));
-  assert.equal(texts(root).includes(translate('es', 'entryForm.retryNote')), false);
+  // The plan's retry note points at the card's Cuotas (a plan records no movement yet), never at Movimientos.
+  assert.ok(texts(root).includes(translate('es', 'common.retryNote', { where: translate('es', 'common.retryWhere.cardInstallments') })));
+  assert.equal(texts(root).includes(translate('es', 'common.retryNote', { where: translate('es', 'common.retryWhere.movements') })), false);
   // Even a change of the underlying data (the commit did land) resends the identical plan: storage treats it as done.
   view.setData({ ...base, installmentPlans: [view.plans[0]] });
   await save(view);
@@ -595,7 +596,7 @@ test('24T2: in English the section reads from the catalogue and the plan saved i
   assert.equal(labelsOf(choices(root, 'once,installments')), 'In full|In installments');
   assert.equal(labelsOf(choices(root, '3,6,12,18,other')), '3|6|12|18|Other');
   assert.equal(labelsOf(choices(root, 'current,next')), 'Sep 28|Oct 28');
-  for (const label of ['Payment', 'Installments', 'First installment']) assert.ok(texts(root).includes(label), label);
+  for (const label of ['How it’s paid', 'Installments', 'First installment']) assert.ok(texts(root).includes(label), label);
   assert.ok(texts(root).includes('Closes Sep 28, due Oct 5.'));
   assert.equal(find(root, 'SwitchRow').props.label, 'With interest');
   assert.equal(textOf(line(root)!), '12 installments of AR$' + NBSP + '100,000.00');

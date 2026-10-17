@@ -230,7 +230,7 @@ test('an incomplete draft reads neutral, never as an error; stale and interrupte
   const conflict = itemOf(drafted());
   const root = harness('review.tsx', { review: trayOf([incomplete, stale, interrupted, conflict], { conflicts: [conflict.id] }), calls: [] }).render();
   const states = all(root, 'PressFeedback').map(row => all(row, 'AppText').at(-1)!);
-  assert.deepEqual(states.map(text), ['Falta 1 dato', 'Revisala de nuevo', 'Registro sin verificar', 'Ya existe otro registro']);
+  assert.deepEqual(states.map(text), ['Falta 1 dato', 'Revisala de nuevo', 'Falta confirmar si se guardó', 'Ya existe otro registro']);
   assert.deepEqual(states.map(node => node.props.style.color), [lightPalette.secondary, lightPalette.warning, lightPalette.warning, lightPalette.expense]);
   for (const node of states) assert.notEqual(node.props.style.color, lightPalette.primaryFill);
 });
@@ -241,7 +241,7 @@ test('unreadable rows are counted apart and never listed; an empty tray, an unav
   assert.ok(texts(root).includes('2 propuestas no se pueden leer. No se registrará nada con ellas.'));
   assert.equal(all(root, 'EmptyState')[0].props.title, 'Nada para revisar');
   root = harness('review.tsx', { review: 'unavailable', calls: [] }).render();
-  assert.equal(all(root, 'EmptyState')[0].props.detail, 'No pudimos abrir las propuestas. Tus movimientos no cambiaron.');
+  assert.equal(all(root, 'EmptyState')[0].props.detail, 'No se pudieron abrir las propuestas. Tus movimientos no cambiaron.');
   root = harness('review.tsx', { review: trayOf([itemOf(drafted())], { writable: false }), calls: [] }).render();
   assert.equal(all(root, 'LifecycleNote')[0].props.detail, 'Estas propuestas vienen de una versión más nueva de FinanzApp: se pueden ver, no modificar.');
 });
@@ -387,7 +387,7 @@ test('Entry or InstallmentPlan: the detail says which one Confirmar writes, and 
   const open = itemOf(drafted({ destinationId: cardAccount.id, purchase: null }));
   const income = itemOf(drafted({ kind: 'income', category: 'Sueldo' }));
   const render = (item: ReviewItem) => harness('review/[id].tsx', { review: trayOf([plan, once, open, income]), calls: [] }, { id: item.id }).render();
-  const pago = (root: Node) => all(root, 'DetailRow').find(row => row.props.label === 'Pago')?.props.value;
+  const pago = (root: Node) => all(root, 'DetailRow').find(row => row.props.label === 'Cómo se paga')?.props.value;
   assert.ok(texts(render(plan)).includes('Al confirmar se registra una compra en 6 cuotas: cada cuota se suma al cerrar su resumen, no hoy.'));
   assert.equal(pago(render(plan)), 'En 6 cuotas');
   assert.equal(all(render(plan), 'DetailRow').find(row => row.props.label === 'Tarjeta')!.props.value, 'Visa');
@@ -729,7 +729,7 @@ test('the review sheet shows the live item compactly, and Confirmar (the one bra
   assert.equal(texts(root)[0], 'Confirmá el gasto');
   assert.deepEqual([all(root, 'Money')[0].props.minor, all(root, 'Money')[0].props.currency], [1500000, 'ARS']);
   const rows = Object.fromEntries(all(root, 'DetailRow').map(row => [row.props.label, row.props.value]));
-  assert.deepEqual(rows, { Categoría: 'Supermercado', Tarjeta: 'Visa', Pago: 'Una vez', Fecha: i18nFormat.formatDate(today, 'dayYear', 'es-AR') });
+  assert.deepEqual(rows, { Categoría: 'Supermercado', Tarjeta: 'Visa', 'Cómo se paga': 'Una vez', Fecha: i18nFormat.formatDate(today, 'dayYear', 'es-AR') });
   const confirm = button(root, 'Confirmar')!;
   assert.deepEqual([confirm.props.label, confirm.props.spokenLabel, confirm.props.secondary, confirm.props.disabled], ['Confirmar · $ 15.000,00', 'Confirmar, 15000,00 pesos', undefined, false]);
   assert.equal(button(root, 'Editar')!.props.secondary, true);

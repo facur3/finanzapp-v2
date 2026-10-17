@@ -133,17 +133,14 @@ export function DebtForm({ original }: { original?: PersonalDebtProfile }) {
         options={[{ value: 'none', label: t('debts.form.noDate') }, { value: 'dated', label: t('debts.form.dated') }]} />
     </View>
     {dueMode === 'dated' && <Surface grouped>
-      <DateField value={dueDate} onChange={setDueDate} disabled={locked} allowFuture label={t('debts.form.dueDate')} />
+      <DateField value={dueDate} onChange={setDueDate} disabled={locked} allowFuture label={t('debts.form.due')} />
     </Surface>}
 
     <Field label={t('debts.form.note')} value={note} onChangeText={setNote} maxLength={120} autoCapitalize="sentences" editable={!locked} />
 
-    <AppText secondary variant="footnote">
-      {t(owed ? 'debts.form.explainOwed' : 'debts.form.explainReceivable')}
-    </AppText>
     <ErrorMessage message={error} />
     {(pendingCreate || pendingEdit) && error && <AppText secondary variant="footnote">
-      {t('debts.form.frozenNote')}
+      {t('common.retryNote', { where: t('common.retryWhere.debts') })}
     </AppText>}
     <ActionButton label={error && (pendingCreate || pendingEdit) ? t('common.retrySave') : before ? t('common.saveChanges') : t('debts.form.create')}
       onPress={save} busy={busy} disabled={(before ? !counterparty.trim() : !counterparty.trim() || !amount.trim()) || !draftFitsCurrency(amount, currency).ok} />

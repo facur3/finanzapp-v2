@@ -171,12 +171,12 @@ test('Tarjetas with a pending plan: idle first, then the selected card\'s balanc
   assert.equal(find(root, 'Money').props.minor, 10000000);
   assert.ok(texts(root).includes('Saldo pendiente' + NBSP + '·' + NBSP + 'ARS'));
   // On Oct 1 the statement that closed on Sep 28 is still due on Oct 5; the open one closes on Oct 28: two facts, never merged.
-  assert.deepEqual(statsOf(root), ['Vence: 5 oct (5 de octubre de 2026)', 'Cierra: 28 oct (28 de octubre de 2026)', 'Disponible: No calculado con cuotas']);
+  assert.deepEqual(statsOf(root), ['Vence: 5 oct (5 de octubre de 2026)', 'Cierra: 28 oct (28 de octubre de 2026)', 'Crédito disponible: No calculado con cuotas']);
   // No figure, no zero, no bar: the issuer's reservation for instalments is not assumed; the reason is one tap away.
   const unknown = find(root, 'PressFeedback', 'No calculado con cuotas');
-  assert.equal(unknown.props.accessibilityHint, 'Más información sobre disponible con cuotas');
+  assert.equal(unknown.props.accessibilityHint, 'Más información sobre crédito disponible con cuotas');
   unknown.props.onPress();
-  assert.equal(view.alerts[0].title, 'Disponible con cuotas');
+  assert.equal(view.alerts[0].title, 'Crédito disponible con cuotas');
   assert.match(view.alerts[0].message, /^Cada emisor reserva el límite de las compras en cuotas a su manera/);
   assert.equal(byName(root, 'UsageBar').length, 0);
   assert.equal(nodes(root).some(node => node.type === 'Money' && node.props.minor === 300000000 - 10000000), false, 'never limit minus balance while a plan is pending');
@@ -202,7 +202,7 @@ test('Tarjetas: selecting a card without limit or balance changes the whole snap
   assert.equal(find(root, 'CardDeck').props.selectedId, 'amex');
   assert.equal(find(root, 'Money').props.minor, 0);
   assert.ok(texts(root).includes('Sin saldo pendiente en esta tarjeta.'));
-  assert.equal(statsOf(root)[2], 'Disponible: Sin límite cargado');
+  assert.equal(statsOf(root)[2], 'Crédito disponible: Sin límite cargado');
   assert.equal(find(root, 'ActionButton', 'Pagar tarjeta').props.disabled, true);
   assert.equal(byName(root, 'FutureInstallmentsRow').length, 0, 'no plan, no future instalments row');
   // Oct 2: the due date is three days away and something is owed.
@@ -220,7 +220,7 @@ test('Tarjetas: over the limit the available figure is negative in the expense t
   const overAccount: domain.Account = { ...cardAccount, openingMinor: -6000000 };
   const small: domain.CreditCardProfile = { ...card, creditLimitMinor: 5000000 };
   const over = picked(harness('cards.tsx', { data: { accounts: [cash, overAccount], records: [], cards: [small] } }));
-  const available = nodes(find(over, 'Stat', 'Disponible').props.children).find(node => node.type === 'Money')!;
+  const available = nodes(find(over, 'Stat', 'Crédito disponible').props.children).find(node => node.type === 'Money')!;
   assert.equal(available.props.minor, -1000000);
   assert.equal(available.props.color, '#c00');
   const bar = byName(over, 'UsageBar')[0];
@@ -301,7 +301,7 @@ test('Tarjetas in English: Due, Closes and Available; availability not calculate
   const view = harness('cards.tsx', { locale: 'en-US', data: { ...archive, accounts: [...archive.accounts, oldAccount], cards: [card, amex, old] } });
   assert.ok(texts(view.render()).includes('Tap a card to see its balance and transactions.'), '25UX1: idle in English too');
   const root = picked(view);
-  assert.deepEqual(statsOf(root), ['Due: Oct 5 (October 5, 2026)', 'Closes: Oct 28 (October 28, 2026)', 'Available: Not calculated with installments']);
+  assert.deepEqual(statsOf(root), ['Due: Oct 5 (October 5, 2026)', 'Closes: Oct 28 (October 28, 2026)', 'Available credit: Not calculated with installments']);
   assert.ok(texts(root).includes('Outstanding balance' + NBSP + '·' + NBSP + 'ARS'));
   assert.equal(nodes(root).find(node => node.type === 'SectionTitle' && node.props.action === 'See all')!.props.caption, 'This cycle, since Sep 29 · 0 purchases · 0 payments');
   assert.equal(nodes(root).find(node => node.type === 'SectionTitle' && node.props.children === 'Archived')!.props.caption, 'They still take payments and record their installments.');
@@ -321,7 +321,7 @@ test('card detail: its face, the same balance and facts with the limit, then its
   const root = view.render();
   const face = find(root, 'CardFace');
   assert.equal(JSON.stringify([face.props.name, face.props.last4, face.props.width, face.props.showCurrency]), JSON.stringify(['Visa Gold', '4009', 353, true]));
-  assert.deepEqual(statsOf(root).map(item => item.split(':')[0]), ['Vence', 'Cierra', 'Disponible']);
+  assert.deepEqual(statsOf(root).map(item => item.split(':')[0]), ['Vence', 'Cierra', 'Crédito disponible']);
   assert.ok(texts(root).includes('de $' + NBSP + '3.000.000,00'), 'the limit under Disponible');
   const sections = nodes(root).filter(node => node.type === 'SectionTitle');
   // 25UX1 (owner): Movimientos before the plans; every plan stays listed after the movements.
@@ -544,8 +544,8 @@ test('plan detail: a plan that recorded nothing can be deleted after a confirmat
   const closing = view.render();
   assert.equal(nodes(closing).some(node => node.type === 'EmptyState'), false);
   assert.equal(nodes(closing).some(node => node.type === 'ActionButton'), false);
-  assert.equal(find(harness('installment/[id].tsx', { params: { id: 'nb' }, data: deleted }).render(), 'EmptyState').props.title, 'No encontramos este plan de cuotas');
-  assert.equal(find(harness('installment/[id].tsx', { params: { id: 'missing' } }).render(), 'EmptyState').props.title, 'No encontramos este plan de cuotas');
+  assert.equal(find(harness('installment/[id].tsx', { params: { id: 'nb' }, data: deleted }).render(), 'EmptyState').props.title, 'No se encontró este plan de cuotas');
+  assert.equal(find(harness('installment/[id].tsx', { params: { id: 'missing' } }).render(), 'EmptyState').props.title, 'No se encontró este plan de cuotas');
   // Nothing recorded yet is what makes it deletable: the card detail lists it until then.
   assert.equal(installmentPresentation.planSummary(nb, withPlans.records, withPlans.purchaseOperations ?? []).deletable, true);
   assert.equal(installmentPresentation.planSummary(tv, withPlans.records, withPlans.purchaseOperations ?? []).deletable, false);
@@ -945,7 +945,7 @@ test('24T3 adelanto: the sheet lists what is brought forward, bounds the date, s
     + 'El pago a la tarjeta se registra aparte, con Pagar tarjeta.');
   const save = find(root, 'ActionButton');
   assert.equal(JSON.stringify([save.props.label, save.props.spokenLabel, save.props.disabled]),
-    JSON.stringify(['Registrar adelanto' + NBSP + '·' + NBSP + '$' + NBSP + '1.000.000,00', 'Registrar adelanto, 1000000,00 pesos', false]));
+    JSON.stringify(['Guardar adelanto' + NBSP + '·' + NBSP + '$' + NBSP + '1.000.000,00', 'Guardar adelanto, 1000000,00 pesos', false]));
   assert.equal(view.writes.length, 0, 'opening the sheet writes nothing');
   assert.equal(/pagad/i.test(JSON.stringify(texts(root))), false);
 });
@@ -960,16 +960,16 @@ test('24T3 adelanto: with future interest the person chooses, with nothing prese
   assert.deepEqual(choices.map(node => [node.props.title, node.props.subtitle, node.props.selected]), [
     ['Los registro ahora', 'Se suman al adelanto, con la misma fecha.', false], ['El emisor no los cobró', 'No se registran; el plan los muestra como no cobrados.', false]]);
   assert.equal(find(root, 'Money').props.minor, 90000000, 'before the choice, only the principal is sure to be recorded');
-  assert.equal(JSON.stringify([find(root, 'ActionButton').props.label, find(root, 'ActionButton').props.disabled]), JSON.stringify(['Registrar adelanto', true]));
+  assert.equal(JSON.stringify([find(root, 'ActionButton').props.label, find(root, 'ActionButton').props.disabled]), JSON.stringify(['Guardar adelanto', true]));
   assert.equal(domain.todayKey(find(root, 'DateField').props.minimumDate), '2026-09-20', 'nothing recorded yet: the purchase date');
   choices[0].props.onPress();
   root = view.render();
   assert.equal(find(root, 'Money').props.minor, 99000000);
-  assert.equal(find(root, 'ActionButton').props.spokenLabel, 'Registrar adelanto, 990000,00 pesos');
+  assert.equal(find(root, 'ActionButton').props.spokenLabel, 'Guardar adelanto, 990000,00 pesos');
   nodes(root).filter(node => node.type === 'CheckRow')[1].props.onPress();
   root = view.render();
   assert.deepEqual(nodes(root).filter(node => node.type === 'CheckRow').map(node => node.props.selected), [false, true]);
-  assert.equal(find(root, 'ActionButton').props.label, 'Registrar adelanto' + NBSP + '·' + NBSP + '$' + NBSP + '900.000,00');
+  assert.equal(find(root, 'ActionButton').props.label, 'Guardar adelanto' + NBSP + '·' + NBSP + '$' + NBSP + '900.000,00');
   find(root, 'ActionButton').props.onPress();
   await settle();
   const sent = view.writes[0].arg as domain.PlanPayoff;
@@ -984,7 +984,7 @@ test('24T3 adelanto: a write with an unknown outcome is retried unchanged; recor
   await settle();
   let root = view.render();
   assert.equal(find(root, 'ErrorMessage').props.message, 'installments.payoff.saveFailed');
-  assert.ok(texts(root).includes('Conservamos el envío: Reintentar nunca registra el adelanto dos veces. Para cambiarlo, cerrá y revisá primero el plan.'));
+  assert.ok(texts(root).includes('Reintentar no guarda nada dos veces. Para cambiar algo, cerrá y revisá primero el plan.'));
   assert.equal(find(root, 'DateField').props.disabled, true, 'frozen: nothing changes under the retry');
   assert.equal(view.failures.join(','), 'Warning', '25Q4: it may have been written, so Warning while it stays frozen');
   find(root, 'ActionButton', 'Reintentar guardado').props.onPress();
@@ -1032,7 +1032,7 @@ test('24T3 adelanto: a refusal storage gave before writing (the instalments chan
   assert.equal(find(root, 'DateField').props.disabled, false);
   assert.deepEqual(rowsOf(root), ['Cuotas=3–12', 'Importe=$ 950.000,00 (950000,00 pesos)'].map(money$));
   const save = find(root, 'ActionButton');
-  assert.equal(save.props.label, 'Registrar adelanto' + NBSP + '·' + NBSP + '$' + NBSP + '950.000,00');
+  assert.equal(save.props.label, 'Guardar adelanto' + NBSP + '·' + NBSP + '$' + NBSP + '950.000,00');
   save.props.onPress();
   await settle();
   const [first, second] = view.writes.map(item => item.arg as domain.PlanPayoff);
@@ -1071,7 +1071,7 @@ test('24T3 adelanto: undone instalments stay pending and the sheet says so; a pl
   const stopped = { ...withPlans, installmentPlans: [domain.cancelInstallmentPlan(tv, '2026-09-30T12:00:00.000Z'), nb, phone] };
   const empty = find(harness('plan-payoff/[id].tsx', { params: { id: 'tv' }, data: stopped }).render(), 'EmptyState');
   assert.equal(JSON.stringify([empty.props.title, empty.props.detail]), JSON.stringify(['No hay cuotas para adelantar', 'Este plan no se sigue. Reactivalo primero.']));
-  assert.equal(find(harness('plan-payoff/[id].tsx', { params: { id: 'missing' } }).render(), 'EmptyState').props.title, 'No encontramos este plan de cuotas');
+  assert.equal(find(harness('plan-payoff/[id].tsx', { params: { id: 'missing' } }).render(), 'EmptyState').props.title, 'No se encontró este plan de cuotas');
 });
 
 test('24T3 adelanto in English: the same sheet, "Brought forward" words, the choice and the sentence', () => {
@@ -1082,7 +1082,7 @@ test('24T3 adelanto in English: the same sheet, "Brought forward" words, the cho
   const sentence = nodes(root).find(node => node.type === 'AppText' && text(node).startsWith('FinanzApp records'))!;
   assert.equal(text(sentence), 'FinanzApp records the remaining installments (AR$' + NBSP + '900,000.00) on Oct 1, 2026 in the card’s outstanding balance. '
     + 'The payment to the card is recorded separately, with Pay card.');
-  assert.equal(find(root, 'ActionButton').props.label, 'Record installments');
+  assert.equal(find(root, 'ActionButton').props.label, 'Save installments');
   assert.equal(/paid/i.test(JSON.stringify(texts(root))), false);
 });
 
@@ -1264,7 +1264,7 @@ test('24UX6D, 25UX1: the snapshot reads Saldo pendiente → Vence · Cierra → 
     : typeof node.type === 'function' && node.type.name === 'FutureInstallmentsRow' ? 'future' : node.type === 'SectionTitle' ? 'recent:' + node.props.children : null)
     .filter((item, index, all) => item && all.indexOf(item) === index);
   // 25UX1 (owner): one clear action (recording a purchase is the dock's «+»); the future instalments are the detail's.
-  assert.deepEqual(order, ['balance', 'fact:Vence', 'fact:Cierra', 'fact:Disponible', 'action:Pagar tarjeta', 'recent:Recientes']);
+  assert.deepEqual(order, ['balance', 'fact:Vence', 'fact:Cierra', 'fact:Crédito disponible', 'action:Pagar tarjeta', 'recent:Recientes']);
   // No surface around the balance or the facts: the only surface is the grouped list of recent movements.
   const surfaces = nodes(snapshot).filter(node => node.type === 'Surface');
   assert.ok(surfaces.length >= 1);
@@ -1273,7 +1273,7 @@ test('24UX6D, 25UX1: the snapshot reads Saldo pendiente → Vence · Cierra → 
   // The two dates share a row; Disponible has its own, full width (a seven-digit amount keeps its row size).
   const row = find(snapshot, 'StatRow');
   assert.deepEqual(nodes(row).filter(node => node.type === 'Stat').map(node => node.props.label), ['Vence', 'Cierra']);
-  assert.equal(nodes(snapshot).filter(node => node.type === 'Stat' && node.props.label === 'Disponible').length, 1);
+  assert.equal(nodes(snapshot).filter(node => node.type === 'Stat' && node.props.label === 'Crédito disponible').length, 1);
   const recent = nodes(snapshot).find(node => node.type === 'SectionTitle')!;
   assert.deepEqual([recent.props.quiet, recent.props.action], [true, 'Ver todos']);
   // English reads the same order.
@@ -1308,7 +1308,7 @@ test('24UX6D, 25UX1: the card detail keeps the snapshot\'s words (balance, Vence
   const order = nodes(root).map(node => node.type === 'CardFace' ? 'face' : node.type === 'Money' && node.props.large ? 'balance'
     : node.type === 'Stat' ? 'fact:' + node.props.label : node.type === 'ActionButton' ? 'action:' + node.props.label
     : node.type === 'SectionTitle' ? 'section:' + node.props.children : null).filter((item, index, all) => item && all.indexOf(item) === index);
-  assert.deepEqual(order, ['face', 'balance', 'fact:Vence', 'fact:Cierra', 'fact:Disponible', 'action:Registrar compra', 'action:Pagar tarjeta', 'section:Movimientos', 'section:Cuotas']);
+  assert.deepEqual(order, ['face', 'balance', 'fact:Vence', 'fact:Cierra', 'fact:Crédito disponible', 'action:Registrar compra', 'action:Pagar tarjeta', 'section:Movimientos', 'section:Cuotas']);
   assert.equal(nodes(root).filter(node => node.type === 'Surface').every(node => node.props.grouped === true), true, 'the facts are flat; the plans one grouped list');
   assert.equal(find(root, 'CardFace').props.nameLines, undefined, 'the detail face takes the default two lines for a long name');
   assert.equal(/pagad/i.test(JSON.stringify(texts(root))), false);

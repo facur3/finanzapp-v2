@@ -135,10 +135,9 @@ export function CategoryForm({ original, kind: requestedKind }: { original?: Cat
     {renamed && <FieldNote>{t('categoryManager.form.renamedNote', { stored: before.storedLabel, shown: label.trim() || before.storedLabel })}</FieldNote>}
     <IconColorPicker icons={CATEGORY_ICON_CHOICES} colors={COLOR_CHOICES} icon={icon} color={color}
       onIconChange={setIcon} onColorChange={setColor} disabled={locked} previewLabel={label} />
-    {before && <AppText secondary variant="footnote">{t('categoryManager.form.editNote')}</AppText>}
     {!before && <AppText secondary variant="footnote">{t(kind === 'expense' ? 'categoryManager.form.availableExpense' : 'categoryManager.form.availableIncome')}</AppText>}
     <ErrorMessage message={error} />
-    {pending && error && <AppText secondary variant="footnote">{t('categoryManager.form.retryNote')}</AppText>}
+    {pending && error && <AppText secondary variant="footnote">{t('common.retryNote', { where: t('common.retryWhere.categories') })}</AppText>}
     <View style={{ gap: 10 }}>
       <ActionButton label={t(pending && error ? 'common.retrySave' : before ? 'common.saveChanges' : 'categoryManager.form.create')} onPress={save} busy={busy} disabled={!label.trim()} />
       {before && <ActionButton label={t(before.archived ? 'categoryManager.form.unarchive' : 'categoryManager.form.archive')} icon={before.archived ? 'arrow-redo-outline' : 'archive-outline'}

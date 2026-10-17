@@ -170,7 +170,7 @@ function RefundForm({ target }: { target: RefundTarget | null }) {
     {/* The live line (a half-typed «12,», an amount over what is left) is shown, not spoken: VoiceOver hears what Save refused. */}
     <ErrorMessage message={error ?? (!amount.trim() ? null : parsed === null && !pending ? REFUND_AMOUNT_MESSAGE : preview.status === 'invalid' ? preview.message : null)}
       announce={error !== null} />
-    {pending && !busy && error && <AppText secondary variant="footnote">{t('operations.refund.retryNote')}</AppText>}
+    {pending && !busy && error && <AppText secondary variant="footnote">{t('common.retryNote', { where: t('common.retryWhere.purchase') })}</AppText>}
     <ActionButton label={submit.text} spokenLabel={submit.spoken} onPress={save} busy={busy} disabled={!pending && preview.status !== 'ready'} />
   </Screen>;
 }

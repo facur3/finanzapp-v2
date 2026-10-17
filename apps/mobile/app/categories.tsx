@@ -26,9 +26,6 @@ export default function CategoriesScreen() {
   const archived = [...expense, ...income].filter(row => row.identity.archived);
   return <Screen>
     <Stack.Screen options={{ headerRight: () => <IconButton name="add" label={t('nav.titles.newCategory')} onPress={() => router.push('/new-category')} /> }} />
-    <AppText secondary variant="subhead">
-      {t('categoryManager.list.intro')}
-    </AppText>
     <CatalogSection title={t('categoryManager.list.expenses')} kind="expense" rows={expense.filter(row => !row.identity.archived)} />
     <CatalogSection title={t('categoryManager.list.incomes')} kind="income" rows={income.filter(row => !row.identity.archived)} />
     {archived.length > 0 && <CatalogSection title={t('categoryManager.list.archived')} caption={t('categoryManager.list.archivedCaption')} rows={archived} />}

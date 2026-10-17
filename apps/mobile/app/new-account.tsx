@@ -84,7 +84,7 @@ export default function NewAccountScreen() {
         onIconChange={setIcon} onColorChange={setColor} disabled={locked} previewLabel={name} />
     </View>
     <ErrorMessage message={error} />
-    {pending && error && <AppText secondary variant="footnote">{t('accounts.form.retryNote')}</AppText>}
+    {pending && error && <AppText secondary variant="footnote">{t('common.retryNote', { where: t('common.retryWhere.accounts') })}</AppText>}
     <ActionButton label={pending && error ? t('common.retrySave') : t('accounts.form.save')} onPress={save} busy={busy} disabled={!name.trim() || !draftFitsCurrency(opening, currency).ok} />
   </Screen>;
 }

@@ -1137,7 +1137,7 @@ export async function deleteAccount(db: LedgerDatabase, accountId: string, nowIS
   await db.withExclusiveTransactionAsync(async tx => {
     const archive = await readArchive(tx);
     const account = archive.accounts.find(item => item.id === accountId);
-    if (!account) throw new Error('No encontramos esta cuenta.');
+    if (!account) throw new Error('No se encontró esta cuenta.');
     if (hiddenLiabilityAccountIds(archive.cards, archive.debts).has(accountId)) throw new Error(OBLIGATION_ACCOUNT_MESSAGE);
     if (!isLiveAccount(account)) return; // Committed already; a refresh failed.
     const tombstone = deleteAccountRecord(account, nowISO);
@@ -1197,7 +1197,7 @@ export async function saveCreditCard(db: LedgerDatabase, input: CreditCardProfil
     const archive = await readArchive(tx);
     validateCreditCardProfile(card, archive.accounts);
     const existing = archive.cards?.find(item => item.id === card.id);
-    if (!existing) throw new Error('No encontramos esta tarjeta.');
+    if (!existing) throw new Error('No se encontró esta tarjeta.');
     const stored = cardCycleDatesOf(card.id, archive.cardCycleDates);
     if (sameCreditCardProfile(existing, card)) {
       // Committed already (a refresh failed): the calendar shows what was asked. A calendar change always moves the card
@@ -1237,7 +1237,7 @@ export async function deleteCreditCard(db: LedgerDatabase, cardId: string, nowIS
   await db.withExclusiveTransactionAsync(async tx => {
     const archive = await readArchive(tx);
     const card = archive.cards?.find(item => item.id === cardId);
-    if (!card) throw new Error('No encontramos esta tarjeta.');
+    if (!card) throw new Error('No se encontró esta tarjeta.');
     if (card.deleted) return; // Committed already; a refresh failed.
     // 25B2: no balance due; 24T1: no pending plan; 24T3 (B3): no credit in the holder's favour.
     assertCardDeletable(card, snapshotFromArchive(archive), archive.installmentPlans ?? [], archive.records, archive.purchaseOperations ?? []);
@@ -1287,7 +1287,7 @@ export async function savePersonalDebt(db: LedgerDatabase, input: PersonalDebtPr
     const archive = await readArchive(tx);
     validatePersonalDebtProfile(debt, archive.accounts);
     const existing = archive.debts?.find(item => item.id === debt.id);
-    if (!existing) throw new Error('No encontramos esta deuda.');
+    if (!existing) throw new Error('No se encontró esta deuda.');
     if (samePersonalDebtProfile(existing, debt)) return;
     validatePersonalDebtChange(existing, debt);
     // 25B2 close: the deletion record has its own path (`deletePersonalDebt`, which checks the balance and the history).
@@ -1309,7 +1309,7 @@ export async function deletePersonalDebt(db: LedgerDatabase, debtId: string, now
   await db.withExclusiveTransactionAsync(async tx => {
     const archive = await readArchive(tx);
     const debt = archive.debts?.find(item => item.id === debtId);
-    if (!debt) throw new Error('No encontramos esta deuda.');
+    if (!debt) throw new Error('No se encontró esta deuda.');
     if (debt.deleted) return; // Committed already; a refresh failed.
     assertDebtDeletable(debt, snapshotFromArchive(archive));
     const tombstone = deletePersonalDebtRecord(debt, nowISO);

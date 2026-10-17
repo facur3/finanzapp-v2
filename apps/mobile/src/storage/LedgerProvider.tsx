@@ -219,7 +219,7 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
   };
 
   const mutate = useCallback((operation: (db: LedgerDatabase) => Promise<void>) => enqueue(async () => {
-    if (!database.current) throw new Error('Todavía estamos abriendo tus datos.');
+    if (!database.current) throw new Error('Tus datos todavía se están abriendo.');
     await operation(database.current);
     // If this read fails after commit, the form keeps the same operation ID;
     // retrying cannot post a duplicate entry.

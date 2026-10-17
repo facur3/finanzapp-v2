@@ -97,7 +97,7 @@ export const assistant = {
       merchant: 'Comercio',
       source: 'Origen',
       destination: 'Dónde se registra',
-      payment: 'Pago',
+      payment: 'Cómo se paga',
       /** VoiceOver reading of one card row: "Comercio: Carrefour". */
       row: '{label}: {value}',
       missing: 'Falta completar',
@@ -123,7 +123,7 @@ export const assistant = {
       limit: 'Llegaste al límite de uso. Podés registrar manualmente.',
       unavailable: 'La integración todavía no está disponible.',
       failed: 'No se pudo completar la solicitud. Tus movimientos no cambiaron.',
-      captureUnverified: 'No pudimos verificar la captura.',
+      captureUnverified: 'No se pudo verificar la captura.',
     },
   },
 } as const;

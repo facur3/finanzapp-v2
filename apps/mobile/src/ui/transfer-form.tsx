@@ -341,7 +341,7 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
       {/* 25Q4: an amount over the cap is said while it is typed: shown, not spoken (VoiceOver hears what Save refused), as the
         devolución form does. Save stays enabled and refuses it with the same sentence, one Error tap and the announcement. */}
       <ErrorMessage message={error ?? (!pending && parsed !== null && overCap(parsed) ? overKey : null)} announce={error !== null} />
-      {pending && error && <AppText secondary variant="footnote">{t('transferForm.retryNote')}</AppText>}
+      {pending && error && <AppText secondary variant="footnote">{t('common.retryNote', { where: t('common.retryWhere.movements') })}</AppText>}
       <ActionButton label={submit.text} spokenLabel={submit.spoken} busy={busy} disabled={!amount.trim() || !from || !to || from.id === to.id || from.currency !== to.currency || !fit.ok} onPress={save} />
     </>}
   </Screen>;

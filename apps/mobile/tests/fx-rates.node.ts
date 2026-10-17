@@ -478,8 +478,8 @@ test('a missing rate gives per-currency subtotals and its reason (fetching, offl
   assert.deepEqual(figure.status === 'unavailable' && figure.parts, [{ currency: 'ARS', minor: 360000 }, { currency: 'USD', minor: 1234 }, { currency: 'EUR', minor: 999 }, { currency: 'JPY', minor: 1500 }]);
   const es = bindLocale('es-AR'), en = bindLocale('en-US');
   if (figure.status !== 'unavailable') return;
-  assert.match(shortfallDetail(figure, { t: es.t, date: es.formatNumericDate, currencyName: es.currencyName }), /^Sin conexión: no pudimos obtener la cotización USD → ARS del 5\/9\/2026/);
-  assert.match(shortfallDetail(figure, { t: en.t, date: en.formatNumericDate, currencyName: en.currencyName }), /^No connection: we could not get the USD → ARS rate for 9\/5\/2026/);
+  assert.match(shortfallDetail(figure, { t: es.t, date: es.formatNumericDate, currencyName: es.currencyName }), /^Sin conexión: no se pudo obtener la cotización USD → ARS del 5\/9\/2026/);
+  assert.match(shortfallDetail(figure, { t: en.t, date: en.formatNumericDate, currencyName: en.currencyName }), /^No connection: the USD → ARS rate for 9\/5\/2026 couldn’t be fetched/);
 });
 
 test('the info texts name the source and the rate dates; nothing is said when nothing was converted', () => {
@@ -489,6 +489,12 @@ test('the info texts name the source and the rate dates; nothing is said when no
   const view = financeView(ledger, 'consolidated', 'USD', book);
   const figure = spendingFigure(ledger, view, september, 'idle', true);
   assert.match(figureInfo(figure, 'spending', words)!, /^Gastos de todas tus cuentas en Dólares estadounidenses\. .*Frankfurter.*11\/9\/2026/);
+  // 25T: rates of several days are named as the range they span (as Reportes does), never as the newest day alone.
+  assert.match(figureInfo(figure, 'spending', words)!, /se usaron cotizaciones del 4\/9\/2026 al 11\/9\/2026\./);
+  const ready = (oldest: string, newest: string) => ({ status: 'ready', currency: 'USD', minor: 100, converted: true,
+    provenance: { converted: 2, oldest, newest, sources: ['Frankfurter'] } }) as Parameters<typeof figureInfo>[0];
+  assert.match(figureInfo(ready('2026-09-04', '2026-09-11'), 'available', words)!, /con la última cotización de referencia de cada moneda \(Frankfurter, bancos centrales\), del 4\/9\/2026 al 11\/9\/2026\./);
+  assert.match(figureInfo(ready('2026-09-11', '2026-09-11'), 'available', words)!, /con la cotización de referencia del 11\/9\/2026 \(Frankfurter/, 'one day: one date');
   assert.match(reportInfo('USD', view.provenance('2026-09-01', '2026-09-30', 'expense'), words)!, /del 4\/9\/2026 al 11\/9\/2026, nunca la de hoy para un mes pasado/);
   const onlyUsd: LedgerSnapshot = { accounts: [account('usd', 'USD')], entries: [spend('u', 'usd', 100, '2026-09-10')] };
   const plain = spendingFigure(onlyUsd, financeView(onlyUsd, 'consolidated', 'USD', rateBook([])), september, 'idle', true);

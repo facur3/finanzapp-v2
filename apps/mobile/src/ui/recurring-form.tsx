@@ -166,7 +166,7 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
       <FieldNote help={{ title: t('recurring.form.noteHelpTitle'), detail: t('recurring.form.noteHelp') }}>{t('recurring.form.note')}</FieldNote>
       <ErrorMessage message={error} />
       {pending && !busy && error && <AppText secondary variant="footnote" style={{ textAlign: 'center' }}>
-        {t('recurring.form.retryNote')}
+        {t('common.retryNote', { where: t('common.retryWhere.recurring') })}
       </AppText>}
       <ActionButton label={pending && error ? t('common.retrySave') : before ? t('common.saveChanges') : t('recurring.form.create')}
         onPress={save} busy={busy} disabled={!amount.trim() || !merchant.trim() || !category.trim() || !account || !fit.ok || !!original?.deleted} />

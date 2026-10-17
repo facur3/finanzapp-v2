@@ -21,8 +21,8 @@ export const home: Pick<Messages, 'home' | 'quickActions'> = {
     heroAvailable: 'Available, {amount}',
     availableHelp: 'The money recorded in your accounts in this currency: opening balance plus income, minus expenses and transfers. '
       + 'It excludes cards and debts, and it is not a bank balance or your net worth.',
-    spendingOutOfRange: 'The total is beyond the range we can show precisely. Your transactions are still saved.',
-    balanceOutOfRange: 'The total balance is beyond the range we can show precisely. Your accounts are still saved.',
+    spendingOutOfRange: 'The total is beyond the range that can be shown precisely. Your transactions are still saved.',
+    balanceOutOfRange: 'The total balance is beyond the range that can be shown precisely. Your accounts are still saved.',
     refundsExceed: 'Refunds exceed what was spent',
     recent: 'Recent activity',
     quietTitle: 'No transactions this month yet',

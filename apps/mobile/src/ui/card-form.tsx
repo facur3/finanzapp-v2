@@ -243,7 +243,7 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
 
     <ErrorMessage message={error} />
     {(pendingCreate || pendingEdit) && error && <AppText secondary variant="footnote">
-      {t('cards.form.frozenNote')}
+      {t('common.retryNote', { where: t('common.retryWhere.cards') })}
     </AppText>}
     <ActionButton label={error && (pendingCreate || pendingEdit) ? t('common.retrySave') : before ? t('common.saveChanges') : t('cards.form.create')}
       onPress={save} busy={busy} disabled={(before ? false : !name.trim()) || !closing || !due || dueBeforeClosing || !fitsCurrency} />

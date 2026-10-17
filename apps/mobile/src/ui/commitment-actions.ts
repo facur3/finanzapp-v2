@@ -135,7 +135,7 @@ export function useDebtManagement() {
     const outstanding = outstandingOf(debt), account = accountOf(debt);
     const closed = closePersonalDebt(debt, now());
     if (!outstanding || !account) { void commit(closed, 'debts.manage.failed', 'selection', done); return; }
-    Alert.alert(t(debt.direction === 'owed_by_me' ? 'debts.manage.closeTitleOwed' : 'debts.manage.closeTitleReceivable', { name: debt.counterparty }), t('debts.manage.closeDetail', { amount: moneyText(outstanding, account.currency) }), [
+    Alert.alert(t(debt.direction === 'owed_by_me' ? 'debts.manage.closeTitleOwed' : 'debts.manage.closeTitleReceivable', { name: debt.counterparty }), t(debt.direction === 'owed_by_me' ? 'debts.manage.closeDetailOwed' : 'debts.manage.closeDetailReceivable', { amount: moneyText(outstanding, account.currency) }), [
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('debts.manage.closeConfirm'), onPress: () => { void commit(closed, 'debts.manage.failed', 'selection', done); } },
     ]);
@@ -175,7 +175,7 @@ export function useDebtManagement() {
   /** Open with a balance: Saldar. Open and settled: Cerrar. Closed: Reabrir. Then delete, always last. */
   function actions(debt: PersonalDebtProfile, done?: () => void): SwipeAction[] {
     const first: SwipeAction = !debt.active ? { key: 'reopen', label: t('debts.manage.reopen'), icon: 'arrow-undo', tone: 'accent', onPress: () => { void reopen(debt, done); } }
-      : outstandingOf(debt) > 0 ? { key: 'settle', label: t('debts.manage.settle'), icon: 'checkmark-done', tone: 'accent', onPress: () => settle(debt) }
+      : outstandingOf(debt) > 0 ? { key: 'settle', label: t(debt.direction === 'owed_by_me' ? 'debts.manage.settle' : 'debts.manage.collect'), icon: 'checkmark-done', tone: 'accent', onPress: () => settle(debt) }
         : { key: 'close', label: t('debts.manage.close'), icon: 'checkmark', tone: 'neutral', onPress: () => close(debt, done) };
     return [first, { key: 'delete', label: t('debts.manage.delete'), icon: 'trash', tone: 'destructive', onPress: () => remove(debt, done) }];
   }

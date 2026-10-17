@@ -166,7 +166,7 @@ export default function PlanPayoffScreen() {
       detail={t('installments.payoff.undone', { count: preview.undoneNumbers.length, numbers: numberRanges(preview.undoneNumbers) })} />}
     <AppText secondary variant="footnote" accessibilityLabel={sentence(spoken, formatDate(shownDateISO, 'long'))}>{sentence(money, formatDate(shownDateISO, 'dayYear'))}</AppText>
     <ErrorMessage message={error} />
-    {pending && !busy && error && <AppText secondary variant="footnote">{t('installments.payoff.retryNote')}</AppText>}
+    {pending && !busy && error && <AppText secondary variant="footnote">{t('common.retryNote', { where: t('common.retryWhere.plan') })}</AppText>}
     <ActionButton label={submit.text} spokenLabel={submit.spoken} onPress={save} busy={busy} disabled={!ready} />
   </Screen>;
 }

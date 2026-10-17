@@ -332,9 +332,9 @@ test('25Q2: after an import, a file that fails leaves «Copia incorporada» for 
   find(view.render(), 'ActionButton', 'Confirmar importación').props.onPress();
   view.alerts[0].buttons[1].onPress();
   await flush();
-  assert.equal(find(view.render(), 'EmptyState').props.title, 'Copia incorporada');
+  assert.equal(find(view.render(), 'EmptyState').props.title, 'Copia importada');
   await find(view.render(), 'ActionButton', 'Elegir otra copia').props.onPress();
-  assert.equal(find(view.render(), 'EmptyState').props.title, 'Copia incorporada', 'a cancelled picker keeps it');
+  assert.equal(find(view.render(), 'EmptyState').props.title, 'Copia importada', 'a cancelled picker keeps it');
   await find(view.render(), 'ActionButton', 'Elegir otra copia').props.onPress();
   assert.equal(find(view.render(), 'EmptyState').props.title, 'Recuperá tus registros', 'before 25Q2 nothing changed on screen');
   assert.equal(find(view.render(), 'ErrorMessage').props.message, 'El archivo no es una copia JSON válida.');
@@ -345,7 +345,7 @@ test('25Q2: after an import, a file that fails leaves «Copia incorporada» for 
   await find(failing.render(), 'ActionButton', 'Elegir copia').props.onPress();
   const message = find(failing.render(), 'ErrorMessage').props.message;
   assert.equal(message, 'backup.import.readFailed', 'never the platform\'s text');
-  assert.equal(bindLocale('es-AR').errorText(message), 'No pudimos leer la copia. Tus datos y el archivo siguen intactos.');
+  assert.equal(bindLocale('es-AR').errorText(message), 'No se pudo leer la copia. Tus datos y el archivo siguen intactos.');
 });
 test('25Q4: an import that fails with an engine\'s error says the import\'s own sentence; a storage refusal keeps its reason', async () => {
   const json = JSON.stringify(domain.createRecoveryBackup(archive));
@@ -359,7 +359,7 @@ test('25Q4: an import that fails with an engine\'s error says the import\'s own 
   await flush();
   let message = find(view.render(), 'ErrorMessage').props.message;
   assert.equal(message, 'backup.import.verifyFailed', 'never the engine\'s text');
-  assert.equal(bindLocale('es-AR').errorText(message), 'No pudimos verificar la importación. Reintentá con la misma copia para comprobarla sin duplicar datos.');
+  assert.equal(bindLocale('es-AR').errorText(message), 'No se pudo verificar la importación. Reintentá con la misma copia para comprobarla sin duplicar datos.');
   find(view.render(), 'ActionButton', 'Confirmar importación').props.onPress();
   view.alerts[1].buttons[1].onPress();
   await flush();
@@ -367,7 +367,7 @@ test('25Q4: an import that fails with an engine\'s error says the import\'s own 
   assert.equal(message, 'La copia contradice cambios locales. No se importó nada. Conservá ambas versiones.', 'a storage refusal keeps its own reason');
   assert.notEqual(bindLocale('en-US').errorText(message), message);
   assert.equal(view.restores.length, 2);
-  assert.equal(nodes(view.render()).some(node => node.props.title === 'Copia incorporada'), false);
+  assert.equal(nodes(view.render()).some(node => node.props.title === 'Copia importada'), false);
 });
 test('25R1: an import that committed but whose view could not be read again is done: «Copia incorporada», never «Confirmar importación» again under the save-finished sentence', async () => {
   const json = JSON.stringify(domain.createRecoveryBackup(archive));
@@ -379,10 +379,10 @@ test('25R1: an import that committed but whose view could not be read again is d
   view.alerts[0].buttons[1].onPress();
   await flush();
   const root = view.render();
-  assert.equal(find(root, 'EmptyState').props.title, 'Copia incorporada');
+  assert.equal(find(root, 'EmptyState').props.title, 'Copia importada');
   assert.equal(nodes(root).some(node => node.props.label === 'Confirmar importación'), false);
   assert.equal(view.restores.length, 1);
-  assert.deepEqual(view.announced, ['Copia incorporada'], '25D2: the copy is in, so VoiceOver hears so');
+  assert.deepEqual(view.announced, ['Copia importada'], '25D2: the copy is in, so VoiceOver hears so');
 });
 test('25R1: a refused import keeps the review: «Volver a revisar» previews the copy again against the stored ledger, and «Elegir otra copia» picks again', async () => {
   const json = JSON.stringify(domain.createRecoveryBackup(archive));
@@ -428,10 +428,10 @@ test('backup preview shows exact totals, cancel stays read-only, confirm waits f
   await flush();
   assert.equal(view.restores.length, 1);
   assert.equal(view.restores[0].baseline, domain.archiveKey({ accounts: [], records: [] }));
-  assert.equal(find(view.render(), 'EmptyState').props.title, 'Copia incorporada');
+  assert.equal(find(view.render(), 'EmptyState').props.title, 'Copia importada');
   assert.equal(view.haptics.join(','), 'Success');
   // 25D2: the review gives way to the done view in place; VoiceOver hears its title once.
-  assert.deepEqual(view.announced, ['Copia incorporada']);
+  assert.deepEqual(view.announced, ['Copia importada']);
   // 25Q4: a failed import keeps nothing frozen and offers the import again, so it taps Error.
   const failing = harness('app/backup-import.tsx', {}, { data: { accounts: [], records: [] }, restore: async () => { throw new Error('database is locked'); },
     picker: async () => ({ canceled: false, result: { size: json.length, name: 'test.json', text: async () => json } }) });
@@ -440,7 +440,7 @@ test('backup preview shows exact totals, cancel stays read-only, confirm waits f
   failing.alerts[0].buttons[1].onPress();
   await flush();
   assert.deepEqual([failing.restores.length, failing.haptics.join(',')], [1, 'Error']);
-  assert.equal(nodes(failing.render()).some(node => node.type === 'EmptyState' && node.props.title === 'Copia incorporada'), false);
+  assert.equal(nodes(failing.render()).some(node => node.type === 'EmptyState' && node.props.title === 'Copia importada'), false);
   assert.deepEqual(failing.announced, [], 'a failure is said by ErrorMessage, never as done');
 });
 test('identical or conflicting backups cannot show an enabled import action', async () => {
@@ -454,7 +454,7 @@ test('identical or conflicting backups cannot show an enabled import action', as
   }
 });
 
-test('24B4: a v9 copy in yen lists the scales it pins as a review row, imports once, and the formats note names v1 to v10; a v8 file naming yen is refused by name', async () => {
+test('24B4: a v9 copy in yen lists the scales it pins as a review row, imports once, and no standing formats line; a v8 file naming yen is refused by name', async () => {
   const yen: domain.Account = { ...account, id: 'yen', name: 'Yenes', currency: 'JPY', openingMinor: 1500 };
   const yenArchive: domain.LedgerArchive = { accounts: [yen], records: [domain.initialRecord({ ...entry, id: 'y1', accountId: 'yen', amountMinor: 700 })] };
   const backup = domain.createRecoveryBackup(yenArchive);
@@ -464,9 +464,10 @@ test('24B4: a v9 copy in yen lists the scales it pins as a review row, imports o
     picker: async () => ({ canceled: false, result: { size: json.length, name: 'yen.json', text: async () => json } }) });
   await find(view.render(), 'ActionButton', 'Choose backup').props.onPress();
   const rows = nodes(view.render()).filter(node => node.type === 'DetailRow').map(node => [node.props.label, node.props.value]);
-  assert.ok(rows.some(([label, value]) => label === 'New currency scales' && value === '1'), JSON.stringify(rows));
+  assert.ok(rows.some(([label, value]) => label === 'New currencies' && value === '1'), JSON.stringify(rows));
   assert.deepEqual({ minor: find(view.render(), 'Money').props.minor, currency: find(view.render(), 'Money').props.currency }, { minor: 800, currency: 'JPY' }, 'yen previewed as yen');
-  assert.ok(nodes(view.render()).some(node => node.type === 'AppText' && String(node.props.children).startsWith('FinanzApp backups v1 to v14')));
+  // File-format vocabulary is not a standing line: versions and the size appear only in a refusal that needs them.
+  assert.equal(nodes(view.render()).some(node => node.type === 'AppText' && /v1 to v14|JSON/.test(String(node.props.children))), false);
   find(view.render(), 'ActionButton', 'Confirm import').props.onPress();
   view.alerts[0].buttons[1].onPress();
   await flush();
@@ -495,7 +496,7 @@ test('transfer form previews exact two-account balances and only offers same-cur
   const root = view.render();
   assert.equal(find(root, 'DetailRow', 'Prueba ARS después').props.value, 'ARS\u00A0866,55');
   assert.equal(find(root, 'DetailRow', 'Destino después').props.value, 'ARS\u00A010,00');
-  await find(root, 'ActionButton', 'Registrar transferencia\u00A0·\u00A0$\u00A010,00').props.onPress();
+  await find(root, 'ActionButton', 'Guardar transferencia\u00A0·\u00A0$\u00A010,00').props.onPress();
   assert.equal(view.transfers.length, 1);
   assert.equal(view.transfers[0].amountMinor, 1000);
   assert.equal(view.transfers[0].fromAccountId, 'a');
@@ -513,7 +514,7 @@ test('changing transfer source clears an incompatible target; validation keeps i
   find(view.render(), 'AccountField', 'Desde').props.onChange('a');
   find(view.render(), 'AccountField', 'Hacia').props.onChange('b');
   find(view.render(), 'AmountField').props.onChangeText('12abc');
-  await find(view.render(), 'ActionButton', 'Registrar transferencia').props.onPress();
+  await find(view.render(), 'ActionButton', 'Guardar transferencia').props.onPress();
   assert.ok(find(view.render(), 'ErrorMessage').props.message);
   assert.equal(find(view.render(), 'AmountField').props.editable, true);
   assert.equal(view.transfers.length, 0);
@@ -669,7 +670,7 @@ test('card payment locks the card as destination, caps at the recorded debt and 
   assert.equal(find(root, 'Field').props.value, 'Pago Visa');
   find(root, 'AmountField').props.onChangeText('60');
   root = view.render();
-  await find(root, 'ActionButton', 'Registrar pago\u00A0·\u00A0$\u00A060,00').props.onPress();
+  await find(root, 'ActionButton', 'Guardar pago\u00A0·\u00A0$\u00A060,00').props.onPress();
   // The form stores the catalogue key; ErrorMessage shows it in the interface language.
   assert.equal(find(view.render(), 'ErrorMessage').props.message, 'transferForm.overCardDebt');
   assert.match(bindLocale('es-AR').errorText('transferForm.overCardDebt'), /supera el saldo pendiente/);
@@ -677,7 +678,7 @@ test('card payment locks the card as destination, caps at the recorded debt and 
   find(view.render(), 'AmountField').props.onChangeText('50');
   root = view.render();
   assert.equal(find(root, 'DetailRow', 'Visa después').props.value, 'Sin saldo pendiente', 'a card paid to zero owes nothing; it is not "in credit"');
-  await find(root, 'ActionButton', 'Registrar pago\u00A0·\u00A0$\u00A050,00').props.onPress();
+  await find(root, 'ActionButton', 'Guardar pago\u00A0·\u00A0$\u00A050,00').props.onPress();
   assert.equal(view.transfers.length, 1);
   assert.deepEqual([view.transfers[0].fromAccountId, view.transfers[0].toAccountId, view.transfers[0].amountMinor, view.transfers[0].note], ['a', 'card-acc', 5000, 'Pago Visa']);
   assert.equal(view.additions.length, 0);
@@ -713,7 +714,7 @@ test('a card payment, debt payment and collection name themselves and write the 
   // Saving writes the same record shape in English: amounts, accounts and the note as shown.
   const view = harness('src/ui/transfer-form.tsx', { toAccountId: 'card-acc', maxAmountMinor: '5000' }, { data, locale: 'en-AR' });
   find(view.render(), 'AmountField').props.onChangeText('50');
-  await find(view.render(), 'ActionButton', 'Record payment\u00A0·\u00A0$\u00A050,00').props.onPress();
+  await find(view.render(), 'ActionButton', 'Save payment\u00A0·\u00A0$\u00A050,00').props.onPress();
   assert.deepEqual([view.transfers[0].fromAccountId, view.transfers[0].toAccountId, view.transfers[0].amountMinor, view.transfers[0].note], ['a', 'card-acc', 5000, 'Visa payment']);
   assert.equal(view.additions.length, 0);
 });
@@ -748,7 +749,7 @@ test('25N1: back from «Agregar cuenta» under a plain transfer, «Hacia» comes
   root = view.render();
   assert.equal(find(root, 'AccountField', 'Hacia').props.value, 'n', 'the new ARS account, not the USD one');
   find(root, 'AmountField').props.onChangeText('10');
-  assert.equal(nodes(view.render()).find(node => node.type === 'ActionButton' && /Registrar/.test(node.props.label))?.props.disabled, false, 'ready to save');
+  assert.equal(nodes(view.render()).find(node => node.type === 'ActionButton' && /Guardar/.test(node.props.label))?.props.disabled, false, 'ready to save');
   // Two added in that currency: nothing is obvious, «Hacia» stays to choose.
   const twice = harness('src/ui/transfer-form.tsx', { accountId: 'a' }, { data: archive });
   nodes(twice.render()).find(node => node.type === 'EmptyState')!.props.action.props.onPress();
@@ -962,11 +963,11 @@ test('English movement detail and transfer form: titles, rows, confirmation and 
   const transfer = harness('src/ui/transfer-form.tsx', { accountId: 'a' }, { locale: 'en-AR',
     data: { ...archive, accounts: [account, { ...account, id: 'b', name: 'Caja' }] } });
   const form = transfer.render();
-  assert.equal(nodes(form).find(node => node.type === 'Stack.Screen')!.props.options.title, 'Between my accounts');
+  assert.equal(nodes(form).find(node => node.type === 'Stack.Screen')!.props.options.title, 'Record a transfer');
   assert.deepEqual(nodes(form).filter(node => node.type === 'AccountField').map(node => node.props.label), ['From', 'To']);
   assert.equal(find(form, 'AmountField').props.label, 'Transfer');
   assert.equal(find(form, 'Field').props.label, 'Note (optional)');
-  assert.equal(find(form, 'ActionButton').props.label, 'Record transfer');
+  assert.equal(find(form, 'ActionButton').props.label, 'Save transfer');
 });
 
 test('in English the account forms and the balance correction read in English and write exactly what Spanish writes', async () => {
@@ -991,7 +992,7 @@ test('in English the account forms and the balance correction read in English an
   assert.equal(stable(english.accountChanges[0]), stable(spanish.accountChanges[0]));
   const created = harness('app/new-account.tsx', {}, { locale: 'en-AR' });
   let form = created.render();
-  assert.equal(find(form, 'Field').props.placeholder, 'e.g. Bank, Cash, Brokerage');
+  assert.equal(find(form, 'Field').props.placeholder, 'e.g. Bank, Cash, Savings');
   assert.equal(find(form, 'AmountField').props.label, 'Opening balance');
   assert.equal(find(form, 'ActionButton').props.label, 'Save account');
   find(form, 'Field').props.onChangeText('Caja de ahorro');
@@ -1299,7 +1300,7 @@ test('24B6: the plain transfer never offers a card on either side, a link asking
   const outOfCard = harness('src/ui/transfer-form.tsx', { fromAccountId: 'card-acc' }, { data });
   const root = outOfCard.render();
   assert.equal(nodes(root).some(node => node.type === 'SelectorCard'), false, 'the card is not locked as a source');
-  assert.equal(find(root, 'Stack.Screen').props.options.title, 'Entre mis cuentas', 'a plain transfer, not a collection');
+  assert.equal(find(root, 'Stack.Screen').props.options.title, 'Registrar transferencia', 'a plain transfer, not a collection');
   assert.deepEqual(find(root, 'AccountField', 'Desde').props.accounts.map((item: domain.Account) => item.id), ['a', 'u']);
   const payment = harness('src/ui/transfer-form.tsx', { toAccountId: 'usd-card', maxAmountMinor: '5000' }, { data });
   const paying = payment.render();
@@ -1610,8 +1611,8 @@ test('24UX4: Eliminar recurrente asks first, names the recorded movements, and o
   assert.equal(find(kept, 'Stack.Screen').props.options.title, 'Netflix');
   // A deep link to a deleted rule finds nothing (its detail and its form); the movement it recorded is a plain movement.
   const deletedData = { ...data, recurring: [view.rules[0]] };
-  assert.equal(find(harness('app/recurring/[id].tsx', {}, { data: deletedData, params: { id: 'netflix' } }).render(), 'EmptyState').props.title, 'No encontramos este recurrente');
-  assert.equal(find(harness('app/edit-recurring/[id].tsx', {}, { data: deletedData, params: { id: 'netflix' } }).render(), 'EmptyState').props.title, 'No encontramos este recurrente');
+  assert.equal(find(harness('app/recurring/[id].tsx', {}, { data: deletedData, params: { id: 'netflix' } }).render(), 'EmptyState').props.title, 'No se encontró este recurrente');
+  assert.equal(find(harness('app/edit-recurring/[id].tsx', {}, { data: deletedData, params: { id: 'netflix' } }).render(), 'EmptyState').props.title, 'No se encontró este recurrente');
   const movement = harness('app/entry/[id].tsx', {}, { data: deletedData, params: { id: occurrence('2026-09-05').id } }).render();
   assert.equal(nodes(movement).some(node => node.type === 'DetailRow' && node.props.label === 'Recurrente'), false);
 });
@@ -1620,7 +1621,7 @@ test('24UX4 review: a rule detail opened before the ledger hydrates shows the fo
   const data: domain.LedgerArchive = { ...archive, recurring: [streaming] };
   const deleted = domain.deleteRecurringRule(streaming, '2026-09-25T12:00:00.000Z');
   const view = harness('app/edit-recurring/[id].tsx', {}, { data: null, params: { id: 'netflix' } });
-  assert.equal(find(view.render(), 'EmptyState').props.title, 'No encontramos este recurrente', 'nothing to show before the ledger loads');
+  assert.equal(find(view.render(), 'EmptyState').props.title, 'No se encontró este recurrente', 'nothing to show before the ledger loads');
   view.setData(data);
   assert.equal(view.render().type, 'RecurringForm', 'the rule appears when the ledger arrives');
   view.setData({ ...data, recurring: [deleted] });
@@ -1631,10 +1632,10 @@ test('24UX4 review: a rule detail opened before the ledger hydrates shows the fo
   const cold = harness('app/edit-recurring/[id].tsx', {}, { data: null, params: { id: 'netflix' } });
   cold.render();
   cold.setData({ ...data, recurring: [deleted] });
-  assert.equal(find(cold.render(), 'EmptyState').props.title, 'No encontramos este recurrente');
+  assert.equal(find(cold.render(), 'EmptyState').props.title, 'No se encontró este recurrente');
   // 25B3: the rule's detail hydrates, closes and refuses a cold link the same way.
   const detail = harness('app/recurring/[id].tsx', {}, { data: null, params: { id: 'netflix' } });
-  assert.equal(find(detail.render(), 'EmptyState').props.title, 'No encontramos este recurrente', 'nothing to show before the ledger loads');
+  assert.equal(find(detail.render(), 'EmptyState').props.title, 'No se encontró este recurrente', 'nothing to show before the ledger loads');
   detail.setData(data);
   assert.equal(find(detail.render(), 'Stack.Screen').props.options.title, 'Netflix', 'the rule appears when the ledger arrives');
   detail.setData({ ...data, recurring: [deleted] });
@@ -1644,7 +1645,7 @@ test('24UX4 review: a rule detail opened before the ledger hydrates shows the fo
   const coldDetail = harness('app/recurring/[id].tsx', {}, { data: null, params: { id: 'netflix' } });
   coldDetail.render();
   coldDetail.setData({ ...data, recurring: [deleted] });
-  assert.equal(find(coldDetail.render(), 'EmptyState').props.title, 'No encontramos este recurrente');
+  assert.equal(find(coldDetail.render(), 'EmptyState').props.title, 'No se encontró este recurrente');
   // The form of a deleted rule cannot be saved, paused, resumed or deleted again.
   const form = harness('src/ui/recurring-form.tsx', { original: deleted }, { data: { ...data, recurring: [deleted] } });
   const root = form.render();
@@ -2100,8 +2101,8 @@ test('25VIS2 (V8): Save waits for every required input of a movement and of a tr
 
 test('25VIS2 (V3): a new transfer, card payment and collection echo the amount they record, on screen and for VoiceOver; editing, retrying, zero and unreadable text do not', async () => {
   const cases = [
-    ['es-AR', 'Registrar transferencia\u00A0·\u00A0$\u00A01.234,50', 'Registrar transferencia, 1234,50 pesos'],
-    ['en-US', 'Record transfer\u00A0·\u00A0AR$\u00A01,234.50', 'Record transfer, 1234.50 pesos'],
+    ['es-AR', 'Guardar transferencia\u00A0·\u00A0$\u00A01.234,50', 'Guardar transferencia, 1234,50 pesos'],
+    ['en-US', 'Save transfer\u00A0·\u00A0AR$\u00A01,234.50', 'Save transfer, 1234.50 pesos'],
   ] as const;
   for (const [locale, shown, spoken] of cases) {
     const view = harness('src/ui/transfer-form.tsx', { accountId: 'a' }, { data: transferData, locale });
@@ -2113,16 +2114,16 @@ test('25VIS2 (V3): a new transfer, card payment and collection echo the amount t
   const plain = harness('src/ui/transfer-form.tsx', { accountId: 'a' }, { data: transferData });
   for (const text of ['0', '12abc']) {
     find(plain.render(), 'AmountField').props.onChangeText(text);
-    assert.deepEqual([find(plain.render(), 'ActionButton').props.label, find(plain.render(), 'ActionButton').props.spokenLabel], ['Registrar transferencia', undefined], text);
+    assert.deepEqual([find(plain.render(), 'ActionButton').props.label, find(plain.render(), 'ActionButton').props.spokenLabel], ['Guardar transferencia', undefined], text);
   }
   // In the source's own currency: a dollar account echoes dollars.
   find(plain.render(), 'AccountField', 'Desde').props.onChange('u');
   find(plain.render(), 'AmountField').props.onChangeText('25');
   // (With no dollar destination yet, the empty state's «Agregar cuenta» is the first button; Save is found by its echo.)
-  assert.equal(find(plain.render(), 'ActionButton', 'Registrar transferencia\u00A0·\u00A0US$\u00A025,00').props.spokenLabel, 'Registrar transferencia, 25,00 dólares');
+  assert.equal(find(plain.render(), 'ActionButton', 'Guardar transferencia\u00A0·\u00A0US$\u00A025,00').props.spokenLabel, 'Guardar transferencia, 25,00 dólares');
   const payment = harness('src/ui/transfer-form.tsx', { toAccountId: 'card-acc', maxAmountMinor: '5000' }, { data: liabilityData });
   find(payment.render(), 'AmountField').props.onChangeText('50');
-  assert.equal(find(payment.render(), 'ActionButton').props.spokenLabel, 'Registrar pago, 50,00 pesos');
+  assert.equal(find(payment.render(), 'ActionButton').props.spokenLabel, 'Guardar pago, 50,00 pesos');
   const original = domain.initialTransferRecord({ id: 't', fromAccountId: 'a', toAccountId: 'b', amountMinor: 1000, note: '', dateISO: '2026-01-03', createdAt });
   const editing = harness('src/ui/transfer-form.tsx', { original }, { data: { ...transferData, transfers: [original] }, updateTransfer: async () => { throw new Error('Refresh failed'); } });
   find(editing.render(), 'AmountField').props.onChangeText('20');
@@ -2139,7 +2140,7 @@ test('25VIS2 (V3): a currency without decimals echoes whole: 1234 yen read as 12
     const view = harness('src/ui/transfer-form.tsx', { accountId: 'ya' }, { data, locale });
     find(view.render(), 'AmountField').props.onChangeText('1234');
     const save = find(view.render(), 'ActionButton');
-    const word = locale === 'es-AR' ? 'Registrar transferencia' : 'Record transfer';
+    const word = locale === 'es-AR' ? 'Guardar transferencia' : 'Save transfer';
     assert.equal(save.props.label, word + '\u00A0·\u00A0' + bound.moneyText(1234, 'JPY'), locale + ': 123400 would mean the yen were read as cents');
     assert.equal(save.props.spokenLabel, word + ', ' + bound.spokenMoney(1234, 'JPY'), locale);
     assert.doesNotMatch(save.props.label, /[.,]00$/, locale + ': no decimals for a currency that has none');
@@ -2287,7 +2288,7 @@ test('25Q4 review: a link asking to pay out of a debt I owe, or to pay into a re
     const root = harness('src/ui/transfer-form.tsx', props, { data: withAna }).render();
     const label = JSON.stringify(props);
     assert.equal(nodes(root).some(node => node.type === 'SelectorCard'), false, label + ': the debt is not fixed as a side');
-    assert.equal(find(root, 'Stack.Screen').props.options.title, 'Entre mis cuentas', label + ': a plain transfer, never «Registrar cobro» or «Registrar pago»');
+    assert.equal(find(root, 'Stack.Screen').props.options.title, 'Registrar transferencia', label + ': a plain transfer, never «Registrar cobro» or «Registrar pago»');
     assert.deepEqual([find(root, 'AmountField').props.value, find(root, 'Field').props.value], ['', ''], label + ': no settlement prefill, no default note');
     assert.deepEqual(find(root, 'AccountField', 'Desde').props.accounts.map((item: domain.Account) => item.id), ['a', 'u', 'b'], label);
     assert.deepEqual(find(root, 'AccountField', 'Hacia').props.accounts.map((item: domain.Account) => item.id), ['b'], label + ': cash only');
@@ -2341,10 +2342,10 @@ test('25Q4: a new debt payment or collection is capped by what is pending now: a
     const view = harness('src/ui/transfer-form.tsx', props, { data: liabilityData });
     find(view.render(), 'AmountField').props.onChangeText('70,01');
     assert.deepEqual(lineOf(view.render()), { message: 'transferForm.overObligation', announce: false }, JSON.stringify(props));
-    await find(view.render(), 'ActionButton', 'Registrar pago\u00A0·\u00A0$\u00A070,01').props.onPress();
+    await find(view.render(), 'ActionButton', 'Guardar pago\u00A0·\u00A0$\u00A070,01').props.onPress();
     assert.equal(view.transfers.length, 0, JSON.stringify(props));
     find(view.render(), 'AmountField').props.onChangeText('70');
-    await find(view.render(), 'ActionButton', 'Registrar pago\u00A0·\u00A0$\u00A070,00').props.onPress();
+    await find(view.render(), 'ActionButton', 'Guardar pago\u00A0·\u00A0$\u00A070,00').props.onPress();
     assert.deepEqual(view.transfers.map(item => item.amountMinor), [7000], JSON.stringify(props));
   }
   const collect = harness('src/ui/transfer-form.tsx', { fromAccountId: 'rec-acc' }, { data: withAna });
@@ -2352,14 +2353,14 @@ test('25Q4: a new debt payment or collection is capped by what is pending now: a
   assert.equal(find(collect.render(), 'SelectorCard', 'Deuda').props.detail, 'Pendiente ARS 40,00');
   assert.equal(find(harness('src/ui/transfer-form.tsx', { fromAccountId: 'rec-acc' }, { data: withAna, locale: 'en-US' }).render(), 'SelectorCard', 'Debt').props.detail, 'Pending ARS 40.00');
   find(collect.render(), 'AmountField').props.onChangeText('40,01');
-  await find(collect.render(), 'ActionButton', 'Registrar cobro\u00A0·\u00A0$\u00A040,01').props.onPress();
+  await find(collect.render(), 'ActionButton', 'Guardar cobro\u00A0·\u00A0$\u00A040,01').props.onPress();
   assert.deepEqual([lineOf(collect.render()).message, collect.transfers.length], ['transferForm.overObligation', 0]);
   find(collect.render(), 'AmountField').props.onChangeText('40');
   assert.equal(find(collect.render(), 'DetailRow', 'Me deben · Ana después').props.value, 'Saldada');
   // A card's credit is modelled: only its caller's cap bounds a new payment.
   const payment = harness('src/ui/transfer-form.tsx', { toAccountId: 'card-acc', maxAmountMinor: '9000' }, { data: liabilityData });
   find(payment.render(), 'AmountField').props.onChangeText('60');
-  await find(payment.render(), 'ActionButton', 'Registrar pago\u00A0·\u00A0$\u00A060,00').props.onPress();
+  await find(payment.render(), 'ActionButton', 'Guardar pago\u00A0·\u00A0$\u00A060,00').props.onPress();
   assert.deepEqual(payment.transfers.map(item => item.amountMinor), [6000]);
 });
 
@@ -2367,14 +2368,14 @@ test('25Q4: Pagar tarjeta says an over-balance amount while it is typed, in word
   const view = harness('src/ui/transfer-form.tsx', { toAccountId: 'card-acc', maxAmountMinor: '5000' }, { data: liabilityData });
   find(view.render(), 'AmountField').props.onChangeText('60');
   assert.deepEqual(lineOf(view.render()), { message: 'transferForm.overCardDebt', announce: false }, 'shown while typed, not spoken');
-  const save = find(view.render(), 'ActionButton', 'Registrar pago\u00A0·\u00A0$\u00A060,00');
+  const save = find(view.render(), 'ActionButton', 'Guardar pago\u00A0·\u00A0$\u00A060,00');
   assert.deepEqual([save.props.disabled, view.transfers.length], [false, 0]);
   await save.props.onPress();
   assert.deepEqual(lineOf(view.render()), { message: 'transferForm.overCardDebt', announce: true });
   assert.deepEqual([view.haptics.join(','), view.transfers.length], ['Error', 0]);
   find(view.render(), 'AmountField').props.onChangeText('50');
   assert.equal(find(view.render(), 'ErrorMessage').props.message, null);
-  await find(view.render(), 'ActionButton', 'Registrar pago\u00A0·\u00A0$\u00A050,00').props.onPress();
+  await find(view.render(), 'ActionButton', 'Guardar pago\u00A0·\u00A0$\u00A050,00').props.onPress();
   assert.deepEqual(view.transfers.map(item => item.amountMinor), [5000]);
   const spanish = bindLocale('es-AR').errorText('transferForm.overCardDebt'), english = bindLocale('en-US').errorText('transferForm.overCardDebt');
   assert.equal(spanish, 'El pago supera el saldo pendiente registrado. Si tu resumen tiene compras, intereses o cargos que faltan, registralos primero como gastos de la tarjeta.');

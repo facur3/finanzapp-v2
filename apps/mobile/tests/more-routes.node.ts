@@ -367,8 +367,12 @@ test('25Q2: the export writes one dated compact file in the cache, shares it as 
 
 test('25Q2: the Backup screen and its Ajustes row say that deleting the app deletes the records', () => {
   const intro = (locale: AppLocale | null) => nodes(harness('backup.tsx', archive, undefined, locale).render()).filter(node => node.type === 'AppText')[0].props.children;
-  assert.match(intro(null), /^Si borrás la app, tus registros se borran con ella\. Guardá tus cuentas/);
-  assert.match(intro('en-AR'), /^If you delete the app, your records are deleted with it\. Save your accounts/);
+  assert.match(intro(null), /^Si borrás la app, tus registros se borran con ella\. Guardá una copia/);
+  assert.match(intro('en-AR'), /^If you delete the app, your records are deleted with it\. Save a backup/);
+  // 25T: one sentence and the unencrypted warning; no footer repeating what the import review says.
+  const shown = nodes(harness('backup.tsx', archive).render()).filter(node => node.type === 'AppText').map(node => String(node.props.children));
+  assert.deepEqual(shown, ['Si borrás la app, tus registros se borran con ella. Guardá una copia antes de borrarla o de cambiar de teléfono.',
+    'El archivo no está cifrado: guardalo en un lugar privado.']);
   const row = (locale: AppLocale | null) => rows(harness('preferences.tsx', archive, undefined, locale).render()).find(item => item.props.title === (locale ? 'Backup' : 'Copia de seguridad'))!;
   assert.equal(row(null).props.subtitle, 'Antes de borrar la app o cambiar de teléfono');
   assert.equal(row('en-AR').props.subtitle, 'Before deleting the app or changing phones');
@@ -639,5 +643,5 @@ test('25N1: a notice shows its full text as published, read by VoiceOver in Engl
   assert.equal(covers.length, 1);
   assert.match(covers[0], /^Includes: expo, expo-constants, .*expo-router/);
   const missing = harness('license/[id].tsx', archive, undefined, null, undefined, true, { id: 'nope' }).render();
-  assert.equal(nodes(missing).find(node => node.type === 'EmptyState')!.props.title, 'No encontramos este aviso');
+  assert.equal(nodes(missing).find(node => node.type === 'EmptyState')!.props.title, 'No se encontró este aviso');
 });

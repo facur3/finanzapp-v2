@@ -38,7 +38,7 @@ function harness(props: any, data: domain.LedgerArchive = archive, save?: (budge
   const jsx = (type: Node['type'], props: Node['props']) => ({ type, props });
   const ledger = { useLedger: () => ({ archive: data, snapshot: domain.snapshotFromArchive(data), ...(gate ? { gate } : {}),
     saveBudget: async (budget: domain.MonthlyBudget) => { saved.push(budget); await save?.(budget); } }) };
-  const components = Object.fromEntries(['Screen', 'ActionButton', 'AmountField', 'AppText', 'Choices', 'ErrorMessage', 'IconButton'].map(name => [name, name]));
+  const components = Object.fromEntries(['Screen', 'ActionButton', 'AmountField', 'AppText', 'Choices', 'ErrorMessage', 'FieldNote', 'IconButton'].map(name => [name, name]));
   const GATE = (typeof gate !== 'undefined' && gate) || domain.LEDGER_CURRENCIES;
   const defaults = { useDefaultCurrency: ({ accountCurrency, requested }: { accountCurrency?: string | null; requested?: unknown } = {}) => accountCurrency ?? (domain.isLedgerCurrency(requested, GATE) ? requested : 'ARS') };
   const modules: Record<string, unknown> = {
@@ -89,13 +89,16 @@ test('a new budget asks for its kind first; General hides the category picker an
   root = view.render();
   assert.equal(nodes(root).some(node => node.type === 'CategoryField'), false, 'no category for a general budget');
   assert.ok(texts(root).includes('Presupuesto general'));
-  assert.ok(texts(root).some(text => text.includes('techo de todos los gastos registrados')));
+  // «Menos texto»: one line under the amount, the whole rule behind its information button.
+  assert.equal(find(root, 'FieldNote').props.children, 'Techo de todos los gastos del mes en esta moneda.');
+  assert.match(find(root, 'FieldNote').props.help.detail, /techo de todos los gastos registrados/);
+  assert.equal(texts(root).some(text => text.includes('techo de todos los gastos registrados')), false, 'the full rule is not a standing paragraph');
   assert.equal(find(root, 'AmountField').props.currency, 'ARS');
-  assert.equal(find(root, 'ActionButton', 'Crear presupuesto').props.disabled, true, 'an amount is still required');
+  assert.equal(find(root, 'ActionButton', 'Guardar presupuesto').props.disabled, true, 'an amount is still required');
   find(root, 'AmountField').props.onChangeText('500.000');
   root = view.render();
-  assert.equal(find(root, 'ActionButton', 'Crear presupuesto').props.disabled, false, 'no category needed');
-  await find(root, 'ActionButton', 'Crear presupuesto').props.onPress();
+  assert.equal(find(root, 'ActionButton', 'Guardar presupuesto').props.disabled, false, 'no category needed');
+  await find(root, 'ActionButton', 'Guardar presupuesto').props.onPress();
   assert.equal(view.saved.length, 1);
   assert.equal(JSON.stringify({ ...view.saved[0] }), JSON.stringify({ id: 'budget-1', currency: 'ARS', monthISO: '2026-10', amountMinor: 50000000, active: true, createdAt: view.saved[0].createdAt, revision: 0, updatedAt: view.saved[0].createdAt, scope: 'total' }));
   assert.equal(Object.hasOwn(view.saved[0], 'category'), false);
@@ -110,13 +113,13 @@ test('the scope parameter preselects General, and Por categoría still requires 
   choice(root, 'total').props.onChange('category');
   root = view.render();
   assert.ok(texts(root).includes('Límite por categoría'));
-  assert.ok(texts(root).some(text => text.includes('sublímite') && text.includes('no se suma al presupuesto general')));
+  assert.ok(['sublímite', 'no se suma al presupuesto general'].every(part => find(root, 'FieldNote').props.help.detail.includes(part)));
   find(root, 'AmountField').props.onChangeText('1.500');
   root = view.render();
-  assert.equal(find(root, 'ActionButton', 'Crear presupuesto').props.disabled, true, 'a sublimit needs its category');
+  assert.equal(find(root, 'ActionButton', 'Guardar presupuesto').props.disabled, true, 'a sublimit needs its category');
   find(root, 'CategoryField').props.onChange(' Comida ');
   root = view.render();
-  await find(root, 'ActionButton', 'Crear presupuesto').props.onPress();
+  await find(root, 'ActionButton', 'Guardar presupuesto').props.onPress();
   assert.deepEqual([view.saved[0].scope, view.saved[0].category, view.saved[0].currency, view.saved[0].amountMinor], ['category', 'Comida', 'USD', 150000]);
 });
 
@@ -143,7 +146,7 @@ test('25N1 review: a save that committed but could not refresh keeps its own sco
   const data: domain.LedgerArchive = { ...archive, budgets: [food] };
   const view = harness({ monthISO: '2026-09', currency: 'ARS', scope: 'total' }, data, async () => { throw new Error('database is locked'); });
   find(view.render(), 'AmountField').props.onChangeText('1');
-  await find(view.render(), 'ActionButton', 'Crear presupuesto').props.onPress();
+  await find(view.render(), 'ActionButton', 'Guardar presupuesto').props.onPress();
   // The write did land: a later refresh (the app back in front) shows the very budget this form is retrying.
   data.budgets = [food, view.saved[0]!];
   const root = view.render();
@@ -158,7 +161,7 @@ test('a failed write, a zero amount and a negative one keep the draft, and archi
   // failed after the input was valid, here a storage error on a budget nothing else conflicts with.
   const failed = harness({ monthISO: '2026-09', currency: 'ARS', scope: 'total' }, { ...archive, budgets: [food] }, async () => { throw new Error('database is locked'); });
   find(failed.render(), 'AmountField').props.onChangeText('1');
-  await find(failed.render(), 'ActionButton', 'Crear presupuesto').props.onPress();
+  await find(failed.render(), 'ActionButton', 'Guardar presupuesto').props.onPress();
   let root = failed.render();
   assert.equal(failed.saved.length, 1, 'the write was attempted');
   assert.equal(find(root, 'ErrorMessage').props.message, 'budgets.form.saveFailed', '25Q4: the form\'s own sentence, never the engine\'s text');
@@ -167,7 +170,7 @@ test('a failed write, a zero amount and a negative one keep the draft, and archi
   assert.equal(failed.haptics.join(','), 'Warning', '25Q4: sent and frozen for «Reintentar guardado», so Warning');
   const zero = harness({ monthISO: '2026-09', currency: 'ARS', scope: 'total' }, { ...archive, budgets: [] });
   find(zero.render(), 'AmountField').props.onChangeText('0');
-  await find(zero.render(), 'ActionButton', 'Crear presupuesto').props.onPress();
+  await find(zero.render(), 'ActionButton', 'Guardar presupuesto').props.onPress();
   root = zero.render();
   assert.match(find(root, 'ErrorMessage').props.message, /mayor que cero/);
   assert.equal(zero.saved.length, 0);
@@ -175,7 +178,7 @@ test('a failed write, a zero amount and a negative one keep the draft, and archi
   assert.equal(zero.haptics.join(','), 'Error', '25Q4: refused before sending, so Error');
   const negative = harness({ monthISO: '2026-09', currency: 'ARS', scope: 'total' }, { ...archive, budgets: [] });
   find(negative.render(), 'AmountField').props.onChangeText('-5');
-  await find(negative.render(), 'ActionButton', 'Crear presupuesto').props.onPress();
+  await find(negative.render(), 'ActionButton', 'Guardar presupuesto').props.onPress();
   assert.ok(find(negative.render(), 'ErrorMessage').props.message, 'a negative limit is refused');
   assert.equal(negative.saved.length, 0);
   assert.equal(negative.haptics.join(','), 'Error');
@@ -198,7 +201,7 @@ test('24UX6E: a second general budget or a second limit for the same category, c
   assert.ok(texts(root).includes('Límite por categoría'));
   find(root, 'AmountField').props.onChangeText('1');
   find(view.render(), 'CategoryField').props.onChange(' comida ');
-  await find(view.render(), 'ActionButton', 'Crear presupuesto').props.onPress();
+  await find(view.render(), 'ActionButton', 'Guardar presupuesto').props.onPress();
   root = view.render();
   assert.equal(view.saved.length, 0, 'nothing is written');
   assert.equal(find(root, 'ErrorMessage').props.message, 'Ya existe un presupuesto activo para esa categoría, moneda y mes.', 'the normalised category is the same one');
@@ -209,7 +212,7 @@ test('24UX6E: a second general budget or a second limit for the same category, c
   find(view.render(), 'CategoryField').props.onChange('Ocio');
   root = view.render();
   assert.equal(texts(root).includes('Para cambiarlo, tocalo en Presupuestos.'), false, 'a free category: no pointer');
-  await find(root, 'ActionButton', 'Crear presupuesto').props.onPress();
+  await find(root, 'ActionButton', 'Guardar presupuesto').props.onPress();
   assert.deepEqual([view.saved.length, view.saved[0].scope, view.saved[0].category, view.saved[0].amountMinor], [1, 'category', 'Ocio', 100]);
   assert.equal(view.backs(), 1);
   assert.equal(view.haptics.join(','), 'Error,Success', '25Q4: one Error tap for the refusal before sending, then Success');
@@ -220,11 +223,11 @@ test('24UX6E: a second general budget or a second limit for the same category, c
   // Another currency, or an archived general budget, is no conflict.
   const usd = harness({ monthISO: '2026-09', currency: 'USD', scope: 'total' });
   find(usd.render(), 'AmountField').props.onChangeText('1');
-  await find(usd.render(), 'ActionButton', 'Crear presupuesto').props.onPress();
+  await find(usd.render(), 'ActionButton', 'Guardar presupuesto').props.onPress();
   assert.equal(usd.saved.length, 1);
   const archived = harness({ monthISO: '2026-09', currency: 'ARS', scope: 'total' }, { ...archive, budgets: [{ ...total, active: false, revision: 1, updatedAt: '2026-09-02T12:00:00.000Z' }, food] });
   find(archived.render(), 'AmountField').props.onChangeText('1');
-  await find(archived.render(), 'ActionButton', 'Crear presupuesto').props.onPress();
+  await find(archived.render(), 'ActionButton', 'Guardar presupuesto').props.onPress();
   assert.equal(archived.saved.length, 1);
   // Editing a sublimit onto another sublimit's category is refused the same way; English reads the rule in English.
   const leisure: domain.MonthlyBudget = { ...food, id: 'leisure', category: 'Ocio' };
@@ -270,7 +273,7 @@ test('in English the budget form is labelled in English, keeps the category as s
     find(view.render(), 'AmountField').props.onChangeText('1.500');
     find(view.render(), 'CategoryField').props.onChange('Comida');
     const root = view.render();
-    await find(root, 'ActionButton', locale === 'en-AR' ? 'Create budget' : 'Crear presupuesto').props.onPress();
+    await find(root, 'ActionButton', locale === 'en-AR' ? 'Save budget' : 'Guardar presupuesto').props.onPress();
     return { root, saved: view.saved };
   };
   const english = await run('en-AR'), spanish = await run('es-AR');
@@ -282,7 +285,8 @@ test('in English the budget form is labelled in English, keeps the category as s
   assert.equal(find(root, 'AmountField').props.label, 'Budget');
   assert.ok(texts(root).includes('October 2026'));
   assert.ok(texts(root).includes('Category limit'));
-  assert.ok(texts(root).some(text => text.startsWith('Compared with the expenses recorded in this category')));
+  assert.equal(find(root, 'FieldNote').props.children, 'A limit within the overall budget.');
+  assert.ok(find(root, 'FieldNote').props.help.detail.startsWith('Compared with the expenses recorded in this category'));
   assert.equal(find(root, 'CategoryField').props.value, 'Comida', 'the stored category is never translated');
   const stable = (saved: domain.MonthlyBudget[]) => JSON.stringify(saved.map(({ createdAt: _c, updatedAt: _u, ...rest }) => rest));
   assert.equal(stable(english.saved), stable(spanish.saved), 'the language changes no stored field');
@@ -297,11 +301,11 @@ test('in English the budget form is labelled in English, keeps the category as s
 test('a failed save stores the catalogue key, which reads the old Spanish text and English', async () => {
   const view = harness({ monthISO: '2026-09', currency: 'ARS', scope: 'total' }, { ...archive, budgets: [] }, async () => { throw 'offline'; });
   find(view.render(), 'AmountField').props.onChangeText('10');
-  await find(view.render(), 'ActionButton', 'Crear presupuesto').props.onPress();
+  await find(view.render(), 'ActionButton', 'Guardar presupuesto').props.onPress();
   const key = find(view.render(), 'ErrorMessage').props.message;
   assert.equal(key, 'budgets.form.saveFailed');
-  assert.equal(bindLocale('es-AR').errorText(key), 'No pudimos guardar el presupuesto. Reintentá con el mismo envío.');
-  assert.equal(bindLocale('en-AR').errorText(key), 'We couldn’t save the budget. Retry with the same submission.');
+  assert.equal(bindLocale('es-AR').errorText(key), 'No se pudo guardar el presupuesto.');
+  assert.equal(bindLocale('en-AR').errorText(key), 'Couldn’t save the budget.');
 });
 
 test('24B5: the budget form offers the gate\'s currencies before the amount; with the preview gate a Chilean peso and a dinar budget are saved at their own scale, and a route currency outside the gate is never coerced into it', async () => {
@@ -314,13 +318,13 @@ test('24B5: the budget form offers the gate\'s currencies before the amount; wit
   assert.equal(find(clp.render(), 'CurrencySwitch').props.value, 'CLP', 'the preview gate honours the route currency');
   assert.equal(find(clp.render(), 'AmountField').props.currency, 'CLP');
   find(clp.render(), 'AmountField').props.onChangeText('25.000');
-  await find(clp.render(), 'ActionButton', 'Crear presupuesto').props.onPress();
+  await find(clp.render(), 'ActionButton', 'Guardar presupuesto').props.onPress();
   assert.deepEqual([clp.saved[0].currency, clp.saved[0].amountMinor, clp.saved[0].scope], ['CLP', 25000, 'total'], '25.000 pesos chilenos are 25000 units');
   const kwd = harness({ monthISO: '2026-10', scope: 'total' }, { ...archive, budgets: [] }, undefined, 'es-AR', PREVIEW_CURRENCIES);
   find(kwd.render(), 'CurrencySwitch').props.onChange('KWD');
   assert.equal(find(kwd.render(), 'AmountField').props.currency, 'KWD');
   find(kwd.render(), 'AmountField').props.onChangeText('12,345');
-  await find(kwd.render(), 'ActionButton', 'Crear presupuesto').props.onPress();
+  await find(kwd.render(), 'ActionButton', 'Guardar presupuesto').props.onPress();
   assert.deepEqual([kwd.saved[0].currency, kwd.saved[0].amountMinor], ['KWD', 12345]);
 });
 
@@ -446,7 +450,7 @@ test('24T3 (A24): devoluciones above a month\'s purchases leave the whole limit 
   const spent = tree.filter(node => node.type === 'Stat').map(node => [node.props.label, (node.props.children as Node).props.minor]);
   assert.equal(JSON.stringify(spent), JSON.stringify([['Gastado', -20000], ['Límite', 500000]]), 'Gastado is the exact net: the devolución is shown');
   const panel = tree.find(node => node.type === 'View' && typeof node.props.accessibilityLabel === 'string' && node.props.accessibilityLabel.startsWith('Presupuesto general'))!;
-  assert.equal(panel.props.accessibilityLabel, 'Presupuesto general: ' + bindLocale('es-AR').spokenMoney(-20000, 'ARS') + ' de 5000,00 pesos, 0 por ciento usado. Disponible 5000,00 pesos. Las devoluciones superan lo gastado');
+  assert.equal(panel.props.accessibilityLabel, 'Presupuesto general: ' + bindLocale('es-AR').spokenMoney(-20000, 'ARS') + ' de 5000,00 pesos, 0 por ciento usado. Quedan 5000,00 pesos. Las devoluciones superan lo gastado');
   // The Ropa sublimit: its devolución exceeds its (zero) purchases this month; the Comida one is untouched.
   const rows = tree.filter(node => node.type === 'PressFeedback' && /^Presupuesto (Ropa|Comida)/.test(node.props.accessibilityLabel));
   assert.equal(rows.find(row => row.props.accessibilityLabel.startsWith('Presupuesto Ropa'))!.props.accessibilityLabel,
@@ -476,7 +480,7 @@ test('25D2: the general budget in amber says «Cerca del límite» to VoiceOver,
   const near = { ...total, amountMinor: 3500 };
   const render = await budgetsScreen({ ...archive, budgets: [near] });
   const panel = render().find(node => node.type === 'View' && typeof node.props.accessibilityLabel === 'string' && node.props.accessibilityLabel.startsWith('Presupuesto general'))!;
-  assert.equal(panel.props.accessibilityLabel, 'Presupuesto general: 30,00 pesos de 35,00 pesos, 85 por ciento usado. Cerca del límite. Disponible 5,00 pesos');
+  assert.equal(panel.props.accessibilityLabel, 'Presupuesto general: 30,00 pesos de 35,00 pesos, 85 por ciento usado. Cerca del límite. Quedan 5,00 pesos');
   const calm = (await budgetsScreen(archive))().find(node => node.type === 'View' && typeof node.props.accessibilityLabel === 'string' && node.props.accessibilityLabel.startsWith('Presupuesto general'))!;
-  assert.match(calm.props.accessibilityLabel, /\. Disponible 4970,00 pesos$/);
+  assert.match(calm.props.accessibilityLabel, /\. Quedan 4970,00 pesos$/);
 });

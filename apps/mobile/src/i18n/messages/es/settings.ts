@@ -75,7 +75,7 @@ export const settings = {
     rates: 'Los tipos de cambio de referencia vienen de Frankfurter (frankfurter.dev), que los reúne de bancos centrales y fuentes oficiales. Cada tasa queda sujeta a los términos de su proveedor.',
     /** On a notice: the npm packages it covers. */
     covers: 'Incluye: {packages}',
-    notFoundTitle: 'No encontramos este aviso',
+    notFoundTitle: 'No se encontró este aviso',
     notFoundDetail: 'Volvé a Licencias para ver la lista.',
   },
 } as const;

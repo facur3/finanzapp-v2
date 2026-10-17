@@ -111,7 +111,7 @@ describe('5. personal debts are independent of cards', () => {
     expect(debtTotalsByCurrency([debt], bought)).toEqual([{ status: 'ready', currency: 'ARS', owedMinor: 30000, receivableMinor: 0 }]);
     expect(debtTotalsByCurrency([], bought)).toEqual([]);
     expect(cardDebtMinor(card, bought)).toBe(23100);
-    expect(() => validateLiabilityProfiles([card], [{ ...debt, accountId: cardAccount.id }], accounts)).toThrow('Una cuenta interna no puede representar dos obligaciones.');
+    expect(() => validateLiabilityProfiles([card], [{ ...debt, accountId: cardAccount.id }], accounts)).toThrow('Una cuenta interna no puede representar dos tarjetas o deudas.');
     expect(accountKind(cardAccount.id, [card], [debt])).toBe('card');
     expect(accountKind(debtAccount.id, [card], [debt])).toBe('debt');
   });

@@ -168,7 +168,6 @@ export default function BackupImportScreen() {
         {!!plan && !plan.conflicts && additions > 0 && <ActionButton label={t('backup.import.confirmImport')} onPress={confirm} busy={busy} />}
         <ActionButton label={t('backup.import.chooseAnother')} onPress={choose} disabled={busy} secondary />
       </>}
-      <AppText secondary style={{ fontSize: 13 }}>{t('backup.import.formats')}</AppText>
     </>}
   </Screen>;
 }

@@ -105,6 +105,12 @@ test('25O1: the illustrations\' figures: pesos of their own, dollar-like elsewhe
   assert.ok(whole.length >= 16);
   for (const currency of whole) assert.ok(sampleFigures(currency).coffee >= 100, `${currency}: a coffee of ${sampleFigures(currency).coffee}`);
   assert.deepEqual(sampleFigures('XOF'), { coffee: 2_700, groceries: 23_000, transport: 1_700, instalment: 110_000, available: 1_900_000, spent: 580_000 });
+  // A two-decimal currency with a small unit is scaled too: a naira or rupee coffee never reads like dollars («4,50»).
+  assert.deepEqual(sampleFigures('INR'), { coffee: 38_000, groceries: 330_000, transport: 23_000, instalment: 1_600_000, available: 28_000_000, spent: 8_200_000 });
+  for (const currency of ['NGN', 'INR', 'PKR', 'PHP', 'KES', 'EGP', 'TRY', 'UAH', 'RUB', 'THB', 'MXN', 'ZAR', 'BRL'] as const) {
+    assert.ok(sampleFigures(currency).coffee >= 2_000, `${currency}: a coffee of ${sampleFigures(currency).coffee} reads dollar-like`);
+    for (const [name, minor] of Object.entries(sampleFigures(currency))) assert.ok(significant(minor, currency) <= 2, `${currency} ${name}: ${minor} reads as a round figure`);
+  }
   for (const currency of domain.LEDGER_CURRENCIES) {
     const figures = sampleFigures(currency);
     for (const [name, minor] of Object.entries(figures)) {
@@ -391,17 +397,17 @@ test('25O1, a new installation: the story\'s three pages, stepped or swiped, the
   const form = nodes(root).find(n => n.type === 'ScrollView' && !n.props.horizontal);
   assert.ok(form, 'the step scrolls');
   assert.deepEqual([form.props.automaticallyAdjustKeyboardInsets, form.props.keyboardShouldPersistTaps, form.props.keyboardDismissMode], [true, 'handled', 'interactive']);
-  assert.equal(scrolls(root, find(root, 'ActionButton', 'Create account')), true);
+  assert.equal(scrolls(root, find(root, 'ActionButton', 'Save account')), true);
   // A name is needed: blank, spaces included, disables Create account until it has words again.
   find(root, 'Field').props.onChangeText('   ');
   root = view.render();
-  assert.equal(find(root, 'ActionButton', 'Create account').props.disabled, true, 'a name is needed');
+  assert.equal(find(root, 'ActionButton', 'Save account').props.disabled, true, 'a name is needed');
   find(root, 'Field').props.onChangeText('Bank');
   root = view.render();
   find(root, 'AmountField').props.onChangeText('1.000,50');
   root = view.render();
-  assert.equal(find(root, 'ActionButton', 'Create account').props.disabled, false);
-  find(root, 'ActionButton', 'Create account').props.onPress();
+  assert.equal(find(root, 'ActionButton', 'Save account').props.disabled, false);
+  find(root, 'ActionButton', 'Save account').props.onPress();
   await settle();
   assert.equal(view.saved.length, 1);
   assert.deepEqual([view.saved[0].name, view.saved[0].currency, view.saved[0].openingMinor, view.saved[0].id], ['Bank', 'USD', 100050, 'first-account']);
@@ -437,7 +443,7 @@ test('Spain suggests EUR for the first account; the person may pick another curr
   find(root, 'CurrencyChip').props.onChange('USD');
   root = spain.render();
   assert.deepEqual([find(root, 'CurrencyChip').props.value, find(root, 'AmountField').props.currency], ['USD', 'USD']);
-  find(root, 'ActionButton', 'Crear cuenta').props.onPress();
+  find(root, 'ActionButton', 'Guardar cuenta').props.onPress();
   await settle();
   assert.deepEqual([spain.saved[0].name, spain.saved[0].currency, spain.saved[0].openingMinor], ['Efectivo', 'USD', 0], 'an empty balance is zero');
   assert.deepEqual(spain.display, { currency: 'USD', mode: 'consolidated' });
@@ -484,16 +490,16 @@ test('the opening balance keeps the New account form\'s rules: refused before se
   assert.equal(find(root, 'Field').props.value, 'Efectivo', 'the preset names the account');
   // 25Q4 review: an opening balance Crear cuenta lets through but cannot read is refused before anything is sent.
   find(root, 'AmountField').props.onChangeText('12abc');
-  find(view.render(), 'ActionButton', 'Crear cuenta').props.onPress();
+  find(view.render(), 'ActionButton', 'Guardar cuenta').props.onPress();
   await settle();
   assert.deepEqual([view.haptics.splice(0).join(','), view.saved.length, find(view.render(), 'Field').props.editable], ['Error', 0, true]);
   find(view.render(), 'AmountField').props.onChangeText('');
-  find(view.render(), 'ActionButton', 'Crear cuenta').props.onPress();
+  find(view.render(), 'ActionButton', 'Guardar cuenta').props.onPress();
   await settle();
   root = view.render();
   assert.equal(find(root, 'ErrorMessage').props.message, 'accounts.form.saveFailed', '25Q4: the form\'s own sentence, never the engine\'s text');
   assert.ok(find(root, 'ActionButton', 'Reintentar guardado'));
-  assert.ok(texts(root).includes(es.accounts.form.retryNote));
+  assert.ok(texts(root).includes(es.common.retryNote.replace('{where}', es.common.retryWhere.accounts)));
   assert.deepEqual([find(root, 'Field').props.editable, find(root, 'AmountField').props.editable, find(root, 'CurrencyChip').props.disabled], [false, false, true],
     'the draft is locked to the pending submission');
   assert.equal(view.haptics.splice(0).join(','), 'Warning', '25Q4 review: sent with an unknown outcome, so Warning');
@@ -508,7 +514,7 @@ test('the opening balance keeps the New account form\'s rules: refused before se
   // The retry instead: the same account (its operation id) goes through, taps Success and reaches the close.
   const retry = harness({ failSave: true });
   find(toStart(retry), 'NavigationRow', 'Efectivo').props.onPress();
-  find(retry.render(), 'ActionButton', 'Crear cuenta').props.onPress();
+  find(retry.render(), 'ActionButton', 'Guardar cuenta').props.onPress();
   await settle();
   find(retry.render(), 'ActionButton', 'Reintentar guardado').props.onPress();
   await settle();
@@ -543,7 +549,7 @@ test('back steps back, never out: page by page in the story, the story (still) f
   find(root, 'NavigationRow', 'Efectivo').props.onPress();
   root = view.render();
   assert.deepEqual([find(root, 'Field').props.value, find(root, 'GlyphTile').props.icon], ['Efectivo', 'cash-outline'], 'another preset renames the account');
-  find(root, 'ActionButton', 'Crear cuenta').props.onPress();
+  find(root, 'ActionButton', 'Guardar cuenta').props.onPress();
   await settle();
   assert.deepEqual(headers(view.render()), ['Todo listo.']);
   view.hardwareBack();
@@ -663,7 +669,7 @@ test('25O1: after a step or a page changes in place, VoiceOver is moved to the n
   attach(root, '¿Cuánto tenés en el banco?', { title: 'account' });
   view.timers.run();
   assert.deepEqual(view.focus.at(-1), [{ title: 'account' }, 'focus']);
-  find(root, 'ActionButton', 'Crear cuenta').props.onPress();
+  find(root, 'ActionButton', 'Guardar cuenta').props.onPress();
   await settle();
   view.render();
   const before = view.focus.length;
@@ -686,7 +692,7 @@ test('25O1: the close is focused too, and a second change inside the delay cance
   view.timers.run();
   assert.deepEqual(view.focus.slice(sent), [[{ title: 'start again' }, 'focus']]);
   find(next, 'NavigationRow', 'Efectivo').props.onPress();
-  find(view.render(), 'ActionButton', 'Crear cuenta').props.onPress();
+  find(view.render(), 'ActionButton', 'Guardar cuenta').props.onPress();
   await settle();
   const done = view.render();
   nodes(done).find(n => n.props.accessibilityRole === 'header')!.props.ref({ title: 'done' });

@@ -250,6 +250,16 @@ que leen son ahora los de Forest. Su restyle por pantalla queda para 24UX6B–6D
 leyendas que reiteren que un pago no es un gasto. La definición de Disponible
 vive detrás del botón de información.
 
+**Una palabra, un significado (25T).** «Disponible» es solo el dinero registrado de Inicio; lo que queda de un
+presupuesto es «Queda», el de una tarjeta «Crédito disponible» y el atajo de una devolución «Devolver todo». «Pago»
+salda una tarjeta o una deuda; cómo se paga una compra con tarjeta es «Cómo se paga». El botón que guarda un
+formulario dice «Guardar [sustantivo]» (o «Guardar cambios»), el título «Nuevo/Nueva [sustantivo]» o, para un
+movimiento, «Registrar [sustantivo]», y el «+» o el estado vacío que lo abre «Agregar [sustantivo]»; nunca «Crear».
+Los mensajes del sistema son impersonales («No se pudo guardar.», nunca «No pudimos…») y no usan palabras de la
+implementación («envío», «congelado», «obligación»); una falla que conserva el borrador dice una sola frase,
+`common.retryNote`, con el lugar donde revisar. Que algo no es un gasto ni un ingreso se dice una vez, donde se
+registra o detrás de ⓘ. `tests/translation.node.ts` lo verifica.
+
 ## Gráficos
 
 Las barras y las barras de progreso usan vistas nativas y **Reanimated**. La dona

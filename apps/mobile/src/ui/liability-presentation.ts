@@ -190,15 +190,16 @@ export function statementCaption(statement: { startISO: string; purchaseCount: n
 }
 
 /** The name an account shows where it appears as one side of a transfer. A personal debt is stored as a
- * hidden account named "Debo · Juan" / "Me deben · Juan" when it is created (and not renamed afterwards).
- * The stored name is shown as it is, except that its Spanish prefix is read in the interface language
- * ("I owe · Juan"); a name without that prefix (an older backup) and every other account show their own name. */
+ * hidden account named "Debo · Juan" / "Me deben · Juan" when it is created, and the stored name is never rewritten.
+ * Shown, it follows the debt: the prefix in the interface language ("I owe · Juan") and the debt's current counterparty,
+ * so a renamed «Juan Pérez» reads the same on every payment row as on the debt itself. A name without that prefix (an
+ * older backup) and every other account show their own name. */
 export function accountDisplayName(account: Account, debts: PersonalDebtProfile[] = [], t: Translate = translator('es')): string {
   const debt = debts.find(item => item.accountId === account.id);
   if (!debt) return account.name;
   const key = debt.direction === 'owed_by_me' ? 'debts.accountName.owedByMe' : 'debts.accountName.owedToMe';
   const prefix = translator('es')(key, { name: '' });
-  return account.name.startsWith(prefix) ? t(key, { name: account.name.slice(prefix.length) }) : account.name;
+  return account.name.startsWith(prefix) ? t(key, { name: debt.counterparty }) : account.name;
 }
 
 /** 25Q4: how a card or a debt reads after an undo or a restore, for its confirmation, in its own words. A card owes a saldo

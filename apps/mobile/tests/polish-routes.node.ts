@@ -185,7 +185,7 @@ test('a general budget is the primary summary over all recorded expenses, with s
   assert.equal(nodes(root).some(node => node.type === 'ActionButton' && node.props.label === 'Agregar presupuesto general'), false);
   assert.equal(nodes(root).filter(node => typeof node.type === 'function' && node.props.row).length, 2, 'sublimits still listed');
   const label = nodes(root).find(node => node.type === 'View' && typeof node.props.accessibilityLabel === 'string' && node.props.accessibilityLabel.startsWith('Presupuesto general'))!;
-  assert.equal(label.props.accessibilityLabel, 'Presupuesto general: 120,00 pesos de 200,00 pesos, 60 por ciento usado. Disponible 80,00 pesos');
+  assert.equal(label.props.accessibilityLabel, 'Presupuesto general: 120,00 pesos de 200,00 pesos, 60 por ciento usado. Quedan 80,00 pesos');
 });
 
 test('an exceeded general budget and a general budget alone are both honest', () => {
@@ -253,6 +253,7 @@ test('25O1 review: Cuentas with no account asks to create one, never to choose f
     ['en-US', 'Create an account to group your transactions. The opening balance is optional.', 'Add account']] as const) {
     const state = find(harness('accounts.tsx', {}, empty, locale).render(), 'SectionList').props.ListEmptyComponent;
     assert.deepEqual([state.type, state.props.detail, state.props.action.props.label], ['EmptyState', detail, button], locale);
+    assert.equal(state.props.action.props.icon, 'add-outline', 'the same «+» glyph as Tarjetas\' and Deudas\' empty-state button');
     assert.ok(detail.split(' ').length <= 12, locale);
   }
 });
@@ -411,7 +412,7 @@ test('in English Presupuestos names the month, the states and the VoiceOver sent
     '2 categorías · 1 excedida · 1 cerca del límite');
   const labels = nodes(root).map(node => node.props.accessibilityLabel).filter(Boolean);
   assert.ok(labels.some(label => /^Café budget: 30\.00 pesos of 25\.00 pesos, 120 percent\. Over by 5\.00 pesos$/.test(label)), 'the category keeps its stored name');
-  assert.ok(labels.some(label => /^Overall budget: 120\.00 pesos of 200\.00 pesos, 60 percent used\. 80\.00 pesos available$/.test(label)));
+  assert.ok(labels.some(label => /^Overall budget: 120\.00 pesos of 200\.00 pesos, 60 percent used\. 80\.00 pesos left$/.test(label)));
   assert.ok(shown.includes('60% used'));
   assert.ok(shown.includes('Supermercado'));
   assert.equal(nodes(root).filter(node => node.type === 'Stat').map(node => node.props.label).join(','), 'Spent,Limit');
@@ -431,7 +432,7 @@ test('in English Cuentas and the account detail read in English; account names s
   assert.equal(rows[0].props.value, '1 active');
   assert.equal(find(harness('account/[id].tsx', { id: 'cash' }).render(), 'DetailRow').props.value, '1 activo');
   const missing = harness('account/[id].tsx', { id: 'nope' }, archive, 'en-AR').render();
-  assert.equal(find(missing, 'EmptyState').props.title, 'We couldn’t find this account');
+  assert.equal(find(missing, 'EmptyState').props.title, 'Account not found');
 });
 
 test('25B3: the account detail prints no opening balance in either language; the recorded balance still starts from openingMinor, which is untouched', () => {
@@ -564,14 +565,14 @@ test('24UX6E: a sublimit\'s name and percent share a line only when both fit; at
   });
 });
 
-test('24UX6E: the general budget is flat on the canvas (no padded card): «Disponible» over a 40 pt hero in ink up to the limit, the 6 pt bar of the domain ratio with the share used under it, then Gastado · Límite', () => {
+test('24UX6E: the general budget is flat on the canvas (no padded card): «Queda» over a 40 pt hero in ink up to the limit, the 6 pt bar of the domain ratio with the share used under it, then Gastado · Límite', () => {
   const block = (root: Node) => nodes(root).find(node => node.type === 'View' && typeof node.props.accessibilityLabel === 'string' && node.props.accessibilityLabel.startsWith('Presupuesto general'))!;
   const calm = harness('budgets.tsx', { currency: 'ARS' }, { ...archive, budgets: [...budgets, total] }).render();
   assert.ok(nodes(calm).filter(node => node.type === 'Surface').every(node => node.props.grouped), 'the only container is the grouped sublimit list');
   const view = block(calm);
   assert.equal(view.props.style.gap, 20);
   assert.equal(view.props.children.at(-1).type, 'StatRow', 'the facts come last');
-  // The order: «Disponible» and the hero, then the bar with the share used right under it, then the facts.
+  // The order: «Queda» and the hero, then the bar with the share used right under it, then the facts.
   assert.equal(view.props.children.length, 3);
   const [heroGroup, progressGroup] = (view.props.children as Node[]).map(child => nodes(child));
   assert.deepEqual([heroGroup.some(node => node.type === 'Money' && node.props.large), heroGroup.some(node => node.type === 'Animated.View')], [true, false]);
@@ -580,7 +581,7 @@ test('24UX6E: the general budget is flat on the canvas (no padded card): «Dispo
   const inside = nodes(view);
   const hero = inside.find(node => node.type === 'Money' && node.props.large)!;
   assert.deepEqual([hero.props.minor, hero.props.size, hero.props.color], [8000, 40, undefined]);
-  const eyebrow = appText(inside, 'Disponible');
+  const eyebrow = appText(inside, 'Queda');
   assert.deepEqual([eyebrow.props.variant, eyebrow.props.secondary], ['footnote', true], 'no currency code: the switch above names it');
   assert.deepEqual([barOf(inside).height, barOf(inside).width, barOf(inside).backgroundColor], [6, '60%', '#000']);
   assert.equal(appText(inside, '60' + NB + '% utilizado').props.style.color, '#666');
@@ -610,16 +611,16 @@ test('24UX6E: Presupuestos never fails on a malformed month or a month it cannot
   assert.throws(() => domain.summarizeMonthlyBudgets(domain.snapshotFromArchive(data), budgets, 'ARS', '2026-09'), /rango seguro/, 'the fixture really overflows');
   const view = harness('budgets.tsx', { currency: 'ARS' }, data);
   let root = view.render();
-  assert.deepEqual([find(root, 'EmptyState').props.title, find(root, 'EmptyState').props.detail], ['No pudimos calcular este mes', 'Tus presupuestos y movimientos siguen guardados.']);
+  assert.deepEqual([find(root, 'EmptyState').props.title, find(root, 'EmptyState').props.detail], ['No se pudo calcular este mes', 'Tus presupuestos y movimientos siguen guardados.']);
   find(root, 'IconButton', 'Mes anterior').props.onPress();
   root = view.render();
   assert.ok(texts(root).includes(es.formatMonthTitle('2026-08')), 'the month stepper stays usable');
-  assert.equal(nodes(root).some(node => node.type === 'EmptyState' && node.props.title === 'No pudimos calcular este mes'), false);
+  assert.equal(nodes(root).some(node => node.type === 'EmptyState' && node.props.title === 'No se pudo calcular este mes'), false);
   const back = find(root, 'PressFeedback', 'Este mes');
   assert.equal(JSON.stringify(back.props.hitSlop), JSON.stringify({ top: 8, bottom: 8, left: 8, right: 8 }));
   assert.equal(nodes(back).find(node => node.type === 'AppText')!.props.style.color, '#1D5647', 'the link token');
   const english = harness('budgets.tsx', { currency: 'ARS' }, data, 'en-AR').render();
-  assert.equal(find(english, 'EmptyState').props.title, 'We couldn’t calculate this month');
+  assert.equal(find(english, 'EmptyState').props.title, 'This month couldn’t be calculated');
   const partial = harness('budgets.tsx', { currency: 'ARS' }, { ...archive, budgets: [budgets[0]] }).render();
   const unbudgeted = nodes(partial).find(node => node.type === 'AppText' && textOf(node).startsWith('Además gastaste'))!;
   assert.equal(unbudgeted.props.accessibilityLabel, 'Además gastaste 90,00 pesos en categorías sin límite propio.');
@@ -1036,11 +1037,11 @@ test('25B3: in English the detail reads in English and keeps the merchant, categ
 });
 
 test('25B3: an unknown or deleted rule, or one without its account, is not found in both languages', () => {
-  assert.equal(find(harness('recurring/[id].tsx', { id: 'nope' }).render(), 'EmptyState').props.title, 'No encontramos este recurrente');
-  assert.equal(find(harness('recurring/[id].tsx', { id: 'nope' }, archive, 'en-AR').render(), 'EmptyState').props.title, 'We couldn’t find this recurring item');
+  assert.equal(find(harness('recurring/[id].tsx', { id: 'nope' }).render(), 'EmptyState').props.title, 'No se encontró este recurrente');
+  assert.equal(find(harness('recurring/[id].tsx', { id: 'nope' }, archive, 'en-AR').render(), 'EmptyState').props.title, 'Recurring item not found');
   const deleted = domain.deleteRecurringRule(rule, '2026-09-19T12:00:00.000Z');
-  assert.equal(find(harness('recurring/[id].tsx', { id: 'rent' }, { ...archive, recurring: [deleted] }).render(), 'EmptyState').props.title, 'No encontramos este recurrente', 'a cold link to a deleted rule');
-  assert.equal(find(harness('recurring/[id].tsx', { id: 'rent' }, { ...archive, accounts: archive.accounts.filter(item => item.id !== 'cash') }).render(), 'EmptyState').props.title, 'No encontramos este recurrente', 'no account, no currency to show');
+  assert.equal(find(harness('recurring/[id].tsx', { id: 'rent' }, { ...archive, recurring: [deleted] }).render(), 'EmptyState').props.title, 'No se encontró este recurrente', 'a cold link to a deleted rule');
+  assert.equal(find(harness('recurring/[id].tsx', { id: 'rent' }, { ...archive, accounts: archive.accounts.filter(item => item.id !== 'cash') }).render(), 'EmptyState').props.title, 'No se encontró este recurrente', 'no account, no currency to show');
 });
 
 test('25B3 review: while a pause, a resume or a confirmed deletion is being written the detail holds navigation (no native back, no back swipe, Editar disabled); success or failure gives it back, a failed write keeps the screen with its error, and a deletion pops exactly once', async () => {

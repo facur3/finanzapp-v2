@@ -279,7 +279,7 @@ export default function OnboardingScreen() {
         </View>
         <Field label={t('onboarding.account.name')} value={name} onChangeText={setName} maxLength={80} autoCapitalize="words" editable={!locked} />
         <ErrorMessage message={error} />
-        {pending && error && <AppText secondary variant="footnote">{t('accounts.form.retryNote')}</AppText>}
+        {pending && error && <AppText secondary variant="footnote">{t('common.retryNote', { where: t('common.retryWhere.accounts') })}</AppText>}
       </View>
       <View style={{ flexGrow: 1, minHeight: space.xxl }} />
       <ActionButton label={pending && error ? t('common.retrySave') : t('onboarding.account.create')} onPress={save} busy={busy}

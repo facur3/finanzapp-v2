@@ -55,6 +55,5 @@ export default function BackupScreen() {
       <NavigationRow title={t('backup.export.importTitle')} subtitle={t('backup.export.importSubtitle')} icon="download-outline" last disabled={busy}
         onPress={() => router.push('/backup-import')} />
     </Surface>
-    <AppText secondary variant="footnote">{t('backup.export.footer')}</AppText>
   </Screen>;
 }

@@ -106,7 +106,7 @@ test('Usar todo fills the complete positive recorded balance of the source accou
   find(root, 'AccountField', 'Hacia').props.onChange('b');
   root = view.render();
   assert.equal(find(root, 'DetailRow', 'Flor después').props.value, 'ARS\u00A00,00');
-  await find(root, 'ActionButton', 'Registrar transferencia\u00A0·\u00A0$\u00A0190.162,00').props.onPress();
+  await find(root, 'ActionButton', 'Guardar transferencia\u00A0·\u00A0$\u00A0190.162,00').props.onPress();
   assert.equal(view.transfers.length, 1);
   assert.deepEqual([view.transfers[0].fromAccountId, view.transfers[0].toAccountId, view.transfers[0].amountMinor], ['a', 'b', 19016200]);
   assert.equal(view.entries.length, 0, 'a transfer is never an expense or income');
@@ -153,13 +153,13 @@ test('Pagar total fills the recorded card debt, never more than the registered d
   assert.equal(view.transfers.length, 0, 'filling never saves');
   // Editing upward past the debt is still refused on submit; downward is allowed.
   amount(root).onChangeText('60');
-  await find(view.render(), 'ActionButton', 'Registrar pago\u00A0·\u00A0$\u00A060,00').props.onPress();
+  await find(view.render(), 'ActionButton', 'Guardar pago\u00A0·\u00A0$\u00A060,00').props.onPress();
   // The form stores the catalogue key; ErrorMessage shows it in the interface language.
   assert.equal(find(view.render(), 'ErrorMessage').props.message, 'transferForm.overCardDebt');
   assert.match(bindLocale('es-AR').errorText('transferForm.overCardDebt'), /supera el saldo pendiente/);
   assert.equal(view.transfers.length, 0);
   amount(view.render()).onChangeText('50');
-  await find(view.render(), 'ActionButton', 'Registrar pago\u00A0·\u00A0$\u00A050,00').props.onPress();
+  await find(view.render(), 'ActionButton', 'Guardar pago\u00A0·\u00A0$\u00A050,00').props.onPress();
   assert.equal(view.transfers.length, 1);
   assert.deepEqual([view.transfers[0].fromAccountId, view.transfers[0].toAccountId, view.transfers[0].amountMinor], ['a', 'card-acc', 5000]);
   assert.equal(view.entries.length, 0, 'a card payment never posts a second expense');
@@ -193,7 +193,7 @@ test('Saldar total fills the pending amount I owe and records one capped payment
   root = view.render();
   assert.equal(amount(root).value, '70');
   assert.equal(view.transfers.length, 0);
-  await find(root, 'ActionButton', 'Registrar pago\u00A0·\u00A0$\u00A070,00').props.onPress();
+  await find(root, 'ActionButton', 'Guardar pago\u00A0·\u00A0$\u00A070,00').props.onPress();
   assert.equal(view.transfers.length, 1, 'one save, one record');
   assert.deepEqual([view.transfers[0].fromAccountId, view.transfers[0].toAccountId, view.transfers[0].amountMinor, view.transfers[0].id], ['a', 'debt-acc', 7000, 'operation-1']);
   assert.equal(view.entries.length, 0);
@@ -208,7 +208,7 @@ test('Cobrar total fills what they owe me and records one collection into cash',
   root = view.render();
   assert.equal(amount(root).value, '40');
   assert.equal(find(root, 'AccountField', 'Hacia').props.value, 'a');
-  await find(root, 'ActionButton', 'Registrar cobro\u00A0·\u00A0$\u00A040,00').props.onPress();
+  await find(root, 'ActionButton', 'Guardar cobro\u00A0·\u00A0$\u00A040,00').props.onPress();
   assert.equal(view.transfers.length, 1);
   assert.deepEqual([view.transfers[0].fromAccountId, view.transfers[0].toAccountId, view.transfers[0].amountMinor], ['rec-acc', 'a', 4000]);
   assert.equal(view.entries.length, 0, 'a collection is never income');
@@ -230,7 +230,7 @@ test('a failed save keeps the same submission for retry and the shortcut cannot 
   const view = harness({ accountId: 'a' }, archive, { addTransfer: async () => { if (++attempts === 1) throw new Error('disco lleno'); } });
   shortcut(view.render()).onPress();
   find(view.render(), 'AccountField', 'Hacia').props.onChange('b');
-  await find(view.render(), 'ActionButton', 'Registrar transferencia\u00A0·\u00A0$\u00A0190.162,00').props.onPress();
+  await find(view.render(), 'ActionButton', 'Guardar transferencia\u00A0·\u00A0$\u00A0190.162,00').props.onPress();
   let root = view.render();
   assert.equal(find(root, 'ErrorMessage').props.message, 'transferForm.saveUnverified', '25Q4: the form\'s own sentence, never the engine\'s text');
   assert.equal(shortcut(root).disabled, true, 'locked until the same command is retried');
@@ -246,12 +246,12 @@ test('24UX4: Saldar from a debt row opens the payment with the whole balance alr
   let root = view.render();
   assert.equal(amount(root).value, '70,00', 'the outstanding 70,00 is in the field');
   assert.equal(view.transfers.length, 0, 'nothing is recorded until the person confirms');
-  await find(root, 'ActionButton', 'Registrar pago\u00A0·\u00A0$\u00A070,00').props.onPress();
+  await find(root, 'ActionButton', 'Guardar pago\u00A0·\u00A0$\u00A070,00').props.onPress();
   assert.deepEqual([view.transfers[0].toAccountId, view.transfers[0].amountMinor], ['debt-acc', 7000]);
   // The person may pay less: the typed text wins over the prefill.
   const partial = harness({ toAccountId: 'debt-acc', maxAmountMinor: '7000', amountMinor: '7000' });
   amount(partial.render()).onChangeText('25');
-  await find(partial.render(), 'ActionButton', 'Registrar pago\u00A0·\u00A0$\u00A025,00').props.onPress();
+  await find(partial.render(), 'ActionButton', 'Guardar pago\u00A0·\u00A0$\u00A025,00').props.onPress();
   assert.equal(partial.transfers[0].amountMinor, 2500);
   // A collection is prefilled the same way; a card payment or a malformed request starts empty.
   assert.equal(amount(harness({ fromAccountId: 'rec-acc', maxAmountMinor: '4000', amountMinor: '4000' }).render()).value, '40,00');

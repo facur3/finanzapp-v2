@@ -5,11 +5,10 @@ export const backup = {
       /** Section title and button label. */
       share: 'Compartir copia',
       /** 25Q2: the uninstall consequence first (production-plan.md §1.3), then what to do; nothing claimed about iCloud (unverified). */
-      intro: 'Si borrás la app, tus registros se borran con ella. Guardá tus cuentas, tarjetas, deudas, movimientos, presupuestos y recurrentes en un lugar privado antes de borrarla o de cambiar de teléfono.',
-      note: 'Incluye el estado actual y los movimientos deshechos. El archivo no está cifrado: guardalo en un lugar privado.',
+      intro: 'Si borrás la app, tus registros se borran con ella. Guardá una copia antes de borrarla o de cambiar de teléfono.',
+      note: 'El archivo no está cifrado: guardalo en un lugar privado.',
       importTitle: 'Importar copia',
       importSubtitle: 'Revisar el archivo antes de agregar',
-      footer: 'Una copia es una foto de tus datos, no una sincronización entre dispositivos. Importar solo agrega lo que falta y nunca reemplaza registros existentes.',
       /** Title of the system share sheet (shown by Android; iOS ignores it). */
       dialogTitle: 'Guardar copia de FinanzApp',
       sharingUnavailable: 'No está disponible el menú para compartir en este dispositivo.',
@@ -18,16 +17,16 @@ export const backup = {
     },
     import: {
       tooLarge: 'La copia supera 5 MB. Conservá el archivo; no se importó nada.',
-      readFailed: 'No pudimos leer la copia. Tus datos y el archivo siguen intactos.',
-      reviewFailed: 'No pudimos revisar la copia.',
-      verifyFailed: 'No pudimos verificar la importación. Reintentá con la misma copia para comprobarla sin duplicar datos.',
+      readFailed: 'No se pudo leer la copia. Tus datos y el archivo siguen intactos.',
+      reviewFailed: 'No se pudo revisar la copia.',
+      verifyFailed: 'No se pudo verificar la importación. Reintentá con la misma copia para comprobarla sin duplicar datos.',
       /** 25Q4: {date} is the export date and time from the file's header, as «Copia del {date}» shows it. */
       confirmTitle: '¿Importar la copia del {date}?',
       /** 25Q4: what is added, and the one consequence the review cannot show: there is no undo of the whole import. */
       confirmMessage: 'Se agregan solo los registros que faltan; no se reemplaza nada. Lo importado no se puede quitar de una sola vez: se deshace o se elimina de a uno.',
       /** Alert button. */
       confirmButton: 'Importar',
-      doneTitle: 'Copia incorporada',
+      doneTitle: 'Copia importada',
       doneDetail: 'Tus cuentas, tarjetas, deudas, movimientos, presupuestos y recurrentes ya están guardados en este dispositivo. No se duplicaron registros existentes.',
       chooseAnother: 'Elegir otra copia',
       emptyTitle: 'Recuperá tus registros',
@@ -72,12 +71,11 @@ export const backup = {
       },
       noAccounts: 'No contiene cuentas.',
       onlyMissing: 'Solo se agrega lo que falta. No se reemplaza ni se borra nada.',
-      nothingNew: 'Esta copia ya está incorporada. No hay nada nuevo para agregar.',
+      nothingNew: 'Esta copia ya está importada. No hay nada nuevo para agregar.',
       reviewAgain: 'Volver a revisar',
       confirmImport: 'Confirmar importación',
-      formats: 'Copias de FinanzApp v1 a v14 · JSON de hasta 5 MB.',
       /** Review row: the currency scales a v9 copy pins that this device has not pinned yet. */
-      units: 'Escalas de moneda nuevas',
+      units: 'Monedas nuevas',
       /** Shown instead of the import button when the copy pins a currency at another number of decimals than this device. {codes} lists them. */
       scaleConflict: 'La copia registra otra cantidad de decimales para {codes}. No se importará nada: los importes nunca se reinterpretan. Conservá el archivo.',
     },

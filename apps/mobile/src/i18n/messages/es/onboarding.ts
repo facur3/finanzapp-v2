@@ -52,7 +52,7 @@ export const onboarding = {
     account: {
       zero: 'Si no lo sabés, dejalo en cero.',
       name: 'Nombre',
-      create: 'Crear cuenta',
+      create: 'Guardar cuenta',
     },
     done: {
       title: 'Todo listo.',

@@ -596,7 +596,7 @@ test('Idioma and Región on the default gate: Según el dispositivo, Español an
   assert.equal(root.root.findByType('Stack.Screen' as never).props.options.title, 'Región');
   assert.deepEqual(rows().map(row => [row.title, row.subtitle, row.selected]), [['Según el dispositivo', 'Ahora: Estados Unidos', true],
     ['Argentina', '22/9/2026 · 1.234,56', false], ['Estados Unidos', '9/22/2026 · 1,234.56', false]], 'Spanish names, each region\'s own conventions');
-  assert.match(note(), /Cambia cómo se escriben fechas y números\. Tus importes y monedas no cambian\./);
+  assert.match(note(), /^Cambia cómo se escriben fechas y números\.$/);
   act(() => rows()[1].onPress());
   assert.deepEqual(rows().map(row => row.selected), [false, true, false], 'Argentina chosen over the device\'s United States');
   act(() => root.unmount());
@@ -614,7 +614,7 @@ test('Idioma with a narrower gate lists no unfinished language; Región lists on
   // 24R1: the device's Region (US) is one the catalogue names but this gate does not honour: the subtitle says whose formats stand in.
   assert.deepEqual(root.root.findAllByType('CheckRow' as never).map(row => [row.props.title, row.props.subtitle]), [['Según el dispositivo', 'Ahora: Estados Unidos (formatos de Argentina)'], ['Argentina', '22/9/2026 · 1.234,56']]);
   assert.equal(root.root.findByType('Stack.Screen' as never).props.options.title, 'Región');
-  assert.match(root.root.findAllByType('AppText' as never).map(node => String(node.props.children)).join(' '), /Tus importes y monedas no cambian/);
+  assert.match(root.root.findAllByType('AppText' as never).map(node => String(node.props.children)).join(' '), /Cambia cómo se escriben fechas y números\./);
   act(() => root.unmount());
 });
 
@@ -636,7 +636,7 @@ test('25O1: Idioma\'s note opens FinanzApp\'s page in iOS Settings; Android, wit
       assert.deepEqual([footnotes(), buttons().length, settingsOpened()], [[], 0, 0], 'Android: no per-app language row to send anyone to');
     }
     act(() => root.update(h(provider.I18nProvider, { store }, h(screen.LocaleChooser, { kind: 'region' }))));
-    assert.deepEqual([footnotes(), buttons().length], [['Cambia cómo se escriben fechas y números. Tus importes y monedas no cambian.'], 0], os + ': Región says its fact on both');
+    assert.deepEqual([footnotes(), buttons().length], [['Cambia cómo se escriben fechas y números.'], 0], os + ': Región says its fact on both');
     act(() => root.unmount());
   }
 });

@@ -226,7 +226,7 @@ test('25D1: at the 1.2× cap a sheet bar leaves its title room for whole words f
   // are semibold (+6 %); the buttons are 16 pt and the title 17 pt, each × 1.2.
   const titles = ['selection.chooseDate', 'selection.chooseAccount', 'selection.chooseCurrency', 'selection.categories', 'display.title', 'display.currency',
     'currency.switchTitle', 'transferForm.from', 'transferForm.to', 'review.fields.destination', 'recurring.form.nextDate', 'operations.refund.date',
-    'installments.payoff.date', 'debts.form.dueDate', 'cards.form.nextClosing', 'cards.form.due', 'entryForm.paidWith', 'entryForm.receivedIn', 'home.capture.title'];
+    'installments.payoff.date', 'debts.form.due', 'cards.form.nextClosing', 'cards.form.due', 'entryForm.paidWith', 'entryForm.receivedIn', 'home.capture.title'];
   for (const locale of ['es-AR', 'en-US'] as const) {
     const { t } = bindLocale(locale);
     const buttons = (labelWidthEm(t('common.cancel')) + labelWidthEm(t('common.done')) * 1.06) * 16;

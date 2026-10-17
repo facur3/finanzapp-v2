@@ -70,7 +70,7 @@ export const assistant: Pick<Messages, 'assistant'> = {
       merchant: 'Merchant',
       source: 'Source',
       destination: 'Recorded in',
-      payment: 'Payment',
+      payment: 'How it’s paid',
       row: '{label}: {value}',
       missing: 'Missing',
       noAmount: 'No amount',
@@ -94,7 +94,7 @@ export const assistant: Pick<Messages, 'assistant'> = {
       limit: 'You’ve reached the usage limit. You can still record transactions manually.',
       unavailable: 'The integration isn’t available yet.',
       failed: 'The request couldn’t be completed. Your transactions didn’t change.',
-      captureUnverified: 'We couldn’t verify the capture.',
+      captureUnverified: 'Couldn’t verify the capture.',
     },
   },
 };

@@ -230,7 +230,7 @@ test('24T3 (review): a devolución whose earliest day is today opens with valid 
   assert.equal(early.refunds.length, 0);
 });
 
-test('24T3: «Registrar devolución» of a purchase: the facts, «Total disponible», a preview of exactly what is recorded, the Save echo, one write and close', async () => {
+test('24T3: «Registrar devolución» of a purchase: the facts, «Devolver todo», a preview of exactly what is recorded, the Save echo, one write and close', async () => {
   const view = harness('app/new-refund.tsx', { params: { entryId: buy.id } });
   let root = view.render();
   assert.equal(find(root, 'Stack.Screen').props.options.title, 'Registrar devolución');
@@ -238,9 +238,9 @@ test('24T3: «Registrar devolución» of a purchase: the facts, «Total disponib
   assert.equal(find(root, 'Money').props.minor, 50000, 'the purchase\'s price on top');
   assert.equal(find(root, 'DetailRow', 'Cuenta').props.value, 'Banco');
   const shortcut = find(root, 'AmountShortcut');
-  assert.equal(shortcut.props.caption, 'Disponible para devolver: ARS 500,00');
+  assert.equal(shortcut.props.caption, 'Por devolver: ARS 500,00');
   assert.match(shortcut.props.spokenCaption, /500 pesos|500,00/);
-  assert.equal(shortcut.props.label, 'Total disponible');
+  assert.equal(shortcut.props.label, 'Devolver todo');
   const date = find(root, 'DateField');
   assert.equal(JSON.stringify([domain.todayKey(date.props.minimumDate), domain.todayKey(date.props.value)]), JSON.stringify([buy.dateISO, TODAY]), 'from the purchase to today');
   assert.equal(find(root, 'ActionButton').props.disabled, true, 'nothing typed: no Save');
@@ -254,8 +254,8 @@ test('24T3: «Registrar devolución» of a purchase: the facts, «Total disponib
   assert.equal(text(sentence), `Se acreditan $${NB}200,00 en Banco con fecha 2 de octubre de 2026 y se restan de Ropa en octubre de 2026. No es un ingreso.`);
   assert.ok(sentence.props.accessibilityLabel && !sentence.props.accessibilityLabel.includes('$'), 'VoiceOver hears the spoken amount: ' + sentence.props.accessibilityLabel);
   const save = find(root, 'ActionButton');
-  assert.equal(save.props.label, `Registrar devolución${NB}·${NB}$${NB}200,00`);
-  assert.match(save.props.spokenLabel, /^Registrar devolución, 200/);
+  assert.equal(save.props.label, `Guardar devolución${NB}·${NB}$${NB}200,00`);
+  assert.match(save.props.spokenLabel, /^Guardar devolución, 200/);
   assert.equal(view.refunds.length, 0, 'typing and previewing write nothing');
   await save.props.onPress();
   assert.equal(view.refunds.length, 1);
@@ -277,7 +277,7 @@ test('24T3: the refund form keeps the submission frozen on an unknown outcome an
   assert.equal(view.backs(), 0);
   assert.equal(find(root, 'AmountField').props.editable, false, 'frozen while the outcome is unknown');
   assert.equal(find(root, 'ActionButton').props.label, 'Reintentar guardado');
-  assert.ok(texts(root).includes('Reintentá: se envía la misma devolución y no se registra dos veces.'));
+  assert.ok(texts(root).includes('Reintentar no guarda nada dos veces. Para cambiar algo, cerrá y revisá primero la compra.'));
   assert.equal(view.failures.join(','), 'Warning', '25Q4: it may have been written, so Warning while it stays frozen');
   // The commit happened: the ledger now holds it; the retry sends the very same devolución (storage's retry is a no-op).
   view.setData(domain.applyNewOperation(base(), view.refunds[0], TODAY));
@@ -307,7 +307,7 @@ test('24T3: the refund form keeps the submission frozen on an unknown outcome an
 test('24T3: an amount over what is left is refused live with Save disabled; a purchase returned in full and an income offer no form', () => {
   const view = harness('app/new-refund.tsx', { params: { entryId: buy.id }, data: refundOf(base(), 'r1', 20000, '2026-09-20') });
   let root = view.render();
-  assert.equal(find(root, 'AmountShortcut').props.caption, 'Disponible para devolver: ARS 300,00');
+  assert.equal(find(root, 'AmountShortcut').props.caption, 'Por devolver: ARS 300,00');
   assert.equal(find(root, 'DetailRow', 'Ya devuelto').props.value, `$${NB}200,00`);
   assert.match(find(root, 'DetailRow', 'Ya devuelto').props.spokenValue, /200/);
   find(root, 'AmountField').props.onChangeText('300,01');
@@ -326,7 +326,7 @@ test('24T3: an amount over what is left is refused live with Save disabled; a pu
   const income = harness('app/new-refund.tsx', { params: { entryId: salary.id } }).render();
   assert.equal(find(income, 'EmptyState').props.title, 'No queda nada por devolver');
   const missing = harness('app/new-refund.tsx', { params: { entryId: 'nope' } }).render();
-  assert.equal(find(missing, 'EmptyState').props.title, 'No encontramos esta compra');
+  assert.equal(find(missing, 'EmptyState').props.title, 'No se encontró esta compra');
   // A deleted account: the domain's reason, no form.
   const gone = harness('app/new-refund.tsx', { params: { entryId: buy.id }, data: { ...base(), accounts: [{ ...bank, deletedAt: at('2026-09-30') }, wallet, cardAccount] } }).render();
   assert.equal(find(gone, 'EmptyState').props.title, 'No se puede registrar una devolución');
@@ -570,7 +570,7 @@ test('24T3 (verify): a plan with interest: the tail sentence, «el interés sigu
   assert.ok(shown.includes('El interés de esas cuotas sigue como estaba.'));
   assert.ok(shown.some(line => /^No queda precio por registrar/.test(line)), 'A17: the financing continues, said before Save');
   const save = find(root, 'ActionButton');
-  assert.equal(save.props.label, `Registrar devolución${NB}·${NB}$${NB}1.200,00`);
+  assert.equal(save.props.label, `Guardar devolución${NB}·${NB}$${NB}1.200,00`);
   await save.props.onPress();
   const [refund] = view.refunds as domain.PlanRefund[];
   assert.equal(JSON.stringify([refund.creditMinor, refund.reductions]),

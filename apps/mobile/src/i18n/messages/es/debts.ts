@@ -9,7 +9,7 @@ export const debts = {
     list: {
       title: 'Deudas y cobros',
       add: 'Agregar deuda',
-      /** 25O1: one line; that a payment or a collection is never an expense or an income is said in the form (form.explainOwed). */
+      /** 25O1: one line; that a payment or a collection is never an expense or an income is said once, in the payment form (transferForm.explainDebt). */
       emptyTitle: 'Sin deudas ni cobros',
       emptyDetail: 'Anotá lo que debés o lo que te deben.',
       /** Section and total label: what I owe. */
@@ -43,8 +43,8 @@ export const debts = {
     },
     detail: {
       edit: 'Editar deuda',
-      notFoundTitle: 'No encontramos esta deuda',
-      notFoundDetail: 'Volvé a Deudas para elegir una obligación guardada en este dispositivo.',
+      notFoundTitle: 'No se encontró esta deuda',
+      notFoundDetail: 'Volvé a Deudas para elegir una guardada en este dispositivo.',
       /** Over the outstanding amount: "Debo a Juan". */
       owedTo: 'Debo a {name}',
       owedBy: 'Me debe {name}',
@@ -59,11 +59,10 @@ export const debts = {
       closedTitle: 'Deuda cerrada',
       closedDetailOwed: 'No cuenta como pendiente. Conserva su saldo y sus pagos; «Reabrir deuda» la vuelve a pendientes.',
       closedDetailReceivable: 'No cuenta como pendiente. Conserva su saldo y sus cobros; «Reabrir deuda» la vuelve a pendientes.',
-      explain: 'Saldar la obligación mueve saldo entre registros. No crea un gasto ni un ingreso.',
       payments: 'Pagos registrados',
       collections: 'Cobros registrados',
-      noPayments: 'Todavía no registraste pagos para esta obligación.',
-      noCollections: 'Todavía no registraste cobros para esta obligación.',
+      noPayments: 'Todavía no registraste pagos.',
+      noCollections: 'Todavía no registraste cobros.',
     },
     /** The transfer form when it pays a debt or collects a receivable. */
     payment: {
@@ -88,14 +87,10 @@ export const debts = {
       due: 'Vencimiento',
       noDate: 'Sin fecha',
       dated: 'Con fecha',
-      dueDate: 'Fecha límite',
       note: 'Nota (opcional)',
-      explainOwed: 'Cada pago que registres sale de una cuenta y baja este saldo. No se crean gastos ni ingresos al saldar una deuda.',
-      explainReceivable: 'Cada cobro que registres entra a una cuenta y baja este saldo. No se crean gastos ni ingresos al saldar una deuda.',
-      frozenNote: 'El envío quedó congelado para que Reintentar no cree otra obligación ni aplique cambios dos veces.',
-      create: 'Crear deuda',
+      create: 'Guardar deuda',
       amountPositive: 'Ingresá un monto mayor que cero.',
-      saveFailed: 'No pudimos guardar la deuda. Reintentá el mismo envío.',
+      saveFailed: 'No se pudo guardar la deuda.',
     },
     /** 24UX4: the trailing swipe actions of a debt (short) and the same actions in its detail (named). */
     manage: {
@@ -110,7 +105,8 @@ export const debts = {
       closeTitleOwed: '¿Cerrar la deuda con {name}?',
       closeTitleReceivable: '¿Cerrar lo que te debe {name}?',
       /** `{amount}` is the outstanding balance, formatted. */
-      closeDetail: 'Todavía quedan {amount} pendientes. Cerrarla la saca de pendientes sin registrar un pago; podés reabrirla.',
+      closeDetailOwed: 'Todavía quedan {amount} pendientes. Cerrarla la saca de pendientes sin registrar un pago; podés reabrirla.',
+      closeDetailReceivable: 'Todavía quedan {amount} pendientes. Cerrarlo lo saca de pendientes sin registrar un cobro; podés reabrirlo.',
       closeConfirm: 'Cerrar',
       deleteTitleOwed: '¿Eliminar la deuda con {name}?',
       deleteTitleReceivable: '¿Eliminar lo que te debe {name}?',
@@ -127,16 +123,16 @@ export const debts = {
       collect: 'Cobrar',
       blockedTitle: 'Todavía no se puede eliminar',
       /** `{amount}` is the outstanding balance, formatted. Closing keeps the balance and the history; it is not a payment. */
-      blockedDetailOwed: 'Todavía le debés {amount} a {name} y ya hay pagos registrados. Saldá el resto, o cerrá la deuda: deja de aparecer en pendientes y conserva el saldo y el historial; podés reabrirla. Cerrar no registra ningún pago.',
-      blockedDetailReceivable: '{name} todavía te debe {amount} y ya hay cobros registrados. Cobrá el resto, o cerrá el cobro: deja de aparecer en pendientes y conserva el saldo y el historial; podés reabrirlo. Cerrar no registra ningún cobro.',
-      blockedDetailClosedOwed: 'Todavía le debés {amount} a {name} y ya hay pagos registrados. Saldá el resto primero; mientras tanto sigue en Cerradas con su saldo y su historial.',
-      blockedDetailClosedReceivable: '{name} todavía te debe {amount} y ya hay cobros registrados. Cobrá el resto primero; mientras tanto sigue en Cerradas con su saldo y su historial.',
+      blockedDetailOwed: 'Le debés {amount} a {name} y ya hay pagos registrados. Saldá el resto o cerrá la deuda; cerrar no registra ningún pago.',
+      blockedDetailReceivable: '{name} te debe {amount} y ya hay cobros registrados. Cobrá el resto o cerrá el cobro; cerrar no registra ningún cobro.',
+      blockedDetailClosedOwed: 'Le debés {amount} a {name} y ya hay pagos registrados. Saldá el resto primero; sigue en Cerradas.',
+      blockedDetailClosedReceivable: '{name} te debe {amount} y ya hay cobros registrados. Cobrá el resto primero; sigue en Cerradas.',
       /** A tracker with a balance and no payment or collection yet (created by mistake): deleting records nothing. */
       deleteDetailUnpaidOwed: 'Deja de seguirse sin registrar ningún pago: los {amount} no se saldan. No tiene pagos registrados.',
       deleteDetailUnpaidReceivable: 'Deja de seguirse sin registrar ningún cobro: los {amount} no se cobran. No tiene cobros registrados.',
       deleteConfirm: 'Eliminar',
-      failed: 'No pudimos cambiar la deuda. Sigue como estaba; probá nuevamente.',
-      deleteFailed: 'No pudimos eliminar la deuda. Sigue como estaba; probá nuevamente.',
+      failed: 'No se pudo cambiar la deuda. Sigue como estaba; probá nuevamente.',
+      deleteFailed: 'No se pudo eliminar la deuda. Sigue como estaba; probá nuevamente.',
     },
   },
 } as const;

@@ -5,7 +5,7 @@ import { randomUUID } from 'expo-crypto';
 import { LEDGER_CURRENCIES, budgetIdentityKey, editedDraftFits, minorFromEditedDraft, sameMonthlyBudget, validateBudgetCollection, validateMonthlyBudget, type StoredDraft,
   type BudgetScope, type Currency, type MonthlyBudget } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
-import { ActionButton, AmountField, AppText, Choices, ErrorMessage, IconButton, Screen } from './components';
+import { ActionButton, AmountField, AppText, Choices, ErrorMessage, FieldNote, IconButton, Screen } from './components';
 import { CurrencySwitch } from './currency-switch';
 import { useDefaultCurrency } from './use-default-currency';
 import { offeredCurrencies } from './currencies';
@@ -152,13 +152,14 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency, sc
     <AmountField label={t('budgets.form.amount')} currency={currency} value={amount} stored={stored ?? undefined}
       onChangeText={value => { setAmount(value); setError(null); }} editable={!locked} />
     {!general && <CategoryField entries={snapshot?.entries ?? []} kind="expense" value={category} onChange={setCategory} disabled={locked} prominent />}
-    <AppText secondary variant="footnote" style={{ textAlign: 'center' }}>
+    {/* One line under the amount; what the budget counts is one tap away («Menos texto»). */}
+    <FieldNote help={{ title: t('budgets.form.noteHelpTitle'), detail: t(general ? 'budgets.form.generalHelp' : 'budgets.form.categoryHelp') }}>
       {t(general ? 'budgets.form.generalNote' : 'budgets.form.categoryNote')}
-    </AppText>
+    </FieldNote>
     <ErrorMessage message={error} />
     {error && taken && <AppText secondary variant="footnote" style={{ textAlign: 'center' }}>{t('budgets.form.takenHint')}</AppText>}
     {pending && error && <AppText secondary variant="footnote" style={{ textAlign: 'center' }}>
-      {t('budgets.form.retryNote')}
+      {t('common.retryNote', { where: t('common.retryWhere.budgets') })}
     </AppText>}
     <ActionButton label={pending && error ? t('common.retrySave') : before ? t('common.saveChanges') : t('budgets.form.create')}
       onPress={save} busy={busy} disabled={!amount.trim() || (!general && !category.trim()) || !editedDraftFits(amount, currency, stored).ok} />

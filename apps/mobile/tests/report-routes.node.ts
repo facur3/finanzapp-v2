@@ -293,6 +293,13 @@ test('comparison category drilldown preserves the cutoff, not the whole previous
   assert.deepEqual(detail.props.entries.map((e: domain.Entry) => e.id), ['b']);
   assert.equal(find(detail, 'Money').props.minor, 202);
 });
+test('25T: what the comparison counts sits behind ⓘ beside its first line, never as a standing 12 pt footer', () => {
+  const list = routeHarness('report-comparison.tsx', { currency: 'ARS', month: '2026-09' }).render();
+  assert.equal(list.props.ListFooterComponent, undefined);
+  const info = find(list, 'InfoButton');
+  assert.equal(info.props.title, 'Qué cuenta este reporte');
+  assert.match(info.props.detail, /^Solo gastos registrados en ARS, sin transferencias ni saldos iniciales\. Las diferencias describen tus registros/);
+});
 test('comparison never presents an invented change when history is absent', () => {
   const list = routeHarness('report-comparison.tsx', { currency: 'ARS', month: '2026-09' }).render();
   assert.equal(list.props.data.length, 0);

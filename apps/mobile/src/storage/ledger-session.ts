@@ -12,7 +12,7 @@ export type CatchUps = Pick<LedgerSession, 'recurringError' | 'installmentError'
 
 /** A write committed but the view could not be read again: said in the banner, never as a failed write. A screen that gets
  * it back from a write that is not frozen for an exact retry treats the write as done (`committedBeforeRefresh`). */
-export const VIEW_REFRESH_MESSAGE = 'El guardado terminó, pero no pudimos actualizar la vista. Verificá de nuevo antes de registrar otro movimiento; no lo cargues otra vez.';
+export const VIEW_REFRESH_MESSAGE = 'El guardado terminó, pero la vista no se pudo actualizar. Verificá de nuevo antes de registrar otro movimiento; no lo cargues otra vez.';
 
 /** The day and outcome of the last catch-up pass the session ran (open, foreground, a day change), for `shouldRefreshOnActive`. */
 export type LastPass = { day: string; failed: boolean };
@@ -71,11 +71,11 @@ export async function restoreFromBackup(db: LedgerDatabase, incoming: LedgerArch
  * carries the retry; the data under it stays open and never claims to be complete while one is shown. */
 export function sessionWarning(session: CatchUps): string | null {
   if (session.recurringError && session.installmentError) {
-    return 'No pudimos verificar los vencimientos recurrentes ni registrar las cuotas vencidas de tus tarjetas. El saldo de tus tarjetas, Reportes y Presupuestos pueden estar incompletos. No se modificó nada fuera de una transacción completa.';
+    return 'No se pudieron verificar los vencimientos recurrentes ni registrar las cuotas vencidas de tus tarjetas. El saldo de tus tarjetas, Reportes y Presupuestos pueden estar incompletos. No se modificó nada a medias.';
   }
-  if (session.recurringError) return 'No pudimos verificar tus datos locales ni los vencimientos recurrentes. No se modificó nada fuera de una transacción completa.';
+  if (session.recurringError) return 'No se pudieron verificar tus datos locales ni los vencimientos recurrentes. No se modificó nada a medias.';
   if (session.installmentError) {
-    return 'No pudimos registrar las cuotas vencidas de tus tarjetas. El saldo de tus tarjetas, Reportes y Presupuestos pueden no incluirlas todavía. No se modificó nada fuera de una transacción completa.';
+    return 'No se pudieron registrar las cuotas vencidas de tus tarjetas. El saldo de tus tarjetas, Reportes y Presupuestos pueden no incluirlas todavía. No se modificó nada a medias.';
   }
   return null;
 }
@@ -86,7 +86,7 @@ export function sessionWarning(session: CatchUps): string | null {
 export function openFailureMessage(cause: unknown): string {
   const message = (cause as { message?: unknown } | null | undefined)?.message;
   return typeof message === 'string' && (message === NEWER_SCHEMA_MESSAGE || message === MIGRATION_REFERENCES_MESSAGE) ? message
-    : 'No pudimos abrir tus datos. No se borró ni reemplazó nada. Probá nuevamente o conservá la app para recuperar la base.';
+    : 'No se pudieron abrir tus datos. No se borró ni reemplazó nada. Probá nuevamente o conservá la app para recuperar la base.';
 }
 
 /** A recurring rule saved from its form or a list action (created, edited, paused, resumed, deleted), then the recurring

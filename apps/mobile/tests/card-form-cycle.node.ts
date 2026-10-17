@@ -371,7 +371,7 @@ test('24T2: a form showing a stale statement is refused by the planner with the 
 
 test('24T2: a failed save keeps the card and its dates frozen; the retry resends the same submission; archiving keeps its own path without dates', async () => {
   let attempts = 0;
-  const view = harness({ original: card }, { save: async () => { if (++attempts === 1) throw new Error('El guardado terminó, pero no pudimos actualizar la vista. Verificá de nuevo antes de registrar otro movimiento; no lo cargues otra vez.'); } });
+  const view = harness({ original: card }, { save: async () => { if (++attempts === 1) throw new Error('El guardado terminó, pero la vista no se pudo actualizar. Verificá de nuevo antes de registrar otro movimiento; no lo cargues otra vez.'); } });
   pick(view, 'Vencimiento', '2026-10-06');
   await saveButton(view.render()).props.onPress();
   let root = view.render();

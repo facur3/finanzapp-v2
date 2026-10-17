@@ -6,7 +6,7 @@ import { useLedger } from '../src/storage/LedgerProvider';
 import { useFinanceView } from '../src/fx/rates-provider';
 import { spendingFigure } from '../src/fx/finance-view';
 import { shortfallDetail } from '../src/fx/fx-copy';
-import { AppText, DetailRow, EmptyState, Money, Screen, SectionTitle, Surface } from '../src/ui/components';
+import { AppText, DetailRow, EmptyState, InfoButton, Money, Screen, SectionTitle, Surface } from '../src/ui/components';
 import { useCategoryLookOf } from '../src/ui/category-hues';
 import { changePercent, dateRangeLabel, requestedReportMonth, strictReportSelection } from '../src/ui/report-presentation';
 import { useI18n } from '../src/i18n/provider';
@@ -48,7 +48,11 @@ export default function ReportComparisonScreen() {
     style={{ flex: 1, backgroundColor: p.background }} contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: 40 }}
     contentInsetAdjustmentBehavior="automatic" removeClippedSubviews={false}
     ListHeaderComponent={<View style={{ gap: 20 }}>
-      <AppText secondary>{t(comparison.mode === 'matching-days' ? 'reports.comparison.matchingDays' : 'reports.comparison.fullMonths')}</AppText>
+      {/* What the comparison counts sits behind ⓘ, as on Reportes («Menos texto»), never as a standing footer. */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+        <AppText secondary style={{ flexShrink: 1 }}>{t(comparison.mode === 'matching-days' ? 'reports.comparison.matchingDays' : 'reports.comparison.fullMonths')}</AppText>
+        <InfoButton title={t('reports.method.title')} detail={t(view.mode === 'consolidated' ? 'fx.comparisonFooter' : 'reports.comparison.footer', { currency: selection.currency })} />
+      </View>
       {comparison.capped && <AppText secondary>{t('reports.comparison.capped', { day: Number(current.endISO.slice(-2)) })}</AppText>}
       {comparison.status === 'out-of-range' ? <EmptyState title={t('reports.outOfRangeTitle')} detail={t('reports.comparison.outOfRangeDetail')} /> : <>
         {comparison.status === 'ready' && deltaMinor !== null && previous?.status === 'ready' && <View style={{ gap: 10 }}>
@@ -70,7 +74,7 @@ export default function ReportComparisonScreen() {
     // 24T3 (A23): a side opens its drill-down when it has lines: purchases, or devoluciones alone (a count of 0 with a net).
     renderItem={({ item }) => <Surface grouped>
       <View style={{ padding: 16, gap: 6 }}>
-        <AppText style={{ fontWeight: '600', fontSize: 17 }}>{lookOf(item.category).label}</AppText>
+        <AppText style={{ fontWeight: '600' }}>{lookOf(item.category).label}</AppText>
         <AppText secondary>{item.deltaMinor === 0 ? t('reports.comparison.noChange')
           : t(item.deltaMinor > 0 ? 'reports.comparison.amountMore' : 'reports.comparison.amountLess', { amount: amount(Math.abs(item.deltaMinor)) })}</AppText>
       </View>
@@ -80,6 +84,5 @@ export default function ReportComparisonScreen() {
         hint={t('reports.comparison.openHint')} value={amount(item.currentMinor)} spokenValue={spoken(item.currentMinor)} onPress={item.currentCount || item.currentMinor ? () => openCategory(current, item.key) : undefined} />
       <DetailRow label={t('reports.comparison.previous')} spokenLabel={t('reports.comparison.rowSpoken', { category: lookOf(item.category).label, period: t('reports.comparison.previous') })}
         hint={t('reports.comparison.openHint')} value={amount(item.previousMinor)} spokenValue={spoken(item.previousMinor)} last onPress={(item.previousCount || item.previousMinor) && previous ? () => openCategory(previous, item.key) : undefined} />
-    </Surface>}
-    ListFooterComponent={<AppText secondary style={{ fontSize: 12, lineHeight: 18 }}>{t(view.mode === 'consolidated' ? 'fx.comparisonFooter' : 'reports.comparison.footer', { currency: selection.currency })}</AppText>} />;
+    </Surface>} />;
 }

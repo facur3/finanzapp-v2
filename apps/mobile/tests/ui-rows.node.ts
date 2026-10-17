@@ -230,7 +230,8 @@ test('the currency row stacks label, full name and code so "Dólares estadounide
   assert.deepEqual(ui.haptics, ['selection']);
   items[1].props.onPress();
   assert.deepEqual(ui.haptics, ['selection'], 'choosing the current currency again does not tick');
-  assert.ok(nodes(list.props.ListFooterComponent).some(node => node.type === 'AppText' && /nunca se suman ni se convierten/.test(String(node.props.children))), 'the sheet says currencies are never added or converted, naming none (24M)');
+  // «Menos texto»: the sheet carries no standing note that currencies are never added (the app already never adds them).
+  assert.equal(list.props.ListFooterComponent, undefined);
   const disabled = ui.render('CurrencyField', { value: 'USD', onChange: () => {}, disabled: true });
   assert.equal(nodes(disabled).find(node => node.type === 'SelectionRow')!.props.disabled, true);
   // Read-only (an existing account): the same row shape, no chooser at all.
@@ -620,7 +621,7 @@ test('24B3: the currency sheet lists exactly the options it is given, searches b
   assert.equal(list().props.ListHeaderComponent, null);
   assert.equal(list().props.ListEmptyComponent, null);
   assert.equal(list().props.data.length, 3);
-  assert.equal(list().props.ListFooterComponent, null, 'no note unless the caller gives one');
+  assert.equal(list().props.ListFooterComponent, undefined, 'no standing note');
 });
 
 test('24B5: the currency field lists the gate\'s currencies with search over code, name, symbol and territory from six on, and a read-only row shows any stored code by its own name', () => {

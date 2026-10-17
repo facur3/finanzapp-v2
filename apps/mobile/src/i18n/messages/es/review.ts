@@ -10,7 +10,7 @@ export const review = {
       one: '{count} propuesta no se puede leer. No se registrará nada con ella.',
       other: '{count} propuestas no se pueden leer. No se registrará nada con ellas.',
     },
-    unavailable: 'No pudimos abrir las propuestas. Tus movimientos no cambiaron.',
+    unavailable: 'No se pudieron abrir las propuestas. Tus movimientos no cambiaron.',
     readOnly: 'Estas propuestas vienen de una versión más nueva de FinanzApp: se pueden ver, no modificar.',
     /** The dock's Más tab, read by VoiceOver after its name when something waits. */
     badge: { one: '{count} para revisar', other: '{count} para revisar' },
@@ -19,7 +19,7 @@ export const review = {
       ready: 'Lista para confirmar',
       incomplete: { one: 'Falta {count} dato', other: 'Faltan {count} datos' },
       stale: 'Revisala de nuevo',
-      interrupted: 'Registro sin verificar',
+      interrupted: 'Falta confirmar si se guardó',
       conflict: 'Ya existe otro registro',
     },
     kind: { expense: 'Gasto', income: 'Ingreso', unknown: 'Gasto o ingreso' },
@@ -42,7 +42,7 @@ export const review = {
       card: 'Tarjeta',
       account: 'Cuenta',
       date: 'Fecha',
-      purchase: 'Pago',
+      purchase: 'Cómo se paga',
       source: 'Origen',
       captured: 'Capturada',
     },
@@ -82,7 +82,7 @@ export const review = {
       missingTitle: 'Para confirmar falta',
       staleNote: 'La cuenta, la tarjeta o la categoría cambió desde la propuesta. Abrí Editar y revisala antes de confirmar.',
       interruptedNote: 'Un intento anterior de registrarla no se pudo verificar. Confirmar lo busca en tus datos y lo completa una sola vez.',
-      conflictNote: 'Tus datos ya tienen otro registro con el identificador de esta propuesta. Para no duplicar nada, no se puede confirmar ni editar; tus movimientos no cambian.',
+      conflictNote: 'Tus datos ya tienen otro registro igual a esta propuesta. Para no duplicar nada, no se puede confirmar ni editar; tus movimientos no cambian.',
       confirm: 'Confirmar',
       retryConfirm: 'Reintentar confirmación',
       edit: 'Editar',
@@ -91,9 +91,9 @@ export const review = {
       dismissDetail: 'No se registra nada y no vuelve a aparecer. Tus movimientos no cambian.',
       /** 25Q4: Confirmar failed with an error the catalogue does not know (an engine's). True either way: the write id makes a
        * retry, or the reconciliation of a write that did commit, record it once. */
-      confirmFailed: 'No pudimos confirmar la propuesta. Podés reintentarlo: se registra una sola vez.',
+      confirmFailed: 'No se pudo confirmar la propuesta. Podés reintentarlo: se registra una sola vez.',
       /** 25Q4: Descartar failed the same way; it writes only the review file, whose transaction rolled back. */
-      dismissFailed: 'No pudimos descartar la propuesta. Sigue pendiente.',
+      dismissFailed: 'No se pudo descartar la propuesta. Sigue pendiente.',
       recordedLater: 'Registrado. La propuesta se marcará como confirmada la próxima vez que se abra la app.',
     },
     /** 25A-04: the review sheet a producer presents over itself, right after a capture. */
@@ -119,7 +119,7 @@ export const review = {
       /** Under the merchant field when it holds a character nobody can see (pasted text): saving waits until it is retyped. */
       hiddenCharacters: 'Este nombre tiene caracteres invisibles de un texto copiado. Escribilo de nuevo.',
       /** 25Q4: Guardar cambios failed with an error the catalogue does not know; the fields stay on screen. */
-      saveFailed: 'No pudimos guardar los cambios. La propuesta sigue como estaba.',
+      saveFailed: 'No se pudieron guardar los cambios. La propuesta sigue como estaba.',
     },
   },
 } as const;

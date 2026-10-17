@@ -4,7 +4,6 @@ import type { Messages } from '../../messages.ts';
 export const categoryManager: Pick<Messages, 'categoryManager'> = {
   categoryManager: {
     list: {
-      intro: 'Tap a category to change its name, icon or color, or to archive it. Past transactions never change.',
       expenses: 'Expenses',
       incomes: 'Income',
       archived: 'Archived',
@@ -21,7 +20,7 @@ export const categoryManager: Pick<Messages, 'categoryManager'> = {
       rowHintArchived: 'Edits the name, icon and color, or unarchives it',
     },
     notFound: {
-      title: 'We couldn’t find this category',
+      title: 'Category not found',
       detail: 'Go back to Categories to choose one from the list.',
     },
     form: {
@@ -29,17 +28,15 @@ export const categoryManager: Pick<Messages, 'categoryManager'> = {
       namePlaceholder: 'e.g. Snacks',
       archivedTitle: 'Archived',
       archivedDetail: 'Not offered when recording. Your transactions, budgets and recurring items keep it; unarchive it to offer it again.',
-      editNote: 'Changing the name, icon or color doesn’t modify any transaction, budget or recurring item.',
       renamedNote: 'Transactions are still recorded as “{stored}” and shown as “{shown}”.',
       availableExpense: 'It will be available right away when recording expenses.',
       availableIncome: 'It will be available right away when recording income.',
-      retryNote: 'Retry the same save. To change it, close and check the list first.',
-      create: 'Create category',
+      create: 'Save category',
       archive: 'Archive category',
       unarchive: 'Unarchive category',
       nameTaken: 'A category with that name already exists. Edit it from the list or choose another name.',
       checkName: 'Check the name.',
-      saveUnverified: 'We couldn’t confirm the save. Retry the same change.',
+      saveUnverified: 'Couldn’t confirm the save.',
       archiveTitle: 'Archive category?',
       unarchiveTitle: 'Unarchive category?',
       archiveMessage: '“{name}” will no longer be offered when recording. Your past transactions, budgets and recurring items keep it as is.',

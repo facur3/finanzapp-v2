@@ -61,7 +61,7 @@ export const settings: Pick<Messages, 'settings' | 'licenses'> = {
     data: 'Data and artwork',
     rates: 'Reference exchange rates come from Frankfurter (frankfurter.dev), which gathers them from central banks and official sources. Each rate is subject to its provider’s terms.',
     covers: 'Includes: {packages}',
-    notFoundTitle: 'We could not find this notice',
+    notFoundTitle: 'Notice not found',
     notFoundDetail: 'Go back to Licenses to see the list.',
   },
 };

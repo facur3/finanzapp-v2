@@ -234,7 +234,7 @@ test('25A-04: a proposal card shows what the review item holds, says what it nee
   assert.equal(line.props.style.color, '#6E7078', 'incomplete is neutral, never a warning or an error');
   // A card destination shows the purchase mode the domain chose: «Una vez».
   const onCard = nodes(ui.render('ProposalCard', { content: proposal(), state: { kind: 'pending', item: itemOf(reviewDraft({ destinationId: 'card-acc', purchase: { mode: 'once' } })), conflict: false, writable: true }, ...handlers }));
-  assert.ok(onCard.some(node => node.props.accessibilityLabel === 'Pago: Una vez'));
+  assert.ok(onCard.some(node => node.props.accessibilityLabel === 'Cómo se paga: Una vez'));
   // Capturing, failed, preview: the snapshot, and what is happening; Reintentar only after a failure.
   const capturing = nodes(ui.render('ProposalCard', { content: proposal(reviewDraft(), 'capturing'), state: { kind: 'capturing' }, ...handlers }));
   assert.ok(capturing.some(node => node.type === 'AppText' && textOf(node) === 'Guardando la propuesta…'));

@@ -230,7 +230,7 @@ test('the release bundle\'s Idioma lists Español and English, each spoken in it
   assert.deepEqual([rows()[0].leading.type, rows()[0].leading.props.fallback], ['FlagMark', 'phone-portrait-outline']);
   assert.equal(rows().slice(1).every(row => row.leading.type === 'FlagMark'), true);
   assert.equal(new Set(rows().slice(1).map(row => row.leading.props.flag)).size, 234, 'each its own');
-  assert.equal(note(), 'Changes how dates and numbers are written. Your amounts and currencies stay the same.');
+  assert.equal(note(), 'Changes how dates and numbers are written.');
   React.act(() => mounted.root.findByType('Field' as never).props.onChangeText('united states'));
   assert.deepEqual(rows().slice(0, 2).map(row => [row.title, row.subtitle ?? '', row.accessibilityLanguage ?? '', row.leading.props.flag ?? '']),
     [['Same as device', 'Now: Argentina', '', ''], ['United States', '9/22/2026 · 1,234.56', '', 'US']]);

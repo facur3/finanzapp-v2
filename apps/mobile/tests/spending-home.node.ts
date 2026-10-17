@@ -1371,7 +1371,7 @@ test('24C1: without a rate Inicio shows each currency\'s own figure and why, nev
   const parts = find(root, 'CurrencyParts');
   assert.equal(JSON.stringify(parts.props.parts), JSON.stringify([{ currency: 'ARS', minor: 300 }, { currency: 'USD', minor: 1000 }]));
   assert.equal(parts.props.line, 'Sin cotización para sumarlo en EUR');
-  assert.match(parts.props.detail, /^Sin conexión: no pudimos obtener la cotización USD → EUR del 1\/9\/2026/);
+  assert.match(parts.props.detail, /^Sin conexión: no se pudo obtener la cotización USD → EUR del 1\/9\/2026/);
   assert.equal(nodes(root).some(n => RETIRED.includes(n.type)), false, 'no category shares of a partial month');
   assert.equal(parts.props.onField, true, 'drawn in the field\'s ink');
   assert.equal(homeTexts(root).some(text => /por día/.test(text)), false, 'no daily average of a partial sum');

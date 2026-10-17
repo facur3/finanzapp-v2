@@ -195,7 +195,7 @@ test('25B2 close: a debt with a balance and a recorded payment is not deleted: t
   let done = 0;
   view.render('useDebtManagement').remove(owed, () => done++);
   assert.equal(view.alerts[0].title, 'Todavía no se puede eliminar');
-  assert.equal(plain(view.alerts[0].message), 'Todavía le debés $ 200,00 a Juan y ya hay pagos registrados. Saldá el resto, o cerrá la deuda: deja de aparecer en pendientes y conserva el saldo y el historial; podés reabrirla. Cerrar no registra ningún pago.');
+  assert.equal(plain(view.alerts[0].message), 'Le debés $ 200,00 a Juan y ya hay pagos registrados. Saldá el resto o cerrá la deuda; cerrar no registra ningún pago.');
   assert.equal(buttons(view.alerts[0]), JSON.stringify([['Cancelar', 'cancel'], ['Saldar', null], ['Cerrar', null]]));
   assert.equal(view.savedDebts.length + view.removedDebts.length + view.pushed.length, 0, 'nothing written by the dialog itself');
   view.alerts[0].buttons[1].onPress!();
@@ -208,7 +208,7 @@ test('25B2 close: a debt with a balance and a recorded payment is not deleted: t
   const closed = harness({ debtTransfers: [debtPayment] });
   closed.render('useDebtManagement').remove({ ...owed, active: false, revision: 1 });
   assert.equal(buttons(closed.alerts[0]), JSON.stringify([['Cancelar', 'cancel'], ['Saldar', null]]));
-  assert.match(closed.alerts[0].message, /sigue en Cerradas con su saldo y su historial\.$/);
+  assert.match(closed.alerts[0].message, /sigue en Cerradas\.$/);
   // Cancelar writes nothing.
   const cancelled = harness({ debtTransfers: [debtPayment] });
   cancelled.render('useDebtManagement').remove(owed);
@@ -219,7 +219,7 @@ test('25B2 close: a debt with a balance and a recorded payment is not deleted: t
 test('25B2 close: a receivable with a balance and a recorded collection offers Cobrar (the collection form) or Cerrar; in English too', async () => {
   const view = harness({ debtTransfers: [collection] });
   view.render('useDebtManagement').remove(lent);
-  assert.equal(plain(view.alerts[0].message), 'Ana todavía te debe $ 100,00 y ya hay cobros registrados. Cobrá el resto, o cerrá el cobro: deja de aparecer en pendientes y conserva el saldo y el historial; podés reabrirlo. Cerrar no registra ningún cobro.');
+  assert.equal(plain(view.alerts[0].message), 'Ana te debe $ 100,00 y ya hay cobros registrados. Cobrá el resto o cerrá el cobro; cerrar no registra ningún cobro.');
   assert.equal(buttons(view.alerts[0]), JSON.stringify([['Cancelar', 'cancel'], ['Cobrar', null], ['Cerrar', null]]));
   view.alerts[0].buttons[1].onPress!();
   assert.equal(JSON.stringify(view.pushed), JSON.stringify([{ pathname: '/new-transfer', params: { fromAccountId: 'lent-account', maxAmountMinor: '10000', amountMinor: '10000' } }]));
@@ -228,7 +228,22 @@ test('25B2 close: a receivable with a balance and a recorded collection offers C
   english.render('useDebtManagement').remove(lent);
   assert.equal(english.alerts[0].title, 'Cannot be deleted yet');
   assert.equal(buttons(english.alerts[0]), JSON.stringify([['Cancel', 'cancel'], ['Collect', null], ['Close', null]]));
-  assert.match(english.alerts[0].message, /^Ana still owes you /);
+  assert.match(english.alerts[0].message, /^Ana owes you /);
+});
+
+test('25T: a receivable\'s swipe says «Cobrar» and a debt\'s «Saldar»; closing either with a balance left names what it does not record', () => {
+  const view = harness({ debtTransfers: [collection, debtPayment] });
+  const manage = view.render('useDebtManagement');
+  assert.equal(JSON.stringify(manage.actions(lent).map((action: any) => [action.key, action.label])), JSON.stringify([['settle', 'Cobrar'], ['delete', 'Eliminar']]));
+  assert.equal(JSON.stringify(manage.actions(owed).map((action: any) => [action.key, action.label])), JSON.stringify([['settle', 'Saldar'], ['delete', 'Eliminar']]));
+  manage.close(lent);
+  assert.match(plain(view.alerts[0].message), /sin registrar un cobro; podés reabrirlo\.$/);
+  manage.close(owed);
+  assert.match(plain(view.alerts[1].message), /sin registrar un pago; podés reabrirla\.$/);
+  const english = harness({ language: 'en-US' as never, debtTransfers: [collection] });
+  assert.equal(english.render('useDebtManagement').actions(lent)[0].label, 'Collect');
+  english.render('useDebtManagement').close(lent);
+  assert.match(english.alerts[0].message, /without recording a collection/);
 });
 
 test('25B2 close: a settled debt or receivable asks first, names what stays and deletes through `removeDebt`; a failed write keeps it and says so', async () => {

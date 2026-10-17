@@ -281,7 +281,7 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
       <Field label={t('entryForm.merchantExpense')} value={merchant} placeholder={t('entryForm.merchantExpensePlaceholder')}
         onChangeText={setMerchant} maxLength={120} autoCapitalize="sentences" editable={!locked} />
       <ErrorMessage message={error} />
-      {pending && !busy && error && <AppText secondary variant="footnote">{t('entryForm.retryNote')}</AppText>}
+      {pending && !busy && error && <AppText secondary variant="footnote">{t('common.retryNote', { where: t('common.retryWhere.movements') })}</AppText>}
       <ActionButton label={pending && error ? t('common.retrySave') : t('common.saveChanges')} onPress={save} busy={busy}
         disabled={!merchant.trim() || !category.trim()} />
     </Screen>;
@@ -328,7 +328,7 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
         {t('operations.edit.refundedNote', { amount: moneyText(refunds.refundedMinor, account.currency) })}
       </AppText>}
       <ErrorMessage message={error} />
-      {pending && !busy && error && <AppText secondary variant="footnote">{t(pending?.plan ? 'entryForm.plan.retryNote' : 'entryForm.retryNote')}</AppText>}
+      {pending && !busy && error && <AppText secondary variant="footnote">{t('common.retryNote', { where: t(pending?.plan ? 'common.retryWhere.cardInstallments' : 'common.retryWhere.movements') })}</AppText>}
       <ActionButton label={submit.text} spokenLabel={submit.spoken}
         onPress={save} busy={busy} disabled={!amount.trim() || !merchant.trim() || !category.trim() || !account || !fit.ok || (inInstallments && planState.blocked)} />
     </>}

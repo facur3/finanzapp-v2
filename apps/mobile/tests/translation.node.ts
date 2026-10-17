@@ -341,11 +341,67 @@ test('a debt’s hidden account is named from the debt in the interface language
   assert.equal(accountDisplayName(account, [debt], translator('en')), 'I owe · Juan', 'the person’s name is kept');
   assert.equal(accountDisplayName({ ...account, name: 'Me deben · Ana' }, [{ ...debt, direction: 'owed_to_me', counterparty: 'Ana' }], translator('en')), 'Owed to me · Ana');
   assert.equal(accountDisplayName({ ...account, id: 'cash', name: 'Caja' }, [debt], translator('en')), 'Caja', 'a cash account keeps its own name');
-  // Editing the counterparty does not rename the hidden account: the stored name is what shows, in Spanish byte for byte.
+  // Editing the counterparty never rewrites the stored hidden account, but what shows follows the debt (golden changed
+  // deliberately in Producto 25T: a renamed «Juan Pérez» no longer reads «Debo · Juan» on its payment rows).
   const edited = { ...debt, counterparty: 'Juan Pérez' };
-  assert.equal(accountDisplayName(account, [edited]), 'Debo · Juan');
-  assert.equal(accountDisplayName(account, [edited], translator('en')), 'I owe · Juan');
+  assert.equal(accountDisplayName(account, [edited]), 'Debo · Juan Pérez');
+  assert.equal(accountDisplayName(account, [edited], translator('en')), 'I owe · Juan Pérez');
+  assert.equal(account.name, 'Debo · Juan', 'the stored name is untouched');
   assert.equal(accountDisplayName({ ...account, name: 'Préstamo Juan' }, [debt], translator('en')), 'Préstamo Juan', 'a name without the prefix is shown as stored');
   // The debt form stores the hidden account with the Spanish formula the catalogue reproduces.
   assert.match(read('src/ui/debt-form.tsx'), /'Debo · ' : 'Me deben · '\) \+ counterparty\.trim\(\)/);
+});
+
+/** Every text of a catalogue with its key (both forms of a plural). */
+const textsOf = (catalogue: object) => messageKeys(es).flatMap(key => {
+  const value = leaf(catalogue, key);
+  return (isPlural(value) ? [value.one, value.other] : [value as string]).map(text => ({ key, text }));
+});
+
+test('25T: system messages are impersonal and never speak in the implementation\'s words (envío, congelado, submission, frozen)', () => {
+  const spanish = textsOf(es), english = textsOf(en);
+  const we = spanish.filter(({ text }) => /\b(No pudimos|No encontramos|[Cc]onservamos|[Mm]ostramos|[Ee]stamos|[Pp]odemos|[Ii]ntentaremos)\b/.test(text));
+  assert.deepEqual(we.map(item => item.key), [], 'Spanish system messages say «No se pudo…», never «No pudimos…»');
+  const weEn = english.filter(({ text }) => /\b[Ww]e\b|\bwe’|\bWe’/.test(text));
+  assert.deepEqual(weEn.map(item => item.key), [], 'English system messages never say «we»');
+  assert.deepEqual(spanish.filter(({ text }) => /\benv[ií]o\b|congelad[oa]|quedó fijo/i.test(text)).map(item => item.key), []);
+  assert.deepEqual(english.filter(({ text }) => /\bsubmission\b|\bfrozen\b|\bis locked\b/i.test(text)).map(item => item.key), []);
+  // One sentence for every failed save that keeps its draft for «Reintentar»; only the place to check differs.
+  assert.deepEqual(messageKeys(es).filter(key => /\.(retryNote|frozenNote)$/.test(key)), ['common.retryNote']);
+  // A debt or a card is named as such, never «obligación»; a proposal's record is never an «identificador».
+  assert.deepEqual(spanish.filter(({ text }) => /obligaci[oó]n/i.test(text)).map(item => item.key), []);
+  assert.deepEqual(spanish.filter(({ key, text }) => key.startsWith('review.') && /identificador/.test(text)).map(item => item.key), []);
+  // No roadmap promise and no file-format vocabulary on screen (a refusal that needs a version or a format still names it).
+  assert.deepEqual(spanish.filter(({ key, text }) => !key.startsWith('errors.') && /otra etapa|v1 a v\d+|[Ee]scalas de moneda/.test(text)).map(item => item.key), []);
+});
+
+test('25T, «Menos texto»: that something is not an expense or an income is said only where a record is made or explained', () => {
+  const allowed = ['transferForm.explainDebt', 'reports.method.detail', 'accounts.form.openingHelp', 'accounts.edit.balanceHelp', 'accounts.edit.correctMessage',
+    'operations.refund.previewEntry', 'operations.refund.previewCredit', 'operations.detail.statusRefund', 'operations.detail.effectEntry',
+    'operations.detail.effectCredit', 'operations.refundHint', 'accounts.form.openingNote', 'transferForm.explainTransfer', 'budgets.form.generalHelp',
+    'reports.comparison.footer', 'fx.comparisonFooter', 'fx.reportInfo', 'recurring.form.note', 'recurring.form.noteHelp', 'entryForm.correctionNote',
+    'cards.form.openingDebtNote', 'transferForm.explainCard', 'installments.payoff.financingCaption', 'operations.detail.payoffNote', 'entryForm.cardNote',
+    'entryForm.plan.note'];
+  const said = textsOf(es).filter(({ text }) => /no es (un )?(gasto|ingreso)|ni (un )?(gasto|ingreso)|no (se )?cuenta como (gasto|ingreso)|no crea (un )?gasto/i.test(text));
+  assert.deepEqual([...new Set(said.map(item => item.key))].filter(key => !allowed.includes(key)), [], 'a standing legend that repeats what the app already does');
+});
+
+test('25T glossary: «Disponible» is Inicio\'s recorded money only; «Pago» settles a card or a debt; a form saves with «Guardar», a list adds with «Agregar»', () => {
+  const spanish = textsOf(es);
+  // The term (capitalised, as a label) names Inicio's figure, or that figure where another screen speaks of it.
+  const disponible = spanish.filter(({ text }) => /\bDisponible\b/.test(text)).map(item => item.key);
+  assert.deepEqual(disponible.filter(key => !/^(home\.|accounts\.manage\.|backup\.import\.availableAfter$)/.test(key)), []);
+  assert.equal(translate('es', 'budgets.total.available'), 'Queda');
+  assert.equal(translate('es', 'cards.panel.available'), 'Crédito disponible');
+  assert.equal(translate('es', 'operations.refund.available'), 'Devolver todo');
+  // The card-purchase mode is how it is paid, not a «Pago» (a payment settles a card or a debt).
+  for (const key of ['entryForm.plan.payment', 'review.fields.purchase', 'assistant.proposal.payment'] as const) assert.equal(translate('es', key), 'Cómo se paga');
+  // The button that saves what a form holds; the action that opens a form to add to a list.
+  const saves = ['entryForm.saveExpense', 'entryForm.saveIncome', 'entryForm.plan.save', 'transferForm.recordPayment', 'transferForm.recordCollection',
+    'transferForm.recordTransfer', 'cards.form.create', 'debts.form.create', 'accounts.form.save', 'onboarding.account.create', 'budgets.form.create',
+    'recurring.form.create', 'categoryManager.form.create', 'operations.refund.save', 'installments.payoff.save', 'common.saveChanges'] as const;
+  for (const key of saves) for (const language of ['es', 'en'] as const) assert.match(translate(language, key), language === 'es' ? /^Guardar / : /^Save /, key);
+  const adds = ['common.addAccount', 'cards.list.add', 'debts.list.add', 'budgets.screen.add', 'budgets.screen.create', 'recurring.list.add', 'recurring.list.create'] as const;
+  for (const key of adds) for (const language of ['es', 'en'] as const) assert.match(translate(language, key), language === 'es' ? /^Agregar / : /^Add /, key);
+  assert.deepEqual(spanish.filter(({ text }) => /^Crear /.test(text)).map(item => item.key), [], 'no button says «Crear»: a form saves, a list adds');
 });

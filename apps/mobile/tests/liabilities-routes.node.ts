@@ -281,7 +281,7 @@ test('card detail lists only that card account with card context and links purch
   // Identity on the card face, one debt, three facts, primary above secondary, then activity. No detail table.
   assert.equal(nodes(root).some(node => node.type === 'DetailRow'), false);
   const stats = nodes(root).filter(node => node.type === 'Stat').map(node => node.props.label);
-  assert.equal(stats.join(','), 'Vence,Cierra,Disponible', '24T2: the next due date first, then the next closing, then what is available');
+  assert.equal(stats.join(','), 'Vence,Cierra,Crédito disponible', '24T2: the next due date first, then the next closing, then what is available');
   assert.ok(nodes(root).filter(node => node.type === 'Money').map(node => node.props.minor).includes(500000 - 13100), 'available limit');
   assert.ok(nodes(root).some(node => node.type === 'AppText' && node.props.children === 'de $\u00A05.000,00'), 'the limit is a caption under Disponible (one catalogue string)');
   const buttons = nodes(root).filter(node => node.type === 'ActionButton').map(node => node.props);
@@ -289,7 +289,7 @@ test('card detail lists only that card account with card context and links purch
   assert.equal(buttons[1].secondary, true);
   assert.ok(buttons.every(button => button.containerStyle === undefined), 'both actions span the full width');
   assert.match(find(root, 'SectionTitle').props.caption, /^Este ciclo, desde .* · 1 compra · 1 pago$/);
-  assert.equal(find(harness('card/[id].tsx', { id: 'missing' }).render(), 'EmptyState').props.title, 'No encontramos esta tarjeta');
+  assert.equal(find(harness('card/[id].tsx', { id: 'missing' }).render(), 'EmptyState').props.title, 'No se encontró esta tarjeta');
 });
 
 test('25N1: each open debt section lists overdue first, then due soon, then by due date, undated, then settled (storage keeps its own order)', () => {
@@ -326,6 +326,8 @@ test('debt detail offers a capped payment into the debt and lists its settlement
   assert.equal(find(root, 'Money').props.minor, 30000);
   find(root, 'ActionButton', 'Registrar pago').props.onPress();
   assert.equal(JSON.stringify(view.pushed[0]), JSON.stringify({ pathname: '/new-transfer', params: { toAccountId: 'debt-acc', maxAmountMinor: '30000' } }));
+  // 25T, «Menos texto»: the payments section carries no standing caption (the payment form says it once).
+  assert.equal(nodes(root).find(node => node.type === 'SectionTitle' && node.props.children === 'Pagos registrados')!.props.caption, undefined);
 });
 
 test('Tarjetas and Deudas read English labels, keep user names as typed and send the same payment parameters', () => {
@@ -335,7 +337,7 @@ test('Tarjetas and Deudas read English labels, keep user names as typed and send
     const cardsRoot = chosen(cardsView);
     const header = nodes(cardsRoot).find(node => node.type === 'Stack.Screen')!.props.options;
     assert.equal(header.title, 'Cards');
-    assert.equal(nodes(cardsRoot).filter(node => node.type === 'Stat').map(node => node.props.label).join(','), 'Due,Closes,Available');
+    assert.equal(nodes(cardsRoot).filter(node => node.type === 'Stat').map(node => node.props.label).join(','), 'Due,Closes,Available credit');
     assert.match(find(cardsRoot, 'SectionTitle').props.caption, /^This cycle, since .* · 1 purchase · 1 payment$/);
     find(cardsRoot, 'ActionButton', 'Pay card').props.onPress();
     assert.equal(JSON.stringify(cardsView.pushed.at(-1)), JSON.stringify({ pathname: '/new-transfer', params: { toAccountId: 'card-acc', maxAmountMinor: '13100' } }));
@@ -465,7 +467,7 @@ test('24B5: the card and debt forms choose the currency before the amount, over 
   // 24T2: the statement dates on a calendar (the harness day is 2026-09-20): the next closing and the due of that closing.
   find(card.render(), 'DateField', 'Próximo cierre').props.onChange(new Date(2026, 8, 28, 12));
   find(card.render(), 'DateField', 'Vencimiento').props.onChange(new Date(2026, 9, 5, 12));
-  await find(card.render(), 'ActionButton', 'Crear tarjeta').props.onPress();
+  await find(card.render(), 'ActionButton', 'Guardar tarjeta').props.onPress();
   assert.equal(card.cards.length, 1);
   assert.deepEqual([card.cards[0].account.currency, card.cards[0].account.openingMinor], ['JPY', -1500], '1500 yen owed, never 15.00');
   assert.deepEqual([card.cards[0].card.closingDay, card.cards[0].card.dueDay], [28, 5], '24T2: the usual days are the days of the dates entered');
@@ -473,12 +475,16 @@ test('24B5: the card and debt forms choose the currency before the amount, over 
   find(debt.render(), 'CurrencySwitch').props.onChange('KWD');
   find(debt.render(), 'AmountField').props.onChangeText('1,234');
   find(debt.render(), 'Field', 'Persona o entidad').props.onChangeText('Ana');
-  await find(debt.render(), 'ActionButton', 'Crear deuda').props.onPress();
+  await find(debt.render(), 'ActionButton', 'Guardar deuda').props.onPress();
   assert.equal(debt.debts.length, 1);
   assert.deepEqual([debt.debts[0].account.currency, debt.debts[0].account.openingMinor], ['KWD', -1234], '1,234 dinars are 1234 fils');
   // The same forms with the release gate never see the preview currencies, whatever the route or the draft says.
   const release = forms('src/ui/debt-form.tsx');
   assert.equal(nodes(release.render()).some(node => node.type === 'CurrencySwitch' && node.props.currencies.includes('KWD')), false);
+  // 25T: one word for the due date («Vencimiento», the section and its date) and no standing «no es un gasto» footnote.
+  nodes(release.render()).find(node => node.type === 'Choices' && node.props.options.some((option: any) => option.value === 'dated'))!.props.onChange('dated');
+  assert.ok(find(release.render(), 'DateField', 'Vencimiento'));
+  assert.equal(nodes(release.render()).some(node => node.type === 'AppText' && /gastos ni ingresos/.test(String(node.props.children))), false);
 });
 
 // ---- Producto 24UX4: settle, close, reopen and delete a debt tracker ---------------------------
@@ -561,7 +567,7 @@ test('24UX4: deleting a debt asks first, names the payments that stay, writes on
   const list = harness('debts.tsx', {}, deletedData).render();
   assert.equal(rowsOf(list).length, 0);
   assert.equal(find(list, 'EmptyState').props.title, 'Sin deudas ni cobros');
-  assert.equal(find(harness('debt/[id].tsx', { id: 'debt' }, deletedData).render(), 'EmptyState').props.title, 'No encontramos esta deuda');
+  assert.equal(find(harness('debt/[id].tsx', { id: 'debt' }, deletedData).render(), 'EmptyState').props.title, 'No se encontró esta deuda');
   assert.equal(domain.snapshotFromArchive(deletedData).transfers!.some(transfer => transfer.id === 'settle-juan'), true);
   // A receivable with no collection yet: its own wording.
   const receivableAccount: domain.Account = { id: 'rec-acc', name: 'Me deben · Ana', currency: 'ARS', openingMinor: 4000, createdAt };
@@ -579,7 +585,7 @@ test('25B2 close: from the detail, a debt with a balance and a recorded payment 
   find(view.render(), 'ActionButton', 'Eliminar deuda').props.onPress();
   const alert = view.alerts[0];
   assert.equal(alert.title, 'Todavía no se puede eliminar');
-  assert.match(alert.message.replace(/\u00a0/g, ' '), /^Todavía le debés \$ 200,00 a Juan y ya hay pagos registrados\./);
+  assert.match(alert.message.replace(/\u00a0/g, ' '), /^Le debés \$ 200,00 a Juan y ya hay pagos registrados\./);
   assert.equal(alert.buttons.map((button: { text: string; style?: string }) => button.text + ':' + (button.style ?? '')).join(','), 'Cancelar:cancel,Saldar:,Cerrar:');
   assert.equal(view.savedDebts.length + view.removedDebts.length + view.pushed.length + view.backs(), 0, 'opening the dialog writes nothing');
   await alert.buttons[2].onPress();
@@ -610,7 +616,7 @@ test('24UX4: a closed row says Cerrada and carries its actions for VoiceOver; En
 
 test('24UX4 review: a debt detail opened before the ledger hydrates shows the debt once it loads, and after its own deletion stays drawn without actions until it closes; a link to a deleted debt is not found', async () => {
   const view = harness('debt/[id].tsx', { id: 'debt' }, null);
-  assert.equal(find(view.render(), 'EmptyState').props.title, 'No encontramos esta deuda', 'nothing to show before the ledger loads');
+  assert.equal(find(view.render(), 'EmptyState').props.title, 'No se encontró esta deuda', 'nothing to show before the ledger loads');
   view.setData(archive);
   const live = view.render();
   assert.equal(nodes(live).some(node => node.type === 'EmptyState'), false, 'the debt appears when the ledger arrives');
@@ -631,7 +637,7 @@ test('24UX4 review: a debt detail opened before the ledger hydrates shows the de
   const cold = harness('debt/[id].tsx', { id: 'debt' }, null);
   cold.render();
   cold.setData({ ...archive, debts: [view.savedDebts[0]] });
-  assert.equal(find(cold.render(), 'EmptyState').props.title, 'No encontramos esta deuda');
+  assert.equal(find(cold.render(), 'EmptyState').props.title, 'No se encontró esta deuda');
 });
 
 // ---- Producto 24UX6E: Deudas in the Forest design -------------------------------------------------
@@ -808,11 +814,11 @@ test('25Q4 review: a new debt taps Error for an amount refused before anything i
   const render = () => view.renderExport('DebtForm', {});
   find(render(), 'Field', 'Persona o entidad').props.onChangeText('Ana');
   find(render(), 'AmountField').props.onChangeText('0');
-  await find(render(), 'ActionButton', 'Crear deuda').props.onPress();
+  await find(render(), 'ActionButton', 'Guardar deuda').props.onPress();
   assert.deepEqual([view.haptics.splice(0).join(','), view.debts.length, find(render(), 'Field', 'Persona o entidad').props.editable], ['Error', 0, true],
     'refused before anything is sent, still editable');
   find(render(), 'AmountField').props.onChangeText('100');
-  await find(render(), 'ActionButton', 'Crear deuda').props.onPress();
+  await find(render(), 'ActionButton', 'Guardar deuda').props.onPress();
   assert.deepEqual([view.haptics.splice(0).join(','), find(render(), 'Field', 'Persona o entidad').props.editable], ['Warning', false], 'sent with an unknown outcome: frozen for the exact retry');
   await find(render(), 'ActionButton', 'Reintentar guardado').props.onPress();
   assert.equal(JSON.stringify(view.debts[1]), JSON.stringify(view.debts[0]), 'the retry resends the same debt and account');
@@ -839,7 +845,8 @@ test('25O1: the empty states of Tarjetas, Deudas y cobros and Recurrentes are a 
   assert.match(t('entryForm.cardNote'), /una sola vez/);
   assert.match(t('entryForm.plan.note'), /cada cuota cuenta como gasto cuando cierra su resumen/);
   assert.match(t('transferForm.explainCard'), /no lo duplica/);
-  for (const key of ['debts.form.explainOwed', 'debts.form.explainReceivable'] as const) assert.match(t(key), /No se crean gastos ni ingresos/);
+  // «Menos texto»: that a debt payment is neither an expense nor an income is said once, where it is recorded.
+  assert.match(t('transferForm.explainDebt'), /No es un gasto ni un ingreso/);
   assert.match(t('recurring.form.note'), /no paga ni cobra nada/);
   assert.match(t('recurring.form.noteHelp'), /al guardar.*una sola vez.*no paga ni cobra nada/);
 });

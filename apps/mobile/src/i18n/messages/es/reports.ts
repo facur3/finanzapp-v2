@@ -50,7 +50,7 @@ export const reports = {
      * no donut is drawn, the total is the compact line and this quiet sentence says why. */
     noNetSpending: 'Sin gasto neto en este período: las devoluciones igualan o superan lo gastado.',
     outOfRangeTitle: 'El total supera el rango disponible',
-    outOfRangeDetail: 'Tus movimientos siguen guardados. No mostramos un total ni un gráfico redondeado que pueda ser incorrecto.',
+    outOfRangeDetail: 'Tus movimientos siguen guardados. No se muestra un total ni un gráfico redondeado que pueda ser incorrecto.',
     /** A day row: "Hoy · 22 sep · 3 gastos". */
     dayRow: '{date} · {count}',
     emptyTitle: 'Sin gastos en este período',
@@ -166,13 +166,13 @@ export const reports = {
       invalidDetail: 'Volvé al reporte para elegir las fechas.',
       emptyTitle: 'No hay gastos de esta categoría',
       emptyDetail: 'Volvé al reporte para elegir una categoría con movimientos en esta moneda y período.',
-      totalUnavailable: 'No podemos mostrar este total con precisión. Los movimientos están disponibles abajo.',
+      totalUnavailable: 'Este total no se puede mostrar con precisión. Los movimientos están disponibles abajo.',
       movements: 'Movimientos',
     },
     day: {
       invalidTitle: 'Día no válido',
       invalidDetail: 'Volvé al reporte para elegir un día.',
-      totalUnavailable: 'No podemos mostrar el total con precisión.',
+      totalUnavailable: 'El total no se puede mostrar con precisión.',
       emptyTitle: 'Sin gastos registrados',
       emptyDetail: 'No hay gastos para este día y moneda.',
     },
@@ -183,7 +183,7 @@ export const reports = {
       matchingDays: 'La misma cantidad de días de cada mes',
       fullMonths: 'Meses completos · pueden tener distinta cantidad de días',
       capped: 'Esta comparación llega hasta el día {day} en ambos meses porque el anterior fue más corto. El reporte mensual conserva todos los días.',
-      outOfRangeDetail: 'Tus movimientos siguen guardados. No mostramos una comparación imprecisa.',
+      outOfRangeDetail: 'Tus movimientos siguen guardados. No se muestra una comparación imprecisa.',
       same: 'El mismo gasto registrado',
       more: '{percent} más registrado',
       less: '{percent} menos registrado',

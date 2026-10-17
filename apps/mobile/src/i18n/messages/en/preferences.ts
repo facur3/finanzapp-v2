@@ -12,7 +12,7 @@ export const preferences: Pick<Messages, 'preferences'> = {
     recent: 'Recent',
     noMatches: 'No matches',
     followingDevice: '{value} · same as device',
-    regionNote: 'Changes how dates and numbers are written. Your amounts and currencies stay the same.',
+    regionNote: 'Changes how dates and numbers are written.',
     languageVariety: 'Variant: {region}',
     languageNote: 'To have iOS use this language in its menus too, choose it in Settings.',
     openSettings: 'Open Settings',

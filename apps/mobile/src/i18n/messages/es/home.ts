@@ -23,8 +23,8 @@ export const home = {
     heroAvailable: 'Disponible, {amount}',
     availableHelp: 'Es el dinero registrado en tus cuentas de esta moneda: saldo inicial más ingresos, menos gastos y transferencias. '
       + 'No incluye tarjetas ni deudas, y no es un saldo bancario ni tu patrimonio.',
-    spendingOutOfRange: 'El total supera el rango que podemos mostrar con precisión. Tus movimientos siguen guardados.',
-    balanceOutOfRange: 'El saldo total supera el rango que podemos mostrar con precisión. Tus cuentas siguen guardadas.',
+    spendingOutOfRange: 'El total supera el rango que se puede mostrar con precisión. Tus movimientos siguen guardados.',
+    balanceOutOfRange: 'El saldo total supera el rango que se puede mostrar con precisión. Tus cuentas siguen guardadas.',
     /** 24T3 (A24): one quiet line under Gastado only while the month's net spending is below zero (devoluciones of earlier
      * purchases); the number itself stays the exact net. */
     refundsExceed: 'Las devoluciones superan lo gastado',

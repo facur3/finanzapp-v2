@@ -167,23 +167,23 @@ export function CurrencyField({ value, onChange, disabled = false, currencies }:
         leading={<CurrencyMark currency={value} size={30} />} last disabled={disabled} onPress={onChange ? open : undefined} />
     </Surface>
     {onChange && <CurrencySheet visible={visible} title={t('selection.chooseCurrency')} options={options} value={value} searchable={options.length >= SEARCHABLE_FROM}
-      note={t('selection.currencyNote')} onClose={() => setVisible(false)} onChange={currency => { onChange(currency); setVisible(false); }} />}
+      onClose={() => setVisible(false)} onChange={currency => { onChange(currency); setVisible(false); }} />}
   </>;
 }
 
 /** The sheet that lists currencies for a choice: one row per option (its mark, the full name, then the
  * code and symbol), a checkmark on the current one, a selection tick when the choice changes.
- * The new-account form lists the currencies the ledger can hold, with a note under them; the
+ * The new-account form lists the currencies the ledger can hold; the
  * currency switch of Inicio, Reportes and Presupuestos lists the currencies held (24B3). With
  * `searchable` a field at the top filters by code or name, accent- and case-insensitive, so a
  * long list never has to be scrolled through; the options are never reordered by it. */
-export function CurrencySheet({ visible, title, options, value, note, searchable = false, onClose, onChange }: {
-  visible: boolean; title: string; options: readonly CurrencyChoice[]; value: Currency; note?: string; searchable?: boolean;
+export function CurrencySheet({ visible, title, options, value, searchable = false, onClose, onChange }: {
+  visible: boolean; title: string; options: readonly CurrencyChoice[]; value: Currency; searchable?: boolean;
   onClose: () => void; onChange: (currency: Currency) => void;
 }) {
   const [query, setQuery] = useState('');
   return <SelectionSheet visible={visible} title={title} onClose={() => { setQuery(''); onClose(); }}>
-    <CurrencyList options={options} value={value} note={note} searchable={searchable} query={query} onQuery={setQuery}
+    <CurrencyList options={options} value={value} searchable={searchable} query={query} onQuery={setQuery}
       onChange={currency => { setQuery(''); onChange(currency); }} />
   </SelectionSheet>;
 }
@@ -191,21 +191,20 @@ export function CurrencySheet({ visible, title, options, value, note, searchable
 /** The currency rows of a sheet: the searchable, windowed list both `CurrencySheet` and the display sheet draw. 25O1: a
  * row leads with its issuer's flag (`CurrencyMark`, beside the code it marks; the neutral glyph for XOF and the other
  * supranational codes), never a claim about where an account is; VoiceOver still hears the name and the code. */
-function CurrencyList({ options, value, note, searchable, query, onQuery, onChange }: {
-  options: readonly CurrencyChoice[]; value: Currency; note?: string; searchable: boolean; query: string; onQuery: (query: string) => void; onChange: (currency: Currency) => void;
+function CurrencyList({ options, value, searchable, query, onQuery, onChange }: {
+  options: readonly CurrencyChoice[]; value: Currency; searchable: boolean; query: string; onQuery: (query: string) => void; onChange: (currency: Currency) => void;
 }) {
   const p = usePalette();
   const { t } = useI18n();
   const shown = searchable ? searchChoices(query, options) : options;
   /* 146 currencies since 24M: a window of rows, never all at once. The sheet's SafeAreaView keeps the home indicator
-     clear; the keyboard insets the list while searching, so the last currency and the note stay reachable. */
+     clear; the keyboard insets the list while searching, so the last currency stays reachable. */
   return <FlatList data={shown} keyExtractor={option => option.code} contentContainerStyle={{ padding: 20, paddingTop: 0, paddingBottom: 48 }} keyboardShouldPersistTaps="handled"
     automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive" initialNumToRender={14} windowSize={7}
     ListHeaderComponent={searchable ? <View style={{ paddingBottom: 16 }}>
       <Field label={t('currency.search')} value={query} onChangeText={onQuery} autoCapitalize="characters" autoCorrect={false} clearButtonMode="while-editing" maxLength={40} />
     </View> : null}
     ListEmptyComponent={searchable ? <AppText secondary variant="subhead" style={{ paddingHorizontal: 4 }}>{t('currency.noMatches')}</AppText> : null}
-    ListFooterComponent={note ? <AppText secondary variant="footnote" style={{ paddingHorizontal: 4, paddingTop: 4 }}>{note}</AppText> : null}
     renderItem={({ item }) => <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityState={{ selected: value === item.code }}
       accessibilityLabel={item.name + ', ' + item.code}
       onPress={() => { if (item.code !== value) selectionHaptic(); onChange(item.code); }}
@@ -255,7 +254,6 @@ export function DisplaySheet({ visible, mode, currency, consolidatedOptions, sin
         <SelectionRow label={t('display.currency')} value={currencyName(currency) + ' · ' + currency} leading={<CurrencyMark currency={currency} size={30} />} last
           onPress={() => setStep('currency')} />
       </Surface>
-      <AppText secondary variant="footnote" style={{ paddingHorizontal: 4 }}>{t('display.note')}</AppText>
     </View>
       : <CurrencyList options={options} value={currency} searchable={options.length >= SEARCHABLE_FROM} query={query} onQuery={setQuery}
         onChange={code => { setQuery(''); onCurrency(code); setStep('options'); }} />}

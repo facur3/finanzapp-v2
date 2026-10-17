@@ -34,6 +34,6 @@ export function CurrencyChip({ value, onChange, currencies, disabled = false }: 
       <Ionicons name="chevron-down" size={14} color={p.secondary} accessible={false} />
     </PressFeedback>
     <CurrencySheet visible={visible} title={t('selection.chooseCurrency')} options={options} value={value} searchable={options.length >= SEARCHABLE_FROM}
-      note={t('selection.currencyNote')} onClose={() => setVisible(false)} onChange={currency => { onChange(currency); setVisible(false); }} />
+      onClose={() => setVisible(false)} onChange={currency => { onChange(currency); setVisible(false); }} />
   </>;
 }

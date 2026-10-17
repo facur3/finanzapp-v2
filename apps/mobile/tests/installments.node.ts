@@ -389,7 +389,7 @@ test('a failed instalment catch-up (disk full, database locked) still opens the 
     assert.deepEqual([session.recurringError, session.installmentError], [false, true], message);
     assert.deepEqual(session.archive.records.map(record => record.entry.id).filter(id => id.startsWith('inst')), ['inst_tv_001'], message + ': the durable write kept, nothing fabricated, nothing half-written');
     assert.equal(cardDebtMinor(card, await readSnapshot(db)), 23100 + 10000, 'the archive is readable as it truly is');
-    assert.match(sessionWarning(session)!, /No pudimos registrar las cuotas vencidas de tus tarjetas/);
+    assert.match(sessionWarning(session)!, /No se pudieron registrar las cuotas vencidas de tus tarjetas/);
     // The retry (a foreground or the banner's «Verificar de nuevo») succeeds and clears the warning; each instalment once.
     broken.heal();
     const retried = await refreshLedger(broken.db, '2026-11-25');
