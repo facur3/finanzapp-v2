@@ -5,13 +5,13 @@ export const cards: Pick<Messages, 'cards'> = {
   cards: {
     list: {
       add: 'Add card',
-      emptyTitle: 'Your cards, like in your wallet',
-      emptyDetail: 'A purchase without installments counts once, as an expense; in installments, each installment counts when its statement closes. When you pay the card, the money leaves your account and lowers the outstanding balance, without counting the purchase again.',
+      emptyTitle: 'Your credit cards',
+      emptyDetail: 'Add one to see its outstanding balance, closing dates and installments.',
       openHint: 'Opens the card details',
       selectHint: 'Selects this card and shows its summary',
       chooseCaption: 'Tap a card to see its balance and transactions.',
       noActiveTitle: 'No active cards',
-      noActiveDetail: 'Your archived cards are below. Add a card to record new purchases.',
+      noActiveDetail: 'Add a card to record new purchases.',
     },
     panel: {
       recordedDebt: 'Outstanding balance',
@@ -88,6 +88,8 @@ export const cards: Pick<Messages, 'cards'> = {
       everyMonth: 'Use these days every month',
       frozenNote: 'The submission is locked so Retry won’t create another card or apply changes twice.',
       create: 'Create card',
+      more: 'More details (optional)',
+      datesMissing: 'Choose the next closing and its due date.',
       retry: 'Retry',
       archive: 'Archive card',
       reactivate: 'Reactivate card',

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
-import { MATERIAL_LABELS, composerBottomPadding, drawReason, glassDisabledBy, loadReason, materialFor, subscribeReduceTransparency } from '../src/ui/material-policy.ts';
+import { MATERIAL_LABELS, composerBottomPadding, drawReason, glassDisabledBy, loadReason, materialFor, subscribeIncreaseContrast, subscribeReduceTransparency } from '../src/ui/material-policy.ts';
 import { translator } from '../src/i18n/messages.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
@@ -52,6 +52,24 @@ test('23.1B2: every material label is a catalogue key, read in Spanish as it alw
     assert.notEqual(en(key), key, key + ' resolves in English');
     assert.ok(key === 'settings.material.glass' || /^Opaque material/.test(en(key)), en(key));
   }
+});
+
+test('25D1: the Increase Contrast subscription reads iOS\'s darker system colours, follows its event, and never throws: missing or failing leaves it off', async () => {
+  const seen: boolean[] = [];
+  assert.doesNotThrow(() => subscribeIncreaseContrast(undefined, value => seen.push(value))());
+  assert.doesNotThrow(() => subscribeIncreaseContrast({ isDarkerSystemColorsEnabled: () => { throw new Error('no native'); }, addEventListener: () => { throw new Error('no native'); } }, value => seen.push(value))());
+  subscribeIncreaseContrast({ isDarkerSystemColorsEnabled: () => Promise.reject(new Error('Android')) }, value => seen.push(value));
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(seen.length, 0, 'nothing reported: off stands');
+  const events: string[] = [];
+  const listener: { fn: ((value: boolean) => void) | null } = { fn: null };
+  const off = subscribeIncreaseContrast({ isDarkerSystemColorsEnabled: () => Promise.resolve(true), isReduceTransparencyEnabled: () => Promise.resolve(false),
+    addEventListener: (event, fn) => { events.push(event); listener.fn = fn; return { remove: () => {} }; } }, value => seen.push(value));
+  await new Promise(resolve => setTimeout(resolve, 0));
+  listener.fn!(false);
+  off();
+  listener.fn!(true);
+  assert.deepEqual([seen, events], [[true, false], ['darkerSystemColorsChanged']], 'its own query and event, never Reduce Transparency\'s');
 });
 
 test('the Reduce Transparency subscription feature-detects the API and never throws: missing, rejecting or throwing keeps opaque', async () => {
@@ -215,4 +233,13 @@ test('glass stays on the control layer and behind the adapter: only material.tsx
   const theme = read('theme.ts');
   assert.equal(theme.includes('AccessibilityInfo.isReduceTransparencyEnabled()'), false, 'the accessibility API is feature-detected through the policy helper, never called blindly');
   assert.match(theme, /subscribeReduceTransparency\(/);
+  // 25D1: Increase Contrast reaches every palette the same way: one subscription in the provider, one context, read by usePalette.
+  assert.equal(theme.includes('AccessibilityInfo.isDarkerSystemColorsEnabled()'), false, 'feature-detected through the policy helper');
+  assert.match(theme, /subscribeIncreaseContrast\(AccessibilityInfo as Parameters<typeof subscribeIncreaseContrast>\[0\], setIncreaseContrast\)/);
+  assert.match(theme, /createElement\(IncreaseContrastContext\.Provider, \{ value: increaseContrast \}/);
+  // The four palettes (scheme × Increase Contrast) are built once at module scope: a render hands out the same object.
+  assert.match(theme, /const increaseContrast = useContext\(IncreaseContrastContext\);\n  return \(isDark \? DARK : LIGHT\)\[increaseContrast \? 1 : 0\];/);
+  assert.match(theme, /const LIGHT = built\(lightPalette, false\), DARK = built\(darkPalette, true\);/);
+  assert.equal(/positive|negativeSoft/.test(theme), false, 'the income/expense aliases are gone: screens read income and expense');
+  assert.match(theme, /const IncreaseContrastContext = createContext\(false\);/, 'off until iOS answers');
 });

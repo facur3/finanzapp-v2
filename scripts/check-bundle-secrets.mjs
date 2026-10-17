@@ -19,17 +19,21 @@ export const BUNDLE_SECRETS = [
 ];
 /** A catalogue key of the integration client (apps/mobile/src/integrations/client.ts), present in every export. */
 export const CANARY = 'assistant.integration.signIn';
+/** A pattern only the patched URL decoder (decode-uri-component 0.5.0, behind apps/mobile/compat) carries: proof that the
+ * exported bundle holds the fixed decoder, not the vulnerable one query-string would otherwise bring. */
+export const DECODER_MARKER = '^[a-f\\d]{2}$';
 
 /** files: [{ path, bytes }]. Bytes are read as latin1, one character per byte, so binary files are searched too. */
 export function scanBundle(files) {
   const hits = [];
-  let canary = false;
+  let canary = false, decoder = false;
   for (const { path, bytes } of files) {
     const text = Buffer.from(bytes).toString('latin1');
     if (text.includes(CANARY)) canary = true;
+    if (text.includes(DECODER_MARKER)) decoder = true;
     for (const { name, re } of BUNDLE_SECRETS) if (re.test(text)) hits.push({ path, name });
   }
-  return { hits, canary, files: files.length };
+  return { hits, canary, decoder, files: files.length };
 }
 
 export function scanDirectory(dir) {
@@ -39,9 +43,10 @@ export function scanDirectory(dir) {
 }
 
 /** The lines to print; empty when the bundle passes. */
-export function problems({ hits, canary, files }) {
+export function problems({ hits, canary, decoder, files }) {
   const lines = hits.map(hit => `${hit.path}: ${hit.name}`);
   if (!files || !canary) lines.push(`The scan did not read the app bundle (${files} files; «${CANARY}» not found).`);
+  else if (!decoder) lines.push('The bundle does not hold the patched URL decoder (decode-uri-component 0.5.0, apps/mobile/compat).');
   return lines;
 }
 
@@ -49,5 +54,5 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const lines = problems(scanDirectory(process.argv[2] ?? 'dist'));
   for (const line of lines) console.error(line);
   if (lines.length) process.exitCode = 1;
-  else console.log('The exported bundle names no server secret.');
+  else console.log('The exported bundle names no server secret and holds the patched URL decoder.');
 }

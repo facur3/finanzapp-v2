@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
@@ -234,12 +234,14 @@ test('form selectors keep the category hue and give the account the interaction 
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': { FlatList: 'FlatList', Keyboard: { dismiss() {} }, Modal: 'Modal', Platform: { OS: 'ios' }, Pressable: 'Pressable', StyleSheet: { absoluteFill: 'absoluteFill' }, View: 'View' },
     // The date field's compact sheet (24B6) animates with Reanimated and reads the safe area; date-field.node.ts exercises it.
-    'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View' }, useSharedValue: (value: unknown) => ({ value }), useAnimatedStyle: (fn: () => unknown) => fn(), runOnJS: (fn: unknown) => fn, withTiming: (value: unknown) => value },
+    'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View' }, useSharedValue: (value: unknown) => ({ value }), useAnimatedStyle: (fn: () => unknown) => fn(), withTiming: (value: unknown) => value },
+    // The sheet hands its exit back to React Native with react-native-worklets' scheduleOnRN (runOnJS is deprecated).
+    'react-native-worklets': { scheduleOnRN: (fn: (...args: unknown[]) => void, ...args: unknown[]) => fn(...args) },
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView', useSafeAreaInsets: () => ({ top: 59, bottom: 34, left: 0, right: 0 }) },
     '@react-native-community/datetimepicker': 'DateTimePicker',
     '@expo/vector-icons/Ionicons': 'Ionicons',
     './components': { useStacked: () => false, AccountBadge: 'AccountBadge', AppText: 'AppText', CategoryBadge: 'CategoryBadge', DetailRow: 'DetailRow', SelectionRow: 'SelectionRow', Field: 'Field', GlyphTile: 'GlyphTile', PressFeedback: 'PressFeedback', Surface: 'Surface', surfaceShadow: () => ({}) },
-    './currencies': currencies,
+    './currencies': currencies, './marks': { CurrencyMark: 'CurrencyMark' },
     '@finanzapp/domain': { todayKey: (d: Date) => d.toISOString().slice(0, 10) },
     './category-hues': { useCategoryColor: (label: string) => label ? '#B0507A' : '#000', useCategoriesInUse: () => [], useCategoryDefinitions: () => [], useCategoryLook: (label: string) => ({ label, hex: label ? '#B0507A' : '#000', glyph: 'paw-outline' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ glyph: 'wallet-outline', hex: '#2557D6' }) },
     './motion': { selectionHaptic: () => {}, timing: () => ({ duration: 0 }) },
@@ -269,4 +271,79 @@ test('form selectors keep the category hue and give the account the interaction 
   const none = selector(render('AccountField', { accounts, value: '', onChange: () => {}, prominent: true }));
   assert.equal(tileOf(none).props.color, undefined);
   assert.equal(tileOf(none).props.tone, 'neutral');
+});
+
+test('25Q4: every haptic comes from motion.tsx, and a write that taps Success also taps Error or Warning when it fails', () => {
+  const root = new URL('../', import.meta.url);
+  const files = ['app/', 'src/'].flatMap(dir => readdirSync(new URL(dir, root), { recursive: true, encoding: 'utf8' })
+    .filter(name => /\.tsx?$/.test(name)).map(name => dir + name));
+  const read = (file: string) => readFileSync(new URL(file, root), 'utf8');
+  assert.deepEqual(files.filter(file => read(file).includes("from 'expo-haptics'")), ['src/ui/motion.tsx'], 'no screen calls expo-haptics directly');
+  const silent = files.filter(file => file !== 'src/ui/motion.tsx' && read(file).includes('successHaptic()')
+    && !read(file).includes('errorHaptic()') && !read(file).includes('warningHaptic()'));
+  assert.deepEqual(silent, [], 'a write that taps Success taps Error or Warning in its catch');
+  // 25Q4 review: per catch, not per file. Every try that taps Success catches its failure with exactly one Error or Warning
+  // tap on every path: one call, or an if/else whose branches tap once each.
+  const failures = ['errorHaptic', 'warningHaptic'];
+  const calls = (node: ts.Node, names: string[]) => ts.isCallExpression(node) && ts.isIdentifier(node.expression) && names.includes(node.expression.text);
+  const contains = (node: ts.Node, names: string[]): boolean => calls(node, names) || !!ts.forEachChild(node, child => contains(child, names) || undefined);
+  /** The failure taps on every path through `node`; null when two paths differ or a tap is anywhere else. */
+  const taps = (node: ts.Node): number | null => {
+    if (ts.isExpressionStatement(node) && calls(node.expression, failures)) return 1;
+    if (ts.isBlock(node)) return node.statements.reduce<number | null>((sum, statement) => { const own = taps(statement); return sum === null || own === null ? null : sum + own; }, 0);
+    if (ts.isIfStatement(node)) { const then = taps(node.thenStatement), other = node.elseStatement ? taps(node.elseStatement) : 0; return then === other ? then : null; }
+    return contains(node, failures) ? null : 0;
+  };
+  const unpaired: string[] = [];
+  for (const file of files.filter(file => file !== 'src/ui/motion.tsx' && read(file).includes('successHaptic()'))) {
+    const source = ts.createSourceFile(file, read(file), ts.ScriptTarget.Latest, true, file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+    const visit = (node: ts.Node): void => {
+      if (ts.isTryStatement(node) && node.catchClause && contains(node.tryBlock, ['successHaptic']) && taps(node.catchClause.block) !== 1) {
+        unpaired.push(file + ':' + (source.getLineAndCharacterOfPosition(node.catchClause.getStart()).line + 1));
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(source);
+  }
+  assert.deepEqual(unpaired, [], 'each catch of a write that taps Success taps Error or Warning exactly once');
+  // The helpers exist and say what their names say.
+  const motion = read('src/ui/motion.tsx');
+  const body = (name: string) => {
+    const start = motion.indexOf('export function ' + name + '()');
+    assert.ok(start >= 0, name);
+    return motion.slice(start, motion.indexOf('}', start));
+  };
+  assert.ok(body('successHaptic').includes('NotificationFeedbackType.Success)'), '25Q4 review: the harnesses record the helper\'s name, so its type is pinned here');
+  assert.ok(body('errorHaptic').includes('NotificationFeedbackType.Error)'));
+  assert.ok(body('warningHaptic').includes('NotificationFeedbackType.Warning)'));
+  assert.ok(body('selectionHaptic').includes('selectionAsync()'));
+});
+
+test('every timing and curve comes from motion.tsx: Reflow on the state duration, colour transitions on easeOut, one named ambient pulse, no runOnJS', () => {
+  const read = (path: string) => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
+  const walk = (dir: string): string[] => readdirSync(new URL('../' + dir, import.meta.url), { withFileTypes: true })
+    .flatMap(entry => entry.isDirectory() ? walk(dir + entry.name + '/') : /\.tsx?$/.test(entry.name) ? [dir + entry.name] : []);
+  const files = [...walk('src/'), ...walk('app/')];
+  const motion = read('src/ui/motion.tsx');
+  assert.match(motion, /const reflow = LinearTransition\.duration\(duration\.state\)\.easing\(easeOut\);/, 'Reflow is a state change (200 ms), not a 220 ms literal');
+  assert.equal(/\.duration\(\d/.test(motion), false, 'no layout animation on a literal duration');
+  // The CSS curve is easeOut's own four points.
+  const points = /export const easeOut = Easing\.bezier\(([^)]*)\);/.exec(motion)![1];
+  assert.match(motion, new RegExp('export const easeOutCss = cubicBezier\\(' + points.replace(/\./g, '\\.') + '\\);'));
+  assert.match(motion, /export const pulseTiming: WithTimingConfig = \{ duration: 600, easing: Easing\.inOut\(Easing\.quad\) \};/);
+  let transitions = 0;
+  for (const file of files) {
+    const source = read(file);
+    if (file !== 'src/ui/motion.tsx') assert.equal(/\bEasing\b/.test(source), false, `${file}: a curve outside motion.tsx`);
+    assert.equal(/\brunOnJS\b/.test(source), false, `${file}: runOnJS is deprecated in Reanimated 4 (react-native-worklets' scheduleOnRN)`);
+    for (const line of source.split('\n').filter(line => line.includes('transitionDuration'))) {
+      transitions++;
+      assert.ok(line.includes('transitionTimingFunction: easeOutCss'), `${file}: a colour transition on the default «ease»: ${line.trim()}`);
+    }
+  }
+  assert.equal(transitions, 7, 'the segmented labels (2), the month bars (2), the appearance picker (2) and the first opening\'s pages');
+  assert.match(read('src/ui/assistant-messages.tsx'), /withRepeat\(withSequence\(withTiming\(0\.3, pulseTiming\), withTiming\(1, pulseTiming\)\), -1, false\)/);
+  const sheet = read('src/ui/form-controls.tsx');
+  assert.match(sheet, /^import \{ scheduleOnRN \} from 'react-native-worklets';$/m);
+  assert.match(sheet, /if \(finished\) scheduleOnRN\(unmount\);/);
 });

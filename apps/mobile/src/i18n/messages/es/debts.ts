@@ -9,8 +9,9 @@ export const debts = {
     list: {
       title: 'Deudas y cobros',
       add: 'Agregar deuda',
-      emptyTitle: 'Lo que debés y lo que te deben',
-      emptyDetail: 'Registrá un préstamo, una deuda con alguien o un monto que te deben. Cada pago o cobro parcial baja el saldo pendiente sin crear gastos ni ingresos falsos.',
+      /** 25O1: one line; that a payment or a collection is never an expense or an income is said in the form (form.explainOwed). */
+      emptyTitle: 'Sin deudas ni cobros',
+      emptyDetail: 'Anotá lo que debés o lo que te deben.',
       /** Section and total label: what I owe. */
       owed: 'Debo',
       /** Section and total label: what others owe me. */

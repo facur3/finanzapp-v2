@@ -3,10 +3,13 @@ import { DATABASE_NAME, type LedgerDatabase } from './database';
 import { runExclusiveTransaction, runSchemaMigration } from './transaction';
 import { RATES_DATABASE_NAME, type RatesDatabase } from './rates-database';
 import { REVIEW_DATABASE_NAME, type ReviewDatabase } from './review-database';
+import { profiledDatabase } from '../dev/qa-profile';
+
+/** The files opened here are the person's own, or a development QA profile's (`qa-profile.ts`): never both in one bundle. */
 
 export async function openLedgerDatabase(): Promise<LedgerDatabase> {
-  const connection = await openDatabaseAsync(DATABASE_NAME);
-  const open = () => openDatabaseAsync(DATABASE_NAME, { useNewConnection: true });
+  const connection = await openDatabaseAsync(profiledDatabase(DATABASE_NAME));
+  const open = () => openDatabaseAsync(profiledDatabase(DATABASE_NAME), { useNewConnection: true });
   return {
     execAsync: sql => connection.execAsync(sql),
     runAsync: (sql, ...params) => connection.runAsync(sql, ...params),
@@ -19,8 +22,8 @@ export async function openLedgerDatabase(): Promise<LedgerDatabase> {
 
 /** The exchange-rate cache (24C1): its own file, apart from the ledger (rates-database.ts). */
 export async function openRatesDatabase(): Promise<RatesDatabase> {
-  const connection = await openDatabaseAsync(RATES_DATABASE_NAME);
-  const open = () => openDatabaseAsync(RATES_DATABASE_NAME, { useNewConnection: true });
+  const connection = await openDatabaseAsync(profiledDatabase(RATES_DATABASE_NAME));
+  const open = () => openDatabaseAsync(profiledDatabase(RATES_DATABASE_NAME), { useNewConnection: true });
   return {
     execAsync: sql => connection.execAsync(sql),
     runAsync: (sql, ...params) => connection.runAsync(sql, ...params),
@@ -32,8 +35,8 @@ export async function openRatesDatabase(): Promise<RatesDatabase> {
 
 /** The review store (25A-02): its own file, apart from the ledger (review-database.ts). Opened by LedgerProvider since 25A-03. */
 export async function openReviewDatabase(): Promise<ReviewDatabase> {
-  const connection = await openDatabaseAsync(REVIEW_DATABASE_NAME);
-  const open = () => openDatabaseAsync(REVIEW_DATABASE_NAME, { useNewConnection: true });
+  const connection = await openDatabaseAsync(profiledDatabase(REVIEW_DATABASE_NAME));
+  const open = () => openDatabaseAsync(profiledDatabase(REVIEW_DATABASE_NAME), { useNewConnection: true });
   return {
     execAsync: sql => connection.execAsync(sql),
     runAsync: (sql, ...params) => connection.runAsync(sql, ...params),

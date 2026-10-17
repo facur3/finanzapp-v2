@@ -7,6 +7,7 @@ import { todayKey } from '@finanzapp/domain';
 import { bindLocale } from '../src/i18n/bind.ts';
 import type { AppLocale } from '../src/i18n/locale.ts';
 import * as currenciesModule from '../src/ui/currencies.ts';
+import { labelWidthEm } from '../src/ui/geometry.ts';
 
 // Producto 23.1C2: the real DateField (src/ui/form-controls.tsx) under a
 // locale that switches between renders, like the live provider (which never
@@ -51,7 +52,7 @@ function harness(os: 'ios' | 'android' = 'ios', { reduced = true, systemReduceMo
       useWindowDimensions: () => ({ width: 393, height: 852 }) },
     // A shared value persists across renders by call order, like a hook.
     'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View' }, useSharedValue: (value: unknown) => { const index = cursor++; if (!(index in state)) state[index] = { value }; return state[index]; },
-      useAnimatedStyle: (fn: () => unknown) => fn(), runOnJS: (fn: (...args: unknown[]) => void) => fn,
+      useAnimatedStyle: (fn: () => unknown) => fn(),
       // Reanimated 4's onStart: with the policy resolved to "reduce", the value lands on the target in one frame whatever the duration.
       withTiming: (to: number, config: { duration: number; easing?: unknown; reduceMotion?: string }, callback?: (finished: boolean) => void) => {
         const instant = reducedByPolicy(config.reduceMotion, systemReduced);
@@ -59,6 +60,8 @@ function harness(os: 'ios' | 'android' = 'ios', { reduced = true, systemReduceMo
         if (callback) { if (manual) pending.push(callback); else callback(true); }
         return to;
       } },
+    // The sheet hands its exit back to React Native with react-native-worklets' scheduleOnRN (runOnJS is deprecated).
+    'react-native-worklets': { scheduleOnRN: (fn: (...args: unknown[]) => void, ...args: unknown[]) => fn(...args) },
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView', useSafeAreaInsets: () => insets },
     '@react-native-community/datetimepicker': 'DateTimePicker',
     '@expo/vector-icons/Ionicons': 'Ionicons',
@@ -67,7 +70,7 @@ function harness(os: 'ios' | 'android' = 'ios', { reduced = true, systemReduceMo
     '../i18n/provider': { useI18n: () => bindLocale(locale) },
     './components': { AccountBadge: 'AccountBadge', AppText: 'AppText', CategoryBadge: 'CategoryBadge', DetailRow: 'DetailRow', SelectionRow: 'SelectionRow', Field: 'Field',
       GlyphTile: 'GlyphTile', PressFeedback: 'PressFeedback', Surface: 'Surface', surfaceShadow: () => ({}) },
-    './currencies': currencies, './category-hues': {}, './categories': {},
+    './currencies': currencies, './category-hues': {}, './categories': {}, './marks': { CurrencyMark: 'CurrencyMark' },
     // The real motion module (timing, sheetTiming, the curves and the reduce-motion policy), not a stub of its numbers.
     './motion': realMotion(reduced),
     './theme': { radius: { group: 16, sheet: 24 }, space: { xs: 4, s: 8, m: 12, l: 16, xl: 20 },
@@ -109,7 +112,9 @@ function realMotion(reduced: boolean): Record<string, unknown> {
   const modules: Record<string, unknown> = {
     react: { useEffect() {}, useRef: (initial: unknown) => ({ current: initial }) },
     'react/jsx-runtime': { jsx: (type: unknown, props: unknown) => ({ type, props }), jsxs: (type: unknown, props: unknown) => ({ type, props }) },
-    'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View' }, Easing: { bezier: (...points: number[]) => 'bezier(' + points.join(',') + ')' },
+    'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View' },
+      Easing: { bezier: (...points: number[]) => 'bezier(' + points.join(',') + ')', quad: 'quad', inOut: (curve: string) => 'inOut(' + curve + ')' },
+      cubicBezier: (...points: number[]) => 'cubicBezier(' + points.join(',') + ')',
       FadeIn: chain(['FadeIn']), FadeInUp: chain(['FadeInUp']), FadeOut: chain(['FadeOut']), LinearTransition: chain(['LinearTransition']), ReduceMotion: REDUCE_MOTION },
     'expo-haptics': {},
     './theme': { useReduceMotion: () => reduced },
@@ -183,6 +188,17 @@ test('open, cancel and done: the sheet speaks the interface language, Cancel kee
   root = field.render();
   assert.equal(find(root, 'Modal')!.props.visible, true);
   assert.deepEqual(bar(root), ['Cancelar', 'Elegir fecha', 'Listo']);
+  // 25D1: the bar stops growing at 1.2× like a system bar; its buttons offer the Large Content Viewer in their own words.
+  for (const word of ['Cancelar', 'Listo']) {
+    const { hitSlop, accessibilityShowsLargeContentViewer, accessibilityLargeContentTitle } = button(root, word).props;
+    assert.deepEqual([hitSlop, accessibilityShowsLargeContentViewer, accessibilityLargeContentTitle], [8, true, word]);
+  }
+  assert.deepEqual(nodes(find(root, 'Modal')).filter(node => node.type === 'AppText').map(node => node.props.maxFontSizeMultiplier), [1.2, 1.2, 1.2]);
+  // 25D1: no grabber. The sheet cannot be dragged, and a grabber promises a drag (HIG: only a resizable sheet shows one); the
+  // card keeps 8 pt above its bar.
+  const card = nodes(find(root, 'Modal')).find(node => node.props.accessibilityViewIsModal)!;
+  assert.equal(nodes(card.props.children).some(node => node.type === 'View' && [node.props.style].flat().some((style: any) => style?.height === 5)), false);
+  assert.equal(Object.assign({}, ...[card.props.style].flat().filter((style: unknown) => style && typeof style === 'object')).paddingTop, 8);
   find(root, 'DateTimePicker')!.props.onValueChange({ nativeEvent: { timestamp: 0, utcOffset: 0 } }, new Date(2026, 8, 18, 12));
   root = field.render();
   assert.equal(todayKey(find(root, 'DateTimePicker')!.props.value), '2026-09-18', 'the wheel moves the draft only');
@@ -198,9 +214,31 @@ test('open, cancel and done: the sheet speaks the interface language, Cancel kee
   field.setLocale('en-US');
   root = field.render();
   assert.deepEqual(bar(root), ['Cancel', 'Choose date', 'Done']);
+  assert.equal(button(root, 'Done').props.accessibilityLargeContentTitle, 'Done');
   button(root, 'Done').props.onPress();
   assert.deepEqual(field.saved, ['2026-09-22']);
   assert.equal(find(field.render(), 'Modal')!.props.visible, false);
+});
+
+test('25D1: at the 1.2× cap a sheet bar leaves its title room for whole words from 375 pt; uncapped at AX5 Cancelar and Listo alone overflowed', () => {
+  // Every title a sheet shows today, from the catalogue. The bar: 16 pt padding each side, two 12 pt gaps; Listo and the title
+  // are semibold (+6 %); the buttons are 16 pt and the title 17 pt, each × 1.2.
+  const titles = ['selection.chooseDate', 'selection.chooseAccount', 'selection.chooseCurrency', 'selection.categories', 'display.title', 'display.currency',
+    'currency.switchTitle', 'transferForm.from', 'transferForm.to', 'review.fields.destination', 'recurring.form.nextDate', 'operations.refund.date',
+    'installments.payoff.date', 'debts.form.dueDate', 'cards.form.nextClosing', 'cards.form.due', 'entryForm.paidWith', 'entryForm.receivedIn', 'home.capture.title'];
+  for (const locale of ['es-AR', 'en-US'] as const) {
+    const { t } = bindLocale(locale);
+    const buttons = (labelWidthEm(t('common.cancel')) + labelWidthEm(t('common.done')) * 1.06) * 16;
+    for (const key of titles) {
+      const title = t(key as Parameters<typeof t>[0]);
+      assert.notEqual(title, key, key + ' is in the catalogue');
+      const word = Math.max(...title.split(' ').map(part => labelWidthEm(part) * 17 * 1.06));
+      for (const width of [375, 393, 430]) assert.ok(word * 1.2 <= width - 32 - 24 - buttons * 1.2, `${locale} «${title}» at ${width} pt`);
+    }
+    assert.ok(buttons * 1.2 + 24 <= (320 - 32) * 0.6, locale + ': at 320 pt the two buttons keep under 60 % of the bar');
+  }
+  const { t } = bindLocale('es-AR');
+  assert.ok((labelWidthEm(t('common.cancel')) + labelWidthEm(t('common.done')) * 1.06) * 16 * 3.571 > 393 - 32, 'uncapped at AX5, Cancelar and Listo alone were wider than the bar');
 });
 
 test('a day spun on the wheel survives es-AR → en-AR → es-US → en-US with the sheet open, and Done saves its ISO key', () => {
@@ -488,6 +526,7 @@ test('24UX6A: a sheet of actions has no Listo and keeps its title centred; onDis
     assert.equal(nodes(find(root, 'Modal')).filter(node => node.type === 'PressFeedback').length, 1, 'no Listo: the rows commit');
     const twin = nodes(find(root, 'Modal')).find(node => node.type === 'View' && node.props.style?.opacity === 0)!;
     assert.deepEqual([twin.props.accessible, twin.props.importantForAccessibility], [false, 'no-hide-descendants'], 'VoiceOver never finds the twin');
+    assert.equal(nodes(twin.props.children).find(node => node.type === 'AppText')!.props.maxFontSizeMultiplier, 1.2, '25D1: the twin stops with Cancelar, so it stays as wide');
     button(root, 'Cancelar').props.onPress();
     assert.equal(closed, 1);
     // An exit interrupted by a reopening dismisses nothing.
@@ -593,4 +632,17 @@ test('24T2: an unchosen date reads as a prompt, on screen and for VoiceOver; the
   const english = harness();
   english.setLocale('en-US');
   assert.equal(find(english.render('DateField', { value: null, onChange }), 'DetailRow')!.props.value, 'Choose date');
+});
+
+test('25VIS2: VoiceOver\'s escape gesture on the date sheet cancels like Cancelar: the wheel\'s draft is dropped, nothing saved', () => {
+  const field = harness('ios', { reduced: false });
+  find(field.render(), 'DetailRow')!.props.onPress();
+  present(field.render());
+  const root = field.render();
+  const { card } = sheet(root);
+  assert.equal(typeof card.props.onAccessibilityEscape, 'function', 'the modal card answers the two-finger scrub');
+  find(root, 'DateTimePicker')!.props.onValueChange({ nativeEvent: { timestamp: 0, utcOffset: 0 } }, new Date(2026, 8, 3, 12));
+  card.props.onAccessibilityEscape();
+  assert.equal(find(field.render(), 'Modal')!.props.visible, false);
+  assert.deepEqual(field.saved, []);
 });

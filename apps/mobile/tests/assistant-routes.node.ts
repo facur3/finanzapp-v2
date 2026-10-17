@@ -338,11 +338,15 @@ test('an answer renders its text and evidence rows/links from the cited facts, a
   assert.deepEqual(proof.props.content.links.map((link: any) => link.id), ['movements']);
   proof.props.onOpen(proof.props.content.links[0].href);
   // Movimientos is a tab root: the link pops back to the existing tabs and selects it (dismissTo), never stacking a
-  // second copy of the tabs over the Assistant (navigate from this root-stack screen would push one).
-  assert.equal(JSON.stringify(view.dismissed), JSON.stringify(['/activity']));
+  // second copy of the tabs over the Assistant (navigate from this root-stack screen would push one). 25Q4: with a fresh
+  // `reset`, made at the tap, Movimientos opens whole and from the top.
+  assert.equal(view.dismissed.length, 1);
+  assert.equal(view.dismissed[0].pathname, '/activity');
+  assert.deepEqual(Object.keys(view.dismissed[0].params), ['reset']);
+  assert.match(view.dismissed[0].params.reset, /^\d+$/);
   assert.equal(view.pushed.length, 0);
   for (const root of ['/', '/reports', '/settings']) proof.props.onOpen({ pathname: root });
-  assert.equal(JSON.stringify(view.dismissed), JSON.stringify(['/activity', '/', '/reports', '/settings']));
+  assert.equal(JSON.stringify(view.dismissed.slice(1)), JSON.stringify(['/', '/reports', '/settings']), 'the other roots keep their bare path');
   proof.props.onOpen({ pathname: '/budgets', params: { currency: 'ARS' } });
   assert.equal(JSON.stringify(view.pushed), JSON.stringify([{ pathname: '/budgets', params: { currency: 'ARS' } }]), 'a screen of the stack is pushed over the Assistant, so back returns to it');
   assert.equal(view.dismissed.length, 4, 'a non-tab screen is never reached by dismissTo');

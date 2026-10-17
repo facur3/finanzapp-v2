@@ -5,6 +5,8 @@ import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import * as domain from '@finanzapp/domain';
 import { bindLocale } from '../src/i18n/bind.ts';
+import * as presentation from '../src/ui/presentation.ts';
+import { VIEW_REFRESH_MESSAGE } from '../src/storage/ledger-session.ts';
 
 // Producto 25B2: the account and card deletion flows of `src/ui/commitment-actions.ts`, run as source with their hosts
 // replaced: the confirmation names what stays and what stops, nothing is written before the destructive button,
@@ -36,13 +38,15 @@ const rules: domain.RecurringRule[] = [
   { id: 'r2', accountId: 'cash', kind: 'expense', amountMinor: 100, merchant: 'Pausado', category: 'Salud', frequency: 'monthly', anchorDateISO: '2026-09-15', nextDateISO: '2026-10-15', active: false, deleted: false, createdAt, revision: 1, updatedAt: createdAt },
 ];
 
-function harness({ fail = false, language = 'es-AR' as const, paid = false, deletedAccount = false, debtTransfers = [] as domain.Transfer[], plans = [] as domain.InstallmentPlan[] } = {}) {
+function harness({ fail = false as boolean | string, language = 'es-AR' as const, paid = false, deletedAccount = false, debtTransfers = [] as domain.Transfer[], plans = [] as domain.InstallmentPlan[] } = {}) {
   const source = readFileSync(new URL('../src/ui/commitment-actions.ts', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, esModuleInterop: true } }).outputText;
   const alerts: { title: string; message: string; buttons: { text: string; style?: string; onPress?: () => void }[] }[] = [];
   const removed: string[] = [], removedCards: string[] = [], pushed: unknown[] = [];
   const savedCards: domain.CreditCardProfile[] = [];
   const savedDebts: domain.PersonalDebtProfile[] = [], removedDebts: string[] = [];
+  // 25Q4: every haptic comes from motion.tsx; the recorder keeps each one's kind.
+  const haptics: string[] = [];
   const state: unknown[] = [], refs: unknown[] = [];
   let cursor = 0, refCursor = 0;
   const accounts = (deletedAccount ? [{ ...cash, revision: 1, updatedAt: createdAt, deletedAt: createdAt }, other, lonely, cardAccount] : [cash, other, lonely, cardAccount]).concat(owedAccount, lentAccount);
@@ -52,15 +56,17 @@ function harness({ fail = false, language = 'es-AR' as const, paid = false, dele
       useRef: (initial: unknown) => { const i = refCursor++; return (refs[i] ??= { current: initial }); } },
     'react-native': { Alert: { alert: (title: string, message: string, buttons: any[]) => alerts.push({ title, message, buttons }) } },
     'expo-router': { router: { push: (target: unknown) => pushed.push(target) } },
-    'expo-haptics': { NotificationFeedbackType: { Success: 'Success' }, notificationAsync: async () => {}, selectionAsync: async () => {} },
+    './motion': { successHaptic: () => { haptics.push('Success'); }, selectionHaptic: () => { haptics.push('Selection'); },
+      errorHaptic: () => { haptics.push('Error'); }, warningHaptic: () => { haptics.push('Warning'); } },
     '@finanzapp/domain': domain,
     '../storage/LedgerProvider': { useLedger: () => ({ snapshot, archive: { accounts: snapshot.accounts, records: entries.map(domain.initialRecord), recurring: rules, cards: [card], installmentPlans: plans },
-      removeAccount: async (id: string) => { if (fail) throw new Error('disk full'); removed.push(id); },
-      saveCard: async (next: domain.CreditCardProfile) => { if (fail) throw new Error('disk full'); savedCards.push(next); },
-      removeCard: async (id: string) => { if (fail) throw new Error('disk full'); removedCards.push(id); },
-      saveDebt: async (next: domain.PersonalDebtProfile) => { if (fail) throw new Error('disk full'); savedDebts.push(next); },
-      removeDebt: async (id: string) => { if (fail) throw new Error('disk full'); removedDebts.push(id); },
-      saveRecurring: async () => {} }) },
+      removeAccount: async (id: string) => { if (fail) throw new Error(fail === true ? 'disk full' : fail); removed.push(id); },
+      saveCard: async (next: domain.CreditCardProfile) => { if (fail) throw new Error(fail === true ? 'disk full' : fail); savedCards.push(next); },
+      removeCard: async (id: string) => { if (fail) throw new Error(fail === true ? 'disk full' : fail); removedCards.push(id); },
+      saveDebt: async (next: domain.PersonalDebtProfile) => { if (fail) throw new Error(fail === true ? 'disk full' : fail); savedDebts.push(next); },
+      removeDebt: async (id: string) => { if (fail) throw new Error(fail === true ? 'disk full' : fail); removedDebts.push(id); },
+      saveRecurring: async () => { if (fail) throw new Error(fail === true ? 'disk full' : fail); } }) },
+    './presentation': presentation,
     '../i18n/provider': { useI18n: () => bindLocale(language) },
   };
   const module = { exports: {} as Record<string, () => any> };
@@ -69,7 +75,7 @@ function harness({ fail = false, language = 'es-AR' as const, paid = false, dele
     return modules[name];
   } });
   const render = (hook: 'useAccountManagement' | 'useCardManagement' | 'useRecurringManagement' | 'useDebtManagement') => { cursor = 0; refCursor = 0; return module.exports[hook](); };
-  return { render, alerts, removed, removedCards, savedCards, savedDebts, removedDebts, pushed };
+  return { render, alerts, removed, removedCards, savedCards, savedDebts, removedDebts, pushed, haptics };
 }
 const settle = () => new Promise(resolve => setTimeout(resolve, 0));
 
@@ -86,10 +92,13 @@ test('deleting an account asks first and names what stays and what stops; Cancel
     + ' Su saldo registrado, ' + money(94400) + ', deja de contar en Disponible. Su 1 recurrente activo se detendrá; lo ya registrado no cambia.' + final);
   assert.equal(JSON.stringify(view.alerts[0].buttons.map(button => [button.text, button.style])), JSON.stringify([['Cancelar', 'cancel'], ['Eliminar', 'destructive']]));
   assert.deepEqual(view.removed, [], 'nothing written before the destructive button');
+  view.alerts[0].buttons[0].onPress?.();
+  assert.equal(view.haptics.join(','), '', 'Cancelar taps nothing');
   view.alerts[0].buttons[1].onPress!();
   await settle();
   assert.equal(JSON.stringify(view.removed), JSON.stringify(['cash']));
   assert.equal(done, 1);
+  assert.equal(view.haptics.join(','), 'Success');
   // A transfer counts as history too; an account with none says so and lists no rule.
   view.render('useAccountManagement').remove(other);
   assert.equal(view.alerts[1].message, 'Deja de aparecer en tus cuentas, en Disponible y en los formularios. Sus movimientos y transferencias siguen en Movimientos con su nombre y su moneda: 0 movimientos y 1 transferencia.'
@@ -110,8 +119,9 @@ test('a failed deletion keeps the account as it was and says so; in English the 
   failing.render('useAccountManagement').remove(cash);
   failing.alerts[0].buttons[1].onPress!();
   await settle();
-  assert.equal(failing.render('useAccountManagement').error, 'disk full');
+  assert.equal(failing.render('useAccountManagement').error, 'accounts.manage.deleteFailed', '25Q4: the action\'s own sentence, never the engine\'s text');
   assert.deepEqual(failing.removed, []);
+  assert.equal(failing.haptics.join(','), 'Error', '25Q4: nothing is kept frozen and Eliminar is offered again, so Error');
   const english = harness({ language: 'en-US' as never });
   english.render('useAccountManagement').remove(cash);
   assert.equal(english.alerts[0].title, 'Delete Banco?');
@@ -158,7 +168,7 @@ test('a card without debt asks first and says purchases and payments stay; Elimi
   failing.render('useCardManagement').remove(card);
   failing.alerts[0].buttons[1].onPress!();
   await settle();
-  assert.equal(failing.render('useCardManagement').error, 'disk full');
+  assert.equal(failing.render('useCardManagement').error, 'cards.form.deleteFailed');
   assert.equal(failing.removedCards.length, 0);
 });
 
@@ -241,8 +251,9 @@ test('25B2 close: a settled debt or receivable asks first, names what stays and 
   failing.render('useDebtManagement').remove(owed);
   failing.alerts[0].buttons[1].onPress!();
   await settle();
-  assert.equal(failing.render('useDebtManagement').error, 'disk full');
+  assert.equal(failing.render('useDebtManagement').error, 'debts.manage.deleteFailed');
   assert.equal(failing.removedDebts.length, 0);
+  assert.equal(failing.haptics.join(','), 'Error', '25Q4: nothing is kept frozen, so Error');
 });
 
 test('25B2 close: a tracker created by mistake (a balance, no payment or collection) is deleted after a clear confirmation, without inventing a payment', async () => {
@@ -274,11 +285,12 @@ test('25B2 close: Cerrar then Reabrir from the row keep the tracker as it was (r
   await settle();
   assert.deepEqual(view.savedDebts[1], { ...owed, revision: 2, updatedAt: view.savedDebts[1].updatedAt });
   assert.equal(view.removedDebts.length, 0);
+  assert.equal(view.haptics.join(','), 'Selection,Selection', 'closing and reopening tick, as a state change does');
 });
 
 // ---- Producto 24T1: a card with a pending instalment plan ----------------------------------------------------------------
 
-test('24T1: a card with a pending instalment plan and no balance due is not deleted: the dialog says so and offers Archivar tarjeta (never Pagar); an archived card gets Cancelar only; nothing is written by the dialog', async () => {
+test('24T1: a card with a pending instalment plan and no balance due is not deleted: the dialog says so and offers Archivar tarjeta (never Pagar); an archived card gets one OK (the alert only informs); nothing is written by the dialog', async () => {
   const plan = domain.newInstallmentPlan({ id: 'tv', card, cardAccount, merchant: 'Electro', category: 'Hogar', purchaseDateISO: '2026-09-10', principalMinor: 120000, count: 12, placement: 'next', createdAt });
   const view = harness({ paid: true, plans: [plan] });
   let done = 0;
@@ -296,7 +308,7 @@ test('24T1: a card with a pending instalment plan and no balance due is not dele
   assert.equal(cancelled.alerts[0].title, '¿Eliminar esta tarjeta?');
   const archived = harness({ paid: true, plans: [plan] });
   archived.render('useCardManagement').remove({ ...card, active: false });
-  assert.equal(buttons(archived.alerts[0]), JSON.stringify([['Cancelar', 'cancel']]));
+  assert.equal(buttons(archived.alerts[0]), JSON.stringify([['OK', 'cancel']]), 'nothing to offer: «OK», never a lone «Cancelar»');
   const english = harness({ paid: true, plans: [plan], language: 'en-US' as never });
   english.render('useCardManagement').remove(card);
   assert.equal(english.alerts[0].message, 'This card still has pending installments. You can archive it to remove it from your active cards without losing its history. Its installments keep being recorded.');
@@ -322,7 +334,7 @@ test('24T3 (B3): a card holding a credit is not deleted: the dialog names the cr
   archived.render('useCardManagement').remove({ ...card, active: false });
   assert.equal(archived.alerts[0].message.replace(/ /g, ' '), 'Esta tarjeta todavía tiene saldo a favor de $ 120,00. Ya está archivada: sigue en Archivadas en Tarjetas con su saldo y su historial.');
   assert.doesNotMatch(archived.alerts[0].message, /rchivala/);
-  assert.equal(buttons(archived.alerts[0]), JSON.stringify([['Cancelar', 'cancel']]));
+  assert.equal(buttons(archived.alerts[0]), JSON.stringify([['OK', 'cancel']]), 'nothing to offer: «OK», never a lone «Cancelar»');
   const english = harness({ debtTransfers: [overpaid], language: 'en-US' as never });
   english.render('useCardManagement').remove({ ...card, active: false });
   assert.equal(english.alerts[0].title, 'Cannot be deleted yet');
@@ -340,12 +352,12 @@ test('24T3 review: an archived card with a balance due or a pending plan is not 
   const english = harness({ paid: true, plans: [plan], language: 'en-US' as never });
   english.render('useCardManagement').remove({ ...card, active: false });
   assert.equal(english.alerts[0].message, 'This card still has pending installments. It is already archived: it stays in Archived in Cards with its history. Its installments keep being recorded.');
-  // A card already deleted (a stale screen): the storage refusal, in the reader's language, with Cancelar only.
+  // A card already deleted (a stale screen): the storage refusal, in the reader's language, with one OK.
   const stale = harness({ paid: true });
   stale.render('useCardManagement').remove({ ...card, active: false, deleted: true });
   assert.equal(stale.alerts[0].title, 'Todavía no se puede eliminar');
   assert.equal(stale.alerts[0].message, domain.CARD_DELETED_MESSAGE);
-  assert.equal(buttons(stale.alerts[0]), JSON.stringify([['Cancelar', 'cancel']]));
+  assert.equal(buttons(stale.alerts[0]), JSON.stringify([['OK', 'cancel']]));
   assert.equal(stale.removedCards.length + stale.savedCards.length, 0);
 });
 
@@ -378,4 +390,22 @@ test('24T3 (owner review): a card held by more than one fact names them all in o
   const snapshot = (transfers: domain.Transfer[]) => ({ accounts: [cash, other, cardAccount], entries, transfers });
   assert.throws(() => domain.assertCardDeletable(card, snapshot(transfers), [], [], []), { message: domain.CARD_DEBT_MESSAGE });
   assert.throws(() => domain.assertCardDeletable(card, snapshot(transfers.concat(overpaid)), [], [], []), { message: domain.CARD_CREDIT_MESSAGE });
+});
+
+test('25R1: a management action that committed but whose view could not be read again is done: no failure said, nothing offered again, `done` runs', async () => {
+  const view = harness({ fail: VIEW_REFRESH_MESSAGE });
+  let done = 0;
+  const recurring = view.render('useRecurringManagement');
+  await recurring.pause(rules[0], () => done++);
+  assert.equal(view.render('useRecurringManagement').error, null);
+  view.render('useAccountManagement').remove(cash, () => done++);
+  view.alerts.at(-1)!.buttons[1].onPress!();
+  await settle();
+  assert.equal(view.render('useAccountManagement').error, null);
+  assert.equal(done, 2, 'a detail closes as after any durable save');
+  assert.ok(!view.haptics.includes('Error'), 'never the failure tap');
+  // An engine failure is still a failure, said and offered again.
+  const failing = harness({ fail: true });
+  await failing.render('useRecurringManagement').pause(rules[0]);
+  assert.equal(failing.render('useRecurringManagement').error, 'recurring.manage.failed');
 });

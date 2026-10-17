@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { debtOutstandingMinor, type PersonalDebtProfile } from '@finanzapp/domain';
 import { useI18n } from '../i18n/provider';
 import { useLedger } from '../storage/LedgerProvider';
-import { AppText, GlyphTile, Money, PressFeedback, useStacked } from './components';
+import { AppText, GlyphTile, Money, PressFeedback, rowStyle, useStacked } from './components';
 import { debtDueState, spokenDueDay } from './liability-presentation';
 import { SwipeRow, swipeAccessibility, type SwipeAction } from './swipe-actions';
 import { useCurrentDay, usePalette } from './theme';
@@ -41,8 +41,7 @@ export function DebtRow({ debt, last, actions = [] }: { debt: PersonalDebtProfil
     accessibilityHint={t('debts.row.openHint')}
     {...swipeAccessibility(actions)}
     onPress={() => router.push({ pathname: '/debt/[id]', params: { id: debt.id } })}
-    style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 16, minHeight: 64,
-      borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, borderBottomColor: p.line }}>
+    style={[rowStyle, { borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, borderBottomColor: p.line }]}>
     <GlyphTile icon={owed ? 'arrow-up-outline' : 'arrow-down-outline'} />
     <View style={{ flex: 1, minWidth: 0, gap: 8, flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center' }}>
       <View style={{ flex: stacked ? undefined : 1, minWidth: 0, gap: 3 }}>

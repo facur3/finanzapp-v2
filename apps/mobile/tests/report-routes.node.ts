@@ -54,9 +54,8 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
   // 24C1: the finance view over a fixed rate book (no network); `ensured` records what the screen asked the provider for.
   const ratesProvider = { useFinanceView: (months: readonly string[], currency?: domain.Currency) => {
     const held = presentation.historyCurrencies(data.accounts);
-    // 25B2: with one currency in the whole history the view is that currency's own ledger, whatever the preference says (rates-provider.tsx).
-    const mode = held.length <= 1 ? 'single' : display.getMode();
-    const target = currency ?? (held.length <= 1 ? held[0] ?? displayCurrency.resolveDisplayCurrency(display.getState(), held, mode) : displayCurrency.resolveDisplayCurrency(display.getState(), held, mode));
+    // 25B2: the provider's own rule (resolveFinanceTarget): with one currency in the whole history the view is that currency's own ledger.
+    const { mode, currency: target } = financeView.resolveFinanceTarget(held, { mode: display.getMode(), currency: displayCurrency.resolveDisplayCurrency(display.getState(), held, display.getMode()) }, currency);
     const built = financeView.financeView(data, mode, target, book);
     if (built.quotes.length) ensured.push({ months: [...months], quotes: built.quotes });
     return { ...built, activity, loaded: true, lastFetchedAt: null, book, held };
@@ -90,10 +89,12 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
     '../src/ui/display-currency-provider': displayProvider, '../src/ui/display-currency': displayCurrency,
     '../src/fx/rates-provider': ratesProvider, '../src/fx/finance-view': financeView, '../src/fx/fx-copy': fxCopy, '../src/fx/rates-store': ratesStore,
     '../src/ui/home-modules': { CurrencyParts: 'CurrencyParts', MetricHelp: 'MetricHelp' },
+    // The spending detail (an Assistant link) names its period; its own screen is pinned in tests/spending-home.node.ts.
+    '../src/ui/spending-timeline': { periodLabel: (period: domain.ReportPeriod) => period.startISO + '–' + period.endISO },
     '@finanzapp/domain': domain,
     '../src/storage/LedgerProvider': { useLedger: () => ({ snapshot: data, archive: { accounts: data.accounts, records: [], ...archive } }) },
     '../src/ui/geometry': geometry,
-    '../src/ui/charts': { DonutChart: 'DonutChart', MonthBars: 'MonthBars', OTHERS_KEY: ' others', MONEY_MAX_SCALE: 1.8,
+    '../src/ui/charts': { DonutChart: 'DonutChart', MonthBars: 'MonthBars', OTHERS_KEY: ' others',
       // Like the real one: at most five slices, the tail grouped into one neutral «Otras» slice keyed OTHERS_KEY.
       donutSlices: (items: { key: string; label: string; value: number }[], _p: unknown, _hues: unknown, othersLabel: string) => {
         const head = items.slice(0, items.length > 5 ? 4 : 5).map((item, index) => ({ ...item, color: 'c' + index }));
@@ -208,12 +209,50 @@ test('daily view opens only expenses in the selected date and currency', () => {
   nodes(view.render()).find(n => n.type === 'Choices' && n.props.value === 'categories')!.props.onChange('days');
   const list = view.render();
   assert.equal(list.props.data.length, 2);
+  // 25D1: one anatomy for every day, the date and count over the amount, whatever their lengths (the 30-character rule drew
+  // a short day beside its amount and a long one under it, in the same list).
+  const days = list.props.data.map((item: unknown, index: number) => find(list.props.renderItem({ item, index }), 'DetailRow'));
+  assert.deepEqual(days.map((day: Node) => day.props.layout), ['stacked', 'stacked']);
+  assert.ok(days.some((day: Node) => day.props.label.length + day.props.value.length <= 30), 'a short day is stacked too');
   const row = list.props.renderItem({ item: list.props.data[1], index: 1 });
   find(row, 'DetailRow').props.onPress();
   const detail = routeHarness('report-day.tsx', view.pushed[0].params).render();
   assert.deepEqual(detail.props.entries.map((e: domain.Entry) => e.id).sort(), ['b', 'c']);
   assert.equal(find(detail, 'Money').props.minor, 505);
 });
+test('25D1: the month title grows to Title 3\'s iOS size; beside the arrows while its longest word fits, else on its own line with the arrows under it', () => {
+  const titleOf = (root: Node) => nodes(root).find(n => n.type === 'AppText' && n.props.accessibilityRole === 'header' && n.props.variant === 'title3')!;
+  const titles = Array.from({ length: 12 }, (_, i) => bindLocale('es-AR').formatMonthTitle('2026-' + String(i + 1).padStart(2, '0')));
+  const wordEm = geometry.widestWordEm(titles);
+  for (const [width, fontScale] of [[393, 1], [320, 1], [393, 1.786], [393, 3.571], [375, 3.571], [320, 3.571]] as const) {
+    const root = routeHarness('(tabs)/reports.tsx', { currency: 'ARS', month: '2026-08' }, snapshot, { window: { width, height: 852, fontScale, scale: 3 } }).render();
+    const title = titleOf(root);
+    const expected = geometry.titleFit(fontScale, 55 / 20, wordEm, 20 * 1.06, width - 144, width - 40);
+    const at = `${width} pt ×${fontScale}`;
+    assert.deepEqual([title.props.maxFontSizeMultiplier, title.props.numberOfLines], [expected.maxScale, 2], at);
+    const drawn = 20 * Math.min(fontScale, expected.maxScale);
+    // «Septiembre» stays whole on its line: beside the arrows (2 × 44 pt and two 8 pt gaps) or alone on the screen's width.
+    assert.ok(wordEm * 20 * 1.06 * Math.min(fontScale, expected.maxScale) <= (expected.stacked ? width - 40 : width - 144) + 1e-9, at);
+    const stepper = nodes(root).find(n => n.type === 'View' && [n.props.children].flat().some((child: any) => child?.type === 'ValueTransition'))!;
+    const arrows = nodes(stepper).filter(n => n.type === 'IconButton').map(n => n.props.label);
+    assert.equal(JSON.stringify(arrows), JSON.stringify(['Mes anterior', 'Mes siguiente']), at);
+    const first = [stepper.props.children].flat().filter(Boolean)[0];
+    if (expected.stacked) {
+      assert.equal(first.type, 'ValueTransition', at + ': the title first, the arrows under it');
+      assert.ok(fontScale >= 1.786, at);
+    } else assert.equal(first.type, 'IconButton', at + ': the arrows beside the title');
+    // The captions under it (August is past, so «Este mes» shows) take Caption 1\'s own ceiling, through AppText: never
+    // larger than the title at any setting.
+    const captions = nodes(stepper).filter(n => n.type === 'AppText' && n.props.variant === 'caption');
+    assert.equal(captions.length, 2, at);
+    for (const caption of captions) assert.equal(caption.props.maxFontSizeMultiplier, undefined, at);
+    assert.ok(12 * Math.min(fontScale, 43 / 12) <= drawn, `${at}: caption ${12 * Math.min(fontScale, 43 / 12)} pt under the title's ${drawn.toFixed(1)}`);
+  }
+  // At AX5 the title is far larger than the 28 pt it was capped at, and on a 393 pt screen it reaches iOS's own 55 pt.
+  const ax5 = geometry.titleFit(3.571, 55 / 20, wordEm, 20 * 1.06, 393 - 144, 393 - 40);
+  assert.deepEqual([ax5.stacked, Math.round(20 * Math.min(3.571, ax5.maxScale))], [true, 55]);
+});
+
 test('day and comparison cutoff reject malformed or future scope', () => {
   for (const date of [['2026-08-10'], '2026-02-30', '2026-09-13', undefined]) {
     assert.equal(find(routeHarness('report-day.tsx', { currency: 'ARS', date }).render(), 'EmptyState').props.title, 'Día no válido');
@@ -538,7 +577,8 @@ test('24C1: a consolidated month with an expense that has no rate shows per-curr
   assert.equal(JSON.stringify(parts.props.parts), JSON.stringify([{ currency: 'ARS', minor: 606 }, { currency: 'USD', minor: 999 }]));
   assert.match(parts.props.detail, /^No hay una cotización USD → ARS para el 31\/8\/2026\./);
   const comparison = routeHarness('report-comparison.tsx', { currency: 'EUR', month: '2026-08' }, snapshot, { display }).render();
-  assert.equal(find(comparison, 'EmptyState').props.detail, 'Sin cotización para sumarlo en EUR', 'no difference is claimed');
+  // 25R1: no difference is claimed, and the screen says why, in Reportes' own words.
+  assert.match(find(comparison, 'EmptyState').props.detail, /^No hay una cotización USD → ARS para el 31\/8\/2026\./);
 });
 
 test('25Q1 (REPORTS-02): a consolidated month waiting for a rate keeps its budgets, which need no rate; the drill-downs carry no day net', () => {
@@ -1277,4 +1317,57 @@ test('25OPS1: Reportes ends its content the dock\'s height above the window\'s b
     assert.equal(root.props.scrollIndicatorInsets, dock.indicator, 'the indicator ends above the dock');
     assert.equal(root.props.contentInsetAdjustmentBehavior, 'never', 'and the system adds no inset of its own');
   } finally { dock = { extraPadding: 0, indicator: undefined }; }
+});
+
+test('25R1: «Comparar con el mes anterior» is offered only when it can compare; the comparison says why a rate is missing, still arriving or offline', () => {
+  const consolidated = () => displayCurrency.createDisplayCurrencyStore(memoryPreferences({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated', [displayCurrency.DISPLAY_CURRENCY_KEY]: 'USD' }).store);
+  const book = domain.rateBook([
+    { base: 'USD', quote: 'ARS', rate: '1000', effectiveDate: '2026-08-07', source: 'Frankfurter', fetchedAt: '2026-09-01T00:00:00.000Z' },
+    { base: 'USD', quote: 'ARS', rate: '1000', effectiveDate: '2026-08-28', source: 'Frankfurter', fetchedAt: '2026-09-01T00:00:00.000Z' },
+  ]);
+  // August is complete; July has no expense at all, so the comparison can run: the row stays.
+  const rowOf = (root: Node) => nodes(root).some(n => n.type === 'NavigationRow' && n.props.title === 'Comparar con el mes anterior');
+  assert.equal(rowOf(routeHarness('(tabs)/reports.tsx', { month: '2026-08' }, snapshot, { display: consolidated(), book }).render()), true);
+  // September is complete but August, its previous month, lacks the rates of its last week: no dead end offered.
+  const later: domain.LedgerSnapshot = { ...snapshot, entries: [...snapshot.entries,
+    { id: 'sep', accountId: 'u', kind: 'expense', amountMinor: 500, merchant: 'Prueba', category: 'Salud', dateISO: '2026-09-11', createdAt }] };
+  const partial = domain.rateBook([{ base: 'USD', quote: 'ARS', rate: '1000', effectiveDate: '2026-08-07', source: 'Frankfurter', fetchedAt: '2026-09-01T00:00:00.000Z' }]);
+  const september = routeHarness('(tabs)/reports.tsx', { month: '2026-09' }, later, { display: consolidated(), book: partial }).render();
+  assert.equal(rowOf(september), false);
+  // One currency at a time (single mode) needs no rate: always offered.
+  assert.equal(rowOf(routeHarness('(tabs)/reports.tsx', { month: '2026-09' }, later).render()), true);
+  // The comparison itself, reached by a link: fetching, offline (its own icon) and missing each say themselves.
+  const comparison = (activity: ratesStore.RatesActivity) => find(routeHarness('report-comparison.tsx', { currency: 'USD', month: '2026-09' }, later, { display: consolidated(), book: partial, activity }).render(), 'EmptyState');
+  assert.equal(comparison('fetching').props.detail, 'Obteniendo cotizaciones');
+  assert.equal(comparison('offline').props.icon, 'cloud-offline-outline');
+  assert.match(comparison('offline').props.detail, /^Sin conexión/);
+  assert.match(comparison('idle').props.detail, /^La última cotización USD → ARS disponible es del 7\/8\/2026/, 'stale: the last one held is named');
+});
+
+test('25R1: a drill-down whose total waits for a rate says so with its reason behind ⓘ; the precision sentence is only for a total too large', () => {
+  const display = displayCurrency.createDisplayCurrencyStore(memoryPreferences({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated', [displayCurrency.DISPLAY_CURRENCY_KEY]: 'EUR' }).store);
+  const screens = [routeHarness('report-day.tsx', { currency: 'EUR', date: '2026-08-10' }, snapshot, { display, activity: 'offline' }).render(),
+    routeHarness('report-category.tsx', { currency: 'EUR', month: '2026-08', category: 'salud' }, snapshot, { display, activity: 'offline' }).render(),
+    routeHarness('spending-detail.tsx', { currency: 'EUR', startISO: '2026-08-01', endISO: '2026-08-31' }, snapshot, { display, activity: 'offline' }).render()];
+  for (const root of screens) {
+    const line = find(root, 'CurrencyParts');
+    assert.equal(JSON.stringify([line.props.parts, line.props.line]), JSON.stringify([[], 'Sin cotización para sumarlo en EUR']));
+    assert.match(line.props.detail, /^Sin conexión/);
+    assert.equal(texts(root).some(text => /precisión/.test(text)), false);
+  }
+  const fetching = find(routeHarness('report-day.tsx', { currency: 'EUR', date: '2026-08-10' }, snapshot, { display, activity: 'fetching' }).render(), 'CurrencyParts');
+  assert.equal(fetching.props.line, 'Obteniendo cotizaciones');
+});
+
+test('25R1: a malformed month or date in a link never reaches the rate store; the screen says the link is invalid', () => {
+  const display = displayCurrency.createDisplayCurrencyStore(memoryPreferences({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated', [displayCurrency.DISPLAY_CURRENCY_KEY]: 'EUR' }).store);
+  for (const [file, params] of [['report-category.tsx', { currency: 'EUR', month: '2026-00', category: 'salud' }], ['report-category.tsx', { currency: 'EUR', month: '2026-0x', category: 'salud' }],
+    ['report-day.tsx', { currency: 'EUR', date: '2026-13-01' }], ['spending-detail.tsx', { currency: 'EUR', startISO: '2026-00-01', endISO: '2026-00-02' }]] as const) {
+    const ensured: { months: readonly string[]; quotes: readonly string[] }[] = [];
+    const root = routeHarness(file, params, snapshot, { display, ensured }).render();
+    assert.ok(find(root, 'EmptyState'), file);
+    // Inicio no longer chooses dates: the invalid period never sends the person there.
+    assert.doesNotMatch(String(find(root, 'EmptyState').props.detail), /Inicio/, file);
+    assert.ok(ensured.every(request => request.months.every(month => domain.validMonthISO(month))), file + ': ' + JSON.stringify(ensured));
+  }
 });

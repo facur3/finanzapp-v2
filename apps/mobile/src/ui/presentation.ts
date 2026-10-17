@@ -4,6 +4,7 @@ import { CARD_DELETED_MESSAGE, OPERATION_ACCOUNT_DELETED_MESSAGE, OPERATION_CHAN
   type Transfer } from '@finanzapp/domain';
 import { dateFromISO, daysAgo, formatDate, relativeDayName } from '../i18n/format.ts';
 import { DEFAULT_LOCALE, type AppLocale } from '../i18n/locale.ts';
+import { VIEW_REFRESH_MESSAGE } from '../storage/ledger-session.ts';
 
 export type EntryFilter = 'all' | EntryKind | 'transfer';
 
@@ -219,4 +220,11 @@ const DETERMINISTIC_REFUSALS = new Set<string>([PLAN_CALENDAR_MESSAGE, OPERATION
   ...operationGuardMessages()]);
 export function releasesDraft(message: string): boolean {
   return DETERMINISTIC_REFUSALS.has(message);
+}
+
+/** 25R1: the write committed and only the view could not be read again (the banner already says to verify before doing it
+ * again). An action that keeps nothing frozen for an exact retry (pause, delete, archive, a restore) is done: it never says
+ * it failed nor offers the same write again over a stale view. */
+export function committedBeforeRefresh(cause: unknown): boolean {
+  return cause instanceof Error && cause.message === VIEW_REFRESH_MESSAGE;
 }

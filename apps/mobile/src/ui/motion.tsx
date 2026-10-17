@@ -1,6 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
-import Animated, { Easing, FadeIn, FadeInUp, FadeOut, LinearTransition, ReduceMotion, type WithTimingConfig } from 'react-native-reanimated';
+import Animated, { Easing, FadeIn, FadeInUp, FadeOut, LinearTransition, ReduceMotion, cubicBezier, type WithTimingConfig } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useReduceMotion } from './theme';
 
@@ -9,6 +9,9 @@ import { useReduceMotion } from './theme';
  * the opacity changes that explain a state and drops movement and reveals. */
 export const easeOut = Easing.bezier(0.23, 1, 0.32, 1);
 export const easeInOut = Easing.bezier(0.77, 0, 0.175, 1);
+/** `easeOut` for a CSS transition (`transitionTimingFunction`), which takes Reanimated's CSS easing, not an `Easing`
+ * function: without it a colour transition runs the default «ease» beside a thumb on `easeOut`. */
+export const easeOutCss = cubicBezier(0.23, 1, 0.32, 1);
 /** iOS's own sheet curve: a quick start that settles long, the way a presented sheet
  * rises. `easeOut` covers 60 % of a travel in its first 33 ms, right for a value or a
  * thumb, too abrupt for a card the eye follows from the bottom edge (24UX1). */
@@ -36,6 +39,10 @@ export const duration = {
 } as const;
 
 export type Duration = keyof typeof duration;
+
+/** The one ambient loop: the Assistant's «Pensando…» dot, 600 ms each way on a symmetric curve (it never settles, so it
+ * has no ease-out end). Static under Reduce Motion: the caller does not start it. */
+export const pulseTiming: WithTimingConfig = { duration: 600, easing: Easing.inOut(Easing.quad) };
 
 /** Timing config for a data or state change; zero-length when motion is reduced. */
 export function timing(kind: Duration, reduced: boolean): WithTimingConfig {
@@ -69,13 +76,25 @@ export function successHaptic() {
   void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
 }
 
+/** 25Q4: a write the person asked for failed and no unverified submission waits for «Reintentar»: refused before sending, or
+ * by storage before writing, or offered again as new. Once, in its catch, after the error is set; never while typing. */
+export function errorHaptic() {
+  void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+}
+
+/** 25Q4: a write the person asked for failed with an outcome the app cannot verify, and the screen keeps the exact submission
+ * frozen for «Reintentar». Once, in its catch, after the error is set. */
+export function warningHaptic() {
+  void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+}
+
 const rise = FadeInUp.duration(duration.enter).easing(easeOut).withInitialValues({ opacity: 0, transform: [{ translateY: 6 }] });
 // A fade is what Reduce Motion keeps (it explains a change without moving anything), so its policy is explicit, as for
 // the sheet (`sheetTiming`): without one, Reanimated follows the device setting and lands in one frame, and every
 // crossfade below would be an instant swap. The callers already drop the rise and the reflow from their own reading.
 const fadeIn = FadeIn.duration(duration.enter).easing(easeOut).reduceMotion(ReduceMotion.Never);
 const fadeOut = FadeOut.duration(duration.exit).easing(easeOut).reduceMotion(ReduceMotion.Never);
-const reflow = LinearTransition.duration(220).easing(easeOut);
+const reflow = LinearTransition.duration(duration.state).easing(easeOut);
 /** Producto 25UX1: a list row travelling to its new place when the list's order changes (Reportes' chosen category rising
  * to the top and the rows around it making room, then returning): the data move of the app's one curve, no spring. The
  * caller drops it under Reduce Motion, so the order changes at once. */

@@ -1,17 +1,17 @@
 import { useRef, useState } from 'react';
-import { Alert, Keyboard } from 'react-native';
+import { Alert, Keyboard, View } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
-import * as Haptics from 'expo-haptics';
 import { accountBalanceMinor, accountLook, isLiveAccount, makeAccountAppearance, makeAccountChange, minorFromEditedDraft, validateAccountAppearance,
   validateAccountChange, type Account, type AccountAppearance, type AccountChange, type LedgerSnapshot, type StoredDraft } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { ACCOUNT_ICON_CHOICES, COLOR_CHOICES } from '../../src/ui/appearance';
 import { IconColorPicker } from '../../src/ui/appearance-picker';
 import { draftFromMinor } from '../../src/ui/money-input';
-import { ActionButton, AmountField, AppText, EmptyState, ErrorMessage, Field, FieldNote, IconButton, Screen } from '../../src/ui/components';
+import { ActionButton, AmountField, AppText, EmptyState, ErrorMessage, Field, FieldNote, IconButton, Screen, SectionTitle } from '../../src/ui/components';
 import { CurrencyField } from '../../src/ui/form-controls';
 import { useAccountManagement } from '../../src/ui/commitment-actions';
+import { errorHaptic, successHaptic, warningHaptic } from '../../src/ui/motion';
 import { useI18n } from '../../src/i18n/provider';
 
 export default function EditAccountScreen() {
@@ -38,10 +38,11 @@ type Submission = { change: AccountChange | null; appearance: AccountAppearance 
 
 /** Display name, icon and colour change how the account is shown; only the
  * balance correction touches a financial field, and it still asks first.
- * Everything is saved in one commit. Currency stays immutable. */
+ * Everything is saved in one commit. Currency stays immutable. 25O1: Nueva cuenta's order: the name, the money (the
+ * recorded balance, the currency), then «Apariencia»; Guardar and, apart, Eliminar. */
 function AccountEditor({ account, snapshot, current }: { account: Account; snapshot: LedgerSnapshot; current?: AccountAppearance }) {
   const { updateAccount, saveAppearance, archive } = useLedger();
-  const { t, formatMoneyAmount } = useI18n();
+  const { t, formatMoneyAmount, failureMessage } = useI18n();
   const manage = useAccountManagement();
   // A card's or a debt's internal account is edited from its own screen and never deleted here.
   const deletable = !archive?.cards?.some(card => card.accountId === account.id) && !archive?.debts?.some(debt => debt.accountId === account.id);
@@ -65,9 +66,13 @@ function AccountEditor({ account, snapshot, current }: { account: Account; snaps
     try {
       if (submission.change) await updateAccount(submission.change, submission.appearance ?? undefined);
       else if (submission.appearance) await saveAppearance(submission.appearance);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      successHaptic();
       working.current = false; close();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'accounts.edit.saveUnverified'); }
+    } catch (cause) {
+      setError(failureMessage(cause, 'accounts.edit.saveUnverified'));
+      // 25Q4: only the write fails here, and the change stays frozen for the exact retry.
+      warningHaptic();
+    }
     finally { working.current = false; setBusy(false); }
   }
   function save() {
@@ -91,22 +96,29 @@ function AccountEditor({ account, snapshot, current }: { account: Account; snaps
         { text: t('common.cancel'), style: 'cancel', onPress: () => { confirming.current = false; } },
         { text: t('accounts.edit.correctConfirm'), onPress: () => { confirming.current = false; void apply(submission); } },
       ], { cancelable: true, onDismiss: () => { confirming.current = false; } });
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'accounts.edit.invalid'); }
+    } catch (cause) {
+      setError(failureMessage(cause, 'accounts.edit.invalid'));
+      // 25Q4: refused before anything was sent.
+      errorHaptic();
+    }
   }
   const locked = busy || pending !== null;
   return <Screen>
     <Stack.Screen options={{ title: t('nav.titles.editAccount'), gestureEnabled: !busy,
       headerLeft: () => <IconButton name="close" label={t('common.close')} onPress={close} disabled={busy} /> }} />
     <Field label={t('accounts.form.name')} value={name} onChangeText={setName} maxLength={80} editable={!locked} />
-    <IconColorPicker icons={ACCOUNT_ICON_CHOICES} colors={COLOR_CHOICES} icon={icon} color={color}
-      onIconChange={setIcon} onColorChange={setColor} disabled={locked} previewLabel={name} />
     <AmountField label={t('accounts.edit.recordedBalance')} currency={account.currency} value={balance} onChangeText={setBalance} stored={stored}
       keyboardType="numbers-and-punctuation" inputMode={undefined} editable={!locked} />
     <FieldNote help={{ title: t('accounts.edit.recordedBalance'), detail: t('accounts.edit.balanceHelp') }}>{t('accounts.edit.balanceNote')}</FieldNote>
     <CurrencyField value={account.currency} />
     <FieldNote help={{ title: t('selection.currency'), detail: t('accounts.edit.currencyHelp') }}>{t('accounts.edit.currencyNote')}</FieldNote>
+    <View>
+      <SectionTitle>{t('accounts.form.appearance')}</SectionTitle>
+      <IconColorPicker icons={ACCOUNT_ICON_CHOICES} colors={COLOR_CHOICES} icon={icon} color={color}
+        onIconChange={setIcon} onColorChange={setColor} disabled={locked} previewLabel={name} />
+    </View>
     <ErrorMessage message={error} />
-    {pending && error && <AppText secondary style={{ fontSize: 13 }}>{t('accounts.edit.retryNote')}</AppText>}
+    {pending && error && <AppText secondary variant="footnote">{t('accounts.edit.retryNote')}</AppText>}
     <ActionButton label={pending && error ? t('common.retrySave') : t('common.saveChanges')} onPress={save} busy={busy} disabled={!name.trim() || !balance.trim()} />
     {/* 25B2: the destructive action last, apart from Save, with its own confirmation naming what stays. */}
     {deletable && <>

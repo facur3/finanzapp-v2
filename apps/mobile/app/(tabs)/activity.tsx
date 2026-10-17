@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, View } from 'react-native';
-import { router, useFocusEffect } from 'expo-router';
+import { Tabs, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useLedger } from '../../src/storage/LedgerProvider';
-import { ActionButton, AppText, Choices, EmptyState, SearchField } from '../../src/ui/components';
+import { ActionButton, AppText, Choices, EmptyState, IconButton, SearchField } from '../../src/ui/components';
 import { EntryList } from '../../src/ui/entry-list';
 import { selectEntries, selectTransfers, type EntryFilter } from '../../src/ui/presentation';
 import { useCategoryLookOf } from '../../src/ui/category-hues';
@@ -12,12 +12,26 @@ import { useI18n } from '../../src/i18n/provider';
  * (Todos, Gastos, Ingresos, Transf.) and the count, then each day as a heading with its net and the day's movements in
  * one grouped surface. Recording is the dock's «+» (no «+» of its own in the header); a row opens its detail, where
  * Deshacer and Recuperar live. Amounts follow movement-amount.ts: no sign on an expense, «+» on an income, a transfer
- * in its own tone; a day's net keeps its sign, which is a computed meaning. */
+ * in its own tone; a day's net keeps its sign, which is a computed meaning.
+ *
+ * 25N1: Movimientos deshechos is a trailing button of this navigation bar (it was a row of Más), shown only while
+ * something is undone: a movement, a transfer, a devolución or an adelanto, the records that screen lists and restores. */
 export default function ActivityScreen() {
-  const { snapshot } = useLedger();
+  const { snapshot, archive } = useLedger();
   const [filter, setFilter] = useState<EntryFilter>('all');
   const [query, setQuery] = useState('');
+  // 25Q4: a link into Movimientos («Ver todos», the Assistant's evidence) carries a fresh `reset`: the whole list, from the
+  // top. The dock re-sends the route's last params, so only a new value resets; a dock arrival keeps the search, the filter
+  // and the scroll. Adjusted while rendering, so no frame shows the old list.
+  const { reset } = useLocalSearchParams<{ reset?: string }>();
+  const [arrival, setArrival] = useState(reset);
+  if (reset !== arrival) { setArrival(reset); setQuery(''); setFilter('all'); }
   const { t } = useI18n();
+  const undone = (archive?.records.filter(record => record.voided).length ?? 0) + (archive?.transfers?.filter(record => record.voided).length ?? 0)
+    + (archive?.purchaseOperations?.filter(operation => operation.voided).length ?? 0);
+  // One options object per change of what the button shows, so typing in the search never re-sets the bar.
+  const bar = useMemo(() => ({ headerRight: undone ? () => <IconButton name="arrow-undo-outline" label={t('nav.titles.undoneEntries')}
+    onPress={() => router.push('/undone-entries')} /> : undefined }), [undone > 0, t]);
   // The search also matches the name a category shows, so a built-in category answers to its name in the interface language.
   const expenseLook = useCategoryLookOf('expense'), incomeLook = useCategoryLookOf('income');
   const entries = useMemo(() => snapshot ? selectEntries(snapshot.entries, snapshot.accounts, filter, query, undefined,
@@ -30,7 +44,7 @@ export default function ActivityScreen() {
   // while typing, at once for a filter; never on the first render or when only the ledger changes. The tab stays mounted
   // under other tabs and pushed screens, so a pending announcement is cancelled when Movimientos loses focus (Codex,
   // PR #72): it never speaks over another screen.
-  const asked = useRef({ query, filter });
+  const asked = useRef({ query, filter, arrival });
   const focused = useRef(true);
   const pending = useRef<ReturnType<typeof setTimeout> | null>(null);
   // What the announcement says is read when it fires: the count of that moment, in the language of that moment.
@@ -42,32 +56,40 @@ export default function ActivityScreen() {
     return () => { focused.current = false; cancel(); };
   }, []));
   useEffect(() => {
-    if (asked.current.query === query && asked.current.filter === filter) return;
-    asked.current = { query, filter };
+    // 25Q4: an arrival is not the person's search or filter: nothing is announced.
+    const arrived = asked.current.arrival !== arrival;
+    if (!arrived && asked.current.query === query && asked.current.filter === filter) return;
+    asked.current = { query, filter, arrival };
     cancel();
-    if (!focused.current) return;
+    if (arrived || !focused.current) return;
     pending.current = setTimeout(() => {
       pending.current = null;
       if (focused.current) AccessibilityInfo.announceForAccessibility(latest.current.t('count.movements', { count: latest.current.count }));
     }, query ? 700 : 0);
-  }, [query, filter]);
+  }, [query, filter, arrival]);
   useEffect(() => cancel, []);
   if (!snapshot) return null;
   const hasRecords = snapshot.entries.length + (snapshot.transfers?.length ?? 0) > 0;
   // 25Q1: «Neto del día» only while nothing narrows the list: under Gastos, Ingresos or a search it would be a subset's sum.
-  return <EntryList entries={entries} transfers={transfers} accounts={snapshot.accounts} dayNet={filter === 'all' && !query.trim()}
-    header={hasRecords ? <View style={{ gap: 14, paddingTop: 4 }}>
-      <SearchField label={t('activity.search')} placeholder={t('activity.searchPlaceholder')} value={query} onChangeText={setQuery} />
-      <Choices value={filter} onChange={setFilter}
-        options={[{ value: 'all', label: t('activity.all') }, { value: 'expense', label: t('activity.expenses') }, { value: 'income', label: t('activity.incomes') },
-          { value: 'transfer', label: t('activity.transfers') }]} />
-      <AppText secondary variant="footnote" style={{ paddingHorizontal: 4 }}>{t('count.movements', { count })}</AppText>
-    </View> : undefined}
-    empty={hasRecords ? <EmptyState title={t('activity.noMatchesTitle')} icon="search-outline"
-      detail={t('activity.noMatchesDetail')}
-      action={<ActionButton label={t('activity.clearFilters')} secondary onPress={() => { setQuery(''); setFilter('all'); }} />} />
-      : <EmptyState title={t('activity.emptyTitle')} icon="receipt-outline"
-        detail={t('activity.emptyDetail')}
-        action={<ActionButton label={snapshot.accounts.length ? t('nav.recordMovement') : t('common.addAccount')}
-          onPress={() => router.push(snapshot.accounts.length ? '/new-entry' : '/new-account')} />} />} />;
+  // 25Q4: a new arrival mounts a new list, at its own top.
+  return <>
+    <Tabs.Screen options={bar} />
+    <EntryList key={arrival} entries={entries} transfers={transfers} accounts={snapshot.accounts} dayNet={filter === 'all' && !query.trim()}
+      header={hasRecords ? <View style={{ gap: 14, paddingTop: 4 }}>
+        <SearchField label={t('activity.search')} placeholder={t('activity.searchPlaceholder')} value={query} onChangeText={setQuery} />
+        <Choices value={filter} onChange={setFilter}
+          options={[{ value: 'all', label: t('activity.all') }, { value: 'expense', label: t('activity.expenses') }, { value: 'income', label: t('activity.incomes') },
+            { value: 'transfer', label: t('activity.transfers') }]} />
+        <AppText secondary variant="footnote" style={{ paddingHorizontal: 4 }}>{t('count.movements', { count })}</AppText>
+      </View> : undefined}
+      empty={hasRecords ? <EmptyState title={t('activity.noMatchesTitle')} icon="search-outline"
+        detail={t('activity.noMatchesDetail')}
+        action={<ActionButton label={t('activity.clearFilters')} secondary onPress={() => { setQuery(''); setFilter('all'); }} />} />
+        // 25O1: with an account the dock's «+» is the filled action, so this one is secondary; without one, adding an account
+        // is the only way forward and it stays filled.
+        : <EmptyState title={t('activity.emptyTitle')} icon="receipt-outline"
+          detail={t('activity.emptyDetail')}
+          action={<ActionButton label={snapshot.accounts.length ? t('nav.recordMovement') : t('common.addAccount')} secondary={snapshot.accounts.length > 0}
+            onPress={() => router.push(snapshot.accounts.length ? '/new-entry' : '/new-account')} />} />} />
+  </>;
 }

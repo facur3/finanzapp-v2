@@ -43,8 +43,8 @@ export function AssistantComposer({ value, onChange, onSend, onStop, busy, disab
   const { fontScale } = useWindowDimensions();
   const canSend = value.trim().length > 0 && !busy && !disabled;
   const maxHeight = Math.round(LINE_HEIGHT * Math.min(fontScale, 1.6) * COMPOSER_MAX_LINES);
-  const opaque = { backgroundColor: p.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: p.isDark ? 'rgba(255,255,255,0.10)' : 'rgba(10,10,12,0.08)',
-    ...(p.isDark ? {} : styles.barShadow) };
+  const opaque = { backgroundColor: p.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: p.edge,
+    ...(p.isDark ? {} : { ...styles.barShadow, shadowColor: p.shadow }) };
   return <KeyboardSpace bottomInset={insets.bottom}>
     <ControlSurface material={material} style={styles.bar} opaque={opaque}>
       <TextInput value={value} onChangeText={onChange} multiline editable={!disabled} placeholder={t(COMPOSER_PLACEHOLDER)} placeholderTextColor={p.tertiary}
@@ -52,11 +52,11 @@ export function AssistantComposer({ value, onChange, onSend, onStop, busy, disab
         selectionColor={p.primary} keyboardAppearance={p.isDark ? 'dark' : 'light'} textAlignVertical="center"
         style={[styles.input, { color: p.text, maxHeight, lineHeight: LINE_HEIGHT }]} />
       {busy
-        ? <PressFeedback accessibilityRole="button" accessibilityLabel={t('assistant.composer.stop')} onPress={onStop} style={styles.round}>
+        ? <PressFeedback accessibilityRole="button" accessibilityLabel={t('assistant.composer.stop')} onPress={onStop} containerStyle={styles.roundSlot} style={styles.round}>
           <View style={[styles.send, { backgroundColor: p.inset }]}><Ionicons name="stop" size={14} color={p.text} accessible={false} /></View>
         </PressFeedback>
         : <PressFeedback accessibilityRole="button" accessibilityLabel={t('assistant.composer.send')} accessibilityState={{ disabled: !canSend }} disabled={!canSend}
-          onPress={onSend} style={styles.round}>
+          onPress={onSend} containerStyle={styles.roundSlot} style={styles.round}>
           <View style={[styles.send, { backgroundColor: canSend ? p.primaryFill : p.inset }]}>
             <Ionicons name="arrow-up" size={18} color={canSend ? p.onPrimary : p.tertiary} accessible={false} />
           </View>
@@ -87,8 +87,11 @@ function KeyboardSpace({ children, bottomInset }: { children: ReactNode; bottomI
 const styles = StyleSheet.create({
   space: { paddingHorizontal: space.l, paddingTop: space.s, gap: space.s },
   bar: { flexDirection: 'row', alignItems: 'flex-end', gap: 2, paddingLeft: 16, paddingRight: 6, paddingVertical: 4, borderRadius: 24, minHeight: 48 },
-  barShadow: { shadowColor: '#0A0A0C', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } },
+  barShadow: { shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } },
   input: { flex: 1, fontSize: 17, paddingTop: Platform.OS === 'ios' ? 9 : 6, paddingBottom: Platform.OS === 'ios' ? 9 : 6, minHeight: 40 },
-  round: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', minHeight: 40 },
+  // 25D1: a real 44 pt target (it was 40) that still costs 40 pt of layout: the extra 2 pt each side sit inside the bar's
+  // 4 pt padding, so the 32 pt disc, the field and the 48 pt bar do not move.
+  round: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', minHeight: 44 },
+  roundSlot: { margin: -2 },
   send: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
 });

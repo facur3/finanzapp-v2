@@ -11,6 +11,7 @@ import * as liabilityPresentation from '../src/ui/liability-presentation.ts';
 import * as installmentPresentation from '../src/ui/installment-presentation.ts';
 import * as moneyInput from '../src/ui/money-input.ts';
 import * as entryPrefill from '../src/ui/entry-prefill.ts';
+import { memoryOf } from './preference-memory.ts';
 import * as purchasePlan from '../src/ui/purchase-plan.ts';
 import * as movementAmount from '../src/ui/movement-amount.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
@@ -79,6 +80,8 @@ function harness(file: string, options: { data?: domain.LedgerArchive; params?: 
   const pushed: any[] = [], alerts: { title: string; message: string; buttons: { text: string; style?: string; onPress?: () => void }[] }[] = [];
   const refunds: (domain.EntryRefund | domain.PlanRefund)[] = [], changes: domain.OperationChange[] = [], updates: domain.EntryChange[] = [];
   let haptics = 0;
+  // 25Q4: a failed write's haptic, by type (Success is counted in `haptics`).
+  const failures: string[] = [];
   let data = options.data ?? base();
   const locale: AppLocale = options.locale ?? 'es-AR';
   const i18nProvider = { useI18n: () => bindLocale(locale) };
@@ -107,16 +110,16 @@ function harness(file: string, options: { data?: domain.LedgerArchive; params?: 
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, useLocalSearchParams: () => options.params ?? {},
       router: { canGoBack: () => true, back: () => { backs++; }, push: (value: unknown) => pushed.push(value), replace: (value: unknown) => pushed.push(value) } },
     'expo-crypto': { randomUUID: () => 'operation-' + (++uuid) },
-    'expo-haptics': { NotificationFeedbackType: { Success: 'Success' }, notificationAsync: async () => { haptics++; } },
     '@finanzapp/domain': clockDomain,
     '../storage/LedgerProvider': ledger, '../src/storage/LedgerProvider': ledger, '../../src/storage/LedgerProvider': ledger,
     '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
     ...ui('components', components), ...ui('theme', theme), ...ui('category-hues', hues),
     ...ui('presentation', presentation), ...ui('operation-presentation', operationPresentation), ...ui('money-input', moneyInput),
     ...ui('budget-presentation', budgetPresentation), ...ui('liability-presentation', liabilityPresentation), ...ui('installment-presentation', installmentPresentation),
-    ...ui('movement-amount', movementAmount), ...ui('entry-prefill', entryPrefill), ...ui('purchase-plan', purchasePlan),
+    ...ui('movement-amount', movementAmount), ...ui('entry-prefill', entryPrefill), ...ui('purchase-plan', purchasePlan), ...ui('last-account', memoryOf({})),
     ...ui('form-controls', { AccountField: 'AccountField', CategoryField: 'CategoryField', DateField: 'DateField', SelectorCard: 'SelectorCard' }),
     ...ui('installment-purchase', { InstallmentPurchase: 'InstallmentPurchase' }), ...ui('entry-list', { EntryList: 'EntryList' }),
+    ...ui('motion', { successHaptic: () => { haptics++; }, errorHaptic: () => { failures.push('Error'); }, warningHaptic: () => { failures.push('Warning'); } }),
   };
   const require = function require(name: string) {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected refund route dependency: ' + name);
@@ -133,7 +136,7 @@ function harness(file: string, options: { data?: domain.LedgerArchive; params?: 
       return node;
     },
     setData: (next: domain.LedgerArchive) => { data = next; },
-    pushed, alerts, refunds, changes, updates, backs: () => backs, haptics: () => haptics,
+    pushed, alerts, refunds, changes, updates, failures, backs: () => backs, haptics: () => haptics,
   };
 }
 function nodes(value: any): Node[] {
@@ -271,11 +274,13 @@ test('24T3: the refund form keeps the submission frozen on an unknown outcome an
   assert.equal(find(root, 'AmountField').props.editable, false, 'frozen while the outcome is unknown');
   assert.equal(find(root, 'ActionButton').props.label, 'Reintentar guardado');
   assert.ok(texts(root).includes('Reintentá: se envía la misma devolución y no se registra dos veces.'));
+  assert.equal(view.failures.join(','), 'Warning', '25Q4: it may have been written, so Warning while it stays frozen');
   // The commit happened: the ledger now holds it; the retry sends the very same devolución (storage's retry is a no-op).
   view.setData(domain.applyNewOperation(base(), view.refunds[0], TODAY));
   await find(view.render(), 'ActionButton').props.onPress();
   assert.equal(JSON.stringify(view.refunds[1]), JSON.stringify(view.refunds[0]));
   assert.equal(view.backs(), 1);
+  assert.equal(JSON.stringify([view.failures.join(','), view.haptics()]), JSON.stringify(['Warning', 1]), 'the retry taps Success once');
 
   let refused = true;
   const again = harness('app/new-refund.tsx', { params: { entryId: buy.id }, addRefund: async () => { if (refused) { refused = false; throw new Error(domain.REFUND_OVER_MESSAGE); } } });
@@ -283,13 +288,16 @@ test('24T3: the refund form keeps the submission frozen on an unknown outcome an
   await find(again.render(), 'ActionButton').props.onPress();
   root = again.render();
   assert.equal(find(root, 'ErrorMessage').props.message, domain.REFUND_OVER_MESSAGE);
+  assert.equal(find(root, 'ErrorMessage').props.announce, true, '25VIS2: what Save refused is spoken');
   assert.equal(bindLocale('en-US').errorText(domain.REFUND_OVER_MESSAGE) !== domain.REFUND_OVER_MESSAGE, true, 'the refusal is catalogued in English too');
   assert.equal(find(root, 'AmountField').props.editable, true, 'released: the person reviews the draft');
   assert.notEqual(find(root, 'ActionButton').props.label, 'Reintentar guardado');
+  assert.equal(again.failures.join(','), 'Error', '25Q4: nothing was written, so Error');
   find(root, 'AmountField').props.onChangeText('150');
   await find(again.render(), 'ActionButton').props.onPress();
   assert.equal(JSON.stringify(again.refunds.map(item => [item.id, item.amountMinor])), JSON.stringify([['operation-1', 20000], ['operation-1', 15000]]), 'the same id, built again');
   assert.equal(again.backs(), 1);
+  assert.equal(JSON.stringify([again.failures.join(','), again.haptics()]), JSON.stringify(['Error', 1]));
 });
 
 test('24T3: an amount over what is left is refused live with Save disabled; a purchase returned in full and an income offer no form', () => {
@@ -301,7 +309,12 @@ test('24T3: an amount over what is left is refused live with Save disabled; a pu
   find(root, 'AmountField').props.onChangeText('300,01');
   root = view.render();
   assert.equal(find(root, 'ErrorMessage').props.message, domain.REFUND_OVER_MESSAGE);
+  assert.equal(find(root, 'ErrorMessage').props.announce, false, '25VIS2: the live line is shown, not spoken while typing');
   assert.equal(find(root, 'ActionButton').props.disabled, true);
+  find(root, 'AmountField').props.onChangeText('12,');
+  root = view.render();
+  assert.equal(find(root, 'ErrorMessage').props.message, domain.REFUND_AMOUNT_MESSAGE, 'a half-typed decimal shows the hint');
+  assert.equal(find(root, 'ErrorMessage').props.announce, false, 'and VoiceOver does not hear a false refusal mid-typing');
   assert.equal(has(root, 'SectionTitle'), false, 'no preview for a draft the domain refuses');
 
   const full = harness('app/new-refund.tsx', { params: { entryId: buy.id }, data: refundOf(base(), 'r1', 50000, '2026-09-20') }).render();
@@ -353,9 +366,11 @@ test('24T3: a devolución\'s detail: hero, purchase link, what it records, and a
   assert.equal(JSON.stringify(view.pushed.pop()), JSON.stringify({ pathname: '/entry/[id]', params: { id: 'buy' } }));
   assert.equal(find(root, 'DetailRow', 'Categoría').props.value, 'Ropa');
   assert.ok(texts(root).includes(`Acredita $${NB}200,00 en Banco y resta del gasto de Ropa en septiembre de 2026. No es un ingreso.`), texts(root).join(' | '));
+  assert.equal(find(root, 'ActionButton', 'Deshacer devolución').props.icon, undefined, 'the hero\'s undo arrow means devolución; the verb says undo');
   find(root, 'ActionButton', 'Deshacer devolución').props.onPress();
   assert.equal(view.alerts[0].title, '¿Deshacer devolución?');
-  assert.equal(view.alerts[0].message, `Deja de acreditar $${NB}200,00 en Banco y la compra vuelve a contar entera en Ropa. Podés restaurarla después desde Movimientos deshechos.`);
+  assert.equal(view.alerts[0].buttons.map((button: { style?: string }) => button.style ?? '').join(','), 'cancel,default', 'restorable: not red');
+  assert.equal(view.alerts[0].message, `Deja de acreditar $${NB}200,00 en Banco y la compra vuelve a contar entera en Ropa. Podés restaurarla después desde Movimientos deshechos, en Movimientos.`);
   view.alerts[0].buttons[0].onPress?.();
   assert.equal(view.changes.length, 0, 'cancelled: nothing sent');
   find(view.render(), 'ActionButton', 'Deshacer devolución').props.onPress();
@@ -379,11 +394,25 @@ test('24T3: an undo whose outcome is unknown keeps the change for «Reintentar c
   view.alerts[0].buttons[1].onPress?.();
   await flush();
   const root = view.render();
-  assert.equal(find(root, 'ErrorMessage').props.message, 'Refresh failed after commit');
+  assert.equal(find(root, 'ErrorMessage').props.message, 'operations.change.failed', '25Q4: the action\'s own sentence, never the engine\'s text');
+  assert.equal(view.failures.join(','), 'Warning', '25Q4: it may have been written, so Warning while it stays frozen');
   find(root, 'ActionButton', 'Reintentar cambio').props.onPress();
   await flush();
   assert.equal(view.alerts.length, 1, 'no second confirmation');
   assert.equal(JSON.stringify(view.changes[1]), JSON.stringify(view.changes[0]), 'the same change, resent');
+  assert.equal(JSON.stringify([view.failures.join(','), view.haptics()]), JSON.stringify(['Warning', 1]));
+
+  // 25R1: once a later read shows the undo applied (it committed), the frozen change gives way: the restore is offered.
+  const late = harness('app/operation/[id].tsx', { params: { id: 'r1' }, data, change: async () => { throw new Error('Refresh failed after commit'); } });
+  find(late.render(), 'ActionButton', 'Deshacer devolución').props.onPress();
+  late.alerts[0].buttons[1].onPress?.();
+  await flush();
+  assert.ok(has(late.render(), 'ActionButton', 'Reintentar cambio'));
+  late.setData(domain.applyOperationChange(data, late.changes[0], TODAY).archive);
+  late.render();
+  const shown = late.render();
+  assert.equal(has(shown, 'ActionButton', 'Reintentar cambio'), false);
+  assert.equal(find(shown, 'ErrorMessage').props.message, null, 'its unknown-outcome sentence goes with it');
 
   // Undone, then another devolución took everything that was left: restoring it would exceed the purchase.
   const blocked = refundOf(undoOf(data, 'r1'), 'r2', 50000, '2026-09-25');
@@ -412,6 +441,7 @@ test('24T3: an adelanto\'s detail lists what it brought forward; its undo names 
   assert.equal(view.alerts[0].title, '¿Deshacer adelanto?');
   assert.equal(view.alerts[0].message, `Las cuotas adelantadas ($${NB}400,00 de precio) vuelven a quedar pendientes y dejan de contar con esta fecha. `
     + `Se registra la cuota 9 en su cierre ($${NB}100,00). Este adelanto no podrá restaurarse.`);
+  assert.equal(view.alerts[0].buttons.map((button: { style?: string }) => button.style ?? '').join(','), 'cancel,destructive', 'it cannot come back: the one undo that stays red');
 });
 
 // ---- the movement detail of a purchase with devoluciones ------------------------------------------------------------
@@ -430,6 +460,8 @@ test('24T3: a purchase lists its devoluciones with «Devuelto … de …», offe
   assert.equal(JSON.stringify(view.pushed.pop()), JSON.stringify({ pathname: '/operation/[id]', params: { id: 'r1' } }));
   find(root, 'ActionButton', 'Registrar devolución').props.onPress();
   assert.equal(JSON.stringify(view.pushed.pop()), JSON.stringify({ pathname: '/new-refund', params: { entryId: 'buy' } }));
+  assert.deepEqual([find(root, 'ActionButton', 'Registrar devolución').props.icon, find(root, 'ActionButton', 'Deshacer movimiento').props.icon], ['arrow-undo-outline', undefined],
+    'two adjacent buttons never share a glyph: the undo arrow is the devolución\'s');
   find(root, 'ActionButton', 'Deshacer movimiento').props.onPress();
   assert.equal(JSON.stringify([view.alerts[0].title, view.alerts[0].message, view.alerts[0].buttons.map(button => button.text)]),
     JSON.stringify(['Esta compra tiene devoluciones', 'Para deshacerla, primero deshacé su devolución.', ['Cancelar', 'Ver devoluciones']]));
@@ -609,7 +641,7 @@ test('24T3 (verify): Movimientos deshechos draws an undone adelanto as its price
 // ---- review fixes (COPY) -------------------------------------------------------------------------------------------
 
 test('24T3 (review): undoing one of several live devoluciones says only its amount counts again and the others stay; the last one says «entera»', () => {
-  const restore = 'Podés restaurarla después desde Movimientos deshechos.';
+  const restore = 'Podés restaurarla después desde Movimientos deshechos, en Movimientos.';
   const alertOf = (data: domain.LedgerArchive, id: string, locale?: AppLocale) => {
     const view = harness('app/operation/[id].tsx', { params: { id }, data, locale });
     find(view.render(), 'ActionButton', locale === 'en-US' ? 'Undo refund' : 'Deshacer devolución').props.onPress();
@@ -619,7 +651,7 @@ test('24T3 (review): undoing one of several live devoluciones says only its amou
   const two = refundOf(refundOf(base(), 'r1', 10000, '2026-09-18'), 'r2', 5000, '2026-09-25');
   assert.equal(alertOf(two, 'r1'), `Deja de acreditar $${NB}100,00 en Banco y la compra vuelve a contar $${NB}100,00 más en Ropa. Su otra devolución sigue. ${restore}`);
   assert.equal(alertOf(two, 'r1', 'en-US'), `AR$${NB}100.00 is no longer credited to Banco and the purchase counts AR$${NB}100.00 more in Ropa. Its other refund stays. `
-    + 'You can restore it later from Undone transactions.');
+    + 'You can restore it later from Undone transactions, in Activity.');
   const three = refundOf(two, 'r3', 2000, '2026-09-28');
   assert.equal(alertOf(three, 'r3'), `Deja de acreditar $${NB}20,00 en Banco y la compra vuelve a contar $${NB}20,00 más en Ropa. Sus otras 2 devoluciones siguen. ${restore}`);
   // Once the other is undone, the one left is the last: the purchase counts in full again.
@@ -638,11 +670,11 @@ test('24T3 (review): undoing a plan devolución that reduced a single instalment
     return [op.creditMinor, op.reductions.map(row => row.number), view.alerts[0].message];
   };
   assert.equal(JSON.stringify(alertOf('small', 5000)),
-    JSON.stringify([0, [12], 'La cuota 12 vuelve a su importe. Podés restaurarla después desde Movimientos deshechos.']));
+    JSON.stringify([0, [12], 'La cuota 12 vuelve a su importe. Podés restaurarla después desde Movimientos deshechos, en Movimientos.']));
   assert.equal(JSON.stringify(alertOf('small', 5000, 'en-US')),
-    JSON.stringify([0, [12], 'Installment 12 goes back to its amount. You can restore it later from Undone transactions.']));
+    JSON.stringify([0, [12], 'Installment 12 goes back to its amount. You can restore it later from Undone transactions, in Activity.']));
   assert.equal(JSON.stringify(alertOf('two', 15000)),
-    JSON.stringify([0, [11, 12], 'Las cuotas 11–12 vuelven a su importe. Podés restaurarla después desde Movimientos deshechos.']));
+    JSON.stringify([0, [11, 12], 'Las cuotas 11–12 vuelven a su importe. Podés restaurarla después desde Movimientos deshechos, en Movimientos.']));
 });
 
 // ---- review fixes (ENTRY) ------------------------------------------------------------------------------------------
@@ -713,9 +745,11 @@ test('24T3 (review): an undo storage refuses before writing releases the change:
   assert.equal(find(root, 'ErrorMessage').props.message, domain.operationGuardMessage('refund-credit'));
   assert.equal(has(root, 'ActionButton', 'Reintentar cambio'), false, 'released: no retry of a change storage always refuses');
   assert.equal(find(root, 'ActionButton', 'Editar movimiento').props.disabled, false);
+  assert.equal(view.failures.join(','), 'Error', '25Q4: released, nothing was written');
   // The next tap asks again, about the ledger as it is now, with a new change.
   find(root, 'ActionButton', 'Deshacer movimiento').props.onPress();
   assert.equal(JSON.stringify([view.alerts.length, view.alerts[1].title]), JSON.stringify([2, '¿Deshacer movimiento?']));
+  assert.equal(view.alerts[1].buttons.map((button: { style?: string }) => button.style ?? '').join(','), 'cancel,default', 'an undo comes back from Movimientos deshechos: not red');
   failure = new Error('database is locked');
   view.alerts[1].buttons[1].onPress?.();
   await flush();
@@ -723,6 +757,42 @@ test('24T3 (review): an undo storage refuses before writing releases the change:
   assert.notEqual(view.updates[1].id, view.updates[0].id);
   assert.ok(has(root, 'ActionButton', 'Reintentar cambio'), 'an unknown outcome keeps the change for an exact retry');
   assert.equal(find(root, 'ActionButton', 'Editar movimiento').props.disabled, true);
+  assert.equal(view.failures.join(','), 'Error,Warning', '25Q4: frozen for the retry, so Warning');
+});
+
+test('25Q4 review: the undo of a devolución storage refuses before writing releases the change with one Error tap, and the next tap asks again with a new change', async () => {
+  let failure: Error | null = new Error(domain.OPERATION_CHANGED_MESSAGE);
+  const view = harness('app/operation/[id].tsx', { params: { id: 'r1' }, data: refundOf(base(), 'r1', 20000, '2026-09-20'), change: async () => { if (failure) throw failure; } });
+  find(view.render(), 'ActionButton', 'Deshacer devolución').props.onPress();
+  view.alerts[0].buttons[1].onPress?.();
+  await flush();
+  const root = view.render();
+  assert.equal(has(root, 'ActionButton', 'Reintentar cambio'), false, 'released: never a retry of a change storage always refuses');
+  assert.equal(view.failures.join(','), 'Error', 'nothing was written');
+  failure = null;
+  find(root, 'ActionButton', 'Deshacer devolución').props.onPress();
+  assert.equal(JSON.stringify([view.alerts.length, view.alerts[1].title]), JSON.stringify([2, '¿Deshacer devolución?']), 'asked again');
+  view.alerts[1].buttons[1].onPress?.();
+  await flush();
+  assert.equal(view.changes.length, 2);
+  assert.notEqual(view.changes[1].id, view.changes[0].id, 'a new change, built from the ledger as it is now');
+  assert.equal(JSON.stringify([view.failures.join(','), view.haptics()]), JSON.stringify(['Error', 1]));
+});
+
+test('25Q4 review: a devolución whose undo the dry run refuses on the tap (the ledger changed under the drawn button) taps Error and sends nothing', () => {
+  // On 2 Oct, $ 1.150 = $ 900 back to the card and instalments 12, 11 and half of 10 (closing 20 Oct) reduced.
+  const op = domain.newPlanRefund(withPlan(TODAY), { id: 'pr', planId: tv.id, amountMinor: 115000, dateISO: TODAY, todayISO: TODAY, createdAt: at(TODAY) });
+  assert.ok(op.reductions.some(row => row.number === 10));
+  const data = domain.applyNewOperation(withPlan(TODAY), op, TODAY);
+  const view = harness('app/operation/[id].tsx', { params: { id: 'pr' }, data });
+  const root = view.render();
+  // The dry run undoes before the plan's catch-up, so a later clock alone never changes its answer. Here the ledger the
+  // button was drawn from gains instalment 10, recorded reduced on its closing, before the tap.
+  NOW = new Date('2026-10-21T12:00:00').getTime();
+  data.records.push(...domain.planCatchUpInserts(data, tv.id, '2026-10-21'));
+  find(root, 'ActionButton', 'Deshacer devolución').props.onPress();
+  assert.equal(JSON.stringify([view.failures.join(','), view.alerts.length, view.changes.length]), JSON.stringify(['Error', 0, 0]));
+  assert.equal(find(view.render(), 'ErrorMessage').props.message, domain.operationGuardMessage('refund-recorded', 'void'), 'the dry run\'s reason');
 });
 
 // ---- 24T3 (owner review): a devolución de compra is not a bank reintegro -----------------------------------------------

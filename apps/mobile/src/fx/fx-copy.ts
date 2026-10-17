@@ -22,6 +22,13 @@ export function reportInfo(currency: Currency, provenance: Provenance | null, { 
   return t('fx.reportInfo', { currency: currencyName(currency), source: source(provenance), oldest: date(provenance.oldest), newest: date(provenance.newest) });
 }
 
+/** A drill-down's line where a consolidated total cannot be given (a rate is missing or still arriving), and its info
+ * button's reason: the Reportes root's words, never the sentence about a total too large to show precisely. */
+export function shortfallLine(figure: HeroFigure, words: Words): { line: string; detail: string } | null {
+  if (figure.status !== 'unavailable') return null;
+  return { line: figure.reason === 'fetching' ? words.t('fx.fetching') : words.t('fx.unavailable', { currency: figure.currency }), detail: shortfallDetail(figure, words) };
+}
+
 /** Why a total is not shown, as the info button explains it. */
 export function shortfallDetail(figure: Extract<HeroFigure, { status: 'unavailable' }>, { t, date }: Words): string {
   const missing = figure.missing;

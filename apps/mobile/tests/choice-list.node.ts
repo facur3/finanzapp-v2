@@ -51,14 +51,17 @@ function screen(props: any, { reduced = true } = {}) {
   const state: unknown[] = [];
   let cursor = 0;
   const haptics: string[] = [];
+  // 25O1 review: each alert as iOS would show it: its text and its buttons (built in the screen's own realm, so as JSON).
+  const alerts: { title: string; message?: string; buttons: string }[] = [];
   const modules: Record<string, unknown> = {
     react: { useMemo: (fn: () => unknown) => fn(), useState: (initial: unknown) => { const index = cursor++; if (!(index in state)) state[index] = initial; return [state[index], (value: unknown) => { state[index] = value; }]; } },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
-    'react-native': { FlatList: 'FlatList', View: 'View', StyleSheet: { create: (styles: unknown) => styles } },
+    'react-native': { FlatList: 'FlatList', View: 'View', StyleSheet: { create: (styles: unknown) => styles },
+      Alert: { alert: (title: string, message?: string, buttons?: unknown) => alerts.push({ title, message, buttons: JSON.stringify(buttons) }) } },
     'expo-router': { Stack: { Screen: 'Stack.Screen' } },
     '../i18n/provider': { useI18n: () => bindLocale('es-AR') },
-    './components': { AppText: 'AppText', CheckRow: 'CheckRow', ErrorMessage: 'ErrorMessage', Field: 'Field' },
-    './choice-list': choiceList,
+    './components': { AppText: 'AppText', CheckRow: 'CheckRow', ErrorMessage: 'ErrorMessage', Field: 'Field', PressFeedback: 'PressFeedback' },
+    './choice-list': choiceList, './marks': { FlagMark: 'FlagMark' },
     './motion': { selectionHaptic: () => haptics.push('selection') },
     './theme': { radius: { group: 16 }, space: { s: 8, m: 12, l: 16, xl: 20 }, usePalette: () => ({ background: '#F2F2F6', surface: '#FFFFFF' }), useReduceMotion: () => reduced },
   };
@@ -67,7 +70,7 @@ function screen(props: any, { reduced = true } = {}) {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected choice-screen dependency: ' + name);
     return modules[name];
   } });
-  return { render: () => { cursor = 0; return module.exports.ChoiceScreen!(props); }, haptics, groupStyle: module.exports.groupStyle as unknown as (position: string) => Record<string, unknown> };
+  return { render: () => { cursor = 0; return module.exports.ChoiceScreen!(props); }, haptics, alerts, groupStyle: module.exports.groupStyle as unknown as (position: string) => Record<string, unknown> };
 }
 function nodes(value: any): Node[] {
   if (!value || typeof value !== 'object') return [];
@@ -77,6 +80,10 @@ function nodes(value: any): Node[] {
 }
 const list = (root: Node) => nodes(root).find(node => node.type === 'FlatList')!;
 const rendered = (root: Node) => list(root).props.data.map((item: any) => list(root).props.renderItem({ item }));
+/** Every ErrorMessage the screen draws in its list, wherever it sits: the header, under a row, the list's footer (25O1
+ * review: none, a refusal is an alert). */
+const errorsIn = (root: Node) => [...nodes(list(root).props.ListHeaderComponent), ...rendered(root).flatMap(nodes), ...nodes(list(root).props.ListFooterComponent)]
+  .filter(node => node.type === 'ErrorMessage').map(node => node.props.message);
 
 test('the screen: a search field only from six options, header rows as VoiceOver headers, CheckRow rows grouped by position, autonyms with their language, and the footnote outside the list', () => {
   const chosen: string[] = [];
@@ -95,10 +102,11 @@ test('the screen: a search field only from six options, header rows as VoiceOver
   assert.deepEqual(list(root).props.data.map((row: any) => row.kind === 'choice' ? row.position : '#'), ['only', 'first', 'last']);
   assert.deepEqual([few.groupStyle('first'), few.groupStyle('last'), few.groupStyle('only'), few.groupStyle('middle')].map(style => Object.keys(style).sort().join(',')),
     ['borderTopLeftRadius,borderTopRightRadius', 'borderBottomLeftRadius,borderBottomRightRadius', 'borderRadius,marginTop', ''], 'consecutive rows draw one grouped card');
-  assert.match(nodes(list(root).props.ListFooterComponent).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' '), /No modifica nada/);
-  assert.equal(nodes(list(root).props.ListFooterComponent).find(node => node.type === 'ErrorMessage')!.props.message, null);
+  assert.match(nodes(list(root).props.ListFooterComponent).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' '), /No modifica nada/,
+    'a short list keeps its note under its last card');
+  assert.deepEqual(errorsIn(root), [], 'no error line');
   // Insets (review of PR #60): the list is the scroll view iOS insets, like `Screen`: navigation bar, home indicator and,
-  // with the search focused, the keyboard; the error and the footnote live in the list's footer, so they scroll clear too.
+  // with the search focused, the keyboard; the footnote lives in the list's footer, so it scrolls clear too.
   assert.deepEqual([list(root).props.contentInsetAdjustmentBehavior, list(root).props.automaticallyAdjustKeyboardInsets, list(root).props.keyboardDismissMode],
     ['automatic', true, 'interactive']);
   assert.equal(JSON.stringify(list(root).props.style), JSON.stringify({ flex: 1, backgroundColor: '#F2F2F6' }));
@@ -122,12 +130,13 @@ test('the screen: a search field only from six options, header rows as VoiceOver
   field.props.onChangeText('jap');
   root = many.render();
   assert.deepEqual(list(root).props.data.map((row: any) => row.kind === 'header' ? '#' : row.option.value), ['system', 'JP'], 'a query: flat matches, the pinned option first');
-  // A refused save: the checkmark stays (selected unchanged), the footer says so.
+  // A refused save: the checkmark stays (selected unchanged), and 25O1 review: an alert says so, never a line in the list.
   field.props.onChangeText('jap');
   root = many.render();
   nodes(rendered(root)[1]).find(node => node.type === 'CheckRow')!.props.onPress();
   root = many.render();
-  assert.equal(nodes(list(root).props.ListFooterComponent).find(node => node.type === 'ErrorMessage')!.props.message, 'No se pudo guardar la preferencia. Tu elección anterior sigue activa; probá de nuevo.');
+  assert.deepEqual(many.alerts.map(alert => alert.title), ['No se pudo guardar la preferencia. Tu elección anterior sigue activa; probá de nuevo.']);
+  assert.deepEqual(errorsIn(root), []);
   assert.deepEqual(many.haptics, []);
 });
 
@@ -149,7 +158,7 @@ test('confirming the checked option: Más (no onConfirm) does nothing; a flow wi
   nodes(rendered(root)[1]).find(node => node.type === 'CheckRow')!.props.onPress();
   assert.deepEqual([saves, confirmed, onboarding.haptics], [[], ['es'], []], 'confirmed without a save or a haptic');
   root = onboarding.render();
-  assert.equal(nodes(list(root).props.ListFooterComponent).find(node => node.type === 'ErrorMessage')!.props.message, null);
+  assert.deepEqual(errorsIn(root), []);
   nodes(rendered(root)[2]).find(node => node.type === 'CheckRow')!.props.onPress();
   assert.deepEqual([saves, confirmed], [['en'], ['es']], 'another option is still a save, not a confirmation');
 });
@@ -189,7 +198,7 @@ test('choosing from the list while a search is active saves, ticks and keeps the
   japan.props.onPress();
   root = many.render();
   assert.deepEqual([chosen, many.haptics], [['JP'], ['selection']]);
-  assert.equal(nodes(list(root).props.ListFooterComponent).find(node => node.type === 'ErrorMessage')!.props.message, null);
+  assert.deepEqual(errorsIn(root), []);
   assert.deepEqual([searchField(root).props.value, list(root).props.data.map((row: any) => row.option.value), noMatchText(root)], ['jap', ['system', 'JP'], []], 'the search is not reset by a choice');
   nodes(rendered(root)[0]).find(node => node.type === 'CheckRow')!.props.onPress();
   assert.deepEqual(chosen, ['JP', 'system'], 'the pinned option is choosable with a search active too');
@@ -222,4 +231,96 @@ test('the pinned card is detached from an options card that follows it at once, 
 
   const bare = screen({ title: 'Idioma', options, selected: 'es', onChoose: () => true });
   assert.deepEqual(renderedAt(bare.render()).map((row: Node) => flatStyle(row).marginBottom), [undefined, undefined], 'without a pinned option nothing is detached');
+});
+
+// 25O1: marks, and nothing on the 234-region list waiting at its end.
+const regionOptions = () => regionChoices('es').map(choice => ({ value: choice.code, title: choice.name, searchText: choice.searchText, flag: choice.code }));
+const markedPinned = { ...pinned, glyph: 'phone-portrait-outline' as const };
+const checkRow = (row: Node) => nodes(row).find(node => node.type === 'CheckRow')!;
+const textsOf = (tree: Node[]) => tree.filter(node => node.type === 'AppText').map(node => String(node.props.children));
+
+test('25O1: a row leads with the mark its option carries: a region its own flag, the device row a neutral glyph, a language its variety\'s flag', () => {
+  const regions = screen({ title: 'Región', options: regionOptions(), pinned: markedPinned, recent: ['UY'], selected: 'UY', onChoose: () => true });
+  const rows = rendered(regions.render());
+  const leading = (row: Node) => checkRow(row)?.props.leading;
+  assert.deepEqual([leading(rows[0]).type, leading(rows[0]).props.flag, leading(rows[0]).props.fallback], ['FlagMark', null, 'phone-portrait-outline'], 'the pinned row: a neutral circle');
+  const data = list(regions.render()).props.data as any[];
+  const marked: [any, any][] = rows.map((row: Node, index: number) => [data[index], leading(row)]).filter(([item]: [any, any]) => item.kind === 'choice' && !item.pinned);
+  assert.equal(marked.length, 257 + 1, 'every region row of the catalogue, the recent one included');
+  assert.equal(marked.every(([item, mark]) => mark.type === 'FlagMark' && mark.props.flag === item.option.value), true, 'each region shows its own code\'s mark');
+  assert.equal(marked.some(([item]) => item.key === 'recent:UY'), true);
+  assert.equal(marked.every(([item]) => checkRow(rows[data.indexOf(item)]).props.accessibilityLanguage === undefined), true);
+  // VoiceOver: the label is the title and the subtitle, as before; the mark hides itself (marks.tsx).
+  const languages = screen({ title: 'Idioma', options: [{ value: 'es', title: 'Español', language: 'es', flag: 'AR' }, { value: 'en', title: 'English', language: 'en', flag: 'US' }],
+    pinned: markedPinned, selected: 'es', onChoose: () => true });
+  assert.deepEqual(rendered(languages.render()).map((row: Node) => [leading(row).props.flag, leading(row).props.fallback ?? null]),
+    [[null, 'phone-portrait-outline'], ['AR', 'globe-outline'], ['US', 'globe-outline']], 'a language shows the flag its option names');
+  const bare = screen({ title: 'Idioma', options: [{ value: 'es', title: 'Español' }], pinned, selected: 'es', onChoose: () => true });
+  assert.deepEqual(rendered(bare.render()).map((row: Node) => leading(row)), [undefined, undefined], 'an option without a mark leads with nothing');
+});
+
+test('25O1: the long list says its note under the pinned card (gone while a search is typed); a short list keeps it under its last card, with its text button', () => {
+  const opened: string[] = [];
+  const many = screen({ title: 'Región', options: regionOptions(), pinned: markedPinned, selected: 'system', onChoose: () => true, note: 'Cambia cómo se escriben fechas y números.' });
+  let root = many.render();
+  assert.equal(list(root).props.ListFooterComponent, null, 'nothing waits after 234 regions');
+  let rows = rendered(root);
+  assert.deepEqual(textsOf(nodes(rows[0])), ['Cambia cómo se escriben fechas y números.'], 'under the pinned card, read before the list');
+  assert.equal(rows.slice(1).some((row: Node) => textsOf(nodes(row)).includes('Cambia cómo se escriben fechas y números.')), false, 'once');
+  assert.equal(checkRow(rows[0]).props.title, 'Según el dispositivo', 'the card itself is unchanged');
+  searchField(root).props.onChangeText('uru');
+  root = many.render();
+  rows = rendered(root);
+  assert.deepEqual(rows.flatMap((row: Node) => textsOf(nodes(row))), [], 'a search shows only its matches');
+  assert.equal(list(root).props.ListFooterComponent, null);
+
+  const few = screen({ title: 'Idioma', options: [{ value: 'es', title: 'Español', language: 'es' }, { value: 'en', title: 'English', language: 'en' }], pinned, selected: 'es', onChoose: () => true,
+    note: 'Para que iOS también use este idioma en sus menús, elegilo en Configuración.', noteAction: { label: 'Abrir Configuración', onPress: () => opened.push('settings') } });
+  root = few.render();
+  assert.deepEqual(rendered(root).flatMap((row: Node) => textsOf(nodes(row))), [], 'a short list draws no footer under its rows');
+  const footer = nodes(list(root).props.ListFooterComponent);
+  assert.deepEqual(textsOf(footer), ['Para que iOS también use este idioma en sus menús, elegilo en Configuración.', 'Abrir Configuración']);
+  const button = footer.find(node => node.type === 'PressFeedback')!;
+  assert.deepEqual([button.props.accessibilityRole, button.props.accessibilityLabel, button.props.feedback, button.props.containerStyle.alignSelf], ['button', 'Abrir Configuración', 'opacity', 'flex-start'],
+    'a text button (PressFeedback keeps its 44 pt), as wide as its words');
+  button.props.onPress();
+  assert.deepEqual(opened, ['settings']);
+  const bare = screen({ title: 'Apariencia', options: [{ value: 'light', title: 'Claro' }, { value: 'dark', title: 'Oscuro' }], pinned, selected: 'light', onChoose: () => true });
+  assert.equal(list(bare.render()).props.ListFooterComponent, null, 'no note, no footer');
+});
+
+test('25O1 review: a refused save is said in an alert, in front wherever the list is scrolled, never as a line in it; the checkmark stays, nothing taps, and each refusal says it again', () => {
+  let refuse = true;
+  const many = screen({ title: 'Región', options: regionOptions(), pinned: markedPinned, recent: ['UY'], selected: 'system', onChoose: () => !refuse, note: 'Nota.' });
+  let root = many.render();
+  const data = () => list(root).props.data as any[];
+  const at = (key: string) => data().findIndex(item => item.key === key);
+  const refused = { title: 'No se pudo guardar la preferencia. Tu elección anterior sigue activa; probá de nuevo.', message: undefined,
+    buttons: JSON.stringify([{ text: 'OK', style: 'cancel' }]) };
+  // India, deep in the I section (28 regions): a line under its card was drawn 27 rows below the finger.
+  checkRow(rendered(root)[at('I:IN')]).props.onPress();
+  root = many.render();
+  assert.deepEqual(many.alerts, [refused], 'once, with the app\'s own OK');
+  assert.deepEqual(errorsIn(root), [], 'nothing drawn in the list');
+  assert.equal(checkRow(rendered(root)[0]).props.selected, true, 'the checkmark stays on the saved choice');
+  assert.deepEqual(many.haptics, [], 'a preference change has no failure tap');
+  // The same option among the recents, then a search match: each refusal alerts once more.
+  checkRow(rendered(root)[at('recent:UY')]).props.onPress();
+  searchField(root).props.onChangeText('a');
+  root = many.render();
+  checkRow(rendered(root)[1]).props.onPress();
+  root = many.render();
+  assert.deepEqual([many.alerts.length, errorsIn(root)], [3, []], 'a retry says it again');
+  checkRow(rendered(root)[0]).props.onPress();
+  assert.equal(many.alerts.length, 3, 'a tap on the checked row saves nothing and says nothing');
+  refuse = false;
+  checkRow(rendered(root)[1]).props.onPress();
+  root = many.render();
+  assert.deepEqual([many.alerts.length, many.haptics, errorsIn(root)], [3, ['selection'], []], 'a save that lands alerts nothing');
+  // The pinned row refused: the alert, and its card keeps only the note under it.
+  const chosen = screen({ title: 'Región', options: regionOptions(), pinned: markedPinned, selected: 'UY', onChoose: () => false, note: 'Nota.' });
+  root = chosen.render();
+  checkRow(rendered(root)[0]).props.onPress();
+  root = chosen.render();
+  assert.deepEqual([chosen.alerts, textsOf(nodes(rendered(root)[0])), errorsIn(root)], [[refused], ['Nota.'], []]);
 });

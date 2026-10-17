@@ -46,7 +46,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   const added: { account: domain.Account; appearance?: domain.AccountAppearance }[] = [];
   const changed: { change: domain.AccountChange; appearance?: domain.AccountAppearance }[] = [];
   const looks: domain.AccountAppearance[] = [], definitions: domain.CategoryDefinition[] = [];
-  const data = options.data ?? archive;
+  let data = options.data ?? archive;
   const jsx = (type: Node['type'], props: Node['props']) => ({ type, props });
   const ledger = { useLedger: () => ({ archive: data, snapshot: domain.snapshotFromArchive(data), ...(options.gate ? { gate: options.gate } : {}),
     addAccount: async (account: domain.Account, look?: domain.AccountAppearance) => { added.push({ account, appearance: look }); options.fail?.(); },
@@ -63,6 +63,10 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   (components as any).surfaceShadow = () => ({});
   const GATE = options.gate ?? domain.LEDGER_CURRENCIES;
   const defaults = { useDefaultCurrency: ({ accountCurrency, requested }: { accountCurrency?: string | null; requested?: unknown } = {}) => accountCurrency ?? (domain.isLedgerCurrency(requested, GATE) ? requested : 'ARS') };
+  // 25Q4 review: each notification haptic by its helper's name (tests/motion.node.ts pins the type each one sends).
+  const haptics: string[] = [];
+  const motion = { selectionHaptic: () => {}, successHaptic: () => { haptics.push('Success'); }, errorHaptic: () => { haptics.push('Error'); }, warningHaptic: () => { haptics.push('Warning'); },
+    timing: () => ({ duration: 0 }) };
   const modules: Record<string, unknown> = {
     '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
     react: { useState: (initial: any) => { const i = cursor++; if (!(i in state)) state[i] = typeof initial === 'function' ? initial() : initial;
@@ -72,7 +76,9 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     'react-native': { View: 'View', FlatList: 'FlatList', Modal: 'Modal', Platform: { OS: 'ios' }, Keyboard: { dismiss() {} }, Pressable: 'Pressable', StyleSheet: { absoluteFill: 'absoluteFill' },
       Alert: { alert: (title: string, message: string, buttons: any[]) => alerts.push({ title, message, buttons }) } },
     // The date field's compact sheet (24B6) animates with Reanimated and reads the safe area; date-field.node.ts exercises it.
-    'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View' }, useSharedValue: (value: unknown) => ({ value }), useAnimatedStyle: (fn: () => unknown) => fn(), runOnJS: (fn: unknown) => fn, withTiming: (value: unknown) => value },
+    'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View' }, useSharedValue: (value: unknown) => ({ value }), useAnimatedStyle: (fn: () => unknown) => fn(), withTiming: (value: unknown) => value },
+    // The sheet hands its exit back to React Native with react-native-worklets' scheduleOnRN (runOnJS is deprecated).
+    'react-native-worklets': { scheduleOnRN: (fn: (...args: unknown[]) => void, ...args: unknown[]) => fn(...args) },
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView', useSafeAreaInsets: () => ({ top: 59, bottom: 34, left: 0, right: 0 }) },
     '@react-native-community/datetimepicker': 'DateTimePicker',
     '@expo/vector-icons/Ionicons': 'Ionicons',
@@ -81,7 +87,6 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
       router: { canGoBack: () => !options.root, back: () => { backs++; }, push: (value: any) => pushed.push(value), replace: (value: any) => pushed.push(value),
         dismissTo: (value: any) => dismissed.push(value) } },
     'expo-crypto': { randomUUID: () => 'op-' + (++uuid) },
-    'expo-haptics': { NotificationFeedbackType: { Success: 'Success' }, notificationAsync: async () => {} },
     '@finanzapp/domain': domain,
     '../storage/LedgerProvider': ledger, '../src/storage/LedgerProvider': ledger, '../../src/storage/LedgerProvider': ledger,
     './components': components, '../src/ui/components': components, '../../src/ui/components': components,
@@ -92,13 +97,14 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     './categories': categories, '../src/ui/category-form': { CategoryForm: 'CategoryForm' },
     // 24UX6E: the edit modals' not-found branches (their forms are tested in their own suites).
     '../../src/ui/budget-form': { BudgetForm: 'BudgetForm' }, '../../src/ui/debt-form': { DebtForm: 'DebtForm' }, '../../src/ui/recurring-form': { RecurringForm: 'RecurringForm' },
-    './currencies': currencies, '../src/ui/currencies': currencies, '../../src/ui/currencies': currencies,
+    '../../src/ui/entry-form': { EntryForm: 'EntryForm' }, '../../src/ui/transfer-form': { TransferForm: 'TransferForm' }, '../../src/ui/card-form': { CardForm: 'CardForm' },
+    './currencies': currencies, '../src/ui/currencies': currencies, '../../src/ui/currencies': currencies, './marks': { CurrencyMark: 'CurrencyMark' },
     '../src/ui/form-controls': { CurrencyField: 'CurrencyField' }, '../../src/ui/form-controls': { CurrencyField: 'CurrencyField' },
     // 25B2: the one default-currency rule (its branches are tested in currency-defaults.node.ts; here it answers ARS) and the account lifecycle hook.
     '../src/ui/use-default-currency': defaults, '../../src/ui/use-default-currency': defaults,
     '../../src/ui/commitment-actions': accountManagement, '../src/ui/commitment-actions': accountManagement,
     '../src/ui/swipe-actions': swipe, '../../src/ui/swipe-actions': swipe,
-    './motion': { selectionHaptic: () => {}, timing: () => ({ duration: 0 }) },
+    './motion': motion, '../src/ui/motion': motion, '../../src/ui/motion': motion,
     './theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, radius: { group: 16, sheet: 24 }, usePalette: () => p, useReduceMotion: () => true },
   };
   const module = { exports: {} as Record<string, (props: any) => Node> };
@@ -109,7 +115,9 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   return {
     render: (component?: string) => { cursor = 0; refCursor = 0; let node = (component ? module.exports[component] : module.exports.default ?? module.exports.CategoryForm)(props);
       while (typeof node.type === 'function') node = node.type(node.props); return node; },
-    pushed, alerts, added, changed, looks, definitions, removed, dismissed, backs: () => backs, setLocale: (next: AppLocale) => { locale = next; },
+    pushed, alerts, added, changed, looks, definitions, removed, dismissed, haptics, backs: () => backs, setLocale: (next: AppLocale) => { locale = next; },
+    /** A write landing while the screen stays mounted (the provider's archive changes). */
+    setData: (next: domain.LedgerArchive) => { data = next; },
   };
 }
 function nodes(value: any): Node[] {
@@ -125,9 +133,22 @@ function find(root: Node, type: string, label?: string): Node {
 }
 const flush = () => new Promise<void>(resolve => setImmediate(resolve));
 
-test('new account: name, icon, colour, currency and opening balance; the look is saved with the account in one call and defaults to wallet on cobalt', async () => {
+/** 25O1: the fields of an account form in the order they are drawn. */
+const formOrder = (root: Node) => nodes(root).map(node => node.type)
+  .filter(type => ['Field', 'CurrencyField', 'AmountField', 'FieldNote', 'SectionTitle', 'IconColorPicker', 'ActionButton'].includes(type as string));
+/** 25O1: «Apariencia» heads the picker it sits with (one block, so the title stays attached to it). */
+const appearanceBlock = (root: Node) => {
+  const block = nodes(root).find(node => node.type === 'View' && [node.props.children].flat().some((child: any) => child?.type === 'SectionTitle'));
+  assert.ok(block, 'Missing the Apariencia block');
+  return [block.props.children].flat().map((child: any) => child.type === 'SectionTitle' ? 'SectionTitle:' + child.props.children : child.type);
+};
+
+test('new account: name, currency and opening balance, then «Apariencia» (25O1: last); the look is saved with the account in one call and defaults to wallet on cobalt', async () => {
   const view = harness('app/new-account.tsx');
   let root = view.render();
+  // 25O1: the two choices that carry money meaning come right after the name; the optional look comes last, before Guardar.
+  assert.deepEqual(formOrder(root), ['Field', 'CurrencyField', 'AmountField', 'FieldNote', 'SectionTitle', 'IconColorPicker', 'ActionButton']);
+  assert.deepEqual(appearanceBlock(root), ['SectionTitle:Apariencia', 'IconColorPicker']);
   const picker = find(root, 'IconColorPicker');
   assert.equal(picker.props.icons, appearance.ACCOUNT_ICON_CHOICES, 'the account icon set, not the category set');
   assert.equal(picker.props.colors, appearance.COLOR_CHOICES);
@@ -165,6 +186,13 @@ test('new account: a failed save freezes the same account and look for retry; an
 test('edit account: changing only the look calls the appearance write, never the account correction or its audit', async () => {
   const view = harness('app/edit-account/[id].tsx', {}, { params: { id: 'cash' } });
   let root = view.render();
+  // 25O1: Nueva cuenta's order: the name, the recorded balance and the currency with their notes, «Apariencia», Guardar and, apart, Eliminar.
+  assert.deepEqual(formOrder(root), ['Field', 'AmountField', 'FieldNote', 'CurrencyField', 'FieldNote', 'SectionTitle', 'IconColorPicker', 'ActionButton', 'ActionButton']);
+  assert.deepEqual(appearanceBlock(root), ['SectionTitle:Apariencia', 'IconColorPicker']);
+  view.setLocale('en-AR');
+  assert.deepEqual(appearanceBlock(view.render()), ['SectionTitle:Appearance', 'IconColorPicker']);
+  view.setLocale('es-AR');
+  root = view.render();
   assert.deepEqual([find(root, 'IconColorPicker').props.icon, find(root, 'IconColorPicker').props.color], ['bank', 'azure'], 'prefilled from the stored look');
   find(root, 'IconColorPicker').props.onColorChange('green');
   root = view.render();
@@ -246,6 +274,7 @@ test('category form: a historical string is archived after confirmation, as a de
   assert.equal(view.definitions.length, 0);
   assert.equal(view.alerts.length, 1);
   assert.match(view.alerts[0].message, /anteriores la conservan/);
+  assert.equal(view.alerts[0].buttons.map((button: { style?: string }) => button.style ?? '').join(','), 'cancel,default', 'Desarchivar undoes it: not the destructive style');
   view.alerts[0].buttons[0].onPress();
   assert.equal(view.definitions.length, 0, 'cancel writes nothing');
   find(view.render(), 'ActionButton', 'Archivar categoría').props.onPress();
@@ -668,6 +697,7 @@ test('24UX6E: a rename into another category\'s name is refused before any write
   await find(view.render(), 'ActionButton', 'Guardar cambios').props.onPress();
   let root = view.render();
   assert.equal(view.definitions.length, 0, 'nothing reached storage');
+  assert.equal(view.haptics.join(','), 'Error', '25Q4 review: refused before anything was sent, so Error');
   assert.equal(bindLocale('es-AR').errorText(find(root, 'ErrorMessage').props.message), '«Supermercado» ya es el nombre de otra categoría.');
   assert.equal(find(root, 'Field').props.editable, true, 'an input error, never a frozen retry');
   assert.equal(find(root, 'IconColorPicker').props.disabled, false);
@@ -694,6 +724,10 @@ test('24UX6E: a rename into another category\'s name is refused before any write
   find(failing.render(), 'ActionButton', 'Guardar cambios').props.onPress(); await flush();
   assert.equal(find(failing.render(), 'Field').props.editable, false);
   assert.ok(find(failing.render(), 'ActionButton', 'Reintentar guardado'));
+  assert.equal(failing.haptics.join(','), 'Warning', '25Q4 review: sent with an unknown outcome, so Warning');
+  find(failing.render(), 'ActionButton', 'Reintentar guardado').props.onPress(); await flush();
+  assert.equal(JSON.stringify(failing.definitions[1]), JSON.stringify(failing.definitions[0]), 'the retry resends the same definition');
+  assert.deepEqual([failing.haptics.join(','), failing.backs()], ['Warning,Success', 1]);
 });
 
 test('24UX6E review: archiving runs the same storage name rules first, so a clash is an editable error, never a frozen retry', async () => {
@@ -707,6 +741,7 @@ test('24UX6E review: archiving runs the same storage name rules first, so a clas
   const root = view.render();
   assert.equal(view.alerts.length, 0, 'no confirmation for a write storage would refuse');
   assert.equal(view.definitions.length, 0, 'nothing reached storage');
+  assert.equal(view.haptics.join(','), 'Error', '25Q4 review: refused before anything was sent, so Error');
   assert.equal(bindLocale('es-AR').errorText(find(root, 'ErrorMessage').props.message), '«Nafta» ya es el nombre de otra categoría.');
   assert.equal(find(root, 'Field').props.editable, true);
   assert.ok(find(root, 'ActionButton', 'Guardar cambios'), 'never «Reintentar guardado»');
@@ -742,18 +777,23 @@ test('24UX6E: an archived category\'s editor opens with the lifecycle note; an a
 });
 
 test('24UX6E: every edit modal keeps a close button when there is nothing to edit, with its form\'s own fallback', () => {
-  const routes: [string, string][] = [['app/edit-category.tsx', '/categories'], ['app/edit-budget/[id].tsx', '/budgets'], ['app/edit-debt/[id].tsx', '/debts'],
-    ['app/edit-recurring/[id].tsx', '/recurring']];
-  for (const [file, fallback] of routes) {
-    const params = { id: 'nunca', kind: 'expense', key: 'nunca' };
-    const view = harness(file, {}, { params });
+  // 25Q4: the movement, transfer and card editors too, for an undone movement and a deleted card as for an unknown id.
+  const undone = { ...archive, records: archive.records.map(record => ({ ...record, voided: true })) };
+  const deleted = { ...archive, cards: [{ ...card, deleted: true }] };
+  const routes: [string, string, { data?: domain.LedgerArchive; params?: Record<string, string> }?][] = [['app/edit-category.tsx', '/categories'],
+    ['app/edit-budget/[id].tsx', '/budgets'], ['app/edit-debt/[id].tsx', '/debts'], ['app/edit-recurring/[id].tsx', '/recurring'], ['app/edit-entry/[id].tsx', '/'],
+    ['app/edit-transfer/[id].tsx', '/'], ['app/edit-card/[id].tsx', '/cards'], ['app/edit-entry/[id].tsx', '/', { data: undone, params: { id: entry.id } }],
+    ['app/edit-card/[id].tsx', '/cards', { data: deleted, params: { id: card.id } }]];
+  for (const [file, fallback, given] of routes) {
+    const options = { params: { id: 'nunca', kind: 'expense', key: 'nunca' }, ...given };
+    const view = harness(file, {}, options);
     const root = view.render();
     assert.ok(find(root, 'EmptyState'), file);
     const close = nodes(root).find(node => node.type === 'Stack.Screen')!.props.options.headerLeft();
     assert.deepEqual([close.type, close.props.name, close.props.label], ['IconButton', 'close', 'Cerrar'], file);
     close.props.onPress();
     assert.equal(view.backs(), 1, file);
-    const alone = harness(file, {}, { params, root: true });
+    const alone = harness(file, {}, { ...options, root: true });
     nodes(alone.render()).find(node => node.type === 'Stack.Screen')!.props.options.headerLeft().props.onPress();
     assert.deepEqual([alone.backs(), alone.pushed], [0, [fallback]], file + ': nothing behind it');
   }
@@ -782,4 +822,16 @@ test('24UX6E: after «Eliminar cuenta» the editor dismisses to Cuentas in one s
   const alone = harness('app/edit-account/[id].tsx', {}, { params: { id: 'cash' }, root: true });
   await find(alone.render(), 'ActionButton', 'Guardar cambios').props.onPress();
   assert.deepEqual([alone.backs(), alone.dismissed, alone.changed.length], [0, ['/accounts'], 0], 'an unchanged save closes to Cuentas');
+});
+
+test('25R1: a budget deleted from its edit modal keeps its form while the modal closes; an id never seen live is not found', () => {
+  const budget: domain.MonthlyBudget = { id: 'b1', scope: 'total', currency: 'ARS', monthISO: '2026-09', amountMinor: 100000, active: true, createdAt: '2026-09-01T12:00:00.000Z', revision: 0, updatedAt: '2026-09-01T12:00:00.000Z' };
+  const data = { ...archive, budgets: [budget] };
+  const view = harness('app/edit-budget/[id].tsx', {}, { data, params: { id: 'b1' } });
+  assert.equal(view.render().type, 'BudgetForm');
+  view.setData({ ...data, budgets: [{ ...budget, active: false, revision: 1 }] });
+  const closing = view.render();
+  assert.equal(closing.type, 'BudgetForm', 'no «No encontramos este presupuesto» flash while the modal slides away');
+  const never = harness('app/edit-budget/[id].tsx', {}, { data: { ...data, budgets: [{ ...budget, active: false, revision: 1 }] }, params: { id: 'b1' } });
+  assert.ok(find(never.render(), 'EmptyState'));
 });

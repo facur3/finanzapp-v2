@@ -7,6 +7,7 @@ import * as merchantMark from '../src/ui/merchant-mark.ts';
 import * as currencies from '../src/ui/currencies.ts';
 import { CURRENCIES, currencyOption, currencyOptions, searchCurrencies } from '../src/ui/currencies.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
+import * as paletteModule from '../src/ui/palette.ts';
 import * as geometry from '../src/ui/geometry.ts';
 import { formatMinorUnits } from '@finanzapp/domain';
 import * as i18nFormat from '../src/i18n/format.ts';
@@ -15,6 +16,8 @@ import * as moneyInput from '../src/ui/money-input.ts';
 import type { AppLocale } from '../src/i18n/locale.ts';
 import * as movementAmount from '../src/ui/movement-amount.ts';
 import * as presentation from '../src/ui/presentation.ts';
+import * as flags from '../src/i18n/flags.ts';
+import { FLAG_ART } from '../src/i18n/flag-art.ts';
 import { darkPalette, lightPalette } from '../src/ui/palette.ts';
 
 // Producto 22.1: the row and field components at source level (React Native
@@ -27,7 +30,7 @@ function load(file: string, extra: Record<string, unknown> = {}, fontScale = 1, 
   const jsx = (type: any, props: any) => ({ type, props });
   const state: unknown[] = [];
   const alerts: { title: string; message: string; buttons?: { text: string }[] }[] = [];
-  const haptics: string[] = [];
+  const haptics: string[] = [], keyboard: string[] = [];
   let cursor = 0;
   const p = palette ?? { isDark: false, surface: '#FFFFFF', inset: '#EEEEF3', text: '#0A0A0C', secondary: '#6E7078', tertiary: '#8E9098', line: '#E6E6EC', primary: '#2557D6', primaryFill: '#2557D6', onPrimary: '#FFF', primarySoft: '#E5ECFB', background: '#F2F2F6',
     income: '#1F7A4D', expense: '#C0392B', warning: '#B26A00', transfer: '#2D6476', transferSoft: '#E2EDF1', incomeSoft: '#E3F1E8' };
@@ -37,9 +40,11 @@ function load(file: string, extra: Record<string, unknown> = {}, fontScale = 1, 
       Children: { map: (children: unknown, fn: (child: unknown) => unknown) => (Array.isArray(children) ? children : [children]).map(fn) } },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': { View: 'View', Text: 'Text', TextInput: 'TextInput', ScrollView: 'ScrollView', Pressable: 'Pressable', ActivityIndicator: 'ActivityIndicator', InputAccessoryView: 'InputAccessoryView',
-      FlatList: 'FlatList', Modal: 'Modal', Platform: { OS: 'ios' }, Keyboard: { dismiss() {} }, StyleSheet: { hairlineWidth: 0.5, create: (styles: unknown) => styles, flatten: (style: any) => Object.assign({}, ...(Array.isArray(style) ? style.flat(Infinity).filter(Boolean) : [style])), absoluteFill: {} },
+      FlatList: 'FlatList', Modal: 'Modal', Platform: { OS: 'ios' }, Keyboard: { dismiss() { keyboard.push('dismiss'); } }, StyleSheet: { hairlineWidth: 0.5, create: (styles: unknown) => styles, flatten: (style: any) => Object.assign({}, ...(Array.isArray(style) ? style.flat(Infinity).filter(Boolean) : [style])), absoluteFill: {} },
       useWindowDimensions: () => ({ fontScale, width, height: 844 }), Alert: { alert: (title: string, message: string, buttons?: { text: string }[]) => alerts.push({ title, message, buttons }) } },
     'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View', Text: 'Animated.Text' }, useSharedValue: (value: number) => ({ value }), withTiming: (value: number) => value, useAnimatedStyle: (fn: () => unknown) => fn() },
+    // The sheet hands its exit back to React Native with react-native-worklets' scheduleOnRN (runOnJS is deprecated).
+    'react-native-worklets': { scheduleOnRN: (fn: (...args: unknown[]) => void, ...args: unknown[]) => fn(...args) },
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
     '@react-native-community/datetimepicker': 'DateTimePicker',
     '@expo/vector-icons/Ionicons': 'Ionicons',
@@ -49,11 +54,11 @@ function load(file: string, extra: Record<string, unknown> = {}, fontScale = 1, 
     './theme': { radius: { chip: 14, tile: 12, group: 16, card: 20, sheet: 24, creditCard: 18, button: 14 }, space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
       type: { body: { fontSize: 17 }, subhead: { fontSize: 15 }, footnote: { fontSize: 13 }, caption: { fontSize: 12 }, title2: { fontSize: 22 }, title3: { fontSize: 20 }, headline: { fontSize: 17 }, eyebrow: {} },
       usePalette: () => p, useReduceMotion: () => true, useCurrentDay: () => '2026-09-22' },
-    './categories': {}, './dock-clearance': { useDockInset: () => ({ extraPadding: 0, indicator: undefined }) }, './category-color': { tintOf: () => '#EEE' }, './category-hues': { useAccountLook: () => ({ glyph: 'wallet-outline', hex: '#2557D6' }), useCategoryLook: () => ({ glyph: 'pricetag-outline', hex: '#3E6FB0', label: 'x' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ glyph: 'wallet-outline', hex: '#2557D6' }), useCategoriesInUse: () => [], useCategoryDefinitions: () => [] },
+    './palette': paletteModule, './categories': {}, './dock-clearance': { useDockInset: () => ({ extraPadding: 0, indicator: undefined }) }, './category-color': { tintOf: () => '#EEE' }, './category-hues': { useAccountLook: () => ({ glyph: 'wallet-outline', hex: '#2557D6' }), useCategoryLook: () => ({ glyph: 'pricetag-outline', hex: '#3E6FB0', label: 'x' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ glyph: 'wallet-outline', hex: '#2557D6' }), useCategoriesInUse: () => [], useCategoryDefinitions: () => [] },
     './geometry': geometry, './merchant-mark': merchantMark, './movement-amount': movementAmount,
     './motion': { duration: { press: 100, release: 160 }, easeOut: 'ease', selectionHaptic: () => haptics.push('selection'), timing: () => ({}) },
     './money-input': moneyInput,
-    './presentation': {}, './currencies': currencies,
+    './presentation': {}, './currencies': currencies, './marks': { CurrencyMark: 'CurrencyMark' },
     './components': { ...Object.fromEntries(['AccountBadge', 'AppText', 'CategoryBadge', 'DetailRow', 'SelectionRow', 'Field', 'GlyphTile', 'PressFeedback', 'Surface'].map(name => [name, name])), surfaceShadow: () => ({}) },
     ...extra,
   };
@@ -62,7 +67,7 @@ function load(file: string, extra: Record<string, unknown> = {}, fontScale = 1, 
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected ' + file + ' dependency: ' + name);
     return modules[name];
   } });
-  return { exports: module.exports, render: (component: string, props: any) => { cursor = 0; return module.exports[component](props); }, alerts, haptics };
+  return { exports: module.exports, render: (component: string, props: any) => { cursor = 0; return module.exports[component](props); }, alerts, haptics, keyboard };
 }
 function nodes(value: any): Node[] {
   if (!value || typeof value !== 'object') return [];
@@ -72,6 +77,8 @@ function nodes(value: any): Node[] {
   return [value, ...own, ...nodes(value.props.children), ...nodes(value.props.ListFooterComponent)];
 }
 const flat = (style: any) => Object.assign({}, ...(Array.isArray(style) ? style.flat(Infinity).filter(Boolean) : [style]));
+/** A Pressable's style as drawn at rest, or under the finger: a function style resolved with { pressed }. */
+const styleOf = (node: Node, pressed = false) => flat(typeof node.props.style === 'function' ? node.props.style({ pressed }) : node.props.style);
 // Inside components.tsx the building blocks are the real functions, so match them by name as well as by descriptor.
 const is = (node: Node, name: string) => node.type === name || node.type?.name === name;
 // A real PressFeedback re-emits its children inside the Pressable, so the same node can be met twice: count each once.
@@ -109,6 +116,50 @@ test('NavigationRow stacks the title over the subtitle with the tile and a chevr
   assert.equal(nodes(disabled).find(node => is(node, 'PressFeedback'))!.props.accessibilityState.disabled, true);
 });
 
+test('25D1: NavigationRow and CheckRow keep two lines up to 1.2× and, from the stacking threshold on, show their words whole', () => {
+  for (const scale of [1, 1.2, 1.235, 2.643, 3.571]) {
+    const ui = load('components.tsx', {}, scale);
+    for (const row of [ui.render('NavigationRow', { title: 'Movimientos deshechos', subtitle: '2 recuperables', onPress: () => {} }),
+      ui.render('CheckRow', { title: 'Movimientos deshechos', subtitle: '2 recuperables', selected: true, onPress: () => {} })]) {
+      const [title, subtitle] = texts(row);
+      assert.deepEqual([title.props.numberOfLines, subtitle.props.numberOfLines], scale <= 1.2 ? [2, 2] : [undefined, undefined], 'at ' + scale);
+      assert.equal(nodes(row).find(node => is(node, 'PressFeedback'))!.props.accessibilityLabel, 'Movimientos deshechos, 2 recuperables');
+    }
+  }
+});
+
+test('25O1 review: a CheckRow\'s leading mark gives its room back to the title from the stacking threshold on, so a region\'s name stays whole', () => {
+  for (const scale of [1, 1.2, 1.235, 2.643, 3.571]) {
+    const row = load('components.tsx', {}, scale).render('CheckRow', { title: 'Argentina', subtitle: '22/9/2026 · 1.234,56', selected: true, onPress: () => {},
+      leading: { type: 'RegionMark', props: { region: 'AR' } } });
+    assert.equal(nodes(row).some(node => is(node, 'RegionMark')), scale <= 1.2, 'at ' + scale);
+    assert.equal(nodes(row).find(node => is(node, 'PressFeedback'))!.props.accessibilityLabel, 'Argentina, 22/9/2026 · 1.234,56', 'VoiceOver hears the same row');
+  }
+});
+
+test('25D1: icon-only controls offer the Large Content Viewer with their VoiceOver name, at the same 44 pt', () => {
+  const ui = load('components.tsx');
+  for (const disabled of [false, true]) {
+    const button = nodes(ui.render('IconButton', { name: 'close', label: 'Cerrar', onPress: () => {}, disabled })).find(node => is(node, 'PressFeedback'))!;
+    assert.deepEqual([button.props.accessibilityShowsLargeContentViewer, button.props.accessibilityLargeContentTitle, button.props.accessibilityLabel], [true, 'Cerrar', 'Cerrar']);
+    assert.deepEqual([flat(button.props.style).width, flat(button.props.style).minHeight], [44, 44]);
+  }
+});
+
+test('25D1: a page sheet\'s bar stops growing at 1.2× like a system bar; Cancelar keeps its 8 pt slop and offers the Large Content Viewer', () => {
+  const ui = load('form-controls.tsx');
+  let field = ui.render('CurrencyField', { value: 'USD', onChange: () => {} });
+  nodes(field).find(node => node.type === 'SelectionRow')!.props.onPress();
+  field = ui.render('CurrencyField', { value: 'USD', onChange: () => {} });
+  const sheet = nodes(field).find(node => node.type === 'Modal')!;
+  const cancel = nodes(sheet).find(node => node.type === 'PressFeedback' && nodes(node.props.children).some(child => child.type === 'AppText' && child.props.children === 'Cancelar'))!;
+  assert.deepEqual([cancel.props.hitSlop, cancel.props.accessibilityShowsLargeContentViewer, cancel.props.accessibilityLargeContentTitle], [8, true, 'Cancelar']);
+  assert.equal(nodes(cancel.props.children).find(node => node.type === 'AppText')!.props.maxFontSizeMultiplier, 1.2);
+  const title = nodes(sheet).find(node => node.type === 'AppText' && node.props.accessibilityRole === 'header')!;
+  assert.deepEqual([title.props.children, title.props.maxFontSizeMultiplier, title.props.numberOfLines], ['Elegir moneda', 1.2, 2]);
+  assert.equal(ui.exports.SHEET_BAR_MAX_SCALE as unknown, geometry.ROW_STACK_SCALE, 'the same threshold the rows stack at');
+});
+
 test('FieldNote keeps one short line under a field and opens the full explanation from its information glyph', () => {
   const ui = load('components.tsx');
   const note = ui.render('FieldNote', { children: 'Opcional. No cuenta como ingreso.', help: { title: 'Saldo inicial', detail: 'La explicación completa.' } });
@@ -118,6 +169,8 @@ test('FieldNote keeps one short line under a field and opens the full explanatio
   assert.equal(info.props.accessibilityRole, 'button');
   assert.equal(info.props.accessibilityLabel, 'Más información sobre saldo inicial');
   assert.equal(info.props.hitSlop, 8, 'a small glyph with a comfortable target');
+  assert.deepEqual([info.props.accessibilityShowsLargeContentViewer, info.props.accessibilityLargeContentTitle], [true, 'Más información sobre saldo inicial'],
+    '25D1: the glyph cannot grow with the text; a long press shows its name large');
   info.props.onPress();
   // The button is named from the catalogue: left to iOS it would read "OK" in the bundle's language, whatever Más says.
   assert.equal(JSON.stringify(ui.alerts), JSON.stringify([{ title: 'Saldo inicial', message: 'La explicación completa.', buttons: [{ text: 'OK', style: 'cancel' }] }]), 'the catalogue\'s OK, still the cancel action');
@@ -150,7 +203,8 @@ test('the currency row stacks label, full name and code so "Dólares estadounide
   assert.equal(row.props.label, 'Moneda');
   assert.equal(row.props.value, 'Dólares estadounidenses', 'the full name is the primary line, on its own');
   assert.equal(row.props.detail, 'USD · US$', 'the code and symbol are the detail line, never appended to the name');
-  assert.equal(row.props.icon, 'cash-outline');
+  // 25O1: the issuer's flag leads the row, in the 30 pt column a selection row's glyph takes; the label is unchanged.
+  assert.deepEqual([row.props.icon, row.props.leading.type, row.props.leading.props.currency, row.props.leading.props.size], [undefined, 'CurrencyMark', 'USD', 30]);
   assert.equal(row.props.last, true);
   assert.equal(typeof row.props.onPress, 'function');
   assert.equal(nodes(field).some(node => node.type === 'DetailRow'), false, 'no label/value pair that could wrap the code alone');
@@ -167,6 +221,8 @@ test('the currency row stacks label, full name and code so "Dólares estadounide
   assert.deepEqual([list.props.initialNumToRender, list.props.windowSize, list.props.automaticallyAdjustKeyboardInsets, list.props.keyboardDismissMode], [14, 7, true, 'interactive']);
   const items = list.props.data.slice(0, 2).map((item: unknown) => list.props.renderItem({ item }));
   assert.deepEqual(items.map((item: Node) => item.props.accessibilityLabel), ['Pesos argentinos, ARS', 'Dólares estadounidenses, USD']);
+  assert.deepEqual(items.map((item: Node) => nodes(item).filter(node => node.type === 'CurrencyMark').map(node => node.props.currency)), [['ARS'], ['USD']], '25O1: each row its own mark');
+  assert.equal(items.some((item: Node) => nodes(item).some(node => node.type === 'GlyphTile')), false, 'no generic cash tile any more');
   assert.deepEqual(items.map((item: Node) => item.props.accessibilityState.selected), [false, true]);
   assert.ok(nodes(items[1]).some(node => is(node, 'Ionicons') && node.props.name === 'checkmark-circle'), 'the current currency carries the checkmark');
   items[0].props.onPress();
@@ -183,6 +239,7 @@ test('the currency row stacks label, full name and code so "Dólares estadounide
   assert.equal(fact.props.value, 'Pesos argentinos');
   assert.equal(fact.props.detail, 'ARS · $');
   assert.equal(fact.props.onPress, undefined, 'no chevron and nothing to press');
+  assert.equal(fact.props.leading.props.currency, 'ARS', 'the stored currency\'s own mark');
   assert.equal(nodes(fixed).some(node => node.type === 'Modal'), false);
 });
 
@@ -325,7 +382,7 @@ test('24T3 carry-in: Reportes\' prominent switch reads at the subhead size, semi
   assert.deepEqual(labels.map(label => flat(label.props.style).fontWeight), ['600', '500'], 'semibold chosen, medium other');
   const segments = [...new Set(nodes(control).filter(node => node.type === 'Pressable'))];
   assert.equal(segments.length, 2);
-  for (const segment of segments) assert.ok(flat(segment.props.style).minHeight + 2 * geometry.SEGMENT_PADDING >= 44, 'a 44 pt track');
+  for (const segment of segments) assert.ok(styleOf(segment).minHeight + 2 * geometry.SEGMENT_PADDING >= 44, 'a 44 pt track');
   // Every other caller keeps the 13 pt default with its shrink (Movimientos' four short labels need it).
   const plain = nodes(ui.render('Choices', { value: 'categories', onChange: () => {}, options })).filter(node => node.type === 'Animated.Text');
   assert.equal(flat(plain[0].props.style).fontSize, 13);
@@ -348,7 +405,7 @@ test('A filled semantic ActionButton paints its label and glyph in onSemantic, r
   }
 });
 
-test('25VIS1 final: Inicio\'s Gastado | Disponible on the field: a white thumb with an ink label, the other label secondary; accessibilityState says which', () => {
+test('25VIS1 final, kept in 25VIS2: Inicio\'s Gastado | Disponible on the field: a light thumb with the light ink label, the other label secondary; accessibilityState says which', () => {
   for (const palette of [lightPalette, darkPalette]) {
     const ui = load('components.tsx', {}, 1, 390, { ...palette, isDark: palette === darkPalette });
     const props = { onField: true, value: 'spent', onChange: () => {}, options: [{ value: 'spent', label: 'Gastado' }, { value: 'available', label: 'Disponible' }] };
@@ -358,7 +415,7 @@ test('25VIS1 final: Inicio\'s Gastado | Disponible on the field: a white thumb w
     assert.equal(flat(control.props.style).backgroundColor, palette.heroControl, 'the track is unchanged');
     const thumb = nodes(control).find(node => node.type === 'Animated.View')!;
     assert.equal(flat(thumb.props.style).backgroundColor, palette.heroThumb);
-    assert.deepEqual([palette.heroThumb, palette.heroThumbInk], [lightPalette.surface, palette.heroInk], 'white thumb, ink label, in both themes');
+    assert.deepEqual([palette.heroThumb, palette.heroThumbInk], [lightPalette.surface, lightPalette.text], 'the light surface\'s thumb and ink, in both themes');
     const labels = nodes(control).filter(node => node.type === 'Animated.Text');
     assert.deepEqual(labels.map(label => flat(label.props.style).color), [palette.heroThumbInk, palette.heroSecondary]);
     assert.deepEqual(labels.map(label => flat(label.props.style).fontWeight), ['600', '500'], 'weight marks the chosen one too, not colour alone');
@@ -436,6 +493,11 @@ test('AmountShortcut and SelectionRow read their spoken twins; the visible capti
   const plain = ui.render('AmountShortcut', { label: 'Usar todo', caption: 'Saldo', onPress: () => {} });
   assert.equal(nodes(plain).find(node => is(node, 'PressFeedback'))!.props.accessibilityLabel, 'Usar todo, Saldo');
   assert.equal(texts(plain)[0].props.accessibilityLabel, undefined);
+  // 25VIS2 (V15): the fill lowers the keyboard first, so Save and its echo of the filled amount come into view.
+  const filled: string[] = [];
+  const pay = ui.render('AmountShortcut', { label: 'Pagar total', caption: 'Saldo pendiente', onPress: () => filled.push('fill') });
+  nodes(pay).find(node => is(node, 'PressFeedback'))!.props.onPress();
+  assert.equal(ui.keyboard.join(',') + '|' + filled.join(','), 'dismiss|fill');
   const row = ui.render('SelectionRow', { label: 'Cuenta', value: 'Banco', detail: 'Saldo $ 1.234,56', spokenDetail: 'Saldo 1234,56 pesos', onPress: () => {} });
   assert.equal(nodes(row).find(node => is(node, 'PressFeedback'))!.props.accessibilityLabel, 'Cuenta: Banco, Saldo 1234,56 pesos');
   assert.equal(texts(row)[2].props.children, 'Saldo $ 1.234,56');
@@ -593,6 +655,57 @@ test('24B5: the currency field lists the gate\'s currencies with search over cod
   assert.deepEqual([dinar.props.value, dinar.props.detail], ['Dinares kuwaitíes', 'KWD · KWD']);
 });
 
+// 25O1: the real marks (src/ui/marks.tsx) under the currency rows: the issuer's round flag, the euro's EU flag, a neutral
+// glyph on the same circle for a supranational code, all hidden from VoiceOver.
+const loadMarks = (fontScale = 1) => load('marks.tsx', { '@expo/vector-icons': { Ionicons: 'Ionicons' }, '../i18n/flags': flags,
+  '../i18n/flag-art': { FLAG_ART }, 'react-native-svg': { __esModule: true, default: 'Svg', Path: 'Path' } }, fontScale);
+/** What a mark draws: the flags its paths are (art shared by several codes lists them all: UM|US), or the fallback glyph's name. */
+const flagOfPaths = (paths: Node[]) => Object.keys(FLAG_ART).filter(code => FLAG_ART[code]!.length === paths.length && FLAG_ART[code]!.every(([fill, d], index) => paths[index]!.props.fill === fill && paths[index]!.props.d === d)).join('|');
+const markDrawn = (root: Node) => { const all = nodes(root); const paths = all.filter(node => node.type === 'Path'); return paths.length ? flagOfPaths(paths) : 'glyph:' + all.find(node => node.type === 'Ionicons')?.props.name; };
+
+test('25O1: a currency\'s mark is its issuer\'s round flag (the euro the EU\'s), XOF and the other supranational codes the neutral cash glyph; a region\'s its own, Sark too; a language its variety\'s; hidden from VoiceOver', () => {
+  const marks = loadMarks();
+  assert.deepEqual(['ARS', 'USD', 'EUR', 'JPY', 'XOF', 'XAF'].map(currency => markDrawn(marks.render('CurrencyMark', { currency }))), ['AR', 'UM|US', 'EU', 'JP', 'glyph:cash-outline', 'glyph:cash-outline']);
+  assert.deepEqual(['AR', 'UY', 'CQ', 'ZZ'].map(region => markDrawn(marks.render('RegionMark', { region }))), ['AR', 'UY', 'CQ', 'glyph:globe-outline'], 'vector art: Sark too');
+  assert.deepEqual(['es', 'en'].map(language => markDrawn(marks.render('LanguageMark', { language }))), ['AR', 'UM|US']);
+  for (const [mark, side] of [[marks.render('FlagMark', { flag: 'AR', fallback: 'globe-outline' }), 36], [marks.render('FlagMark', { flag: null, fallback: 'phone-portrait-outline', size: 34 }), 34]] as const) {
+    const view = nodes(mark).find(node => node.type === 'View')!;
+    assert.deepEqual([view.props.accessible, view.props.accessibilityElementsHidden, view.props.importantForAccessibility], [false, true, 'no-hide-descendants']);
+    assert.deepEqual([view.props.style.width, view.props.style.height, view.props.style.borderRadius], [side, side, side / 2], 'a circle, at every text size');
+  }
+  const flag = nodes(marks.render('FlagMark', { flag: 'JP', fallback: 'globe-outline' }));
+  assert.equal(flag.find(node => node.type === 'View')!.props.style.overflow, 'hidden', 'the art is clipped to the circle');
+  assert.equal(flag.find(node => node.type === 'Svg')!.props.viewBox, '0 0 512 512');
+  const ring = flag.filter(node => node.type === 'View')[1]!;
+  assert.deepEqual([ring.props.style[1].borderWidth, ring.props.style[1].borderColor], [0.5, '#E6E6EC'], 'a hairline ring of the palette\'s line keeps a white field\'s edge');
+  assert.equal(nodes(marks.render('FlagMark', { flag: null, fallback: 'globe-outline' })).find(node => node.type === 'View')!.props.style.backgroundColor, '#EEEEF3', 'the neutral glyph on the inset circle');
+  assert.equal(marks.render('InlineFlag', { flag: null }), null, 'no flag: nothing inline, not an empty box');
+  const inline = (scale: number, size?: number) => nodes(loadMarks(scale).render('InlineFlag', { flag: 'AR', size })).find(node => node.type === 'View')!.props.style.width;
+  assert.deepEqual([inline(1), inline(1, 15), inline(1.4, 15), inline(3, 15), inline(0.8, 15)], [19, 17, 23, 26, 17], 'inline: grows with the text beside it, up to 1.6×, never below its size');
+
+  // The same marks inside the sheet: a supranational row shows the neutral glyph; the label stays name and code.
+  const ui = load('form-controls.tsx', { './marks': marks.exports });
+  const options = ['ARS', 'EUR', 'XOF'].map(code => ({ code, name: i18nFormat.currencyName(code as any), symbol: i18nFormat.currencySymbol(code as any) }));
+  const sheet = ui.render('CurrencySheet', { visible: true, title: 'Elegir moneda', options, value: 'ARS', onClose: () => {}, onChange: () => {} });
+  const list = nodes(sheet).find(node => node.type === 'FlatList')!;
+  const rows = list.props.data.map((item: unknown) => list.props.renderItem({ item }));
+  assert.deepEqual(rows.map((row: Node) => markDrawn(row)), ['AR', 'EU', 'glyph:cash-outline']);
+  assert.deepEqual(rows.map((row: Node) => row.props.accessibilityLabel), ['Pesos argentinos, ARS', 'Euros, EUR', options[2].name + ', XOF']);
+});
+
+test('25O1: the display sheet\'s currency row leads with that currency\'s mark, and its currency step lists each with its own', () => {
+  const ui = load('form-controls.tsx');
+  const options = ['ARS', 'USD', 'EUR'].map(code => ({ code, name: i18nFormat.currencyName(code as any), symbol: i18nFormat.currencySymbol(code as any) }));
+  const props = { visible: true, mode: 'consolidated', currency: 'EUR', consolidatedOptions: options, singleOptions: options.slice(0, 2), onClose: () => {}, onMode: () => {}, onCurrency: () => {} };
+  let sheet = ui.render('DisplaySheet', props);
+  const row = nodes(sheet).find(node => node.type === 'SelectionRow')!;
+  assert.deepEqual([row.props.icon, row.props.leading.type, row.props.leading.props.currency, row.props.leading.props.size], [undefined, 'CurrencyMark', 'EUR', 30]);
+  row.props.onPress();
+  sheet = ui.render('DisplaySheet', props);
+  const list = nodes(sheet).find(node => node.type === 'FlatList')!;
+  assert.deepEqual(list.props.data.map((item: unknown) => nodes(list.props.renderItem({ item })).find(node => node.type === 'CurrencyMark')!.props.currency), ['ARS', 'USD', 'EUR']);
+});
+
 // ---- 24UX2: the merchant mark --------------------------------------------------------------------------------
 
 test('24UX2: MerchantBadge draws the category glyph for every merchant in production, recognized or not', () => {
@@ -708,6 +821,32 @@ test('24UX6C: a transfer row shows the stored amount unsigned in the transfer to
   assert.equal(spoken({ transfer, accountId: 'a', context: 'debt' }), 'Cobro, de Banco a Efectivo, 2500,00 ARS, Hoy');
   assert.equal(spoken({ transfer: { ...transfer, note: 'Cuota' }, accountId: 'b', context: 'card' }), 'Pago de tarjeta, de Banco a Efectivo, 2500,00 ARS, Hoy, Cuota',
     'in a card context the note is still read after the facts');
+});
+
+test('25N1: a row of Movimientos deshechos never looks live: the amount in the tertiary ink with no «+», and VoiceOver hears «deshecho»', () => {
+  const ui = load('components.tsx');
+  const bank = { id: 'a', name: 'Banco', currency: 'ARS', openingMinor: 0, createdAt: 't' };
+  const cash = { id: 'b', name: 'Efectivo', currency: 'ARS', openingMinor: 0, createdAt: 't' };
+  const income = { id: 'i', accountId: 'a', kind: 'income', merchant: 'Sueldo', category: 'Sueldo', amountMinor: 500000, dateISO: '2026-09-22', createdAt: 't' };
+  const row = ui.render('EntryRow', { entry: income, account: bank, voided: true });
+  const [money] = moneyOf(row);
+  assert.deepEqual([money.props.minor, money.props.signed, money.props.color], [500000, false, '#8E9098'], 'the stored amount, unsigned, in palette.tertiary');
+  assert.equal(drawn(row).some(text => text.startsWith('+')), false, 'no «+» on an undone income: ' + drawn(row).join(' | '));
+  assert.equal(pressOf(row).props.accessibilityLabel, 'Sueldo, ingreso, deshecho, 5000,00 ARS, x, Banco, Hoy');
+  const live = ui.render('EntryRow', { entry: income, account: bank });
+  assert.deepEqual([moneyOf(live)[0].props.signed, moneyOf(live)[0].props.color], [true, undefined], 'a live row is unchanged');
+  const expense = ui.render('EntryRow', { entry: { ...income, kind: 'expense', merchant: 'Café', category: 'Comida' }, account: bank, voided: true });
+  assert.equal(pressOf(expense).props.accessibilityLabel, 'Café, gasto, deshecho, 5000,00 ARS, x, Banco, Hoy');
+  // A devolución is feminine: «Devolución, Café, deshecha».
+  const refundRow = ui.render('EntryRow', { entry: { ...income, merchant: 'Café', category: 'Comida', refund: { operationId: 'op' } }, account: bank, voided: true });
+  assert.match(pressOf(refundRow).props.accessibilityLabel, /^Devolución, Café, deshecha, /);
+  const transfer = { id: 't', fromAccountId: 'a', toAccountId: 'b', amountMinor: 250000, dateISO: '2026-09-22', createdAt: 't', note: '' };
+  const undoneTransfer = ui.render('TransferRow', { transfer, accounts: [bank, cash], voided: true });
+  assert.equal(moneyOf(undoneTransfer)[0].props.color, '#8E9098');
+  assert.equal(pressOf(undoneTransfer).props.accessibilityLabel, 'Transferencia, deshecha, de Banco a Efectivo, 2500,00 ARS, Hoy');
+  // Through MovementRow, as EntryList draws them.
+  const viaList = ui.render('MovementRow', { item: { type: 'transfer', value: { ...transfer, note: 'Alquiler' }, key: 't' }, accounts: [bank, cash], voided: true });
+  assert.equal(pressOf(viaList).props.accessibilityLabel, 'Transferencia, Alquiler, deshecha, de Banco a Efectivo, 2500,00 ARS, Hoy');
 });
 
 test('24UX6C: a computed sign is kept: a negative account balance still renders with its minus', () => {
@@ -862,4 +1001,207 @@ test('25OPS1: Screen and EntryList (Más, Movimientos) take the dock clearance a
   const account = list({});
   assert.equal(account.props.contentContainerStyle.paddingBottom, 40);
   assert.deepEqual([account.props.contentInset, account.props.scrollIndicatorInsets, account.props.contentInsetAdjustmentBehavior], [undefined, undefined, 'automatic']);
+});
+
+test('25VIS2: every segment is a 44 pt target without being drawn taller (the default 32 pt segment gets 6 pt of vertical slop)', () => {
+  const ui = load('components.tsx');
+  const options = [{ value: 'expense', label: 'Gasto' }, { value: 'income', label: 'Ingreso' }, { value: 'transfer', label: 'Transferencia' }];
+  const reach = (slop: any) => typeof slop === 'number' ? 2 * slop : (slop.top ?? 0) + (slop.bottom ?? 0);
+  for (const [variant, drawn] of [['default', 32], ['compact', 28], ['onField', 36], ['prominent', 40]] as const) {
+    const control = ui.render('Choices', { value: 'expense', onChange: () => {}, options, [variant]: true });
+    const segments = [...new Set(nodes(control).filter(node => node.type === 'Pressable'))];
+    assert.equal(segments.length, 3, variant);
+    for (const segment of segments) {
+      assert.equal(styleOf(segment).minHeight, drawn, variant + ': drawn as before');
+      assert.ok(drawn + reach(segment.props.hitSlop) >= 44, variant + ': a 44 pt target');
+    }
+  }
+  const segment = nodes(ui.render('Choices', { value: 'expense', onChange: () => {}, options })).find(node => node.type === 'Pressable')!;
+  assert.equal(JSON.stringify(segment.props.hitSlop), '{"top":6,"bottom":6}', 'vertical only: the neighbour is 2 pt away sideways');
+  // The composer's 4 pt under the track: rendered in tests/recovery-routes.node.ts (the movement modal's own test).
+});
+
+test('25D1: a segment under the finger dims to 60 % until it lifts; the chosen one never dims; nothing moves', () => {
+  const ui = load('components.tsx');
+  const options = [{ value: 'expense', label: 'Gasto' }, { value: 'income', label: 'Ingreso' }];
+  for (const variant of ['default', 'compact', 'onField', 'prominent'] as const) {
+    const control = ui.render('Choices', { value: 'expense', onChange: () => {}, options, [variant]: true });
+    const [chosen, other] = [...new Set(nodes(control).filter(node => node.type === 'Pressable'))];
+    assert.equal(chosen.props.accessibilityState.selected, true, variant);
+    assert.equal(styleOf(other).opacity, undefined, variant + ': at rest, full strength');
+    assert.equal(styleOf(other, true).opacity, 0.6, variant + ': touch-down feedback');
+    assert.equal(styleOf(chosen, true).opacity, undefined, variant + ': tapping the chosen one does nothing, so it never answers');
+    const { opacity, ...pressedShape } = styleOf(other, true);
+    assert.equal(JSON.stringify(pressedShape), JSON.stringify(styleOf(other)), variant + ': colour only, the geometry never changes (Reduce Motion needs nothing)');
+  }
+});
+
+test('25VIS2: a disabled segmented control looks disabled and says so on every segment', () => {
+  const ui = load('components.tsx');
+  const options = [{ value: 'expense', label: 'Gasto' }, { value: 'income', label: 'Ingreso' }];
+  const live = ui.render('Choices', { value: 'expense', onChange: () => {}, options });
+  assert.equal(flat(live.props.style).opacity, 1);
+  const locked = ui.render('Choices', { value: 'expense', onChange: () => {}, options, disabled: true });
+  assert.equal(flat(locked.props.style).opacity, 0.5, 'the whole track at half strength, as a disabled button');
+  const segments = [...new Set(nodes(locked).filter(node => node.type === 'Pressable'))];
+  for (const segment of segments) assert.deepEqual([segment.props.disabled, segment.props.accessibilityState.disabled], [true, true]);
+});
+
+test('25VIS2: under Reduce Motion a pressed scale control dims instead of showing nothing; glass opts out; without Reduce Motion it still scales', () => {
+  const shared = { value: 0 };
+  const theme = (reduced: boolean) => ({ radius: { chip: 14, tile: 12, group: 16, card: 20, sheet: 24, creditCard: 18, button: 14 }, space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
+    type: { body: { fontSize: 17 }, subhead: { fontSize: 15 }, footnote: { fontSize: 13 }, caption: { fontSize: 12 }, title2: { fontSize: 22 }, title3: { fontSize: 20 }, headline: { fontSize: 17 }, eyebrow: {} },
+    usePalette: () => ({ isDark: false }), useReduceMotion: () => reduced, useCurrentDay: () => '2026-09-22' });
+  const press = (reduced: boolean, props: Record<string, unknown> = {}) => {
+    shared.value = 0;
+    const ui = load('components.tsx', { './theme': theme(reduced), 'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View', Text: 'Animated.Text' },
+      useSharedValue: () => shared, withTiming: (value: number) => value, useAnimatedStyle: (fn: () => unknown) => fn } });
+    const root = ui.render('PressFeedback', { onPress: () => {}, children: 'x', ...props });
+    const style = () => root.props.style.find((item: unknown) => typeof item === 'function')();
+    const before = JSON.stringify(style());
+    root.props.children.props.onPressIn({});
+    return [before, JSON.stringify(style())];
+  };
+  assert.deepEqual(press(true), ['{"opacity":1}', '{"opacity":0.7}'], 'Save, the selector cards, the dock tabs and «+» dim when pressed');
+  assert.deepEqual(press(true, { reducedDim: false }), ['{"transform":[{"scale":1}]}', '{"transform":[{"scale":1}]}'], 'a glass pill keeps no pressed state');
+  assert.deepEqual(press(false), ['{"transform":[{"scale":1}]}', '{"transform":[{"scale":0.97}]}'], 'the scale is unchanged without Reduce Motion');
+  assert.deepEqual(press(true, { feedback: 'opacity' }), ['{"opacity":1}', '{"opacity":0.4}'], 'a text button dims as before');
+  // An account detail's pills opt out only while they are glass: rendered with each material.
+  for (const [material, dim] of [['glass', false], ['opaque', true]] as const) {
+    const quick = load('quick-actions.tsx', { './material': { ControlSurface: 'ControlSurface', useMaterial: () => material },
+      './components': { AppText: 'AppText', PressFeedback: 'PressFeedback', toneColors: () => ({ color: '#000' }), useStacked: () => false } });
+    const row = quick.render('QuickActions', {});
+    const pills = row.props.children.map((child: any) => child.type(child.props));
+    assert.equal(JSON.stringify(pills.map((pill: Node) => [pill.type, pill.props.reducedDim, pill.props.children.type])), JSON.stringify(Array(3).fill(['PressFeedback', dim, 'ControlSurface'])), material);
+  }
+});
+
+test('25VIS2: a field\'s caption is not a VoiceOver stop of its own; the amount keyboard\'s Listo is named as it reads', async () => {
+  const ui = load('components.tsx', { '@finanzapp/domain': await import('@finanzapp/domain') });
+  const field = ui.render('Field', { label: 'Comercio', value: '' });
+  const caption = nodes(field).find(node => is(node, 'AppText'))!;
+  assert.equal(caption.props.accessible, false);
+  assert.equal(nodes(field).find(node => node.type === 'TextInput')!.props.accessibilityLabel, 'Comercio', 'the field says its label once');
+  const amount = ui.render('AmountField', { label: 'Gasto', currency: 'ARS', value: '', onChangeText: () => {} });
+  for (const text of nodes(amount).filter(node => is(node, 'AppText') && node.props.variant === 'footnote')) assert.equal(text.props.accessible, false);
+  assert.match(nodes(amount).find(node => node.type === 'TextInput')!.props.accessibilityLabel, /^Gasto/, 'the field itself carries the label and the currency');
+  const done = nodes(amount).find(node => is(node, 'PressFeedback') && node.props.onPress)!;
+  assert.equal(done.props.accessibilityLabel, 'Listo', 'Voice Control finds «Listo» by what it shows');
+  assert.ok(texts(done).some(node => node.props.children === 'Listo'));
+});
+
+test('25VIS2: a section\'s plain action reaches 44 pt with slop, as the quiet one does', () => {
+  const ui = load('components.tsx');
+  for (const quiet of [false, true]) {
+    const heading = ui.render('SectionTitle', { children: 'Presupuestos', action: 'Ver todos', onAction: () => {}, quiet });
+    const action = nodes(heading).find(node => is(node, 'PressFeedback'))!;
+    assert.equal(flat(action.props.style).minHeight, 36, 'drawn as before');
+    assert.ok(36 + action.props.hitSlop.top + action.props.hitSlop.bottom >= 44, quiet ? 'quiet' : 'plain');
+  }
+});
+
+// ErrorMessage alone on a platform. The effect stub follows React's rule (it runs again only when its keys changed), so
+// «a re-render is not spoken» is exercised, not read off the deps array; one slot is enough because nothing else renders.
+function errorMessageOn(os: 'ios' | 'android') {
+  const said: string[] = [];
+  let last: string | undefined;
+  const ui = load('components.tsx', {
+    react: { useState: (value: unknown) => [value, () => {}], useEffect: (effect: () => void, keys: unknown[]) => { const next = JSON.stringify(keys); if (next !== last) { last = next; effect(); } },
+      useId: () => 'id', useRef: (value: unknown) => ({ current: value }), useMemo: (fn: () => unknown) => fn(), Children: { map: () => [] } },
+    'react-native': { View: 'View', Text: 'Text', Pressable: 'Pressable', Platform: { OS: os }, StyleSheet: { hairlineWidth: 0.5, create: (styles: unknown) => styles },
+      AccessibilityInfo: { announceForAccessibility: (text: string) => said.push(text) } },
+  });
+  const alert = (root: Node) => nodes(root).find(node => node.type === 'Text' && node.props.accessibilityRole === 'alert')!;
+  return { said, show: (props: Record<string, unknown>) => ui.render('ErrorMessage', props), alert };
+}
+
+test('25VIS2: on iOS ErrorMessage tells VoiceOver when an error appears or changes, never twice for the same one, and not for a line shown while typing', () => {
+  const { said, show, alert } = errorMessageOn('ios');
+  const sentence = bindLocale('es-AR').errorText('transferForm.overCardDebt');
+  show({ message: null });
+  assert.equal(said.length, 0);
+  const line = show({ message: 'transferForm.overCardDebt' });
+  assert.deepEqual(said, [sentence], 'the translated sentence, not the key');
+  show({ message: 'transferForm.overCardDebt' });
+  assert.equal(said.length, 1, 'a re-render of the same error is not spoken again');
+  show({ message: 'entryForm.futureDate' });
+  assert.equal(said.length, 2, 'a new error is spoken');
+  show({ message: 'transferForm.overCardDebt', announce: false });
+  assert.equal(said.length, 2, 'a line a form shows while typing is not spoken');
+  assert.equal(alert(line).props.accessibilityLiveRegion, 'polite', 'the live region stays for Android');
+});
+
+test('25VIS2: on Android ErrorMessage announces nothing itself: TalkBack speaks its live region, so each error is said once', () => {
+  const { said, show, alert } = errorMessageOn('android');
+  const line = show({ message: 'transferForm.overCardDebt' });
+  show({ message: 'entryForm.futureDate' });
+  assert.equal(said.length, 0, 'one utterance per error: the live region\'s');
+  assert.equal(alert(line).props.accessibilityLiveRegion, 'polite');
+});
+
+test('25VIS2 (V7): a fixed SelectorCard reads as a fact: full strength, no chevron, no button role, the same label and the language', () => {
+  const ui = load('form-controls.tsx', { './categories': { categoryChoices: () => [], categoryKey: (label: string) => label.toLowerCase(), customCategory: () => null } });
+  const props = { label: 'Tarjeta', value: 'Visa', placeholder: '', detail: 'Saldo pendiente ARS 50,00', spokenDetail: 'Saldo pendiente 50,00 pesos', icon: 'card-outline' };
+  const fixed = ui.render('SelectorCard', { ...props, fixed: true, disabled: true });
+  assert.equal(fixed.type, 'View');
+  assert.deepEqual([fixed.props.accessible, fixed.props.accessibilityRole, fixed.props.accessibilityState], [true, undefined, undefined]);
+  assert.equal(fixed.props.accessibilityLabel, 'Tarjeta: Visa, Saldo pendiente 50,00 pesos');
+  assert.ok(Object.hasOwn(fixed.props, 'accessibilityLanguage'), 'the View is its own VoiceOver element, so it carries the language (voiceover.node.ts rule b)');
+  assert.equal(flat(fixed.props.style).opacity, 1);
+  assert.equal(nodes(fixed).some(node => node.type === 'Ionicons'), false, 'no chevron: nothing opens');
+  const chooser = ui.render('SelectorCard', { ...props, onPress: () => {} });
+  assert.equal(chooser.type, 'PressFeedback');
+  assert.equal(chooser.props.accessibilityRole, 'button');
+  assert.ok(nodes(chooser).some(node => node.type === 'Ionicons'), 'a chooser keeps its chevron');
+});
+
+test('25N1: a press keeps React Native\'s own retention (20/20/20/30 pt of drift) unless its caller sets one', () => {
+  const ui = load('components.tsx');
+  const pressable = (props: Record<string, unknown> = {}) => ui.render('PressFeedback', { onPress: () => {}, children: 'x', ...props }).props.children;
+  assert.equal(pressable().props.pressRetentionOffset, undefined, 'never a tighter 12 pt');
+  assert.equal(pressable({ pressRetentionOffset: 40 }).props.pressRetentionOffset, 40, 'a caller may widen it');
+  const deck = readFileSync(new URL('../src/ui/card-visual.tsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(deck, /pressRetentionOffset/, 'the deck slot keeps the default too');
+});
+
+test('25N1: a text field offers Clear while editing, and a field on a keyboard with no Return key gets the «Listo» bar', () => {
+  const ui = load('components.tsx');
+  const input = (root: Node) => nodes(root).find(node => node.type === 'TextInput')!;
+  const name = ui.render('Field', { label: 'Nombre', value: 'Banco' });
+  assert.equal(input(name).props.clearButtonMode, 'while-editing');
+  assert.equal(input(name).props.inputAccessoryViewID, undefined, 'a Return key already dismisses it');
+  assert.equal(nodes(name).some(node => is(node, 'InputAccessoryView') || node.type === 'InputAccessoryView'), false);
+  assert.equal(input(ui.render('Field', { label: 'Buscar', value: '', clearButtonMode: 'never' })).props.clearButtonMode, 'never', 'a caller may opt out');
+  for (const keyboardType of ['number-pad', 'decimal-pad', 'numeric', 'phone-pad']) {
+    const digits = ui.render('Field', { label: 'Últimos 4 dígitos', value: '', keyboardType });
+    const accessory = nodes(digits).find(node => node.type === 'InputAccessoryView')!;
+    assert.ok(accessory, keyboardType + ' has no Return key');
+    assert.equal(input(digits).props.inputAccessoryViewID, accessory.props.nativeID);
+    const done = nodes(accessory).find(node => is(node, 'PressFeedback') && node.props.onPress)!;
+    assert.equal(done.props.accessibilityLabel, 'Listo');
+    done.props.onPress();
+  }
+  assert.deepEqual(ui.keyboard, ['dismiss', 'dismiss', 'dismiss', 'dismiss']);
+});
+
+test('25N1: a locked field, amount or date row looks disabled (60 %), as a locked selector card does; a live one is full strength', async () => {
+  const ui = load('components.tsx', { '@finanzapp/domain': await import('@finanzapp/domain') });
+  const strength = (root: Node) => flat(root.props.style).opacity;
+  assert.deepEqual([strength(ui.render('Field', { label: 'Comercio', value: 'x' })), strength(ui.render('Field', { label: 'Comercio', value: 'x', editable: false }))], [1, 0.6]);
+  const amount = (editable?: boolean) => strength(ui.render('AmountField', { label: 'Gasto', currency: 'ARS', value: '10', onChangeText: () => {}, editable }));
+  assert.deepEqual([amount(), amount(true), amount(false)], [1, 1, 0.6]);
+  const row = (disabled: boolean) => nodes(ui.render('DetailRow', { label: 'Fecha', value: 'Hoy', onPress: () => {}, disabled })).find(node => is(node, 'PressFeedback'))!;
+  assert.deepEqual([styleOf(row(false)).opacity, styleOf(row(true)).opacity, row(true).props.accessibilityState.disabled], [1, 0.6, true]);
+});
+
+test('25N1: a locked appearance picker draws every icon and colour at 60 % and says each is disabled', async () => {
+  const appearance = await import('../src/ui/appearance.ts');
+  const ui = load('appearance-picker.tsx', { './appearance': appearance, './motion': { duration: { state: 200 }, selectionHaptic: () => {} },
+    './theme': { space: { l: 16 }, usePalette: () => ({ ...lightPalette, isDark: false }), useReduceMotion: () => false } });
+  const options = (disabled: boolean) => nodes(ui.render('IconColorPicker', { icons: appearance.ACCOUNT_ICON_CHOICES, colors: appearance.COLOR_CHOICES,
+    icon: appearance.ACCOUNT_ICON_CHOICES[0].id, color: appearance.COLOR_CHOICES[0].id, onIconChange: () => {}, onColorChange: () => {}, disabled }))
+    .filter(node => node.type === 'PressFeedback' && node.props.accessibilityRole === 'radio');
+  assert.ok(options(true).length > 0);
+  assert.ok(options(true).every(node => flat(node.props.style).opacity === 0.6 && node.props.accessibilityState.disabled === true));
+  assert.ok(options(false).every(node => flat(node.props.style).opacity === undefined));
 });
