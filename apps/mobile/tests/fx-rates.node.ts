@@ -227,6 +227,32 @@ function retryHarness(clock: { now: Date }) {
   return { timers, provider, store, fire };
 }
 
+test('25R1 review: a short back-off of one quote never strands a longer one of another quote in the same month', async () => {
+  const clock = { now: new Date('2026-09-25T12:00:00.000Z') };
+  const { timers, provider, store } = retryHarness(clock);
+  const live = () => { timers.splice(0, timers.length, ...timers.filter(timer => !timer.cancelled)); return timers; };
+  const fire = () => { const timer = live().shift()!; clock.now = new Date(clock.now.getTime() + timer.ms); timer.run(); };
+  provider.fail('offline');
+  const euro = store.watch(['2026-09'], ['EUR'], '2026-09-25');
+  await store.settled();
+  fire(); await store.settled();
+  fire(); await store.settled();
+  const euroAsks = provider.requests.length;
+  assert.equal(euroAsks, 3, 'EUR failed three times: its back-off has grown');
+  // The display currency changes: ARS is asked, fails once (the shortest back-off) while EUR still waits its longer one.
+  const pesos = store.watch(['2026-09'], ['ARS'], '2026-09-25');
+  await store.settled();
+  assert.equal(live().length, 1, 'one timer for the month, at the earliest back-off');
+  provider.fail(null);
+  fire(); await store.settled();
+  assert.equal(store.activity(['2026-09'], ['ARS']), 'idle', 'ARS came back');
+  assert.equal(live().length, 1, 'EUR, still waiting, keeps a timer');
+  fire(); await store.settled();
+  assert.equal(store.activity(['2026-09'], ['EUR']), 'idle', 'and EUR is asked again without leaving the screen');
+  assert.equal(live().length, 0);
+  euro(); pesos();
+});
+
 test('after a failure the store retries by itself once the back-off has passed, while the view that asked is still active', async () => {
   const clock = { now: new Date('2026-09-25T12:00:00.000Z') };
   const { timers, provider, store, fire } = retryHarness(clock);

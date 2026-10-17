@@ -144,6 +144,20 @@ export function createRatesStore({ cache, fetchRates, now = () => new Date(), sc
   };
   const cancelRetry = (month: string) => { retries.get(month)?.(); retries.delete(month); };
   const key = (quote: Currency, month: string) => quote + '|' + month;
+  /** The month's one retry timer, set for the earliest back-off among the quotes still watched and failing, and set again
+   * after it fires while any of them is still waiting: a short failure of one quote never strands a longer one of another. */
+  const scheduleRetry = (month: string) => {
+    cancelRetry(month);
+    const at = now().getTime();
+    const ends = watched(month).quotes.map(quote => failures.get(key(quote, month))?.until).filter((until): until is number => until !== undefined && until > at);
+    if (!ends.length) return;
+    retries.set(month, schedule(() => {
+      retries.delete(month);
+      const current = watched(month);
+      if (current.quotes.length) store.ensure([month], current.quotes, current.today);
+      scheduleRetry(month);
+    }, Math.min(...ends) - at));
+  };
   /** Whether a request for (quote, month) would be made now: not in flight, not backing off, not refused, and due. */
   const due = (quote: Currency, month: string, today: string, moment: Date) => {
     const item = key(quote, month), failure = failures.get(item), refused = unsupported.get(item);
@@ -199,27 +213,16 @@ export function createRatesStore({ cache, fetchRates, now = () => new Date(), sc
           else { for (const item of keys) { unsupported.set(item, at + UNSUPPORTED_MS); failures.delete(item); } emit(); }
           return;
         }
-        let wait = 0;
         for (const item of keys) {
           const attempt = (failures.get(item)?.attempt ?? 0) + 1;
           const step = RETRY_STEPS_MS[Math.min(attempt, RETRY_STEPS_MS.length) - 1];
           const ms = Math.max(step, error instanceof RateFetchError ? error.retryAfterMs ?? 0 : 0);
           failures.set(item, { until: at + ms, attempt, kind: error instanceof RateFetchError ? error.kind : 'provider' });
-          wait = Math.max(wait, ms);
         }
         emit();
         // The screen that asked stays mounted with the same months and quotes, so nothing would ask again: the store
-        // retries by itself once the back-off has passed, for the quotes some view still watches (a second failure
-        // schedules the next one; a view that left cancels it, and one that leaves meanwhile finds nothing to ask).
-        const interest = watched(month);
-        if (interest.quotes.some(quote => quotes.includes(quote))) {
-          cancelRetry(month);
-          retries.set(month, schedule(() => {
-            retries.delete(month);
-            const current = watched(month);
-            if (current.quotes.length) store.ensure([month], current.quotes, current.today);
-          }, wait));
-        }
+        // retries by itself once the back-off has passed, for the quotes some view still watches (a view that left cancels it).
+        if (watched(month).quotes.some(quote => quotes.includes(quote))) scheduleRetry(month);
       } finally {
         inFlight.delete(requestKey);
         for (const item of keys) pendingQuotes.delete(item);

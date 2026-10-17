@@ -57,6 +57,20 @@ copies' locations (25Q4 step 9 needs Xcode's Devices window), the cold links of 
 merges `master` and keeps its CI green before its own merge; never a force-push). A failure fixes forward on the branch
 it belongs to and the stack above merges it in.
 
+## Producto 25R1 — robustness (on its branch, stacked on 25N1; milestone M2)
+
+JavaScript only, the same development build; Metro from this branch in a QA profile (`EXPO_PUBLIC_QA_PROFILE=m2`).
+
+1. **Midnight and Control Center:** with the app open across midnight, and again after pulling Control Center down and
+   up: Recurrentes never flashes «Revisar», and a rule due today is recorded once.
+2. **Rates offline:** a consolidated Reportes in Airplane mode, then back online: retries slow down and recover without
+   leaving the screen; the comparison row hides while the previous month lacks rates; the drill-downs give the reason
+   under ⓘ.
+3. **Links:** open a `finanzapp-dev://new-entry?…` link from Notes with the app closed: it opens on Inicio with no form;
+   with a half-filled «Nuevo gasto» open, tap a link: nothing changes, the form stays.
+4. **Plans:** on a plan whose statement closed since the last pass, «Eliminar plan» is not offered and «Dejar de
+   seguir» is.
+
 ## Producto 25N1 — Finanzas, Ajustes and the shared controls (on its branch, stacked on #119; milestone M2)
 
 JavaScript only, the same development build; Metro from this branch, in a QA profile for anything that writes
@@ -151,7 +165,7 @@ way round, which opens as a plain transfer and is capped once turned back).
 5. **A refused save taps once.** Nuevo presupuesto for a month and category that already has one, and Nueva categoría
    with a name in use: the sentence and one Error tap, nothing saved, the fields editable; the same save done right
    gives the Success tap. With System Haptics off, no tap at all.
-6. **«Cerrar» with nothing to edit.** Open `finanzapp-dev://edit-entry/<id of an undone movement>`,
+6. **«Cerrar» with nothing to edit.** *(From 25R1 on, an inbound link only opens the app on Inicio (and does nothing while it is open): this step applies to #118/#119 alone; the screens are covered by tests.)* Open `finanzapp-dev://edit-entry/<id of an undone movement>`,
    `edit-card/<id of a deleted card>`, `edit-transfer/<unknown id>` and `edit-review/<unknown id>` (no build
    produces a proposal yet):
    «Cerrar» in the header, read by VoiceOver; from a cold link it goes to Inicio, Tarjetas or Para revisar; the swipe
@@ -455,7 +469,7 @@ JavaScript only; on the development build cut after PR #113, Metro from `master`
 
 - [ ] **A held dock tab.** Press and hold Movimientos for a full second, then lift: it opens (before: nothing). The same
   with every tab; a quick tap as before. With Larger Accessibility Sizes, holding still shows iOS's Large Content Viewer.
-- [ ] **An unknown link.** From Notes tap `finanzapp-dev://nope` (or `xcrun simctl openurl booted finanzapp-dev://nope`),
+- [ ] **An unknown link.** *(From 25R1 on, an inbound link only opens the app on Inicio (and does nothing while it is open): this step applies to #118/#119 alone; the screens are covered by tests.)* From Notes tap `finanzapp-dev://nope` (or `xcrun simctl openurl booted finanzapp-dev://nope`),
   in Spanish and in English. **Expect:** no black screen, no «Unmatched Route» or Sitemap; the header «Pantalla no
   encontrada», the compass card «No encontramos esa pantalla», «El enlace no lleva a ninguna pantalla de FinanzApp.» and
   «Ir a Inicio», which opens Inicio with the dock.
@@ -1024,7 +1038,7 @@ and the last button clear the home indicator and the dock where it shows, nothin
 - [ ] Creating a second general budget for the same currency and month (or a second limit for the same category):
   an error under the form, the fields still editable; changing the category or the kind saves once. «Reintentar
   guardado» never appears for it.
-- [ ] A malformed link on the development build (`finanzapp-dev://budgets?month=2026-13`, and
+- [ ] A malformed link on the development build *(From 25R1 on, an inbound link only opens the app on Inicio (and does nothing while it is open): this step applies to #118/#119 alone; the screens are covered by tests.)* (`finanzapp-dev://budgets?month=2026-13`, and
   `finanzapp-dev://new-budget?month=2026-13`): the screen and the form open on this month instead of failing.
 - [ ] «Eliminar presupuesto» in the edit form is the red destructive button with the trash glyph; it asks first.
 - [ ] VoiceOver: the general block is one element with the summary sentence; a sublimit row is one button with its

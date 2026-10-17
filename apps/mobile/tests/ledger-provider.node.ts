@@ -43,7 +43,7 @@ function provider(change: Partial<Script> = {}) {
   let listener: ((state: string) => void) | null = null;
   let reads = 0;
   /** The UI's day (useCurrentDay): a test moves it as midnight or a return to the foreground would. */
-  const clock = { day: domain.todayKey() };
+  const clock = { day: domain.todayKey(), real: null as string | null };
   const modules: Record<string, unknown> = {
     react: {
       useState: (initial: unknown) => {
@@ -66,7 +66,8 @@ function provider(change: Partial<Script> = {}) {
     },
     'react/jsx-runtime': { jsx: (type: unknown, props: Record<string, unknown>) => ({ type, props }) },
     'react-native': { AppState: { addEventListener: (_: string, fn: (state: string) => void) => { listener = fn; return { remove() {} }; } } },
-    '@finanzapp/domain': domain,
+    // The device's own day (`todayKey`) a test can move while a pass runs; null: the real clock.
+    '@finanzapp/domain': { ...domain, todayKey: () => clock.real ?? domain.todayKey() },
     '../ui/theme': { useCurrentDay: () => clock.day },
     './currency-gate': { currencyGateForBuild: () => domain.LEDGER_CURRENCIES },
     './database': { readArchive: () => { reads++; return script.read(); }, catchUpInstallments: async () => 0, createEntry: async () => {} },
@@ -201,6 +202,27 @@ test('25R1: the catch-up runs once per change of day and on a real return, never
   await settle();
   view.value();
   assert.equal(refreshes, 5);
+});
+
+test('25R1 review: a midnight that passes while a pass runs is not lost: the pass runs once more for the new day', async () => {
+  let refreshes = 0, release: () => void = () => {};
+  const view = provider({ refresh: async () => { refreshes++; if (refreshes === 1) await new Promise<void>(resolve => { release = resolve; }); return session(); } });
+  await view.start();
+  await view.appState('background');
+  await view.appState('active');
+  await settle();
+  assert.equal(refreshes, 1, 'a pass is running for today');
+  view.clock.real = '2099-01-02';
+  view.clock.day = '2099-01-02';
+  view.value();
+  await settle();
+  assert.equal(refreshes, 1, 'the change of day is coalesced into the running pass');
+  release();
+  await settle();
+  assert.equal(refreshes, 2, 'and runs once more once that pass ends');
+  view.value();
+  await settle();
+  assert.equal(refreshes, 2, 'never again for the same day');
 });
 
 test('25R1: a foreground return and a change of day on the same new day run one pass, and returns that arrive while one is queued add nothing', async () => {

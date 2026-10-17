@@ -221,7 +221,7 @@ test('25N1: Ajustes groups Preferencias, Tus datos and Acerca de, and ends with 
     'es,AR,contrast-outline,save-outline,document-text-outline');
   assert.equal(rows(root).every(row => row.props.leading.props.color === undefined), true, 'Ajustes\' tiles stay neutral');
   assert.equal(nodes(root).some(node => node.type === 'ActionButton'), false);
-  assert.match(texts(root), /FinanzApp 0\.1\.0 \(25N1\)/, 'the version line, like the About line of an iOS app');
+  assert.match(texts(root), /FinanzApp 0\.1\.0 \(25R1\)/, 'the version line, like the About line of an iOS app');
   assert.match(texts(root), /Material opaco \(Expo Go\)/, 'a development build says which control material this session draws');
   assert.doesNotMatch(texts(root), /Piloto nativo|Producto 2/, '24UX5: no project vocabulary');
   assert.doesNotMatch(texts(root), /se guardan solo en este dispositivo/, '25O1: the local-storage footnote is gone (app-store-launch.md §13.1)');
@@ -425,7 +425,7 @@ test('23.1B2 English Ajustes: every row, group, note and the diagnostic footer a
   assert.equal(value('Licenses'), 'Third-party software and data');
   for (const row of rows(root)) row.props.onPress();
   assert.equal(view.pushed.join(','), SETTINGS_ROUTES.join(','));
-  assert.match(texts(root), /FinanzApp 0\.1\.0 \(25N1\)/);
+  assert.match(texts(root), /FinanzApp 0\.1\.0 \(25R1\)/);
   assert.match(texts(root), /Opaque material \(Expo Go\) · Language: default/);
   assert.doesNotMatch(texts(root), /saved only on this device/, '25O1: no local-storage footnote in either language');
   assert.doesNotMatch(texts(root), /Material opaco|Idioma|Región|sincronización/);
@@ -477,7 +477,7 @@ test('M1: a development bundle running a QA profile says so under the footer; th
 test('24UX5: a preview or store build shows the version, never the diagnostics (25O1: nor the local-storage footnote, §13.1)', () => {
   for (const locale of [null, 'en-AR'] as const) {
     const footer = texts(harness('preferences.tsx', archive, undefined, locale, undefined, false).render());
-    assert.match(footer, /FinanzApp 0\.1\.0 \(25N1\)/);
+    assert.match(footer, /FinanzApp 0\.1\.0 \(25R1\)/);
     assert.doesNotMatch(footer, /Material|material|Idioma:|Language:/, 'no material or locale diagnostics outside a development build');
     assert.doesNotMatch(footer, locale ? /saved only on this device/ : /se guardan solo en este dispositivo/, 'the first opening says where the records live; Ajustes does not repeat it');
   }
