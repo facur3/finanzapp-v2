@@ -4,18 +4,20 @@ import { todayKey } from '@finanzapp/domain';
 
 import { defaultPreferenceStore } from '../i18n/preference';
 import { subscribeIncreaseContrast, subscribeReduceTransparency } from './material-policy';
-import { darkPalette, lightPalette, type PaletteColors } from './palette';
+import { INCREASED_CONTRAST, darkPalette, lightPalette, type PaletteColors } from './palette';
 import { createThemePreferenceStore, effectiveScheme, type ThemePreference, type ThemePreferenceStore } from './theme-preference';
 
 export type Palette = PaletteColors & {
   isDark: boolean;
   /** 25D1: iOS's Increase Contrast is on: what is drawn quieter for composition (a hero's symbol and cents) is drawn at
-   * full strength. Absent where no provider answers (a test palette), which reads as off. */
+   * full strength; 25T: separators, edges and tertiary text take `INCREASED_CONTRAST`, and fields, surfaces and the
+   * segment thumb draw an edge. Absent where no provider answers (a test palette), which reads as off. */
   increaseContrast?: boolean;
 };
 
 /** The four palettes a screen can draw (scheme × Increase Contrast), built once, so every render hands out the same object. */
-const built = (base: PaletteColors, isDark: boolean): readonly [Palette, Palette] => [{ ...base, isDark, increaseContrast: false }, { ...base, isDark, increaseContrast: true }];
+const built = (base: PaletteColors, isDark: boolean): readonly [Palette, Palette] =>
+  [{ ...base, isDark, increaseContrast: false }, { ...base, ...INCREASED_CONTRAST[isDark ? 'dark' : 'light'], isDark, increaseContrast: true }];
 const LIGHT = built(lightPalette, false), DARK = built(darkPalette, true);
 
 let themeStore: ThemePreferenceStore | null = null;

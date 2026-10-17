@@ -406,6 +406,23 @@ test('A filled semantic ActionButton paints its label and glyph in onSemantic, r
   }
 });
 
+test('25T: under Increase Contrast the default segment thumb, a field and a surface draw a 1 pt edge; off, they draw none', async () => {
+  const { INCREASED_CONTRAST } = await import('../src/ui/palette.ts');
+  for (const [base, patch, isDark] of [[lightPalette, INCREASED_CONTRAST.light, false], [darkPalette, INCREASED_CONTRAST.dark, true]] as const) {
+    for (const increaseContrast of [false, true]) {
+      const palette = { ...base, ...(increaseContrast ? patch : {}), isDark, increaseContrast };
+      const ui = load('components.tsx', {}, 1, 390, palette);
+      const props = { value: 'expense', onChange: () => {}, options: [{ value: 'expense', label: 'Gasto' }, { value: 'income', label: 'Ingreso' }] };
+      ui.render('Choices', props).props.onLayout({ nativeEvent: { layout: { width: 300 } } });
+      const thumb = flat(nodes(ui.render('Choices', props)).find(node => node.type === 'Animated.View')!.props.style);
+      const field = flat(nodes(ui.render('Field', { label: 'Nombre', value: '' })).find(node => node.type === 'TextInput')!.props.style);
+      const surface = flat(ui.render('Surface', { children: null, grouped: true }).props.style);
+      const edges = [thumb, field, surface].map(style => [style.borderWidth ?? 0, style.borderColor ?? null]);
+      assert.deepEqual(edges, increaseContrast ? [[1, palette.edge], [1, palette.line], [1, palette.line]] : [[0, null], [0, null], [0, null]], JSON.stringify({ isDark, increaseContrast }));
+    }
+  }
+});
+
 test('25VIS1 final, kept in 25VIS2: Inicio\'s Gastado | Disponible on the field: a light thumb with the light ink label, the other label secondary; accessibilityState says which', () => {
   for (const palette of [lightPalette, darkPalette]) {
     const ui = load('components.tsx', {}, 1, 390, { ...palette, isDark: palette === darkPalette });

@@ -37,7 +37,7 @@ export function SelectorCard({ label, value, placeholder, detail, spokenDetail, 
   const spoken = spokenDetail ?? detail;
   const accessibilityLabel = `${label}: ${value ?? placeholder}${spoken ? ', ' + spoken : ''}`;
   const style = [{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14, borderRadius: radius.group, backgroundColor: p.surface, minHeight: 72,
-    opacity: disabled && !fixed ? 0.6 : 1 } as const, surfaceShadow(p)];
+    opacity: disabled && !fixed ? 0.6 : 1 } as const, surfaceShadow(p), p.increaseContrast ? { borderWidth: 1, borderColor: p.line } : null];
   const tile = <GlyphTile icon={icon} tone={tone} color={color} size={44} />;
   const body = <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
     <AppText secondary variant="caption" style={{ fontWeight: '500' }}>{label}</AppText>

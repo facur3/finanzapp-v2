@@ -128,6 +128,15 @@ export const darkPalette: typeof lightPalette = {
 
 export type PaletteColors = typeof lightPalette;
 
+/** 25T: what iOS's Increase Contrast changes. Only what separates one thing from another (separators, field and control
+ * edges, the dock's rim, an off switch's track) and the quietest text: each edge holds 3:1 or more against every ground it
+ * meets (canvas, surface, inset, elevated), tertiary text a step darker in light and secondary's strength in dark. Fills,
+ * the brand, the semantic tones and the hero never change, so nothing reads as another state. Pinned by theme.node.ts. */
+export const INCREASED_CONTRAST: { readonly light: Partial<PaletteColors>; readonly dark: Partial<PaletteColors> } = {
+  light: { line: '#857E70', edge: '#857E70', dockEdge: '#7A766D', switchTrack: '#857E70', tertiary: '#4F4B44' },
+  dark: { line: '#827D73', edge: '#827D73', dockEdge: '#7A766D', switchTrack: '#78736A', tertiary: darkPalette.secondary },
+};
+
 /** 25D1: how much of a coloured hero's own tone its symbol and cents keep (two-digit hex alpha). The quiet parts sit over
  * any ground (the canvas, a card, a sheet); on the light sand 30 to 45 % of the ground showed through and the cents fell
  * to 2.2:1, under the 3:1 a hero's figure (28 pt or more) needs. Floors pinned by tests/contrast-floors.node.ts. */

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { darkPalette, lightPalette } from '../src/ui/palette.ts';
+import { INCREASED_CONTRAST, darkPalette, lightPalette } from '../src/ui/palette.ts';
 import { radius, space, type } from '../src/ui/tokens.ts';
 import { contrast, deltaE, lab, luminance } from './contrast.ts';
 
@@ -253,4 +253,20 @@ test('the account, debt and recurring screens draw the scale and the radii from 
   assert.match(read('src/ui/recurring-form.tsx'), /<AppText secondary variant="footnote" style=\{\{ fontWeight: '500' \}\}>\{t\('recurring\.form\.frequency'\)\}/);
   assert.match(read('src/ui/liability-rows.tsx'), /style=\{\[rowStyle, \{ borderBottomWidth/, 'DebtRow reuses the list row geometry');
   assert.equal(/paddingVertical: 12, paddingHorizontal: 16, minHeight: 64/.test(read('src/ui/liability-rows.tsx')), false, 'no copied row geometry');
+});
+
+test('25T: Increase Contrast strengthens only what separates (edges, separators, the off switch) and the quietest text, each to 3:1 or more on every ground', () => {
+  for (const [base, patch] of [[lightPalette, INCREASED_CONTRAST.light], [darkPalette, INCREASED_CONTRAST.dark]] as const) {
+    assert.deepEqual(Object.keys(patch).sort(), ['dockEdge', 'edge', 'line', 'switchTrack', 'tertiary'], 'fills, the brand and the semantic tones never change');
+    for (const ground of [base.background, base.surface, base.inset, base.elevated]) {
+      assert.ok(contrast(patch.line!, ground) >= 3, `line ${patch.line} on ${ground}: ${contrast(patch.line!, ground).toFixed(2)}`);
+      assert.ok(contrast(patch.edge!, ground) >= 3, `edge ${patch.edge} on ${ground}`);
+      assert.ok(contrast(patch.tertiary!, ground) >= Math.max(4.5, contrast(base.tertiary, ground)), `tertiary ${patch.tertiary} on ${ground}`);
+    }
+    assert.ok(contrast(base.line, base.surface) < 3, 'the drawn separator is a composition value: the setting is what lifts it');
+    for (const ground of [base.dock, base.background]) assert.ok(contrast(patch.dockEdge!, ground) >= 3, `dock rim on ${ground}`);
+    for (const ground of [base.surface, base.background]) assert.ok(contrast(patch.switchTrack!, ground) >= 3, `off track on ${ground}`);
+  }
+  // The theme hands these values out exactly when iOS says the setting is on.
+  assert.match(readFileSync(new URL('../src/ui/theme.ts', import.meta.url), 'utf8'), /\.\.\.INCREASED_CONTRAST\[isDark \? 'dark' : 'light'\], isDark, increaseContrast: true/);
 });

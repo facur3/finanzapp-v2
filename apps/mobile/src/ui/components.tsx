@@ -113,7 +113,9 @@ export function surfaceShadow(p: Palette): ViewStyle {
  * like an inset grouped table). */
 export function Surface({ children, style, grouped = false }: { children: ReactNode; style?: StyleProp<ViewStyle>; grouped?: boolean }) {
   const p = usePalette();
-  return <View style={[styles.surface, { backgroundColor: p.surface }, grouped ? { padding: 0, gap: 0, overflow: 'hidden', borderRadius: radius.group } : surfaceShadow(p), style]}>{children}</View>;
+  // 25T: under Increase Contrast a surface draws its edge (on the dark canvas a card is 1.1:1 without one).
+  return <View style={[styles.surface, { backgroundColor: p.surface }, grouped ? { padding: 0, gap: 0, overflow: 'hidden', borderRadius: radius.group } : surfaceShadow(p),
+    p.increaseContrast ? { borderWidth: 1, borderColor: p.line } : null, style]}>{children}</View>;
 }
 
 /** A section heading with an optional text action on the right. `quiet` (Inicio, 24UX3) draws the action at footnote
@@ -250,7 +252,7 @@ export function Field({ label, ...props }: TextInputProps & { label: string }) {
   return <View style={{ gap: 8, opacity: props.editable === false ? 0.6 : 1 }}><AppText accessible={false} secondary variant="footnote" style={{ fontWeight: '500' }}>{label}</AppText>
     <TextInput returnKeyType="done" onSubmitEditing={Keyboard.dismiss} clearButtonMode="while-editing" inputAccessoryViewID={pad ? accessoryId : undefined} {...props} accessibilityLabel={label}
       accessibilityLanguage={props.accessibilityLanguage ?? speechLanguage} placeholderTextColor={p.tertiary}
-      selectionColor={p.primary} style={[styles.input, { color: p.text, backgroundColor: p.surface }, props.style]} />
+      selectionColor={p.primary} style={[styles.input, { color: p.text, backgroundColor: p.surface }, p.increaseContrast ? { borderWidth: 1, borderColor: p.line } : null, props.style]} />
     {pad && <DoneAccessory id={accessoryId} />}
   </View>;
 }
@@ -496,8 +498,9 @@ export function Choices<T extends string>({ value, options, onChange, disabled, 
   const thumbStyle = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));
   const track = onField ? p.heroControl : compact && p.isDark ? p.surface : p.inset;
   const thumb = onField ? p.heroThumb : p.isDark ? (compact ? p.thumb : p.elevated) : p.surface;
-  // The compact thumb carries a hairline edge in both themes, so the chosen segment reads as a state, not a tint.
-  const thumbEdge = compact && !onField ? { borderWidth: StyleSheet.hairlineWidth, borderColor: p.edge } : {};
+  // The compact thumb carries a hairline edge in both themes, so the chosen segment reads as a state, not a tint. 25T: under
+  // Increase Contrast every thumb off the field draws a 1 pt edge (the default one is 1.25:1 against its track).
+  const thumbEdge = onField ? {} : p.increaseContrast ? { borderWidth: 1, borderColor: p.edge } : compact ? { borderWidth: StyleSheet.hairlineWidth, borderColor: p.edge } : {};
   // A disabled switch looks disabled (25VIS2), as a disabled button does: the whole track at half opacity.
   return <View style={[styles.choices, onField && styles.choicesField, { backgroundColor: track, opacity: disabled ? 0.5 : 1 }]} onLayout={event => setTrackWidth(event.nativeEvent.layout.width)}>
     {width > 0 && found >= 0 && <Animated.View pointerEvents="none" style={[styles.thumb, onField && styles.thumbField, { width, backgroundColor: thumb }, thumbEdge,
