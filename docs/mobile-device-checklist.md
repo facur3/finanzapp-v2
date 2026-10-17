@@ -77,7 +77,8 @@ VoiceOver on, Spanish, then the key steps in English; Metro from this branch in 
    month «Sin gastos en este período»; bars of months with nothing «sin gastos registrados»; Comparar rows «Este período,
    Comida: …»; «Dónde más gastaste» one stop per row; Voice Control «Tocar Este mes»; Presupuestos' arrows tick and say
    the month and its state; a budget at 85 % or more says «Cerca del límite» and its percent never rounds up into amber.
-7. **Lists and pickers:** Movimientos' fourth filter is «Transferencias»; rows say «pesos», never «ARS»; a plain detail
+7. **Lists and pickers:** Movimientos' fourth filter shows «Transf.» and is spoken «Transferencias» (Voice Control: say
+   «Tocar Transferencias»; the full word does not fit a 320 pt segment); rows say «pesos», never «ARS»; a plain detail
    row is one stop; the account and category pickers close with the two-finger scrub; in Cuentas and Deudas at rest the
    swipe actions are not separate stops and the Actions rotor still has them.
 
