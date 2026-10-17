@@ -57,6 +57,17 @@ export const review = {
       merchant: 'Falta el comercio o concepto.',
       category: 'Elegí una categoría que ya uses.',
       date: 'Elegí una fecha de hoy o anterior.',
+      /** The draft names an account that was deleted, or a card archived or deleted, since the proposal. */
+      destinationUnavailable: 'Esa cuenta o tarjeta ya no está disponible. Elegí otra.',
+      /** The draft names a category archived since the proposal (or an archived one). */
+      categoryArchived: 'Esa categoría está archivada. Elegí otra.',
+      /** A chosen count larger than the amount's cents. */
+      installmentCountTooMany: 'Esa cantidad de cuotas no entra en este monto.',
+    },
+    /** A name the draft holds that is no longer valid, drawn with why (never as a current value): «Banco Nación (ya no disponible)». */
+    value: {
+      unavailable: '{value} (ya no disponible)',
+      archived: '{value} (archivada)',
     },
     detail: {
       notFoundTitle: 'Esta propuesta ya no está pendiente',

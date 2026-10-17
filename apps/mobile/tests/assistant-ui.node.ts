@@ -269,6 +269,16 @@ test('25A-04: a proposal card shows what the review item holds, says what it nee
   assert.ok(income.some(node => node.type === 'AppText' && textOf(node) === 'Revisala de nuevo' && node.props.style.color === '#B45309'));
 });
 
+test('a proposal card draws a destination that stopped being valid with why, in the secondary style, never as the current account', () => {
+  const ui = load('assistant-messages.tsx');
+  const changed = { ...proposalArchive, accounts: proposalArchive.accounts.map(account => account.id === 'visa' ? { ...account, deletedAt: '2026-09-22T10:00:00.000Z' } : account) };
+  const card = ui.render('ProposalCard', { content: proposal(), state: { kind: 'pending', item: itemOf(reviewDraft()), conflict: false, writable: true }, archive: changed,
+    onReview: () => {}, onRetry: () => {}, onOpenRecord: () => {} });
+  const row = nodes(card).find(node => node.props.accessibilityLabel === 'Dónde se registra: Visa Galicia (ya no disponible)');
+  assert.ok(row, 'named with why');
+  assert.equal(flat(nodes(row!).filter(node => node.type === 'AppText').at(-1)!.props.style).color, '#6E7078', 'the secondary (missing) style');
+});
+
 test('suggestions cap at four with VoiceOver names; clarification chips tick once and leave after a choice', () => {
   const ui = load('assistant-messages.tsx');
   const picked: string[] = [];

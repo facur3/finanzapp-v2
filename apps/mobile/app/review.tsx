@@ -5,7 +5,7 @@ import { useLedger } from '../src/storage/LedgerProvider';
 import type { ReviewItem } from '../src/storage/review-database';
 import { AppText, EmptyState, GlyphTile, LifecycleNote, Money, PressFeedback, Screen, Surface, useStacked } from '../src/ui/components';
 import { useAccountNameOf, useCategoryLabel } from '../src/ui/category-hues';
-import { reviewFacts, stateTone, type ReviewContext, type ReviewFacts } from '../src/ui/review-presentation';
+import { reviewFacts, staleValueKey, stateTone, type ReviewContext, type ReviewFacts } from '../src/ui/review-presentation';
 import { space, usePalette } from '../src/ui/theme';
 import { useI18n } from '../src/i18n/provider';
 
@@ -45,14 +45,17 @@ function ReviewRow({ item, facts, last }: { item: ReviewItem; facts: ReviewFacts
   const kind = t(facts.kind === null ? 'review.kind.unknown' : `review.kind.${facts.kind}`);
   const purchase = facts.purchase === null ? null : facts.purchase.mode === 'once' ? t('review.purchase.once')
     : facts.purchase.count === null ? t('review.purchase.installmentsOpen') : t('review.purchase.installments', { count: facts.purchase.count });
-  const destination = facts.destination ? nameOf(facts.destination) : missing;
+  // A name that is no longer valid says so in the row, never drawn as the current value beside «Falta 1 dato».
+  const named = (name: string, key: ReturnType<typeof staleValueKey>) => key ? t(key, { value: name }) : name;
+  const destination = facts.destination ? named(nameOf(facts.destination), staleValueKey(facts.destinationState)) : missing;
+  const category = facts.category ? named(categoryLabel, staleValueKey(facts.categoryState)) : null;
   const state = facts.state === 'incomplete' ? t('review.state.incomplete', { count: facts.gaps.length }) : t(`review.state.${facts.state}`);
   const tone = stateTone(facts.state);
   const stateColor = tone === 'expense' ? p.expense : tone === 'warning' ? p.warning : p.secondary;
-  const facts1 = [kind, facts.category ? categoryLabel : missing, destination].join(' · ');
+  const facts1 = [kind, category ?? missing, destination].join(' · ');
   const facts2 = [facts.dateISO ? formatDate(facts.dateISO, 'day') : missing, purchase, t(`review.source.${item.source}`)].filter(Boolean).join(' · ');
   const spoken = [kind, facts.amount ? spokenMoney(facts.amount.minor, facts.amount.currency) : t('review.noAmount'), facts.merchant ?? t('review.noMerchant'),
-    facts.category ? categoryLabel : t('review.fields.category') + ': ' + missing, t('review.fields.destination') + ': ' + destination,
+    category ?? t('review.fields.category') + ': ' + missing, t('review.fields.destination') + ': ' + destination,
     facts.dateISO ? formatDate(facts.dateISO, 'long') : t('review.fields.date') + ': ' + missing, purchase, t(`review.source.${item.source}`), state].filter(Boolean).join(', ');
   return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={spoken} accessibilityLanguage={speechLanguage}
     onPress={() => router.push({ pathname: '/review/[id]', params: { id: item.id } })}

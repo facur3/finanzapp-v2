@@ -12,7 +12,7 @@ import { useCategoryLook, useCategoryLookOf } from './category-hues';
 import { AccountBadge, ActionButton, AppText, CategoryBadge, Money, PressFeedback, Surface, useStacked, type IconName } from './components';
 import { Appear, Reflow, WAIT_REVEAL_MS, pulseTiming, selectionHaptic } from './motion';
 import { activityDateLabel } from './presentation';
-import { reviewFacts } from './review-presentation';
+import { reviewFacts, staleValueKey } from './review-presentation';
 import { radius, space, useCurrentDay, usePalette, useReduceMotion } from './theme';
 
 /** The conversation, visually quiet. A user message is a compact grey pill on
@@ -243,6 +243,9 @@ export function ProposalCard({ content, state, archive, onReview, onRetry, onOpe
     : draft.purchase.count === null ? t('review.purchase.installmentsOpen') : t('review.purchase.installments', { count: draft.purchase.count });
   const facts = state.kind === 'pending' && archive ? reviewFacts(state.item, archive, { todayISO: todayKey(), writable: state.writable, conflicts: state.conflict ? [state.item.id] : [] }) : null;
   const statusKey = state.kind === 'pending' ? 'pending' : state.kind;
+  // While pending, a destination or category that stopped being valid is drawn as such (secondary, with why), never as current.
+  const accountStale = facts ? staleValueKey(facts.destinationState) : null;
+  const categoryStale = facts ? staleValueKey(facts.categoryState) : null;
   const kind = t(draft.kind === null ? 'review.kind.unknown' : draft.kind === 'expense' ? 'movement.expense' : 'movement.income');
   // What the proposal needs, in the review's own words: neutral when merely incomplete, never an error.
   const line = state.kind === 'preview' ? t('assistant.proposal.preview') : state.kind === 'capturing' ? t('assistant.proposal.capturing')
@@ -264,9 +267,9 @@ export function ProposalCard({ content, state, archive, onReview, onRetry, onOpe
       </View>
       <View style={{ gap: 0 }}>
         <ProposalRow label={t(expense ? 'assistant.proposal.merchant' : 'assistant.proposal.source')} value={draft.merchant ?? missing} missing={draft.merchant === null} />
-        <ProposalRow label={t('selection.category')} value={draft.category ? categoryName : missing} missing={!draft.category}
+        <ProposalRow label={t('selection.category')} value={draft.category ? (categoryStale ? t(categoryStale, { value: categoryName }) : categoryName) : missing} missing={!draft.category || !!categoryStale}
           leading={draft.category ? <CategoryBadge category={draft.category} kind={draft.kind ?? 'expense'} size={28} /> : undefined} />
-        <ProposalRow label={t('assistant.proposal.destination')} value={account?.name ?? missing} missing={!account}
+        <ProposalRow label={t('assistant.proposal.destination')} value={account ? (accountStale ? t(accountStale, { value: account.name }) : account.name) : missing} missing={!account || !!accountStale}
           leading={account && !card ? <AccountBadge accountId={account.id} size={28} /> : undefined} />
         {purchase !== null && <ProposalRow label={t('assistant.proposal.payment')} value={purchase} missing={draft.purchase === null} />}
         <ProposalRow label={t('selection.date')} value={draft.dateISO ? activityDateLabel(draft.dateISO, day, locale) : missing} missing={!draft.dateISO}

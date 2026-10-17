@@ -53,6 +53,13 @@ export const review: Pick<Messages, 'review'> = {
       merchant: 'The merchant or description is missing.',
       category: 'Choose a category you already use.',
       date: 'Choose today or an earlier date.',
+      destinationUnavailable: 'That account or card is no longer available. Choose another.',
+      categoryArchived: 'That category is archived. Choose another.',
+      installmentCountTooMany: 'That number of installments doesn’t fit this amount.',
+    },
+    value: {
+      unavailable: '{value} (no longer available)',
+      archived: '{value} (archived)',
     },
     detail: {
       notFoundTitle: 'This proposal is no longer pending',

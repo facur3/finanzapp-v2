@@ -1091,3 +1091,32 @@ test('the editor checks where it is typed: hidden characters in the merchant and
   assert.equal(domain.hasHiddenCharacters('Coto'), false);
   assert.equal(domain.hasHiddenCharacters('Co' + String.fromCharCode(0x202e) + 'to'), true);
 });
+
+test('a destination or category that stopped being valid is drawn with why on every surface, and its gap says what changed', () => {
+  const custom = domain.editedCategoryDefinition(domain.resolveCategory('expense', 'Mascotas'), { label: 'Mascotas' }, createdAt);
+  const live: domain.LedgerArchive = { ...archive, categories: [custom] };
+  const item = itemOf(drafted({ category: 'Mascotas' }, live));
+  // Since the proposal: the account was deleted and the category archived.
+  const changed: domain.LedgerArchive = { ...live, accounts: live.accounts.map(account => account.id === bank.id ? { ...account, deletedAt: createdAt } : account),
+    categories: [{ ...custom, archived: true }] };
+  const facts = reviewPresentation.reviewFacts(item, changed as domain.ReviewArchive, { todayISO: today, writable: true, conflicts: [] });
+  assert.deepEqual([facts.destinationState, facts.categoryState], ['unavailable', 'archived']);
+  assert.deepEqual(facts.gaps.map(gap => reviewPresentation.gapText(gap, facts)), ['review.gaps.destinationUnavailable', 'review.gaps.categoryArchived']);
+  for (const file of ['review-sheet/[id].tsx', 'review/[id].tsx']) {
+    const root = harness(file, { review: trayOf([item]), calls: [], archive: changed }, { id: item.id }).render();
+    const values = all(root, 'DetailRow').map(row => row.props.value);
+    assert.ok(values.includes('Banco (ya no disponible)'), file + ': never drawn as the current account');
+    assert.ok(values.includes('Mascotas (archivada)'), file);
+    const notes = all(root, 'LifecycleNote').map(note => note.props.detail);
+    assert.ok(notes.includes('Esa cuenta o tarjeta ya no está disponible. Elegí otra.') && notes.includes('Esa categoría está archivada. Elegí otra.'), file + ': the specific sentence, not «never chosen»');
+    assert.ok(!notes.includes('Elegí una cuenta o tarjeta disponible.'), file);
+  }
+  const tray = harness('review.tsx', { review: trayOf([item]), calls: [], archive: changed }).render();
+  assert.ok(texts(tray).some(text => text.includes('Mascotas (archivada) · Banco (ya no disponible)')), 'the tray row says it too');
+  // A count the amount cannot hold says so; a never-chosen destination keeps the plain sentence.
+  const tiny = reviewPresentation.reviewFacts(itemOf(drafted({ amountMinor: 5, destinationId: cardAccount.id, purchase: { mode: 'installments', count: 6, placement: 'current' } })),
+    archive as domain.ReviewArchive, { todayISO: today, writable: true, conflicts: [] });
+  assert.equal(reviewPresentation.gapText('installmentCount', tiny), 'review.gaps.installmentCountTooMany');
+  const none = reviewPresentation.reviewFacts(itemOf(drafted({ destinationId: null })), archive as domain.ReviewArchive, { todayISO: today, writable: true, conflicts: [] });
+  assert.deepEqual([none.destinationState, reviewPresentation.gapText('destination', none)], ['none', 'review.gaps.destination']);
+});
