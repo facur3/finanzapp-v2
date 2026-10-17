@@ -22,7 +22,7 @@ import { space, useCurrentDay, usePalette } from '../../src/ui/theme';
  * share the first screenful. A rule on a deleted account or card says «Cuenta eliminada» / «Tarjeta eliminada». */
 export default function RecurringDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { archive, snapshot } = useLedger();
+  const { archive, snapshot, asOfISO } = useLedger();
   const day = useCurrentDay();
   const p = usePalette();
   const { t, relativeDate, formatDate } = useI18n();
@@ -46,7 +46,8 @@ export default function RecurringDetailScreen() {
   // Eliminar only. Editar stays: the form offers a live account or card of the same currency (the recovery path); once the
   // rule sits on one it is no longer closed, still paused, and Reanudar comes back (resume never records the backlog).
   const closed = manage.closed(rule);
-  const review = !closed && recurringNeedsReview(rule, day);
+  // 25R1: against the day the catch-up last ran through, so «Continuar desde hoy» is offered only for a rule it left behind.
+  const review = !closed && recurringNeedsReview(rule, asOfISO ?? day);
   const card = archive.cards?.find(item => item.accountId === account.id);
   const busy = manage.busyId === rule.id;
   // 24UX6E: the row's words: a closed rule names what was deleted, calm (secondary, 400), never «Pausado».

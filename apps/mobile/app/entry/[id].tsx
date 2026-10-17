@@ -2,15 +2,16 @@ import { useRef, useState } from 'react';
 import { Alert, View } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
-import * as Haptics from 'expo-haptics';
-import { categoryKey, entryRefundSummary, makeEntryChange, operationGuardMessage, recurringOccurrenceOf, summarizeMonthlyBudgets, todayKey, validateArchive, type EntryChange, type EntryRecord, type Account, type PurchaseOperation } from '@finanzapp/domain';
+import { categoryKey, entryRefundSummary, makeEntryChange, operationGuardMessage, recurringOccurrenceOf, snapshotFromArchive, summarizeMonthlyBudgets, todayKey, validateArchive, type EntryChange, type EntryRecord, type Account, type PurchaseOperation } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
-import { budgetTone } from '../../src/ui/budget-presentation';
+import { budgetTone, percentUsed } from '../../src/ui/budget-presentation';
 import { AccountBadge, ActionButton, AppText, DetailRow, EmptyState, ErrorMessage, MerchantBadge, Money, Screen, SectionTitle, Surface } from '../../src/ui/components';
 import { presentedAmount } from '../../src/ui/movement-amount';
 import { useI18n } from '../../src/i18n/provider';
 import { useCategoryLabel } from '../../src/ui/category-hues';
 import { installmentOfEntry } from '../../src/ui/installment-presentation';
+import { balanceAfterSentence } from '../../src/ui/liability-presentation';
+import { announce, errorHaptic, successHaptic, warningHaptic } from '../../src/ui/motion';
 import { canRefundEntry } from '../../src/ui/operation-presentation';
 import { releasesDraft } from '../../src/ui/presentation';
 import { space, usePalette } from '../../src/ui/theme';
@@ -31,7 +32,7 @@ export default function EntryScreen() {
 function EntryDetail({ record, account }: { record: EntryRecord; account: Account }) {
   const { updateEntry, archive, snapshot } = useLedger();
   const p = usePalette();
-  const { t, formatDate, currencyName, formatMoneyAmount, spokenMoney, moneyText, errorText } = useI18n();
+  const { t, formatDate, currencyName, formatMoneyAmount, spokenMoney, moneyText, errorText, failureMessage } = useI18n();
   const { entry } = record;
   const card = archive?.cards?.find(item => item.accountId === account.id);
   // 24T2: a movement an instalment plan recorded (a share of one instalment: its principal, or its interest, fee or tax).
@@ -46,6 +47,11 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
   // to record another only when the domain would accept one now (a dry run with what is still returnable).
   const refunds = archive ? entryRefundSummary(archive, entry.id) : null;
   const liveRefunds = refunds ? [...refunds.refunds].sort((a, b) => b.dateISO.localeCompare(a.dateISO) || b.createdAt.localeCompare(a.createdAt)) : [];
+  // 25R1: a change sent with an unknown outcome that the ledger now shows applied (it committed; a later read brought it):
+  // nothing is left to retry, so «Reintentar cambio» and the locked Editar give way. Set during render, React's pattern for
+  // information from previous renders.
+  if (pending && !busy && record.revision === pending.after.revision && record.voided === pending.after.voided) { setPending(null); setError(null); }
+  const statusOf = (shown: EntryRecord) => t(shown.voided ? 'entryDetail.statusVoided' : shown.revision > 0 ? 'entryDetail.statusCorrected' : 'entryDetail.statusRecorded');
   const refundable = !!archive && !record.voided && !pending && canRefundEntry(archive, entry.id, todayKey(), new Date().toISOString());
   async function apply(change: EntryChange) {
     if (saving.current) return;
@@ -56,12 +62,15 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
     try {
       await updateEntry(change);
       setPending(null);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      successHaptic();
+      // 25D2: the status line under the hero is the outcome; iOS has no live region, so VoiceOver is told it.
+      announce(statusOf(change.after));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'entryDetail.changeUnverified');
+      setError(failureMessage(cause, 'entryDetail.changeUnverified'));
       // A13: a refusal storage decided before writing (an instalment a devolución's credit stands on, …) releases the change:
       // Editar unlocks and the next tap asks again from the current ledger. Only an unknown outcome stays frozen for a retry.
-      if (cause instanceof Error && releasesDraft(cause.message)) setPending(null);
+      // 25Q4: the haptic says which: Error for the release, Warning for the frozen retry.
+      if (cause instanceof Error && releasesDraft(cause.message)) { setPending(null); errorHaptic(); } else warningHaptic();
     } finally { saving.current = false; setBusy(false); }
   }
   function confirm() {
@@ -87,7 +96,8 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
       confirming.current = true;
       const view = blockingOperation(refusal);
       Alert.alert(t('entryDetail.voidBlockedTitle'), errorText(refusal), [
-        { text: t('common.cancel'), style: 'cancel', onPress: () => { confirming.current = false; } },
+        // With no operation to open the alert only informs: one «OK», never a lone «Cancelar».
+        { text: t(view ? 'common.cancel' : 'common.ok'), style: 'cancel', onPress: () => { confirming.current = false; } },
         ...(view ? [{ text: t(view.kind === 'payoff' ? 'entryDetail.viewPayoff' : 'entryDetail.viewRefund'),
           onPress: () => { confirming.current = false; router.push({ pathname: '/operation/[id]', params: { id: view.id } }); } }] : []),
       ], { cancelable: true, onDismiss: () => { confirming.current = false; } });
@@ -95,14 +105,24 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
     }
     confirming.current = true;
     const adds = restore ? entry.kind === 'income' : entry.kind === 'expense';
+    const money = (minor: number) => formatMoneyAmount(minor, account.currency) + ' ' + account.currency;
+    // 25Q4: a card says how it will read afterwards, in its own words; «Se sumarán … a Visa» read backwards on a card. Cash
+    // keeps its sentence. A balance out of range drops the sentence, never back to the inverted one.
+    let effect: string | null = t(adds ? 'entryDetail.willAdd' : 'entryDetail.willSubtract', { amount: money(entry.amountMinor), account: account.name });
+    if (card && archive) {
+      try {
+        effect = balanceAfterSentence(account, snapshotFromArchive({ ...archive, records: archive.records.map(item => item.entry.id === entry.id ? change.after : item) }),
+          archive.cards ?? [], archive.debts ?? [], money, t);
+      } catch { effect = null; }
+    }
     Alert.alert(t(restore ? 'entryDetail.restoreQuestion' : 'entryDetail.voidQuestion'),
-      t(adds ? 'entryDetail.willAdd' : 'entryDetail.willSubtract', { amount: formatMoneyAmount(entry.amountMinor, account.currency) + ' ' + account.currency, account: account.name }) + ' '
-      + t(restore ? 'entryDetail.restoreEffect' : 'entryDetail.voidEffect')
-      // An undone instalment is never recreated by the catch-up and its obligation stays open in the plan (24T1). A share of
-      // an instalment that has another (its principal and its interest) is undone alone: the note says so.
-      + (instalment && !restore ? ' ' + t(instalment.shared ? 'entryDetail.installmentShareVoidNote' : 'entryDetail.installmentVoidNote') : ''), [
+      [effect, t(restore ? 'entryDetail.restoreEffect' : 'entryDetail.voidEffect'),
+        // An undone instalment is never recreated by the catch-up and its obligation stays open in the plan (24T1). A share
+        // of an instalment that has another (its principal and its interest) is undone alone: the note says so.
+        instalment && !restore ? t(instalment.shared ? 'entryDetail.installmentShareVoidNote' : 'entryDetail.installmentVoidNote') : null].filter(Boolean).join(' '), [
         { text: t('common.cancel'), style: 'cancel', onPress: () => { confirming.current = false; } },
-        { text: t(restore ? 'entryDetail.restore' : 'entryDetail.void'), style: restore ? 'default' : 'destructive', onPress: () => { confirming.current = false; void apply(change); } },
+        // Reversible from Movimientos deshechos: not the destructive style.
+        { text: t(restore ? 'entryDetail.restore' : 'entryDetail.void'), style: 'default', onPress: () => { confirming.current = false; void apply(change); } },
       ], { cancelable: true, onDismiss: () => { confirming.current = false; } });
   }
   /** The dry run of an undo: the domain's deterministic refusal, or null when storage would accept it (or the outcome is not
@@ -129,23 +149,23 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
   const date = long.charAt(0).toLocaleUpperCase() + long.slice(1);
   // Budget context only when a matching active budget exists for this month, currency and category.
   // 24T3 (A24, as Presupuestos): devoluciones may net the category below zero; what is left never reads above the limit.
-  let budget: { ratio: number; remainingMinor: number; exceeded: boolean; refunded: boolean } | null = null;
+  let budget: { ratio: number; percent: number; remainingMinor: number; exceeded: boolean; refunded: boolean } | null = null;
   if (!income && !record.voided && snapshot) {
     try {
       const row = summarizeMonthlyBudgets(snapshot, archive?.budgets ?? [], account.currency, entry.dateISO.slice(0, 7)).rows
         .find(item => categoryKey(item.budget.category) === categoryKey(entry.category));
-      if (row) budget = { ratio: row.ratio, remainingMinor: Math.min(row.remainingMinor, row.budget.amountMinor), exceeded: row.exceeded, refunded: row.spentMinor < 0 };
+      if (row) budget = { ratio: row.ratio, percent: percentUsed(row), remainingMinor: Math.min(row.remainingMinor, row.budget.amountMinor), exceeded: row.exceeded, refunded: row.spentMinor < 0 };
     } catch { budget = null; }
   }
   // A movement a recurring rule recorded links back to its rule's detail (24UX2, 25B3); a rule deleted since (24UX4:
   // its deletion record stays in storage) leaves a plain movement, unchanged.
   const occurrence = recurringOccurrenceOf(entry.id);
   const rule = occurrence ? archive?.recurring?.find(item => item.id === occurrence.ruleId && !item.deleted) : undefined;
-  const status = t(record.voided ? 'entryDetail.statusVoided' : record.revision > 0 ? 'entryDetail.statusCorrected' : 'entryDetail.statusRecorded');
+  const status = statusOf(record);
   // The budget row on screen (the region's separators) and for VoiceOver (the amount in the language's words).
   const budgetLine = (row: NonNullable<typeof budget>, money: (minor: number) => string) => row.exceeded ? t('entryDetail.budgetExceeded', { amount: money(-row.remainingMinor) })
     : row.refunded ? t('entryDetail.budgetRefunds', { amount: money(row.remainingMinor) })
-    : t('entryDetail.budgetUsed', { percent: Math.round(row.ratio * 100), amount: money(row.remainingMinor) });
+    : t('entryDetail.budgetUsed', { percent: row.percent, amount: money(row.remainingMinor) });
 
   const shown = presentedAmount(entry.kind, entry.amountMinor);
   return <Screen gap={space.xl}>
@@ -201,7 +221,7 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
       {refundable && <ActionButton label={t('operations.entry.refund')} icon="arrow-undo-outline" secondary disabled={busy}
         onPress={() => router.push({ pathname: '/new-refund', params: { entryId: entry.id } })} />}
       <ActionButton label={pending ? t('common.retryChange') : t(record.voided ? 'entryDetail.restoreAction' : 'entryDetail.voidAction')}
-        icon={record.voided ? 'arrow-redo-outline' : 'arrow-undo-outline'} onPress={confirm} busy={busy} secondary={!record.voided} />
+        onPress={confirm} busy={busy} secondary={!record.voided} />
     </View>
   </Screen>;
 }

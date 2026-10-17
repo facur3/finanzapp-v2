@@ -54,7 +54,8 @@ function load(file: string, { reduced = false, fontScale = 1, dark = false, bott
       withTiming: (value: number) => value, withSequence: (...steps: number[]) => steps[0], withRepeat: (value: number) => value },
     'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 59, bottom: bottomInset, left: 0, right: 0 }) },
     '@expo/vector-icons/Ionicons': 'Ionicons',
-    './components': Object.fromEntries(['AccountBadge', 'ActionButton', 'AppText', 'CategoryBadge', 'Money', 'PressFeedback', 'Surface'].map(name => [name, name])),
+    './components': { ...Object.fromEntries(['AccountBadge', 'ActionButton', 'AppText', 'CategoryBadge', 'Money', 'PressFeedback', 'Surface'].map(name => [name, name])),
+      useStacked: () => fontScale > 1.2 },
     './motion': { Appear: 'Appear', Reflow: 'Reflow', selectionHaptic: () => haptics.push('selection') },
     './presentation': presentation,
     './theme': { radius: { chip: 14, tile: 12, group: 16, card: 20, sheet: 24, creditCard: 18, button: 14 }, space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
@@ -116,6 +117,14 @@ test('the composer labels its field and send (no microphone until dictation exis
   assert.equal(byLabel(root, 'Enviar'), undefined);
   byLabel(root, 'Detener respuesta')!.props.onPress();
   assert.deepEqual(events, ['send', 'stop']);
+  // 25D1: Enviar and Detener are 44 pt targets that still take 40 pt of the bar: a −2 pt margin inside its padding, so the
+  // 32 pt disc, the field and the 48 pt bar do not move.
+  for (const control of [ready, byLabel(root, 'Detener respuesta')!]) {
+    const target = flat(control.props.style);
+    assert.deepEqual([target.width, target.height, target.minHeight, flat(control.props.containerStyle).margin], [44, 44, 44, -2]);
+    const disc = flat(nodes(control).find(node => node.type === 'View')!.props.style);
+    assert.deepEqual([disc.width, disc.height], [32, 32]);
+  }
   // No dictation note either, and no line under the bar when no note is passed (the disconnected caption is gone).
   root = ui.render('AssistantComposer', props);
   assert.equal(nodes(root).some(node => node.type === 'AppText'), false);
@@ -195,7 +204,7 @@ test('25A-04: a proposal card shows what the review item holds, says what it nee
   assert.equal(all.some(node => node.type === 'AppText' && textOf(node) === 'Pendiente · Gasto'), true);
   assert.ok(all.some(node => node.type === 'AppText' && textOf(node) === 'Lista para confirmar.'));
   assert.deepEqual(all.filter(node => node.type === 'ActionButton').map(node => [node.props.label, node.props.secondary]), [['Revisar', true]],
-    'one way on: the review sheet; no Confirmar, Editar or Descartar in the chat, and no lime');
+    'one way on: the review sheet; no Confirmar, Editar or Descartar in the chat, and no brand fill');
   all.find(node => node.type === 'ActionButton')!.props.onPress();
   assert.deepEqual(calls, ['review:item-1']);
   assert.equal(pending.type, 'Appear');
@@ -299,6 +308,14 @@ test('assistant text, thinking and system notes are said in words; the pulse sto
   assert.equal(nodes(offline).find(node => node.type === 'Ionicons')!.props.name, 'cloud-offline-outline');
   const unavailable = ui.render('SystemNote', { message: { id: 's', role: 'system', reason: 'unavailable', text: 'No conectado.', retryText: null }, onRetry: () => {} });
   assert.equal(byLabel(unavailable, 'Reintentar'), undefined, 'nothing was sent, so there is nothing to retry');
+  // 25D2: inside one accessible element «Reintentar» was never a VoiceOver stop of its own. The note and the button are
+  // siblings now: the text is one element, the button another, and nothing accessible holds the button.
+  assert.notEqual(offline.props.accessible, true, 'the row itself is not one element');
+  const stops = nodes(offline).filter(node => node.props.accessible || node.props.accessibilityRole === 'button');
+  assert.deepEqual(stops.map(node => node.props.accessibilityLabel), ['Sin conexión.', 'Reintentar']);
+  assert.equal(stops[0].props.accessibilityRole, 'text');
+  assert.ok(!nodes(stops[0]).some(node => node.props.accessibilityRole === 'button'), 'the button is not inside the note\'s element');
+  assert.equal(JSON.stringify(stops[1].props.hitSlop), JSON.stringify({ top: 4, bottom: 4 }), 'the row\'s padding takes the 36 pt button to 44 pt');
 });
 
 test('answer evidence renders rows with the shared Money component and links as text buttons; nothing when there is no evidence', () => {
@@ -320,6 +337,15 @@ test('answer evidence renders rows with the shared Money component and links as 
   links[1].props.onPress();
   assert.equal(JSON.stringify(opened), JSON.stringify([{ pathname: '/activity' }]));
   assert.equal(ui.render('AnswerEvidence', { content: { kind: 'answer', rows: [], links: [] }, currency: 'ARS', onOpen: () => {} }), null);
+  // 25D1: beside its label up to 1.2×; above, the figure goes under the label and the label is whole (an amount that
+  // grows with the text left a label beside it no room).
+  const rowOf = (tree: any) => nodes(tree).find(node => node.type === 'View' && node.props.accessible)!;
+  const labelOf = (tree: any) => nodes(rowOf(tree)).find(node => node.type === 'AppText')!;
+  const flatStyle = (style: any) => Object.assign({}, ...[style].flat(Infinity).filter(Boolean));
+  assert.deepEqual([flatStyle(rowOf(root).props.style).flexDirection, labelOf(root).props.numberOfLines, flatStyle(labelOf(root).props.style).flex], ['row', 2, 1]);
+  const large = load('assistant-messages.tsx', { fontScale: 2.643 }).render('AnswerEvidence', { content, currency: 'ARS', onOpen: () => {} });
+  assert.deepEqual([flatStyle(rowOf(large).props.style).flexDirection, labelOf(large).props.numberOfLines, flatStyle(labelOf(large).props.style).flex], ['column', undefined, undefined]);
+  assert.equal(rowOf(large).props.accessibilityLabel, 'Supermercado, 31200,00 pesos más', 'one VoiceOver element, the same sentence');
 });
 
 test('English: every word the Assistant UI says is English; account names, merchants, custom categories and the model\'s text are untouched', () => {
@@ -352,9 +378,9 @@ test('English: every word the Assistant UI says is English; account names, merch
   assert.ok(thinking.some(node => node.type === 'AppText' && node.props.children === 'Thinking…'));
   // A note stored as a key reads in English; a caught sentence nobody translated is shown as it was thrown.
   const note = ui.render('SystemNote', { message: { id: 's', role: 'system', reason: 'offline', text: 'assistant.reasons.offline', retryText: 'hola' }, onRetry: () => {} });
-  assert.equal(note.props.accessibilityLabel, 'No connection. Your transactions didn’t change; you can retry.');
+  assert.equal(nodes(note).find(node => node.props.accessible)!.props.accessibilityLabel, 'No connection. Your transactions didn’t change; you can retry.');
   assert.ok(byLabel(note, 'Retry'));
-  assert.equal(ui.render('SystemNote', { message: { id: 's', role: 'system', reason: 'failed', text: 'Respuesta inválida del servidor.', retryText: null } }).props.accessibilityLabel, 'Respuesta inválida del servidor.');
+  assert.equal(nodes(ui.render('SystemNote', { message: { id: 's', role: 'system', reason: 'failed', text: 'Respuesta inválida del servidor.', retryText: null } })).find(node => node.props.accessible)!.props.accessibilityLabel, 'Respuesta inválida del servidor.');
   // Clarification chips: the app's words translate, account names do not, a built-in category reads localized and is echoed as shown.
   const chosen: string[] = [];
   const kinds = nodes(ui.render('ClarificationChoices', { options: [{ id: 'expense', labelKey: 'movement.expense' }, { id: 'income', labelKey: 'movement.income' }], chosen: null, onChoose: (_o: unknown, shown: string) => chosen.push(shown) }))

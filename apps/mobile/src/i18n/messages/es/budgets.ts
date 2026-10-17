@@ -44,6 +44,8 @@ export const budgets = {
       exceededBy: 'Excedido por {amount}',
       reached: 'Límite alcanzado',
       availableAmount: 'Disponible {amount}',
+      /** 25D2: VoiceOver's status of the general budget in the amber state (85 % or more, not yet reached). */
+      nearAvailable: 'Cerca del límite. Disponible {amount}',
       /** 24T3 (A24): the month nets below zero (devoluciones): what is left is shown at the limit, never above it. */
       refundsAvailable: 'Disponible {amount}. Las devoluciones superan lo gastado',
       refundsExceed: 'Las devoluciones superan lo gastado',
@@ -64,6 +66,8 @@ export const budgets = {
       exceededBy: 'Excedido por {amount}',
       reached: 'Límite alcanzado',
       left: 'Quedan {amount}',
+      /** 25D2: VoiceOver's status of a sublimit in the amber state (85 % or more, not yet reached). */
+      nearLeft: 'Cerca del límite. Quedan {amount}',
       /** 24UX6E: the row's one quiet line under its bar. */
       leftOf: 'Quedan {amount} de {limit}',
       overOf: '{amount} por encima de {limit}',
@@ -84,6 +88,8 @@ export const budgets = {
       categoryNote: 'Se compara con los gastos registrados en esta categoría durante ese mes. Es un sublímite: no se suma al presupuesto general. Las devoluciones restan en su mes y su categoría.',
       retryNote: 'El envío quedó congelado para que Reintentar no cree otro presupuesto.',
       create: 'Crear presupuesto',
+      /** Under the refusal of a budget that already exists: where to change it. */
+      takenHint: 'Para cambiarlo, tocalo en Presupuestos.',
       delete: 'Eliminar presupuesto',
       retryDelete: 'Reintentar eliminación',
       deleteTitle: '¿Eliminar este presupuesto?',

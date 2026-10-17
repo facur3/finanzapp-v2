@@ -11,8 +11,8 @@ export const debts: Pick<Messages, 'debts'> = {
     list: {
       title: 'Debts and IOUs',
       add: 'Add debt',
-      emptyTitle: 'What you owe and what you’re owed',
-      emptyDetail: 'Record a loan, a debt with someone or an amount someone owes you. Each partial payment or collection lowers the balance due without creating fake expenses or income.',
+      emptyTitle: 'No debts or IOUs',
+      emptyDetail: 'Track what you owe or are owed.',
       owed: 'I owe',
       receivable: 'Owed to me',
       outOfRange: 'Total out of range',
@@ -28,8 +28,8 @@ export const debts: Pick<Messages, 'debts'> = {
       closed: 'Closed',
     },
     row: {
-      owedLabel: 'I owe {name}, {amount} {currency}, {status}',
-      receivableLabel: '{name} owes me, {amount} {currency}, {status}',
+      owedLabel: 'I owe {name}, {amount}, {status}',
+      receivableLabel: '{name} owes me, {amount}, {status}',
       openHint: 'Opens the debt details',
     },
     detail: {

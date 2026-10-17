@@ -32,7 +32,7 @@ const glyphAliases = new Map<string, string>();
 let dark = false;
 const harnessPalette = () => {
   const base = dark ? darkPalette : lightPalette;
-  return { ...base, isDark: dark, positive: base.income, negative: base.expense, positiveSoft: base.incomeSoft, negativeSoft: base.expenseSoft };
+  return { ...base, isDark: dark };
 };
 /** The day the harness's `useCurrentDay` answers; a test may move it and must restore it. */
 let today = '2026-09-12';
@@ -62,6 +62,8 @@ function displayStore(initial: Record<string, string> = {}) {
   return displayCurrency.createDisplayCurrencyStore(() => ({ getItemSync: (key: string) => rows.get(key) ?? null, setItemSync: (key: string, value: string) => { rows.set(key, value); }, removeItemSync: (key: string) => rows.delete(key) }));
 }
 
+/** The window Inicio is drawn in (25D1: a test may set a width or a text size, and restores it). */
+let homeWindow = { width: 393, height: 852, fontScale: 1, scale: 3 };
 function routeHarness(file: string, params: Record<string, unknown>, initialData = snapshot, extra: Partial<domain.LedgerArchive> = {}, display = displayStore(),
   rates: { book: domain.RateBook; activity?: ratesStore.RatesActivity; ensured?: { months: readonly string[]; quotes: readonly string[] }[] } = { book: domain.rateBook([]) }) {
   // The ledger as the provider hands it; `setData` stands for a write landing while the screen stays mounted.
@@ -71,9 +73,8 @@ function routeHarness(file: string, params: Record<string, unknown>, initialData
   // 24C1: the finance view as the provider builds it, over a fixed rate book (no network); `ensured` records what the screen asked for.
   const ratesProvider = { useFinanceView: (months: readonly string[], currency?: domain.Currency) => {
     const held = presentation.historyCurrencies(data.accounts);
-    // 25B2: with one currency in the whole history the view is that currency's own ledger, whatever the preference says (rates-provider.tsx).
-    const mode = held.length <= 1 ? 'single' : display.getMode();
-    const target = currency ?? (held.length <= 1 ? held[0] ?? displayCurrency.resolveDisplayCurrency(display.getState(), held, mode) : displayCurrency.resolveDisplayCurrency(display.getState(), held, mode));
+    // 25B2: the provider's own rule (resolveFinanceTarget): with one currency in the whole history the view is that currency's own ledger.
+    const { mode, currency: target } = financeView.resolveFinanceTarget(held, { mode: display.getMode(), currency: displayCurrency.resolveDisplayCurrency(display.getState(), held, display.getMode()) }, currency);
     const built = financeView.financeView(data, mode, target, rates.book);
     if (built.quotes.length) rates.ensured?.push({ months, quotes: built.quotes });
     return { ...built, activity: rates.activity ?? 'idle', loaded: true, lastFetchedAt: null, book: rates.book, held };
@@ -90,6 +91,7 @@ function routeHarness(file: string, params: Record<string, unknown>, initialData
   const navigated: any[] = [];
   /** Every `setStatusBarStyle(style)` the screen asked for, in order. */
   const statusBar: string[] = [];
+  const announced: string[] = [];
   // Inicio's focus effect: run once when the screen first renders focused (like React Navigation on mount), its cleanup on blur.
   let focusEffect: (() => void | (() => void)) | undefined, focusCleanup: void | (() => void), focusedOnce = false;
   let cursor = 0, effectCursor = 0, refCursor = 0;
@@ -108,7 +110,7 @@ function routeHarness(file: string, params: Record<string, unknown>, initialData
       return [state[index], (value: unknown) => { state[index] = typeof value === 'function' ? (value as (current: unknown) => unknown)(state[index]) : value; }];
     } },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
-    'react-native': { View: 'View', ScrollView: 'ScrollView', FlatList: 'FlatList', StyleSheet: { hairlineWidth: 1, create: <T,>(styles: T) => styles, absoluteFill: {} }, useWindowDimensions: () => ({ width: 393, height: 852, fontScale: 1, scale: 3 }) },
+    'react-native': { View: 'View', ScrollView: 'ScrollView', FlatList: 'FlatList', StyleSheet: { hairlineWidth: 1, create: <T,>(styles: T) => styles, absoluteFill: {} }, useWindowDimensions: () => homeWindow },
     'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View', FlatList: 'FlatList' },
       useSharedValue: (value: number) => ({ value }), withTiming: (value: number) => value,
       useAnimatedStyle: (fn: () => unknown) => fn() },
@@ -127,18 +129,20 @@ function routeHarness(file: string, params: Record<string, unknown>, initialData
     '../src/ui/report-presentation': reportPresentation,
     '../src/ui/spending-chart': { CategorySpendingRow: 'CategorySpendingRow', CategoryLegendRow: 'CategoryLegendRow' },
     '../src/ui/geometry': geometry,
-    '../src/ui/charts': { DonutChart: 'DonutChart', MonthBars: 'MonthBars', OTHERS_KEY: ' others', MONEY_MAX_SCALE: 1.8,
+    '../src/ui/charts': { DonutChart: 'DonutChart', MonthBars: 'MonthBars', OTHERS_KEY: ' others',
       donutSlices: (items: { key: string; label: string; value: number }[]) => items.slice(0, 5).map((item, index) => ({ ...item, color: 'c' + index })) },
     '../src/ui/budget-presentation': budgetPresentation,
     '@expo/vector-icons/Ionicons': 'Ionicons',
     // 24UX6A: no insight row, no capture module and no quick actions are mapped: Inicio importing one fails loudly here.
     // 24UX6C2: the general budget's attention row is the one budget module Inicio may draw.
-    '../src/ui/home-modules': { BudgetAttentionRow: 'BudgetAttentionRow', CurrencyParts: 'CurrencyParts', FieldButton: 'FieldButton', MetricHelp: 'MetricHelp', UpcomingRecurringRow: 'UpcomingRecurringRow' },
+    // 25O1: Primeros pasos, Inicio's start while nothing is recorded (its rows are tested in home-ranking.node.ts).
+    '../src/ui/home-modules': { BudgetAttentionRow: 'BudgetAttentionRow', CurrencyParts: 'CurrencyParts', FieldButton: 'FieldButton', FirstSteps: 'FirstSteps', MetricHelp: 'MetricHelp', UpcomingRecurringRow: 'UpcomingRecurringRow' },
     '../src/ui/home-focus': homeFocus,
     '../src/ui/category-color': categoryColor,
     '../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: glyphAliases.get(s) ?? 'glyph-' + String(s).toLowerCase() }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) },
     '../src/ui/dock-clearance': { useDockInset: () => dock },
-    '../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', rowReorder: 'rowReorder', selectionHaptic: () => {}, impactHaptic: () => {}, duration: { press: 100, release: 160, state: 200, data: 260, enter: 200, exit: 100, reveal: 480 }, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
+    // 25D2: what VoiceOver is told through motion.tsx's `announce` (its iOS-only queue is tested in motion.node.ts).
+    '../src/ui/motion': { announce: (text: string) => { announced.push(text); }, ValueTransition: 'ValueTransition', Reflow: 'Reflow', rowReorder: 'rowReorder', selectionHaptic: () => {}, impactHaptic: () => {}, duration: { press: 100, release: 160, state: 200, data: 260, enter: 200, exit: 100, reveal: 480 }, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
     '../src/ui/theme': { useCurrentDay: () => today, useReduceMotion: () => false, space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
       usePalette: harnessPalette },
   };
@@ -149,7 +153,7 @@ function routeHarness(file: string, params: Record<string, unknown>, initialData
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected report dependency: ' + name);
     return modules[name];
   } });
-  return { render: () => { cursor = 0; effectCursor = 0; refCursor = 0; return module.exports.default!(); }, pushed, navigated, statusBar, display,
+  return { render: () => { cursor = 0; effectCursor = 0; refCursor = 0; return module.exports.default!(); }, pushed, navigated, statusBar, display, announced,
     setData: (next: domain.LedgerSnapshot) => { data = next; },
     /** Another screen comes in front (the focus effect's cleanup), and Inicio comes back (the effect again). */
     blur: () => { if (typeof focusCleanup === 'function') focusCleanup(); focusCleanup = undefined; },
@@ -271,6 +275,9 @@ test('24UX6A: the month is the current one, a header label, never a control: no 
   assert.equal(month.props.color ?? month.props.style?.color, lightPalette.heroInk);
   for (const prop of ['onPress', 'onLongPress', 'onPressIn', 'accessibilityHint', 'accessibilityActions']) assert.equal(prop in month.props, false, 'the month has no ' + prop);
   assert.equal(month.props.accessibilityRole, 'header', 'a header, not a button');
+  // 25D1: at the default size it sits beside the accounts button, free to grow as far as Title 2 does while it fits there.
+  assert.equal(month.props.style.flex, 1);
+  assert.ok(month.props.maxFontSizeMultiplier >= 1 && month.props.maxFontSizeMultiplier <= 56 / 22, String(month.props.maxFontSizeMultiplier));
   // No ancestor turns it into a control.
   const pressable = nodes(root).filter(n => typeof n.props.onPress === 'function' || typeof n.props.onLongPress === 'function');
   assert.equal(pressable.some(n => nodes(n).includes(month)), false, 'no pressable wraps the month');
@@ -327,6 +334,34 @@ test('24UX6C: with one currency the scope row is absent (no empty row) and the h
   // Consolidated spending: the rate's help, in the same row.
   const consolidated = routeHarness('(tabs)/index.tsx', {}, homeData, {}, displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated' }), { book: consolidatedRates() }).render();
   assert.equal([fieldChildren(consolidated)[1].props.children].flat().filter(Boolean).map((n: Node) => n.type).join('|'), 'DisplayCurrencyButton|MetricHelp');
+});
+
+test('25D2: VoiceOver hears Inicio\'s number with its name, «Gastado en <month>» or «Disponible», and the new figure once when the segment switches it', () => {
+  const es = bindLocale('es-AR');
+  const onlyPesos: domain.LedgerSnapshot = { accounts: [homeData.accounts[0]], entries: homeData.entries.filter(entry => entry.accountId === 'a') };
+  const view = routeHarness('(tabs)/index.tsx', {}, onlyPesos);
+  const heroOf = (root: Node) => nodes(find(root, 'ValueTransition')).find(n => n.type === 'Money')!;
+  let root = view.render();
+  const spent = heroOf(root);
+  assert.equal(spent.props.spokenLabel, 'Gastado en septiembre, ' + es.spokenMoney(spent.props.minor, 'ARS'), 'the name before the amount, never a bare «… pesos»');
+  assert.deepEqual(view.announced, [], 'drawing says nothing');
+  metricOf(root).props.onChange('available');
+  root = view.render();
+  const available = heroOf(root);
+  assert.equal(available.props.spokenLabel, 'Disponible, ' + es.spokenMoney(available.props.minor, 'ARS'));
+  assert.deepEqual(view.announced, [available.props.spokenLabel], 'the swapped figure, said once in the same words');
+  metricOf(root).props.onChange('spending');
+  assert.deepEqual(view.announced.slice(1), [heroOf(view.render()).props.spokenLabel]);
+  // English, and the parts of a total that cannot be converted: the first line carries the metric's name.
+  locale = 'en-AR';
+  try {
+    const english = routeHarness('(tabs)/index.tsx', {}, onlyPesos).render();
+    assert.match(heroOf(english).props.spokenLabel, /^Spent in September, /);
+  } finally { locale = 'es-AR'; }
+  const parts = routeHarness('(tabs)/index.tsx', {}, homeData, {}, displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated' })).render();
+  const split = nodes(parts).find(n => n.type === 'CurrencyParts');
+  assert.ok(split, 'no rate: the parts');
+  assert.equal(split.props.spokenPrefix, 'Gastado');
 });
 
 test('24UX6C: no line under the number in Gastado or Disponible, in Spanish or English, with one or several currencies, in any mode or amount', () => {
@@ -401,7 +436,7 @@ test('24UX6C: the hero numbers are byte-identical to the domain figures: Gastado
 test('24UX6A: the number is the field\'s ink at 46 pt, and the secondary ink when it is exactly zero; dark keeps the dark field', () => {
   let root = routeHarness('(tabs)/index.tsx', {}, homeData).render();
   assert.deepEqual([find(root, 'Money').props.size, find(root, 'Money').props.color], [46, lightPalette.heroInk]);
-  // 25A-03: the hero asks for the field's solid graphite symbol and cents; the whole units keep the ink.
+  // 25A-03: the hero asks for the field's solid quiet symbol and cents; the whole units keep the ink.
   assert.equal(find(root, 'Money').props.onField, true);
   root = routeHarness('(tabs)/index.tsx', {}, snapshot).render();
   assert.deepEqual([find(root, 'Money').props.minor, find(root, 'Money').props.color], [0, lightPalette.heroSecondary], 'a true zero reads quieter');
@@ -414,35 +449,67 @@ test('24UX6A: the number is the field\'s ink at 46 pt, and the secondary ink whe
   } finally { dark = false; }
 });
 
-test('24UX6A: the status bar is the field\'s own over it (dark on the lime since 25VIS1), the scheme\'s own after scrolling past it or when another screen is in front', () => {
+test('25D1: the month grows to Title 2\'s iOS size, in whole words: beside the accounts button while it fits, else on its own line with the button under it', () => {
+  for (const locale of ['es-AR', 'en-US'] as const) {
+    const names = Array.from({ length: 12 }, (_, i) => { const name = i18nFormat.formatDate(`2026-${String(i + 1).padStart(2, '0')}-15`, 'month', locale); return name.charAt(0).toUpperCase() + name.slice(1); });
+    const wordEm = geometry.widestWordEm(names);
+    for (const width of [320, 375, 393, 430]) {
+      for (const scale of [1, 1.353, 1.786, 2.643, 3.571]) {
+        const fit = geometry.titleFit(scale, 56 / 22, wordEm, 22 * 1.08, width - 96, width - 40);
+        const drawn = 22 * Math.min(scale, fit.maxScale);
+        const at = `${locale} ${width} pt ×${scale}`;
+        assert.ok(wordEm * 22 * 1.08 * Math.min(scale, fit.maxScale) <= (fit.stacked ? width - 40 : width - 96) + 1e-9, at + ': the longest name stays whole');
+        if (scale === 1) assert.equal(fit.stacked, false, at);
+        // Never smaller than iOS draws Title 2 at the first accessibility size (34 pt) once the person is past it.
+        if (scale >= 1.786) assert.ok(drawn >= 34, `${at}: ${drawn.toFixed(1)} pt`);
+      }
+    }
+  }
+  // (No size order with the amount is claimed: the hero is fitted to the field's width, so from AX3 a long amount can draw
+  // about as large as the month. It stays right under it, bold and whole.)
+  // Rendered at AX5 on a 393 pt iPhone: the month takes the full line and reaches iOS's own 56 pt; the button wraps under it, on the right.
+  homeWindow = { width: 393, height: 852, fontScale: 3.571, scale: 3 };
+  try {
+    const root = routeHarness('(tabs)/index.tsx', {}, homeData).render();
+    const month = monthOf(root);
+    const row = nodes(fieldOf(root)).find(n => n.type === 'View' && [n.props.children].flat().includes(month))!;
+    assert.deepEqual([row.props.style.flexWrap, row.props.style.justifyContent, month.props.style.flexBasis, month.props.style.flex], ['wrap', 'flex-end', '100%', undefined]);
+    assert.equal(Math.round(22 * Math.min(3.571, month.props.maxFontSizeMultiplier)), 56);
+    assert.equal([row.props.children].flat().filter(Boolean).map((n: Node) => n.type).join('|'), 'AppText|FieldButton', 'the same two elements, the button after the month');
+  } finally { homeWindow = { width: 393, height: 852, fontScale: 1, scale: 3 }; }
+});
+
+test('24UX6A: the status bar is the field\'s own over it (`heroStatusBar`: light over the sapphire since 25VIS2), the scheme\'s own after scrolling past it or when another screen is in front', () => {
+  const field = lightPalette.heroStatusBar, nightField = darkPalette.heroStatusBar;
+  assert.deepEqual([field, nightField], ['light', 'light'], 'the sapphire field is dark in both themes');
   const view = routeHarness('(tabs)/index.tsx', {}, homeData);
   let root = view.render();
-  assert.equal(view.statusBar.join(), 'dark', 'focused at the top: dark content over the lime field');
+  assert.equal(view.statusBar.join(), field, 'focused at the top: the field\'s own');
   fieldOf(root).props.onLayout({ nativeEvent: { layout: { height: 320 } } });
   root.props.onScroll({ nativeEvent: { contentOffset: { y: 100 } } });
-  assert.equal(view.statusBar.join(), 'dark', 'still over the field: nothing changes');
+  assert.equal(view.statusBar.join(), field, 'still over the field: nothing changes');
   root.props.onScroll({ nativeEvent: { contentOffset: { y: 320 - INSETS.top + 1 } } });
   assert.equal(view.statusBar.at(-1), 'dark', 'past the field in light: dark text on the light canvas');
   root = view.render();
   root.props.onScroll({ nativeEvent: { contentOffset: { y: 0 } } });
-  assert.equal(view.statusBar.at(-1), 'dark', 'back over the field');
+  assert.equal(view.statusBar.at(-1), field, 'back over the field');
   view.blur();
   assert.equal(view.statusBar.at(-1), 'dark', 'another screen in front: the light scheme\'s own');
   const count = view.statusBar.length;
   root.props.onScroll({ nativeEvent: { contentOffset: { y: 5 } } });
   assert.equal(view.statusBar.length, count, 'no change while still over the field');
   view.focus();
-  assert.equal(view.statusBar.at(-1), 'dark', 'focused again at the top');
+  assert.equal(view.statusBar.at(-1), field, 'focused again at the top');
   dark = true;
   try {
     const night = routeHarness('(tabs)/index.tsx', {}, homeData);
     const nightRoot = night.render();
-    assert.equal(night.statusBar.at(-1), 'dark', 'dark scheme, at the top: the lime field still wants dark content');
+    assert.equal(night.statusBar.at(-1), nightField, 'dark scheme, at the top: the field\'s own');
     fieldOf(nightRoot).props.onLayout({ nativeEvent: { layout: { height: 320 } } });
     nightRoot.props.onScroll({ nativeEvent: { contentOffset: { y: 600 } } });
     assert.equal(night.statusBar.at(-1), 'light', 'dark scheme past the field: its own light content on the near-black');
     nightRoot.props.onScroll({ nativeEvent: { contentOffset: { y: 0 } } });
-    assert.equal(night.statusBar.at(-1), 'dark', 'back over the field');
+    assert.equal(night.statusBar.at(-1), nightField, 'back over the field');
     night.blur();
     assert.equal(night.statusBar.at(-1), 'light');
   } finally { dark = false; }
@@ -477,7 +544,9 @@ test('24UX6A, 24UX6C2: the month\'s latest expenses, incomes and transfers, newe
   const title = nodes(root).find(n => n.type === 'SectionTitle' && n.props.children === 'Actividad reciente')!;
   assert.equal(title.props.action, 'Ver todos');
   title.props.onAction();
-  assert.deepEqual([alone.navigated.at(-1), alone.pushed.length], ['/activity', 0], 'the tab root is selected, never pushed over Inicio');
+  assert.deepEqual([alone.navigated.at(-1).pathname, alone.pushed.length], ['/activity', 0], 'the tab root is selected, never pushed over Inicio');
+  // 25Q4: with a fresh `reset`: Movimientos opens whole and from the top.
+  assert.match(alone.navigated.at(-1).params.reset, /^\d+$/);
   // A commitment this week: four rows under it, the transfer counted among the four.
   root = routeHarness('(tabs)/index.tsx', {}, data, { recurring: [dueRule()] }).render();
   assert.equal(sectionTitles(root).join('|'), 'Próximos compromisos|Actividad reciente');
@@ -633,9 +702,11 @@ test('24UX6C2: with two currencies, «Solo USD» leaves an ARS transfer out; the
   assert.equal(row.props.accounts, data.accounts, 'the stored accounts themselves');
 });
 
-test('24UX6A: commitments without activity show only the commitments; with neither, one quiet line and no action; with no account, the start', () => {
+test('24UX6A: commitments without activity show only the commitments; with neither, one quiet line and no action (25O1: once something was recorded; Primeros pasos before)', () => {
   const account: domain.Account = { id: 'a', name: 'Efectivo', currency: 'ARS', openingMinor: 0, createdAt };
-  let view = routeHarness('(tabs)/index.tsx', {}, { accounts: [account], entries: [] }, { recurring: [dueRule('r1'), dueRule('r2', { merchant: 'Spotify' }), dueRule('r3', { merchant: 'Gimnasio', nextDateISO: '2026-09-13', anchorDateISO: '2026-09-13' })] });
+  // 25O1: a returning person: something recorded in August, nothing this month (the harness day is 2026-09-12).
+  const august: domain.Entry = { id: 'old', accountId: 'a', kind: 'expense', amountMinor: 100, merchant: 'Kiosco', category: 'Comida', dateISO: '2026-08-20', createdAt };
+  let view = routeHarness('(tabs)/index.tsx', {}, { accounts: [account], entries: [august] }, { recurring: [dueRule('r1'), dueRule('r2', { merchant: 'Spotify' }), dueRule('r3', { merchant: 'Gimnasio', nextDateISO: '2026-09-13', anchorDateISO: '2026-09-13' })] });
   let root = view.render();
   assert.equal(sectionTitles(root).join('|'), 'Próximos compromisos', 'only the commitments');
   assert.equal(nodes(root).filter(n => n.type === 'UpcomingRecurringRow').map(n => n.props.rule.id).join(), 'r3,r1', 'two at most, soonest first');
@@ -643,12 +714,12 @@ test('24UX6A: commitments without activity show only the commitments; with neith
   const surface = nodes(root).find(n => n.type === 'Surface' && nodes(n).some(child => child.type === 'UpcomingRecurringRow'))!;
   assert.equal(surface.props.grouped, true);
   // 25VIS1 (owner): future content is not brand content. The commitments' surface is the same neutral grouped surface as
-  // Actividad reciente's, with no tint of its own (no lime, no wash); only each row's mark keeps its category identity.
+  // Actividad reciente's, with no tint of its own (no brand tint, no wash); only each row's mark keeps its category identity.
   assert.equal(JSON.stringify(surface.props.style ?? {}).includes('backgroundColor'), false, 'no tinted fill on the commitments');
   nodes(root).find(n => n.type === 'SectionTitle' && n.props.children === 'Próximos compromisos')!.props.onAction();
   assert.equal(view.pushed.at(-1), '/recurring');
   // Neither: the quiet line, no action (the dock's «+» and the Assistant are the actions).
-  view = routeHarness('(tabs)/index.tsx', {}, { accounts: [account], entries: [] });
+  view = routeHarness('(tabs)/index.tsx', {}, { accounts: [account], entries: [august] });
   root = view.render();
   assert.equal(sectionTitles(root).length, 0, 'no section header, no placeholder');
   const quiet = find(root, 'EmptyState');
@@ -656,17 +727,59 @@ test('24UX6A: commitments without activity show only the commitments; with neith
     'one currency held: the line names no currency; the detail names the dock\'s button by its label');
   assert.equal(quiet.props.action, undefined, 'no button: recording is the dock\'s');
   assert.equal(nodes(root).filter(n => n.type === 'EmptyState').length, 1);
-  assert.equal(nodes(root).some(n => n.type === 'ActionButton' || n.type === 'Surface'), false);
-  // No account: the start.
-  view = routeHarness('(tabs)/index.tsx', {}, { accounts: [], entries: [] });
+  assert.equal(nodes(root).some(n => n.type === 'ActionButton' || n.type === 'Surface' || n.type === 'FirstSteps'), false, 'a returning person never sees the first steps again');
+});
+
+test('25O1: while nothing is recorded, Primeros pasos stands where the empty states stood: its steps done by what exists, the expense form in the currency shown, gone once something is recorded', () => {
+  const at = '2026-09-01T12:00:00.000Z';
+  const cash: domain.Account = { id: 'a', name: 'Efectivo', currency: 'ARS', openingMinor: 0, createdAt: at };
+  const dollars: domain.Account = { id: 'u', name: 'Dólares', currency: 'USD', openingMinor: 0, createdAt: at };
+  const visaAccount: domain.Account = { id: 'visa', name: 'Visa Galicia', currency: 'ARS', openingMinor: 0, createdAt: at };
+  const card: domain.CreditCardProfile = { id: 'card', accountId: 'visa', issuer: 'Visa', last4: '', creditLimitMinor: null, closingDay: 28, dueDay: 5, active: true,
+    deleted: false, createdAt: at, revision: 0, updatedAt: at };
+  const debtAccount: domain.Account = { id: 'juan', name: 'Debo · Juan', currency: 'ARS', openingMinor: -5000, createdAt: at };
+  const debt: domain.PersonalDebtProfile = { id: 'debt', accountId: 'juan', direction: 'owed_by_me', counterparty: 'Juan', dueDateISO: null, note: '', active: true,
+    deleted: false, createdAt: at, revision: 0, updatedAt: at };
+  // The section's props as a plain triple (the harness renders in another realm, whose objects deepEqual refuses).
+  const steps = (root: Node) => { const all = nodes(root).filter(n => n.type === 'FirstSteps'); assert.equal(all.length, 1, 'one section');
+    const { account, card, currency } = all[0].props; return { account, card, currency }; };
+  // A new installation: nothing done; no empty state and no filled button (the dock's «+» stays Inicio's one bright object).
+  let root = routeHarness('(tabs)/index.tsx', {}, { accounts: [], entries: [] }).render();
+  assert.deepEqual(steps(root), { account: null, card: null, currency: undefined }, 'no account holds the currency shown');
+  assert.equal(nodes(root).some(n => n.type === 'EmptyState' || n.type === 'ActionButton'), false);
+  const section = nodes(root).find(n => n.type === 'Reflow' && nodes(n).some(child => child.type === 'FirstSteps'))!;
+  assert.equal(section.props.fade, true, 'it comes and leaves with a fade');
+  // The first account (the onboarding's or Nueva cuenta's) is done by its name; the expense form opens in its currency.
+  root = routeHarness('(tabs)/index.tsx', {}, { accounts: [cash], entries: [] }).render();
+  assert.deepEqual(steps(root), { account: 'Efectivo', card: null, currency: 'ARS' });
+  // A card's or a debt's own account and a deleted account are never «your first account»; a deleted card is no card.
+  const deleted = { ...cash, id: 'gone', name: 'Cerrada', deletedAt: at };
+  root = routeHarness('(tabs)/index.tsx', {}, { accounts: [visaAccount, debtAccount, deleted], entries: [] }, { cards: [{ ...card, deleted: true, active: false }], debts: [debt] }).render();
+  assert.deepEqual([steps(root).account, steps(root).card], [null, null]);
+  root = routeHarness('(tabs)/index.tsx', {}, { accounts: [visaAccount, debtAccount, deleted, cash], entries: [] }, { cards: [card], debts: [debt] }).render();
+  assert.deepEqual([steps(root).account, steps(root).card], ['Efectivo', 'Visa Galicia'], 'the card is named by its own account');
+  // The currency Inicio shows, only when an account holds it (the dock's «+» rule).
+  root = routeHarness('(tabs)/index.tsx', {}, { accounts: [cash, dollars], entries: [] }, {}, displayStore({ [displayCurrency.DISPLAY_CURRENCY_KEY]: 'USD' })).render();
+  assert.equal(steps(root).currency, 'USD');
+  root = routeHarness('(tabs)/index.tsx', {}, { accounts: [cash, dollars], entries: [] }, {},
+    displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated', [displayCurrency.DISPLAY_CURRENCY_KEY]: 'EUR' }), { book: consolidatedRates() }).render();
+  assert.equal(steps(root).currency, undefined, 'a consolidated total in a currency no account holds preselects nothing');
+  // A commitment already set up stays above the steps.
+  root = routeHarness('(tabs)/index.tsx', {}, { accounts: [cash], entries: [] }, { recurring: [dueRule()] }).render();
+  assert.deepEqual(nodes(root).filter(n => n.type === 'UpcomingRecurringRow' || n.type === 'FirstSteps').map(n => n.type), ['UpcomingRecurringRow', 'FirstSteps']);
+  // Anything recorded ends it: a transfer, or a purchase in instalments (its plan records no movement until its statement closes).
+  const transfer: domain.Transfer = { id: 't', fromAccountId: 'a', toAccountId: 'b', amountMinor: 100, note: '', dateISO: '2026-08-20', createdAt: at };
+  root = routeHarness('(tabs)/index.tsx', {}, { accounts: [cash, { ...cash, id: 'b', name: 'Banco' }], entries: [], transfers: [transfer] }).render();
+  assert.equal(nodes(root).some(n => n.type === 'FirstSteps'), false);
+  root = routeHarness('(tabs)/index.tsx', {}, { accounts: [cash, visaAccount], entries: [] }, { cards: [card], installmentPlans: [{ id: 'plan' } as unknown as domain.InstallmentPlan] }).render();
+  assert.deepEqual([nodes(root).some(n => n.type === 'FirstSteps'), find(root, 'EmptyState').props.title], [false, 'Todavía no hay movimientos este mes']);
+  // The first expense lands while Inicio stays mounted: the steps leave and the month's activity takes their place.
+  const view = routeHarness('(tabs)/index.tsx', {}, { accounts: [cash], entries: [] });
+  assert.equal(nodes(view.render()).some(n => n.type === 'FirstSteps'), true);
+  view.setData({ accounts: [cash], entries: [{ id: 'first', accountId: 'a', kind: 'expense', amountMinor: 250000, merchant: 'Café', category: 'Comida', dateISO: '2026-09-12', createdAt: at }] });
   root = view.render();
-  const start = find(root, 'EmptyState');
-  assert.equal(start.props.title, 'Entendé tus gastos.');
-  assert.equal(start.props.action.type, 'ActionButton');
-  assert.equal(start.props.action.props.label, 'Empezar');
-  start.props.action.props.onPress();
-  assert.equal(view.pushed.at(-1), '/new-account');
-  assert.equal(sectionTitles(root).length, 0);
+  assert.equal(nodes(root).some(n => n.type === 'FirstSteps' || n.type === 'EmptyState'), false);
+  assert.deepEqual([sectionTitles(root).join(), nodes(root).filter(n => n.type === 'EntryRow').map(n => n.props.entry.id).join()], ['Actividad reciente', 'first']);
 });
 
 test('24UX6A: no Registrar button, insight line, ranking, budget card, chart or Assistant banner on Inicio, in the tree or the source (24UX6C2\'s «one budget row at most» superseded by the 24UX6D refinement: two compact rows at most)', () => {
@@ -1056,10 +1169,12 @@ test('24UX6A review: the quiet line names the currency shown when another one is
   assert.equal(quietOf(root).length, 0);
   assert.equal(nodes(root).filter(n => n.type === 'EntryRow').map(n => n.props.entry.id).join(), 'usd');
   // One currency held: nothing to tell apart, the plain line.
-  root = routeHarness('(tabs)/index.tsx', {}, { accounts: [pesos], entries: [] }).render();
+  // 25O1: a returning person (an August movement), so the quiet line, not Primeros pasos.
+  const august: domain.Entry = { id: 'old', accountId: 'a', kind: 'expense', amountMinor: 100, merchant: 'Kiosco', category: 'Comida', dateISO: '2026-08-20', createdAt: at };
+  root = routeHarness('(tabs)/index.tsx', {}, { accounts: [pesos], entries: [august] }).render();
   assert.deepEqual([quietOf(root).length, quietOf(root)[0].props.title, quietOf(root)[0].props.detail], [1, 'Todavía no hay movimientos este mes', DETAIL]);
   // Consolidated over both currencies with an empty month: every account is shown, so no currency is named.
-  root = routeHarness('(tabs)/index.tsx', {}, { accounts: [pesos, dollars], entries: [] }, {}, displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated' }), { book: consolidatedRates() }).render();
+  root = routeHarness('(tabs)/index.tsx', {}, { accounts: [pesos, dollars], entries: [august] }, {}, displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated' }), { book: consolidatedRates() }).render();
   assert.equal(quietOf(root).map(n => n.props.title).join(), 'Todavía no hay movimientos este mes');
   // English follows the same rule.
   locale = 'en-AR';
@@ -1186,16 +1301,15 @@ test('24UX6A: Inicio keeps its hierarchy with no account, one or several account
   const order = (root: Node) => nodes(root).map(node => node.type === 'SectionTitle' ? 'title:' + node.props.children
     : node.type === 'AppText' && node.props.accessibilityRole === 'header' ? 'month' : node.type === 'AppText' && SUBLINE.test(textOf(node)) ? 'subline'
       : node.type === 'EmptyState' ? 'empty:' + node.props.title : node.type)
-    .filter(type => ['month', 'FieldButton', 'DisplayCurrencyButton', 'Money', 'subline', 'Choices', 'BudgetAttentionRow', 'UpcomingRecurringRow', 'EntryRow'].concat(RETIRED).includes(type) || /^(title|empty):/.test(type))
+    .filter(type => ['month', 'FieldButton', 'DisplayCurrencyButton', 'Money', 'subline', 'Choices', 'BudgetAttentionRow', 'UpcomingRecurringRow', 'EntryRow', 'FirstSteps'].concat(RETIRED).includes(type) || /^(title|empty):/.test(type))
     .filter((type, index, all) => type !== all[index - 1]);
   // 24C1 / 25B2: the chip is part of the field only while two or more currencies are held.
   // 24UX6C: no line under the number; a «subline» in the order would fail here.
   const expected = (modules: string[], chip = false) => ['month', 'FieldButton', ...(chip ? ['DisplayCurrencyButton'] : []), 'Money', 'Choices', ...modules];
 
-  // No account: the field and the start, nothing else.
-  assert.deepEqual(order(routeHarness('(tabs)/index.tsx', {}, { accounts: [], entries: [] }).render()), expected(['empty:Entendé tus gastos.']));
-  // One account, nothing recorded: the field and one quiet line.
-  assert.deepEqual(order(routeHarness('(tabs)/index.tsx', {}, { accounts: [account('a', 'ARS')], entries: [] }).render()), expected(['empty:Todavía no hay movimientos este mes']));
+  // 25O1: no account, or an account and nothing recorded: the field and Primeros pasos, nothing else.
+  assert.deepEqual(order(routeHarness('(tabs)/index.tsx', {}, { accounts: [], entries: [] }).render()), expected(['FirstSteps']));
+  assert.deepEqual(order(routeHarness('(tabs)/index.tsx', {}, { accounts: [account('a', 'ARS')], entries: [] }).render()), expected(['FirstSteps']));
   // Several categories, incomes and expenses, several accounts of one currency, a second currency, an overall budget
   // already exceeded, one active rule this week, one paused and one deleted (neither shown), and an amount of 13 digits.
   const data = { accounts: [account('a', 'ARS', 'Efectivo'), account('b', 'ARS', 'Banco'), account('u', 'USD', 'Dólares')],

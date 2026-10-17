@@ -12,7 +12,7 @@ import { REGION_RELEASE_STAGES, dateFamily, numberFamily, releasedByStages, stag
 import { REGION_CODES, REGION_DATA } from '../src/i18n/regions/index.ts';
 import { activeRegionChoice, createLocaleStore, pendingRegionChoice, type DeviceReading } from '../src/i18n/store.ts';
 import { buildChoiceRows, filterChoices } from '../src/ui/choice-list.ts';
-import { languageChooser, preferenceSummary, regionChooser } from '../src/ui/locale-options.ts';
+import { languageChooser, preferenceSummary, regionChooser, shownRegion } from '../src/ui/locale-options.ts';
 import { AmountInput, amountFromDraft, amountFromView, displayAmount, draftFromAmount, latinDigits, readPastedAmount, renderAmount, type AmountFormat } from '../src/ui/money-input.ts';
 
 // Producto 24R2A: the catalogue's 257 regions integrated behind the release gate. The registry is derived from the
@@ -301,9 +301,11 @@ test('a region chosen in a development preview is saved, kept by a release build
   assert.equal(release.setRegion('SA'), false, 'a release build never saves a blocked region');
   const t = bindLocale(state.locale).t;
   assert.equal(preferenceSummary('region', state, t), 'Arabia Saudí · formatos de Estados Unidos', 'the Más row says what is written');
+  assert.equal(shownRegion(state), 'SA', '25O1: and its flag is the one it names first, not the stand-in\'s');
   const chooser = regionChooser(state, t);
   assert.equal(chooser.options.length, 235, 'the 234 released regions and the kept one');
-  assert.equal(chooser.options.find(option => option.value === 'SA')!.subtitle, 'Todavía no disponible en esta versión · formatos de Estados Unidos');
+  assert.equal(chooser.options.find(option => option.value === 'SA')!.subtitle, 'Aún no disponible · formatos de Estados Unidos');
+  assert.equal(chooser.options.find(option => option.value === 'SA')!.flag, 'SA', '25O1: a kept preview region shows its own flag');
   assert.equal(chooser.selected, 'SA', 'the checkmark on what the person chose, with the stand-in named');
   assert.equal(chooser.acceptRecent('SA'), false, 'a blocked region is never offered as a recent');
   // A build that releases it: the same rows apply with no action.
@@ -340,6 +342,17 @@ test('the choosers: two languages are one card; the 234 released regions are sea
   assert.deepEqual(filterChoices('english', languageChooser(release, t).options).map(option => option.value), ['en']);
   const long = regionChooser(release, t);
   assert.equal(long.options.length, 234);
+  // 25O1: every region row carries its own code as its mark, the device row a neutral glyph.
+  assert.equal(long.options.every(option => option.flag === option.value && option.glyph === undefined), true);
+  assert.deepEqual([long.pinned.flag, long.pinned.glyph], [undefined, 'phone-portrait-outline']);
+  // A language row shows the flag of the variety its copy is written in, and says so in words; never a flag alone.
+  const languages = languageChooser(release, t);
+  assert.deepEqual(languages.options.map(option => [option.value, option.flag, option.subtitle]),
+    [['es', 'AR', 'Variante: Argentina'], ['en', 'US', 'Variant: United States']]);
+  assert.deepEqual([languages.pinned.flag, languages.pinned.glyph], [undefined, 'phone-portrait-outline']);
+  const americanState = createLocaleStore({ devices: () => device('en-US', 'US'), store: memory().store }).getState();
+  assert.deepEqual(languageChooser(americanState, bindLocale(americanState.locale).t).options.map(option => option.subtitle),
+    ['Variante: Argentina', 'Variant: United States'], 'each row says it in its own language, whatever the interface');
   assert.doesNotMatch(long.note, /Vista previa/, 'a release says nothing about previews');
   assert.equal(long.options.some(option => option.value === 'SA'), false, 'a blocked region is not offered');
   const search = (query: string) => filterChoices(query, long.options).slice(0, 3).map(option => option.value);

@@ -118,28 +118,62 @@ test('24B1: the MonthBars scale caption for ARS and USD, whole units from cents,
   assert.equal(caption('es-US', 'USD'), 'Mes en curso hasta hoy · escala de 0 a US$\u00A01,234,568');
 });
 
-test('23.1C2: a month bar speaks the full month name and the axis keeps the short one', () => {
+test('23.1C2, 25D1: a month bar speaks the full month name; the axis keeps the short one for the eye, hidden from VoiceOver and fitted to its column', () => {
   const points = [{ monthISO: '2026-03', amountMinor: 123456, partial: false }, { monthISO: '2026-05', amountMinor: 50000, partial: true }];
   const read = (i18n: ReturnType<typeof bindLocale>) => {
     const chart = chartsModule(i18n).MonthBars({ points, selected: '2026-05', onSelect: () => {}, currency: 'ARS' });
     const bars = flat(chart).filter(node => typeof node.type === 'function').map(node => node.type(node.props));
     const axis = flat(chart).filter(node => node.type === 'AnimatedText');
-    return { labels: bars.map(bar => bar.props.accessibilityLabel), axis: axis.map(node => node.props.children), languages: axis.map(node => node.props.accessibilityLanguage) };
+    const row = flat(chart).find(node => node.type === 'View' && [node.props.children].flat(2).some((child: any) => child?.type === 'AnimatedText'));
+    return { labels: bars.map(bar => bar.props.accessibilityLabel), axis: axis.map(node => node.props.children), row, ticks: axis.map(node => node.props) };
   };
-  const spanish = read(bindLocale('es-AR'));
-  assert.deepEqual(spanish.labels, ['marzo 2026, 1234,56 pesos', 'mayo 2026, 500,00 pesos, mes en curso']);
-  assert.deepEqual(spanish.axis, ['mar', 'may']);
-  assert.deepEqual(spanish.languages, [undefined, undefined], 'a device in the interface language keeps its own voice');
-  const english = read(bindLocale('en-US', 'native', 'es'));
-  assert.deepEqual(english.labels, ['March 2026, 1234.56 pesos', 'May 2026, 500.00 pesos, month in progress']);
-  assert.deepEqual(english.axis, ['Mar', 'May']);
-  assert.deepEqual(english.languages, ['en', 'en'], 'English chosen on a Spanish iPhone: the axis is read with an English voice');
+  for (const [locale, device, labels, axis] of [['es-AR', undefined, ['marzo 2026, 1234,56 pesos', 'mayo 2026, 500,00 pesos, mes en curso'], ['mar', 'may']],
+    ['en-US', 'es', ['March 2026, 1234.56 pesos', 'May 2026, 500.00 pesos, month in progress'], ['Mar', 'May']]] as const) {
+    const chart = read(device ? bindLocale(locale, 'native', device) : bindLocale(locale));
+    assert.deepEqual(chart.labels, labels);
+    assert.deepEqual(chart.axis, axis);
+    // The ticks were one VoiceOver stop each, repeating what the bars say (HIG, charts: hide axis labels).
+    assert.deepEqual([chart.row.props.accessibilityElementsHidden, chart.row.props.importantForAccessibility], [true, 'no-hide-descendants'], locale);
+    const fitted = (chartsModule(bindLocale(locale)).axisLabels as unknown as (shorts: string[], width: number, scale: number) => { maxScale: number })([...axis], chartWidth, 1);
+    for (const tick of chart.ticks) {
+      assert.deepEqual([tick.numberOfLines, tick.maxFontSizeMultiplier, tick.accessibilityLanguage], [1, fitted.maxScale, undefined], locale);
+    }
+  }
   const donut = (i18n: ReturnType<typeof bindLocale>) => chartsModule(i18n).DonutChart({ slices: [{ key: 'a', label: 'Food', value: 1, color: '#1' }], currency: 'ARS',
     caption: 'Total', shareOf: () => ({ label: '100 %', spoken: '100 %' }) });
   // 24UX6C2: the chart's root is an outer View (the readout can move under the donut), so the element is found by type.
   const pressOf = (tree: any) => flat(tree).find(node => node.type === 'Pressable');
   assert.equal(pressOf(donut(bindLocale('en-US', 'native', 'es'))).props.accessibilityLanguage, 'en');
   assert.equal(pressOf(donut(bindLocale('es-AR', 'native', 'es'))).props.accessibilityLanguage, undefined);
+});
+
+test('25D1: the axis follows the person\'s text size at every setting: the short month while it fits its column, else its initial, never capped below the setting', () => {
+  const charts = chartsModule(bindLocale('es-AR'));
+  const fit = charts.axisLabels as unknown as (shorts: string[], width: number, scale: number) => { labels: string[]; maxScale: number };
+  // The column: the screen less its padding (2 × 20) and the card's (2 × 16), less five 6 pt gaps, over six months.
+  const column = (width: number) => (width - 72 - 30) / 6;
+  for (const locale of ['es-AR', 'en-US'] as const) {
+    const formatDate = (dateISO: string, style: 'day') => i18nFormat.formatDate(dateISO, style, locale);
+    const short = (month: number) => (charts.shortMonth as unknown as (monthISO: string, format: typeof formatDate) => string)(`2026-${String(month).padStart(2, '0')}`, formatDate);
+    for (let first = 1; first <= 7; first++) {
+      const shorts = Array.from({ length: 6 }, (_, i) => short(first + i));
+      for (const width of [320, 375, 393, 430]) {
+        for (const scale of [1, 1.353, 1.786, 2.143, 2.643, 3.143, 3.571]) {
+          const { labels, maxScale } = fit(shorts, width, scale);
+          const drawn = Math.min(scale, maxScale);
+          const at = `${locale} ${shorts.join(' ')} at ${width} pt ×${scale}`;
+          // The person's setting is honoured (React Native's largest is 3.571, under Caption 1's AX5 ceiling of 43/12).
+          assert.equal(drawn, scale, at + ': drawn at the person\'s size');
+          for (const label of labels) assert.ok(geometry.labelWidthEm(label) * 12 * 1.06 * drawn <= column(width), `${at}: «${label}» fits its column`);
+          if (scale === 1) assert.equal(JSON.stringify(labels), JSON.stringify(shorts), at + ': the short month at the default size');
+        }
+      }
+    }
+    // At AX5 the short month no longer fits any column, so the axis shows the initial («S», «O», «N»), at the full size.
+    const ax5 = fit(Array.from({ length: 6 }, (_, i) => short(7 + i)), 393, 3.571);
+    assert.equal(ax5.labels.join(' '), 'J A S O N D');
+  }
+  assert.equal(JSON.stringify(fit([], 393, 1)), JSON.stringify({ labels: [], maxScale: 1 }));
 });
 
 test('24B3: the MonthBars scale and the bar labels use each currency\'s own units: yen whole, dinars to the fil', () => {
@@ -211,16 +245,19 @@ test('24UX6B: idle month bars hold 3:1 on their surface in light and dark; the s
     const shown = over(idle, p.surface);
     assert.ok(ratio(shown, p.surface) >= 3, `idle bar on the surface: ${ratio(shown, p.surface).toFixed(2)}`);
     assert.ok(ratio(shown, p.surface) < ratio(p.primary, p.surface), 'the shown month stays the strongest mark');
+    // 25O1 review: the first opening's story draws its pages to come in this ink straight on the canvas, which is darker.
+    const onCanvas = over(idle, p.background);
+    assert.ok(ratio(onCanvas, p.background) >= 3, `idle segment on the canvas: ${ratio(onCanvas, p.background).toFixed(2)}`);
   }
   const points = [{ monthISO: '2026-08', amountMinor: 100, partial: false }, { monthISO: '2026-09', amountMinor: 50, partial: true }];
   const chart = charts.MonthBars({ points, selected: '2026-09', onSelect: () => {}, currency: 'ARS' });
   const bars = flat(chart).filter(node => typeof node.type === 'function').map(node => node.type(node.props));
   const fills = bars.map(bar => bar.props.children.props.style[0].backgroundColor);
   assert.deepEqual(fills, ['#586961B3', '#2557D6'], 'the other month in the idle ink, the shown one in the brand');
-  // The month in progress keeps its outline when it is not the shown one: ink on the idle fill (the secondary edge vanished on it).
-  const past = charts.MonthBars({ points, selected: '2026-08', onSelect: () => {}, currency: 'ARS' });
-  const outline = flat(past).filter(node => typeof node.type === 'function').map(node => node.type(node.props))[1].props.children.props.style[0];
-  assert.deepEqual([outline.backgroundColor, outline.borderColor, outline.borderWidth > 0], ['#586961B3', '#000', true]);
+  // The month in progress is said, not outlined: secondary on the sapphire was 1.09:1 (light) and 1.12:1 (dark). The caption
+  // and its VoiceOver label carry it; no bar draws an edge.
+  for (const bar of bars) assert.equal('borderWidth' in bar.props.children.props.style[0] || 'borderColor' in bar.props.children.props.style[0], false);
+  assert.match(bars[1].props.accessibilityLabel, /curso/);
 });
 
 // 24UX6C2, recomposed in 24UX6D: the category donut. It is the head of Categorías and its centre carries the period's total
@@ -459,11 +496,13 @@ test('24UX6C2: at large text (1.353) the chosen readout moves under the donut; 2
     assertReadoutBelow(donut(), { texts: ['Total del período'], minor: DONUT_TOTAL });
     assertReadoutBelow(donut({ locale: 'en-US' }), { texts: ['Period total'], minor: DONUT_TOTAL });
   } finally { chartFontScale = 1; }
-  // At the AX sizes a long total under the donut steps down to keep to the row (Money caps its own scale at 1.8×).
+  // At the AX sizes a long total under the donut steps down to keep to the row. 25D1: a row amount stops at 53 pt (Body's
+  // AX5 size; it stopped at 1.8×, so this total drew 26 × 1.8 = 46.8 pt); no step fits this one at 53 pt, so it takes the
+  // last step and iOS shrinks it to the row natively.
   chartFontScale = 3.1;
   try {
     const millions = [{ key: 'a', label: 'Supermercado', value: FOUR_MILLION, color: '#111' }];
-    assertReadoutBelow(donut({ slices: millions, total: FOUR_MILLION }), { texts: ['Total del período'], minor: FOUR_MILLION, size: 26 });
+    assertReadoutBelow(donut({ slices: millions, total: FOUR_MILLION }), { texts: ['Total del período'], minor: FOUR_MILLION, size: 18 });
     const huge = 1234567890123;
     assertReadoutBelow(donut({ slices: [{ key: 'a', label: 'Supermercado', value: huge, color: '#111' }], total: huge }), { texts: ['Total del período'], minor: huge, size: 18 });
   } finally { chartFontScale = 1; }
@@ -667,7 +706,11 @@ test('24T3 (A24): a month that nets to zero or less is a bar at zero, VoiceOver 
   const bars = flat(chart).filter(node => typeof node.type === 'function');
   assert.deepEqual(bars.map(bar => bar.props.fraction), [0, 0, 1, 0], 'clamped at zero on a scale of 0 to the largest positive net');
   const labels = bars.map(bar => bar.type(bar.props).props.accessibilityLabel);
-  assert.equal(labels[0], 'junio 2026, 0,00 pesos', 'a month without records is not «sin gasto neto»: no records is not no spending');
+  // 25D2: a month without records is neither «sin gasto neto» nor «0,00 pesos»: nothing recorded is not no spending.
+  assert.equal(labels[0], 'junio 2026, sin gastos registrados', 'a month without records says so, never «0,00 pesos»');
+  const fresh = chartsModule(i18n).MonthBars({ points: [{ monthISO: '2026-09', amountMinor: 0, partial: true, count: 0 }, { monthISO: '2026-08', amountMinor: 0, partial: false }], selected: '2026-09', onSelect: () => {}, currency: 'ARS' });
+  const freshLabels = flat(fresh).filter(node => typeof node.type === 'function').map(bar => bar.type(bar.props).props.accessibilityLabel);
+  assert.deepEqual(freshLabels, ['septiembre 2026, sin gastos registrados, mes en curso', 'agosto 2026, 0,00 pesos'], 'a point without a count keeps its amount');
   assert.equal(labels[1], 'julio 2026, 0,00 pesos, sin gasto neto');
   assert.equal(labels[2], 'agosto 2026, 10,00 pesos');
   assert.equal(labels[3], 'septiembre 2026, ' + i18n.spokenMoney(-600, 'ARS') + ', sin gasto neto, mes en curso');

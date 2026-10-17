@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { accountBalanceMinor, archiveKey, createRecoveryBackup, deleteRecurringRule, parsePilotBackup, makeEntryChange, pauseRecurringRule, recurringHistory, recurringNeedsReview, resumeRecurringRule, snapshotFromArchive,
   type Account, type RecurringRule } from '@finanzapp/domain';
 import { catchUpRecurring, changeEntry, createAccount, importArchive, initializeDatabase, processRecurring, readArchive, saveRecurringRule, type LedgerDatabase } from '../src/storage/database.ts';
-import { openLedger, refreshLedger } from '../src/storage/ledger-session.ts';
+import { openLedger, refreshLedger, saveRecurring } from '../src/storage/ledger-session.ts';
 import { runExclusiveTransaction, runSchemaMigration, type TransactionConnection } from '../src/storage/transaction.ts';
 
 /** Producto 24UX5: what a recurring rule does today, pinned against a real SQLite file. Synthetic records in disposable
@@ -302,8 +302,10 @@ test('an undone recorded occurrence is not recorded again', async () => {
 
 test('LedgerProvider opens and returns to the foreground through the session functions, and a recurring failure never hides the data', () => {
   const source = readFileSync(new URL('../src/storage/LedgerProvider.tsx', import.meta.url), 'utf8');
-  assert.match(source, /await openLedger\(db, todayKey\(\)\)/);
-  assert.match(source, /state !== 'active'[\s\S]*?await refreshLedger\(database\.current!, todayKey\(\)\)/);
+  assert.match(source, /const today = todayKey\(\);[\s\S]*?await openLedger\(db, today\)/);
+  // 25R1: a return runs the queued pass (runPass) when shouldRefreshOnActive says so; tests/ledger-provider.node.ts pins when.
+  assert.match(source, /state !== 'active'[\s\S]*?shouldRefreshOnActive\([\s\S]*?runPass\(\)/);
+  assert.match(source, /await refreshLedger\(database\.current!, today\)/);
   assert.doesNotMatch(source, /await processRecurring\(db, todayKey\(\)\);\s*const next = await readArchive/, 'opening no longer depends on processing succeeding');
 });
 
@@ -319,4 +321,29 @@ test('recurring rules stay automatic: no confirmation mode in the app, the catal
   for (const file of ['src/i18n/messages/es/recurring.ts', 'src/i18n/messages/en/recurring.ts', 'src/ui/recurring-form.tsx', 'src/ui/recurring-history.tsx', 'app/recurring/[id].tsx', 'src/ui/commitment-actions.ts']) {
     assert.doesNotMatch(read(file), /Esperar confirmación|Wait for confirmation|confirmationMode|autoRecord/i, file);
   }
+});
+
+test('25R1: a rule is durable before its catch-up: a catch-up that fails is returned, never thrown, and a retry after the catch-up advanced the rule is a no-op', async () => {
+  const { db } = await ledger();
+  // The catch-up's movement insert fails (a locked or full database) after the rule committed.
+  let armed = true;
+  const broken = { ...db, withExclusiveTransactionAsync: (work: Parameters<LedgerDatabase['withExclusiveTransactionAsync']>[0]) =>
+    db.withExclusiveTransactionAsync(tx => work({ ...tx, runAsync: async (sql: string, ...params: (string | number | null)[]) => {
+      if (armed && sql.startsWith('INSERT INTO entries')) throw new Error('database is locked');
+      return tx.runAsync(sql, ...params);
+    } })) } as LedgerDatabase;
+  const created = rule({ anchorDateISO: '2026-01-15', nextDateISO: '2026-01-15' });
+  assert.deepEqual(await saveRecurring(broken, created, '2026-01-15'), { recurringError: true });
+  assert.deepEqual([(await ruleOf(db)).revision, await datesOf(db)], [0, []], 'the rule is saved; nothing half-recorded');
+  armed = false;
+  assert.deepEqual(await saveRecurring(broken, created, '2026-01-15'), { recurringError: false }, 'the same rule again: saved already, the catch-up runs');
+  assert.deepEqual([(await ruleOf(db)).revision, (await ruleOf(db)).nextDateISO, await datesOf(db)], [1, '2026-02-15', ['2026-01-15']]);
+  // The form's frozen retry (its view refresh failed) sends the revision-0 rule once more: a no-op, never «changed».
+  await saveRecurringRule(db, created);
+  assert.deepEqual([(await ruleOf(db)).revision, await datesOf(db)], [1, ['2026-01-15']]);
+  // A different definition at an old revision is still refused: only the catch-up's own advance is recognised.
+  await assert.rejects(saveRecurringRule(db, { ...created, amountMinor: 2000 }));
+  const paused = pauseRecurringRule(await ruleOf(db), '2026-01-16T12:00:00.000Z');
+  await saveRecurringRule(db, paused);
+  await assert.rejects(saveRecurringRule(db, created), 'a pause since then is not the catch-up\'s advance');
 });

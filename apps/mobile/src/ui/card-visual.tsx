@@ -5,7 +5,7 @@ import type { Currency, LegacyCurrency } from '@finanzapp/domain';
 import type { I18n } from '../i18n/bind';
 import type { MessageKey } from '../i18n/messages';
 import { useI18n } from '../i18n/provider';
-import { cardFaceTone } from './card-faces';
+import { DECK_PRESSED_WASH, FACE_RIM, cardFaceTone } from './card-faces';
 import { DECK_MAX_TEXT_SCALE, deckExposure, deckLayout } from './geometry';
 import { duration, easeOut, selectionHaptic, timing } from './motion';
 import { radius, space, usePalette, useReduceMotion } from './theme';
@@ -112,8 +112,9 @@ export function CardDeck({ cards, selectedId, onSelect, onOpen, showCurrency = t
   </View>;
 }
 
-/** One card of the deck: its face at `top` (animated there), layered by `zIndex`, pressed like any card (0.97; Reduce
- * Motion keeps it flat), and a touch target over the part of it that shows. */
+/** One card of the deck: its face at `top` (animated there), layered by `zIndex`, pressed like any card (0.97; under
+ * Reduce Motion it stays flat and a dark wash shows the press instead, 25D1), and a touch target over the part of it
+ * that shows. */
 function DeckSlot({ top, zIndex, reduced, tone, hitHeight, selected, label, hint, onPress, children }: {
   top: number; zIndex: number; reduced: boolean; tone: string; hitHeight: number; selected: boolean; label: string; hint: string; onPress: () => void; children: ReactNode;
 }) {
@@ -122,22 +123,27 @@ function DeckSlot({ top, zIndex, reduced, tone, hitHeight, selected, label, hint
   const y = useSharedValue(top);
   const pressed = useSharedValue(0);
   useEffect(() => { y.value = withTiming(top, timing('data', reduced)); }, [top, reduced, y]);
-  const style = useAnimatedStyle(() => ({ transform: [{ translateY: y.value }, { scale: 1 - 0.03 * pressed.value }] }));
+  const wash = DECK_PRESSED_WASH;
+  const style = useAnimatedStyle(() => ({ transform: [{ translateY: y.value }, { scale: reduced ? 1 : 1 - 0.03 * pressed.value }] }));
+  const washStyle = useAnimatedStyle(() => ({ opacity: wash * pressed.value }));
   // The slot carries the face's own colour and radius, so the shadow that separates a card from the one it overlaps is
   // computed from a solid shape (light mode; dark mode separates by the face's rim).
-  return <Animated.View style={[styles.slot, { zIndex, backgroundColor: tone }, p.isDark ? null : styles.lift, style]}>
+  return <Animated.View style={[styles.slot, { zIndex, backgroundColor: tone }, p.isDark ? null : { ...styles.lift, shadowColor: p.shadow }, style]}>
     {children}
+    {/* Inside the slot, so a card stacked above still covers it; never a target. */}
+    {reduced && <Animated.View pointerEvents="none" style={[styles.wash, washStyle]} />}
     <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityHint={hint} accessibilityState={{ selected }} accessibilityLanguage={speechLanguage}
-      onPress={onPress} pressRetentionOffset={12}
-      onPressIn={() => { pressed.value = reduced ? 0 : withTiming(1, { duration: duration.press, easing: easeOut }); }}
+      onPress={onPress}
+      onPressIn={() => { pressed.value = withTiming(1, { duration: reduced ? 0 : duration.press, easing: easeOut }); }}
       onPressOut={() => { pressed.value = withTiming(0, { duration: reduced ? 0 : duration.release, easing: easeOut }); }}
       style={[styles.hit, { height: hitHeight }]} />
   </Animated.View>;
 }
 
 const styles = StyleSheet.create({
+  wash: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: radius.creditCard, backgroundColor: '#000000' },
   face: { borderRadius: radius.creditCard, paddingHorizontal: 18, paddingVertical: 16, overflow: 'hidden', justifyContent: 'space-between',
-    borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.12)' },
+    borderWidth: StyleSheet.hairlineWidth, borderColor: FACE_RIM },
   sheen: { position: 'absolute', opacity: 0.35 },
   faceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
   name: { color: '#FFFFFF', fontSize: 17, lineHeight: 22, fontWeight: '600', letterSpacing: -0.2, flexShrink: 1 },
@@ -146,6 +152,6 @@ const styles = StyleSheet.create({
   chip: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.14)' },
   chipText: { color: '#FFFFFF', fontSize: 11, fontWeight: '600', letterSpacing: 0.4 },
   slot: { position: 'absolute', top: 0, left: 0, borderRadius: radius.creditCard },
-  lift: { shadowColor: '#0A0A0C', shadowOpacity: 0.16, shadowRadius: 10, shadowOffset: { width: 0, height: -2 } },
+  lift: { shadowOpacity: 0.16, shadowRadius: 10, shadowOffset: { width: 0, height: -2 } },
   hit: { position: 'absolute', top: 0, left: 0, right: 0 },
 });

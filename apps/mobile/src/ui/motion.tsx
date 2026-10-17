@@ -1,6 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react';
-import type { StyleProp, ViewStyle } from 'react-native';
-import Animated, { Easing, FadeIn, FadeInUp, FadeOut, LinearTransition, ReduceMotion, type WithTimingConfig } from 'react-native-reanimated';
+import { AccessibilityInfo, Platform, type StyleProp, type ViewStyle } from 'react-native';
+import Animated, { Easing, FadeIn, FadeInUp, FadeOut, LinearTransition, ReduceMotion, cubicBezier, type WithTimingConfig } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useReduceMotion } from './theme';
 
@@ -9,6 +9,9 @@ import { useReduceMotion } from './theme';
  * the opacity changes that explain a state and drops movement and reveals. */
 export const easeOut = Easing.bezier(0.23, 1, 0.32, 1);
 export const easeInOut = Easing.bezier(0.77, 0, 0.175, 1);
+/** `easeOut` for a CSS transition (`transitionTimingFunction`), which takes Reanimated's CSS easing, not an `Easing`
+ * function: without it a colour transition runs the default «ease» beside a thumb on `easeOut`. */
+export const easeOutCss = cubicBezier(0.23, 1, 0.32, 1);
 /** iOS's own sheet curve: a quick start that settles long, the way a presented sheet
  * rises. `easeOut` covers 60 % of a travel in its first 33 ms, right for a value or a
  * thumb, too abrupt for a card the eye follows from the bottom edge (24UX1). */
@@ -36,6 +39,10 @@ export const duration = {
 } as const;
 
 export type Duration = keyof typeof duration;
+
+/** The one ambient loop: the Assistant's «Pensando…» dot, 600 ms each way on a symmetric curve (it never settles, so it
+ * has no ease-out end). Static under Reduce Motion: the caller does not start it. */
+export const pulseTiming: WithTimingConfig = { duration: 600, easing: Easing.inOut(Easing.quad) };
 
 /** Timing config for a data or state change; zero-length when motion is reduced. */
 export function timing(kind: Duration, reduced: boolean): WithTimingConfig {
@@ -69,13 +76,42 @@ export function successHaptic() {
   void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
 }
 
+/** 25Q4: a write the person asked for failed and no unverified submission waits for «Reintentar»: refused before sending, or
+ * by storage before writing, or offered again as new. Once, in its catch, after the error is set; never while typing. */
+export function errorHaptic() {
+  void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+}
+
+/** 25Q4: a write the person asked for failed with an outcome the app cannot verify, and the screen keeps the exact submission
+ * frozen for «Reintentar». Once, in its catch, after the error is set. */
+export function warningHaptic() {
+  void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+}
+
+/** Producto 25D2: how long a screen takes to leave (a sheet's dismissal, a pop) before an outcome said over it is posted. */
+export const LEAVE_DELAY = 500;
+
+/** Producto 25D2: what just happened, told to VoiceOver in the app's own words: the outcome of a write the person asked
+ * for (beside its haptic) or a change made in place away from the control they touched (a month stepped, a reply that
+ * finished). iOS has no live regions, so this is how VoiceOver hears it. Android posts nothing: TalkBack reads the live
+ * region such a line carries there, and announcing too would say it twice (AGENTS rule 13). Queued behind what VoiceOver
+ * is saying (the control's own reply), never cutting it off. `after: 'leave'` for an outcome whose screen closes with it:
+ * posted once the destination is up, so its first reading does not swallow it. The caller passes spoken forms only
+ * (tests/voiceover.node.ts follows the argument like any label) and calls it once per outcome, from the handler that
+ * caused it, never from a mount (a screen coming back would repeat its history). */
+export function announce(text: string, after: 'now' | 'leave' = 'now') {
+  if (Platform.OS !== 'ios' || !text) return;
+  const say = () => AccessibilityInfo.announceForAccessibilityWithOptions(text, { queue: true });
+  if (after === 'leave') setTimeout(say, LEAVE_DELAY); else say();
+}
+
 const rise = FadeInUp.duration(duration.enter).easing(easeOut).withInitialValues({ opacity: 0, transform: [{ translateY: 6 }] });
 // A fade is what Reduce Motion keeps (it explains a change without moving anything), so its policy is explicit, as for
 // the sheet (`sheetTiming`): without one, Reanimated follows the device setting and lands in one frame, and every
 // crossfade below would be an instant swap. The callers already drop the rise and the reflow from their own reading.
 const fadeIn = FadeIn.duration(duration.enter).easing(easeOut).reduceMotion(ReduceMotion.Never);
 const fadeOut = FadeOut.duration(duration.exit).easing(easeOut).reduceMotion(ReduceMotion.Never);
-const reflow = LinearTransition.duration(220).easing(easeOut);
+const reflow = LinearTransition.duration(duration.state).easing(easeOut);
 /** Producto 25UX1: a list row travelling to its new place when the list's order changes (Reportes' chosen category rising
  * to the top and the rows around it making room, then returning): the data move of the app's one curve, no spring. The
  * caller drops it under Reduce Motion, so the order changes at once. */

@@ -1,13 +1,13 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, View } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { ActionButton, AppText, DetailRow, EmptyState, ErrorMessage, LifecycleNote, MerchantBadge, Money, Screen, SectionTitle, Surface, type IconName } from '../../src/ui/components';
 import { PlanProgressSummary, ScheduleRow } from '../../src/ui/card-rows';
 import { useCategoryLabel } from '../../src/ui/category-hues';
-import { isPlanWriteRefusal, planActions, planOperationRows, planScheduleRows, planStateWord, planSummary, scheduleRowOpens, type PlanClosings } from '../../src/ui/installment-presentation';
+import { isPlanWriteRefusal, planActions, planOperationRows, planScheduleRows, planStateWord, planSummary, scheduleRowOpens, type PlanClosings, type PlanStateWord } from '../../src/ui/installment-presentation';
 import { numberRanges } from '../../src/ui/operation-presentation';
-import { successHaptic } from '../../src/ui/motion';
+import { announce, errorHaptic, successHaptic, warningHaptic } from '../../src/ui/motion';
 import { withCurrencyCode } from '../../src/i18n/format';
 import { useI18n } from '../../src/i18n/provider';
 import { space, useCurrentDay, usePalette } from '../../src/ui/theme';
@@ -19,7 +19,7 @@ import { space, useCurrentDay, usePalette } from '../../src/ui/theme';
  * 24UX6D (Forest): a calm hero (the merchant, «Compra en cuotas · ARS», the price, «12 cuotas sin interés», the state),
  * then the schedule's progress flat on the canvas (`PlanProgressSummary`: a bar, «3 de 12 registradas» by the domain's
  * recognised count, the next instalment and, while the plan is live, the principal still to come), then one grouped list
- * with the purchase and the figures not already in that summary, then the Calendario.
+ * with the purchase and the figures not already in that summary, then the actions (25N1: above the calendar), then the Calendario.
  *
  * 24T3: what can be done with the plan, each action offered only when storage would accept it (`planActions`, the
  * domain's dry runs on the caught-up view), primary first and the destructive last:
@@ -40,7 +40,7 @@ export default function InstallmentPlanScreen() {
   const { archive, snapshot, removeInstallmentPlan, cancelInstallmentPlan, reactivateInstallmentPlan } = useLedger();
   const p = usePalette();
   const day = useCurrentDay();
-  const { t, formatDate, moneyText, spokenMoney } = useI18n();
+  const { t, formatDate, moneyText, spokenMoney, failureMessage } = useI18n();
   const plan = archive?.installmentPlans?.find(item => item.id === id);
   const card = archive?.cards?.find(item => item.id === plan?.cardId);
   const account = snapshot?.accounts.find(item => item.id === card?.accountId);
@@ -55,6 +55,16 @@ export default function InstallmentPlanScreen() {
   // revision the person saw) without asking twice; storage makes it a no-op once committed.
   const [pending, setPending] = useState<{ action: 'delete' | 'stop' | 'reactivate'; revision: number } | null>(null);
   const writing = useRef(false);
+  // 25D2 (review): a stop or a reactivation is said once the screen reads the plan it wrote, as the state word it now shows: a
+  // reactivation whose catch-up recorded every instalment reads «Completo» (or «Adelantado», «Devuelto»), never «Activo».
+  const sayState = useRef(false);
+  const stateLabel = (word: Exclude<PlanStateWord, 'deleted'>) => t(word === 'stopped' ? 'installments.detail.cancelled' : `installments.detail.${word}`);
+  useEffect(() => {
+    if (!sayState.current || !plan || !archive) return;
+    sayState.current = false;
+    const word = planStateWord(planSummary(plan, archive.records, archive.purchaseOperations ?? []));
+    if (word !== 'deleted') announce(stateLabel(word));
+  });
   const back = () => { if (router.canGoBack()) router.back(); else router.replace('/cards'); };
 
   if (!archive || !snapshot || !plan || !card || !account || (plan.deleted && seenLiveId !== plan.id)) return <Screen>
@@ -88,14 +98,17 @@ export default function InstallmentPlanScreen() {
       else await reactivateInstallmentPlan(planId, next.revision);
       setPending(null);
       successHaptic();
-      // A deleted plan leaves; a stopped or reactivated one stays, its new state said under the hero.
+      // A deleted plan leaves; a stopped or reactivated one stays, its new state said under the hero. 25D2: and to VoiceOver
+      // (iOS has no live region): the state word that replaces the pressed button, said by the effect above.
       if (next.action === 'delete') back();
+      else sayState.current = true;
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : failure[next.action];
-      setError(message);
-      // Refused before anything was written (the plan changed, nothing left to stop…): the screen reads the plan again and
-      // the next tap asks again. The deletion keeps its 24T2 rule: frozen until it goes through.
-      if (next.action !== 'delete' && isPlanWriteRefusal(message)) setPending(null);
+      setError(failureMessage(cause, failure[next.action]));
+      // Refused before anything was written (the plan changed, an instalment or an operation was recorded since the screen was
+      // drawn, nothing is left to stop…): the screen has read the plan again and the next tap asks again. 25Q4: a deletion too.
+      // Only an unknown outcome stays frozen; for a deletion Reintentar sends the same deletion (24T2). 25Q4: Error for the
+      // release, Warning for the frozen retry.
+      if (cause instanceof Error && isPlanWriteRefusal(cause.message)) { setPending(null); errorHaptic(); } else warningHaptic();
     } finally { writing.current = false; setBusy(false); }
   }
   const money = (minor: number) => moneyText(minor, plan.currency);
@@ -117,7 +130,7 @@ export default function InstallmentPlanScreen() {
         numbers: numberRanges(actions.stopClosings.numbers), amount: money(actions.stopClosings.totalMinor) }) + ' ' : '';
       Alert.alert(t('installments.detail.stopTitle'), first + t('installments.detail.stopDetail', { amount: money(actions.stopMinor) }), [
         { text: t('common.cancel'), style: 'cancel' },
-        { text: t('installments.detail.stopConfirm'), style: 'destructive', onPress: () => { void commit(next); } },
+        { text: t('installments.detail.stopConfirm'), style: 'default', onPress: () => { void commit(next); } }, // «Reactivar plan» undoes it: never red
       ]);
     } else {
       const closings = actions.reactivateClosings;
@@ -132,7 +145,7 @@ export default function InstallmentPlanScreen() {
 
   const word = planStateWord(summary);
   const stopped = status === 'cancelled';
-  const state = word === 'deleted' ? null : t(word === 'stopped' ? 'installments.detail.cancelled' : `installments.detail.${word}`);
+  const state = word === 'deleted' ? null : stateLabel(word);
   // Interest only, or a mix with fees or taxes (an older plan): how the financing rows and each instalment name it.
   const financing = plan.feeMinor + plan.taxMinor > 0 ? 'financing' : 'interest';
   // With financing, the plan's figures are its principal and say so; the financing still to come has its own row.
@@ -195,6 +208,20 @@ export default function InstallmentPlanScreen() {
       {facts.map((fact, index) => <DetailRow key={fact.key} label={fact.label} value={fact.value} spokenValue={fact.spokenValue} icon={fact.icon}
         onPress={fact.onPress} disabled={busy} last={index === facts.length - 1} />)}
     </Surface>
+    {/* 25N1: what the screen is for once the plan is read, above the calendar (up to 120 rows), the destructive pair last. */}
+    {any && <View style={{ gap: space.m }}>
+      <ErrorMessage message={error} />
+      {actions.refund && <ActionButton secondary icon="return-down-back-outline" label={t('installments.detail.refund')} disabled={locked}
+        onPress={() => router.push({ pathname: '/new-refund', params: { planId } })} />}
+      {actions.payoff && <ActionButton secondary icon="play-forward-circle-outline" label={t('installments.detail.payoff')} disabled={locked}
+        onPress={() => router.push({ pathname: '/plan-payoff/[id]', params: { id: planId } })} />}
+      {offers.reactivate && <ActionButton secondary icon="play-circle-outline" label={label('reactivate', t('installments.detail.reactivate'))}
+        busy={busy && pending?.action === 'reactivate'} disabled={locked && pending?.action !== 'reactivate'} onPress={() => ask('reactivate')} />}
+      {offers.stop && <ActionButton secondary tone="expense" icon="stop-circle-outline" label={label('stop', t('installments.detail.stop'))}
+        busy={busy && pending?.action === 'stop'} disabled={locked && pending?.action !== 'stop'} onPress={() => ask('stop')} />}
+      {offers.remove && <ActionButton secondary tone="expense" icon="trash-outline" label={label('delete', t('installments.detail.delete'))}
+        busy={busy && pending?.action === 'delete'} disabled={locked && pending?.action !== 'delete'} onPress={() => ask('delete')} />}
+    </View>}
     <View>
       <SectionTitle caption={t('installments.detail.scheduleCaption')}>{t('installments.detail.schedule')}</SectionTitle>
       <Surface grouped>
@@ -218,19 +245,6 @@ export default function InstallmentPlanScreen() {
             last={index === planOperations.length - 1} onPress={() => router.push({ pathname: '/operation/[id]', params: { id: operation.id } })} />;
         })}
       </Surface>
-    </View>}
-    {any && <View style={{ gap: space.m }}>
-      <ErrorMessage message={error} />
-      {actions.refund && <ActionButton secondary icon="return-down-back-outline" label={t('installments.detail.refund')} disabled={locked}
-        onPress={() => router.push({ pathname: '/new-refund', params: { planId } })} />}
-      {actions.payoff && <ActionButton secondary icon="play-forward-circle-outline" label={t('installments.detail.payoff')} disabled={locked}
-        onPress={() => router.push({ pathname: '/plan-payoff/[id]', params: { id: planId } })} />}
-      {offers.reactivate && <ActionButton secondary icon="play-circle-outline" label={label('reactivate', t('installments.detail.reactivate'))}
-        busy={busy && pending?.action === 'reactivate'} disabled={locked && pending?.action !== 'reactivate'} onPress={() => ask('reactivate')} />}
-      {offers.stop && <ActionButton secondary tone="expense" icon="stop-circle-outline" label={label('stop', t('installments.detail.stop'))}
-        busy={busy && pending?.action === 'stop'} disabled={locked && pending?.action !== 'stop'} onPress={() => ask('stop')} />}
-      {offers.remove && <ActionButton secondary tone="expense" icon="trash-outline" label={label('delete', t('installments.detail.delete'))}
-        busy={busy && pending?.action === 'delete'} disabled={locked && pending?.action !== 'delete'} onPress={() => ask('delete')} />}
     </View>}
   </Screen>;
 }

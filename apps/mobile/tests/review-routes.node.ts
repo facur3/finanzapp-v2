@@ -53,11 +53,14 @@ interface Ledger {
   calls: unknown[][];
   confirmResult?: () => Promise<{ recorded: boolean }>;
   updateResult?: () => Promise<unknown>;
+  dismissResult?: () => Promise<void>;
   /** 25A-04: the store's own read of one item (default: the tray's, else none) and the tray reload it may ask for. */
   getReviewItem?: (id: string) => Promise<ReviewItem | null>;
   refreshes?: number;
   /** The provider's count of review operations (a stale tray re-reads the store when it changes). */
   reviewVersion?: number;
+  /** 25Q4 review: null while the ledger has not opened (default: the fixture archive). */
+  archive?: domain.LedgerArchive | null;
 }
 function harness(file: string, ledger: Ledger, params: Record<string, string> = {}, options: { locale?: AppLocale; dev?: boolean; canGoBack?: boolean; fontScale?: number; height?: number } = {}) {
   const source = readFileSync(new URL('../app/' + file, import.meta.url), 'utf8');
@@ -74,19 +77,26 @@ function harness(file: string, ledger: Ledger, params: Record<string, string> = 
   const pushed: unknown[] = [];
   const alerts: { title: string; detail: string; buttons: { text: string; style?: string; onPress?: () => void }[] }[] = [];
   const nav = { back: 0, replaced: [] as unknown[] };
+  // 25Q4: every haptic comes from motion.tsx; the recorder keeps each one's kind.
+  const haptics: string[] = [];
+  // 25D2: what VoiceOver was told through motion.tsx's `announce`, in order (its iOS-only queue is tested in motion.node.ts).
+  const announced: string[] = [];
+  const motion = { announce: (text: string, after = 'now') => { announced.push(after === 'leave' ? 'after leaving: ' + text : text); }, successHaptic: () => { haptics.push('Success'); }, errorHaptic: () => { haptics.push('Error'); } };
   const i18n = { useI18n: () => bindLocale(options.locale ?? 'es-AR') };
+  const opened = ledger.archive === undefined ? archive : ledger.archive;
   const useLedger = () => ({
-    archive, snapshot: domain.snapshotFromArchive(archive), review: ledger.review, reviewVersion: ledger.reviewVersion ?? 0,
+    archive: opened, snapshot: opened ? domain.snapshotFromArchive(opened) : null, review: ledger.review, reviewVersion: ledger.reviewVersion ?? 0,
     confirmReview: (...args: unknown[]) => { ledger.calls.push(['confirm', ...args]); return ledger.confirmResult?.() ?? Promise.resolve({ recorded: true }); },
     updateReview: (...args: unknown[]) => { ledger.calls.push(['update', ...args]); return ledger.updateResult?.() ?? Promise.resolve(args[2]); },
-    dismissReview: (...args: unknown[]) => { ledger.calls.push(['dismiss', ...args]); return Promise.resolve(); },
+    dismissReview: (...args: unknown[]) => { ledger.calls.push(['dismiss', ...args]); return ledger.dismissResult?.() ?? Promise.resolve(); },
     getReviewItem: (id: string) => ledger.getReviewItem?.(id)
       ?? Promise.resolve(ledger.review && ledger.review !== 'unavailable' ? ledger.review.items.find(item => item.id === id) ?? null : null),
     refreshReview: () => { ledger.refreshes = (ledger.refreshes ?? 0) + 1; return Promise.resolve(); },
   });
   const names = ['ActionButton', 'AmountField', 'AppText', 'Choices', 'DetailRow', 'EmptyState', 'ErrorMessage', 'Field', 'GlyphTile', 'IconButton', 'LifecycleNote',
     'Money', 'PressFeedback', 'Screen', 'SectionTitle', 'Surface'];
-  const components: Record<string, unknown> = { ...Object.fromEntries(names.map(name => [name, name])), STACK_AT_SCALE: ROW_STACK_SCALE };
+  const components: Record<string, unknown> = { ...Object.fromEntries(names.map(name => [name, name])), STACK_AT_SCALE: ROW_STACK_SCALE,
+    useStacked: () => (options.fontScale ?? 1) > ROW_STACK_SCALE };
   const hues = { useCategoryLabel: (stored: string) => stored, useAccountNameOf: () => (account: domain.Account) => account.name };
   const theme = { space: { s: 8, m: 12, l: 16, xl: 24 }, usePalette: () => ({ ...lightPalette, isDark: false }) };
   const modules: Record<string, unknown> = {
@@ -113,7 +123,6 @@ function harness(file: string, ledger: Ledger, params: Record<string, string> = 
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, useLocalSearchParams: () => params,
       useFocusEffect: (effect: () => unknown) => { const index = focusCursor++; focusEffects[index] = effect; focusCells[index] ??= { cleanup: effect() }; },
       router: { push: (to: unknown) => pushed.push(to), back: () => { nav.back += 1; }, canGoBack: () => options.canGoBack ?? true, replace: (to: unknown) => nav.replaced.push(to) } },
-    'expo-haptics': { notificationAsync: () => Promise.resolve(), NotificationFeedbackType: { Success: 'success' } },
     '@finanzapp/domain': domain,
   };
   for (const prefix of ['../', '../../']) Object.assign(modules, {
@@ -133,6 +142,7 @@ function harness(file: string, ledger: Ledger, params: Record<string, string> = 
     [prefix + 'src/ui/liability-presentation']: liabilityPresentation,
     [prefix + 'src/ui/money-input']: moneyInput,
     [prefix + 'src/ui/geometry']: geometry,
+    [prefix + 'src/ui/motion']: motion,
   });
   modules['../storage/LedgerProvider'] = { useLedger };
   modules['../i18n/provider'] = i18n;
@@ -144,6 +154,7 @@ function harness(file: string, ledger: Ledger, params: Record<string, string> = 
   const reviewItemHook = realModule('src/ui/use-review-item.ts', require);
   for (const prefix of ['../', '../../']) modules[prefix + 'src/ui/use-review-item'] = reviewItemHook;
   // 25A-04: the one Confirmar / Descartar of the detail and the review sheet, real, over the same mocks.
+  modules['./motion'] = motion;
   const reviewActions = realModule('src/ui/review-actions.ts', require);
   for (const prefix of ['../', '../../']) modules[prefix + 'src/ui/review-actions'] = reviewActions;
   const module = { exports: {} as { default?: () => Node } };
@@ -151,7 +162,7 @@ function harness(file: string, ledger: Ledger, params: Record<string, string> = 
   const blur = () => { for (const cell of focusCells) if (typeof cell.cleanup === 'function') (cell.cleanup as () => void)(); };
   /** Focus regained (the screen in front again): each focus effect runs again, as React Navigation does. */
   const refocus = () => { for (const [index, effect] of focusEffects.entries()) focusCells[index] = { cleanup: effect() }; };
-  return { render: () => { cursor = 0; refCursor = 0; effectCursor = 0; focusCursor = 0; return module.exports.default!(); }, pushed, alerts, nav, blur, refocus };
+  return { render: () => { cursor = 0; refCursor = 0; effectCursor = 0; focusCursor = 0; return module.exports.default!(); }, pushed, alerts, nav, blur, refocus, haptics, announced };
 }
 /** Every node, local components rendered once per element (their hooks run in traversal order, as React would). */
 function nodes(value: any): Node[] {
@@ -199,7 +210,20 @@ test('a row names kind, amount, merchant, category, destination, date, source an
   assert.match(emptyRow.props.accessibilityLabel, /^Gasto o ingreso, Sin monto, Sin comercio, Categoría: Falta completar, Dónde se registra: Falta completar, Fecha: Falta completar, Asistente, Faltan 7 datos$/);
 });
 
-test('an incomplete draft reads neutral, never as an error; stale and interrupted ask in amber; only a conflict takes the negative tone; lime is never a state', () => {
+test('25D1: a row keeps the amount beside the merchant up to 1.2×; above, the amount goes under it and every line is whole', () => {
+  const plan = itemOf(drafted({ destinationId: cardAccount.id, purchase: { mode: 'installments', count: 6, placement: 'current' } }));
+  for (const [fontScale, stacked] of [[1, false], [1.2, false], [1.786, true], [3.571, true]] as const) {
+    const [row] = all(harness('review.tsx', { review: trayOf([plan]), calls: [] }, {}, { fontScale }).render(), 'PressFeedback');
+    const line = all(row, 'View').find(node => [node.props.children].flat().some((child: any) => child?.type === 'Money'))!;
+    const [merchant, ...rest] = all(row, 'AppText');
+    assert.equal(line.props.style.flexDirection, stacked ? undefined : 'row', 'at ' + fontScale);
+    assert.equal(merchant.props.numberOfLines, stacked ? undefined : 1, 'at ' + fontScale);
+    for (const text of rest.slice(0, 2)) assert.equal(text.props.numberOfLines, stacked ? undefined : 2, 'at ' + fontScale);
+    assert.equal(all(row, 'Money')[0].props.minor, 1500000);
+  }
+});
+
+test('an incomplete draft reads neutral, never as an error; stale and interrupted ask in amber; only a conflict takes the negative tone; the brand is never a state', () => {
   const incomplete = itemOf(drafted({ category: null }));
   const stale = itemOf({ ...drafted(), basis: [{ kind: 'account', id: bank.id, revision: 4 }] });
   const interrupted = itemOf(drafted(), { attempt: domain.writeForReviewDraft(drafted(), archive as domain.ReviewArchive, { writeId: 'w-x', createdAt, todayISO: today }) });
@@ -236,7 +260,7 @@ test('the tray has no in-app producer: no development action creates a proposal,
 
 // ---- the detail ---------------------------------------------------------------------------------------------------------
 
-test('a complete, current proposal: what will be recorded, where and when, and Confirmar (the one lime action) calls the store once at the shown revision', async () => {
+test('a complete, current proposal: what will be recorded, where and when, and Confirmar (the one brand-filled action) calls the store once at the shown revision', async () => {
   const item = itemOf(drafted(), { revision: 3 });
   const ledger: Ledger = { review: trayOf([item]), calls: [] };
   const view = harness('review/[id].tsx', ledger, { id: item.id });
@@ -247,13 +271,16 @@ test('a complete, current proposal: what will be recorded, where and when, and C
     Fecha: i18nFormat.formatDate(today, 'dayYear', 'es-AR'), Origen: 'Asistente' });
   const confirm = button(root, 'Confirmar')!;
   assert.deepEqual([confirm.props.label, confirm.props.spokenLabel, confirm.props.disabled, confirm.props.secondary], ['Confirmar · $ 15.000,00', 'Confirmar, 15000,00 pesos', false, undefined],
-    'the primary (lime) fill; Editar and Descartar are secondary');
+    'the primary (brand) fill; Editar and Descartar are secondary');
   assert.deepEqual(['Editar', 'Descartar'].map(label => button(root, label)!.props.secondary), [true, true]);
   confirm.props.onPress();
   confirm.props.onPress(); // A second tap while the first is in flight does nothing.
   await settle();
   assert.deepEqual(ledger.calls, [['confirm', item.id, 3]]);
   assert.equal(view.nav.back, 1, 'back to the tray once recorded');
+  assert.equal(view.haptics.join(','), 'Success', 'one Success tap; the double tap adds nothing');
+  // 25D2: the detail closes with the write; VoiceOver hears that it was recorded once the tray is back.
+  assert.deepEqual(view.announced, ['after leaving: Registrado.']);
   root = view.render();
   assert.equal(all(root, 'ErrorMessage')[0].props.message, null);
 });
@@ -337,10 +364,21 @@ test('a refusal from the store (the proposal changed, or went stale) is shown an
   await settle();
   const root = view.render();
   assert.equal(all(root, 'ErrorMessage')[0].props.message, domain.REVIEW_STALE_MESSAGE);
+  assert.equal(bindLocale('en-US').errorText(all(root, 'ErrorMessage')[0].props.message), 'The account, card or category changed since the proposal. Review it again.');
   assert.equal(view.nav.back, 0);
+  assert.equal(view.haptics.join(','), 'Error', '25Q4: nothing is kept frozen and Confirmar is offered again, so Error');
   button(root, 'Confirmar')!.props.onPress();
   await settle();
   assert.equal(ledger.calls.length, 2);
+  assert.equal(view.haptics.join(','), 'Error,Error', 'every refused attempt taps');
+  // 25Q4: an engine's error is never shown as itself: Confirmar's own sentence (a retry records it once either way).
+  const failing = itemOf(drafted());
+  const engine: Ledger = { review: trayOf([failing]), calls: [], confirmResult: () => Promise.reject(new Error('disk I/O error')) };
+  const second = harness('review/[id].tsx', engine, { id: failing.id });
+  button(second.render(), 'Confirmar')!.props.onPress();
+  await settle();
+  assert.equal(all(second.render(), 'ErrorMessage')[0].props.message, 'review.detail.confirmFailed');
+  assert.equal(second.nav.back, 0);
 });
 
 test('Entry or InstallmentPlan: the detail says which one Confirmar writes, and a card\'s mode is shown, never assumed', () => {
@@ -375,6 +413,17 @@ test('Descartar asks first, then dismisses at the shown revision; cancelling cha
   await settle();
   assert.deepEqual(ledger.calls, [['dismiss', item.id, 2]]);
   assert.equal(view.nav.back, 1);
+});
+
+test('25Q4: a Descartar that fails with an engine\'s error says the proposal is still pending', async () => {
+  const item = itemOf(drafted());
+  const ledger: Ledger = { review: trayOf([item]), calls: [], dismissResult: () => Promise.reject(new Error('disk I/O error')) };
+  const view = harness('review/[id].tsx', ledger, { id: item.id });
+  button(view.render(), 'Descartar')!.props.onPress();
+  view.alerts[0].buttons[1].onPress!();
+  await settle();
+  assert.equal(all(view.render(), 'ErrorMessage')[0].props.message, 'review.detail.dismissFailed');
+  assert.equal(view.nav.back, 0);
 });
 
 test('a confirmed, dismissed or unreadable id is not pending: the detail says so and offers nothing', async () => {
@@ -428,6 +477,7 @@ test('Editar keeps the item\'s id, source and capture, saves at the revision it 
   assert.equal(JSON.stringify(draft.basis), JSON.stringify(domain.reviewBasis(draft, archive as domain.ReviewArchive)), 'reviewed against the ledger now');
   assert.equal(domain.isStaleReviewDraft(draft, archive as domain.ReviewArchive), false);
   assert.equal(view.nav.back, 1);
+  assert.equal(view.haptics.join(','), 'Success', '25Q4 review: a saved edit taps Success, as every other «Guardar cambios» does');
 });
 
 test('Editar refused because the proposal changed since it opened: the message shows, the editor stays open, nothing else is written', async () => {
@@ -439,6 +489,14 @@ test('Editar refused because the proposal changed since it opened: the message s
   assert.equal(all(root(), 'ErrorMessage')[0].props.message, REVIEW_ITEM_CHANGED_MESSAGE);
   assert.equal(view.nav.back, 0);
   assert.equal(ledger.calls.length, 1);
+  assert.equal(view.haptics.join(','), 'Error', '25Q4: nothing is kept frozen and Guardar cambios is offered again, so Error');
+  // 25Q4: an engine's error says Guardar cambios' own sentence; the editor stays open.
+  const engine: Ledger = { review: trayOf([item]), calls: [], updateResult: () => Promise.reject(new Error('disk I/O error')) };
+  const failing = editor(item, engine);
+  button(failing.root(), 'Guardar cambios')!.props.onPress();
+  await settle();
+  assert.equal(all(failing.root(), 'ErrorMessage')[0].props.message, 'review.edit.saveFailed');
+  assert.equal(failing.view.nav.back, 0);
 });
 
 test('nothing is filled in: no kind, destination or amount scale is chosen for the person, and the amount is entered in the destination\'s currency', async () => {
@@ -524,6 +582,24 @@ test('the editor only opens a pending item of a writable store', async () => {
   }
 });
 
+test('25Q4: Editar keeps a close button while the proposal resolves, when it is no longer pending and before the ledger opens; with nothing behind, it goes to Para revisar', async () => {
+  const pending = itemOf(drafted());
+  // 25Q4 review: the third is a pending proposal whose editor waits for the ledger.
+  const ledgers = (): Ledger[] => [{ review: null, calls: [] }, { review: trayOf([]), calls: [], getReviewItem: async () => null },
+    { review: trayOf([pending]), calls: [], archive: null }];
+  for (const [index, canGoBack] of [[0, true], [1, true], [2, true], [0, false], [1, false], [2, false]] as const) {
+    const view = harness('edit-review/[id].tsx', ledgers()[index], { id: index === 2 ? pending.id : 'gone' }, { canGoBack });
+    view.render();
+    await settle();
+    const root = view.render();
+    assert.equal(all(root, 'EmptyState')[0]?.props.title, index === 1 ? 'Esta propuesta ya no está pendiente' : undefined, 'resolving says nothing yet');
+    const close = all(root, 'Stack.Screen')[0].props.options.headerLeft();
+    assert.deepEqual([close.type, close.props.name, close.props.label], ['IconButton', 'close', 'Cerrar'], String(index));
+    close.props.onPress();
+    assert.deepEqual([view.nav.back, view.nav.replaced], canGoBack ? [1, []] : [0, ['/review']]);
+  }
+});
+
 // ---- the pure derivation ------------------------------------------------------------------------------------------------
 
 test('canConfirm follows the domain and the store: gaps, a stale basis, a conflict or a read-only file each withhold it; an interrupted write keeps it', () => {
@@ -549,7 +625,8 @@ test('canConfirm follows the domain and the store: gaps, a stale basis, a confli
 
 test('no second write path: the review screens never build or send a ledger write; the provider confirms only through the store, in the ledger\'s queue', () => {
   const read = (path: string) => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
-  for (const file of ['app/review.tsx', 'app/review/[id].tsx', 'app/edit-review/[id].tsx', 'src/ui/review-presentation.ts']) {
+  // The sheet the Assistant presents and the actions both confirmation surfaces share are where Confirmar and Descartar live.
+  for (const file of ['app/review.tsx', 'app/review/[id].tsx', 'app/edit-review/[id].tsx', 'app/review-sheet/[id].tsx', 'src/ui/review-presentation.ts', 'src/ui/review-actions.ts']) {
     assert.doesNotMatch(read(file), /writeForReviewDraft|createEntry|createInstallmentPlan|savePurchasePlan|addEntry|addInstallmentPlan|newInstallmentPlan|openReviewStore/, file);
     assert.doesNotMatch(read(file), /^import \{[^}]*\} from '[^']*storage\/(review-database|database)'/m, file + ': types only from storage');
   }
@@ -557,7 +634,8 @@ test('no second write path: the review screens never build or send a ledger writ
   assert.match(provider, /const reviewOperation = [\s\S]*?return rereadOnRefusal\(async db => \{[\s\S]*?finally \{\s*await loadReview\(db\);\s*if \(mounted\.current\) setReviewVersion\(value => value \+ 1\);/, 'every review operation runs in the ledger\'s queue (re-reading it on a refusal) and reloads the tray');
   assert.match(provider, /confirmReview: \(id, expectedRevision\) => reviewOperation\(async store => \{\s*const result = await store\.confirm\(id, \{ expectedRevision, todayISO: todayKey\(\), at: new Date\(\)\.toISOString\(\) \}\);/);
   // A review file that cannot be opened never stops the ledger: its failure is caught and the ledger's archive is already set.
-  assert.match(provider, /setArchive\(session\.archive\);\s*setError\(sessionWarning\(session\)\);\s*await loadReview\(db\);/);
+  assert.match(provider, /adopt\(session, today\);\s*await loadReview\(db\);/);
+  assert.match(provider, /function adopt\([\s\S]*?setArchive\(session\.archive\);[\s\S]*?setError\(sessionWarning\(session\)\);/);
   assert.match(provider, /const loadReview = async \(db: LedgerDatabase\) => \{\s*try \{[\s\S]*?\} catch \{/);
 });
 
@@ -642,7 +720,7 @@ test('25A-04 (Codex review of #85): a capture that committed while the tray coul
 
 // ---- 25A-04: the review sheet ------------------------------------------------------------------------------------------
 
-test('the review sheet shows the live item compactly, and Confirmar (the one lime action) calls the same dispatcher once, at the shown revision', async () => {
+test('the review sheet shows the live item compactly, and Confirmar (the one brand-filled action) calls the same dispatcher once, at the shown revision', async () => {
   const item = itemOf(drafted({ destinationId: cardAccount.id, purchase: { mode: 'once' } }), { revision: 2 });
   const ledger: Ledger = { review: trayOf([item]), calls: [] };
   const view = harness('review-sheet/[id].tsx', ledger, { id: item.id });
@@ -689,12 +767,16 @@ test('Descartar in the sheet is explicit and asks first; only the destructive an
   const ledger: Ledger = { review: trayOf([item]), calls: [] };
   const view = harness('review-sheet/[id].tsx', ledger, { id: item.id });
   const discard = all(view.render(), 'PressFeedback').find(node => node.props.accessibilityLabel === 'Descartar propuesta')!;
+  const opacity = (node: Node) => Object.assign({}, ...[node.props.style].flat(Infinity).filter(Boolean)).opacity;
+  assert.equal(opacity(discard), 1);
   discard.props.onPress();
   const [alert] = view.alerts;
   assert.equal(alert.title, '¿Descartar esta propuesta?');
   alert.buttons[0].onPress?.();
   assert.equal(ledger.calls.length, 0);
   alert.buttons[1].onPress!();
+  const held = all(view.render(), 'PressFeedback').find(node => node.props.accessibilityLabel === 'Descartar propuesta')!;
+  assert.deepEqual([held.props.disabled, opacity(held)], [true, 0.5], 'while it runs Descartar looks disabled too, not full red');
   await settle();
   assert.deepEqual(ledger.calls, [['dismiss', item.id, 1]]);
   assert.equal(view.nav.back, 1);

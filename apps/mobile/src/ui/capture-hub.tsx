@@ -90,14 +90,14 @@ export function CaptureAction() {
   </>;
 }
 
-/** The «+»'s material: the Electric Lime accent, with an ink hairline edge and a soft lift on the light ground so it
- * holds its shape on the pale canvas (the glyph carries the contrast: 14.1:1). */
+/** The «+»'s material: the brand accent, with a hairline edge and a soft lift on the light ground so it holds its
+ * shape on the canvas (the glyph carries the contrast, `onAccent`). */
 export function plusMaterial(p: ReturnType<typeof usePalette>) {
-  return { backgroundColor: p.accent, borderWidth: StyleSheet.hairlineWidth, borderColor: p.isDark ? 'rgba(255,255,255,0.14)' : 'rgba(19,20,17,0.14)',
-    ...(p.isDark ? {} : { shadowColor: p.text, shadowOpacity: 0.12, shadowRadius: 14, shadowOffset: { width: 0, height: 6 } }) };
+  return { backgroundColor: p.accent, borderWidth: StyleSheet.hairlineWidth, borderColor: p.edge,
+    ...(p.isDark ? {} : { shadowColor: p.shadow, shadowOpacity: 0.12, shadowRadius: 14, shadowOffset: { width: 0, height: 6 } }) };
 }
 
-/** The Assistant as the hub's first and largest choice: a lime tile (the hero's field, its circle the field's ink with a lime glyph), what it does, and, only when this
+/** The Assistant as the hub's first and largest choice: a brand tile (the hero's field, its circle the field's ink with a field-coloured glyph), what it does, and, only when this
  * app session already has a conversation, the person's last words to continue from. Never an invented line. */
 function AssistantTile({ onPress }: { onPress: () => void }) {
   const p = usePalette();

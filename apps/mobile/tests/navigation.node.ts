@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
@@ -73,11 +73,11 @@ for (const [theme, background] of [['light', '#F5F6F8'], ['dark', '#080B10']]) {
   });
 }
 
-test('24UX6A: four sections, no Assistant tab, Tarjetas stays in Más, and Inicio has no header of its own', () => {
+test('24UX6A: four sections, no Assistant tab, Tarjetas stays in Finanzas (Más before 25N1), and Inicio has no header of its own', () => {
   const { props } = renderLayout('#F5F6F8');
   const screens = props.children;
   const byName = Object.fromEntries(screens.map((screen: any) => [screen.props.name, screen.props.options]));
-  assert.equal(screens.map((screen: any) => screen.props.options.title).join(','), 'Inicio,Movimientos,Reportes,Más');
+  assert.equal(screens.map((screen: any) => screen.props.options.title).join(','), 'Inicio,Movimientos,Reportes,Finanzas');
   assert.equal(byName.assistant, undefined, 'the Assistant is a root-stack screen opened from the capture hub, never a tab');
   assert.equal(screens.some((screen: any) => screen.props.name === 'assistant'), false);
   assert.equal(byName.cards, undefined, 'Tarjetas is no longer a tab');
@@ -87,7 +87,7 @@ test('24UX6A: four sections, no Assistant tab, Tarjetas stays in Más, and Inici
   // Each root has a filled glyph when focused and an outline otherwise (the dock is icon-only, so the glyph carries it).
   const glyphs: Record<string, [string, string]> = {
     index: ['home', 'home-outline'], activity: ['receipt', 'receipt-outline'], reports: ['pie-chart', 'pie-chart-outline'],
-    settings: ['ellipsis-horizontal-circle', 'ellipsis-horizontal-circle-outline'],
+    settings: ['wallet', 'wallet-outline'],
   };
   for (const [name, [filled, outline]] of Object.entries(glyphs)) {
     assert.equal(byName[name].tabBarIcon({ color: '#000', size: 24, focused: true }).props.name, filled, name);
@@ -99,7 +99,9 @@ test('24UX6A: four sections, no Assistant tab, Tarjetas stays in Más, and Inici
   assert.equal(byName.index.headerShown, false);
   assert.equal(byName.index.headerRight, undefined);
   for (const name of ['activity', 'reports', 'settings']) assert.notEqual(byName[name].headerShown, false, name + ' keeps its title');
-  for (const name of ['index', 'activity', 'reports', 'settings']) assert.equal(byName[name].headerRight, undefined, name + ' has no header action');
+  // 25N1: the layout gives no root a header action; Finanzas' gear and Movimientos' Movimientos deshechos are set by the
+  // screens themselves (tests/more-routes.node.ts, tests/activity-route.node.ts).
+  for (const name of ['index', 'activity', 'reports', 'settings']) assert.equal(byName[name].headerRight, undefined, name + ' has no header action from the layout');
   assert.equal(JSON.stringify(screens).includes('/new-entry'), false);
   assert.equal(pushed.length, 0, 'rendering the layout navigates nowhere');
 });
@@ -120,27 +122,90 @@ test('23.1B1: tab labels follow the language; routes and order never change', ()
     const { props } = renderLayout('#F5F6F8');
     return props.children.map((screen: any) => screen.props.name + '=' + screen.props.options.title).join(',');
   };
-  assert.equal(labels(), 'index=Inicio,activity=Movimientos,reports=Reportes,settings=Más');
+  assert.equal(labels(), 'index=Inicio,activity=Movimientos,reports=Reportes,settings=Finanzas');
   locale = 'en-AR';
   try {
-    assert.equal(labels(), 'index=Home,activity=Activity,reports=Reports,settings=More');
+    assert.equal(labels(), 'index=Home,activity=Activity,reports=Reports,settings=Finances');
     // 24UX6C: no header button left to translate (the dock «+» carries its own label, tests/floating-tab-bar.node.ts).
     const { props } = renderLayout('#F5F6F8');
     for (const screen of props.children) assert.equal(screen.props.options.headerRight, undefined, screen.props.name);
   } finally { locale = 'es-AR'; }
 });
 
-test('25A-03: Más carries the number of readable pending proposals as its badge, and no badge at zero or when the store is unavailable', () => {
+test('25A-03: Finanzas (Más before 25N1) carries the number of readable pending proposals as its badge, and no badge at zero or when the store is unavailable', () => {
   const badgeOf = () => renderLayout('#F5F6F8').props.children.find((screen: any) => screen.props.name === 'settings').props.options.tabBarBadge;
   const others = () => renderLayout('#F5F6F8').props.children.filter((screen: any) => screen.props.name !== 'settings').map((screen: any) => screen.props.options.tabBarBadge);
   try {
     assert.equal(badgeOf(), undefined, 'nothing pending: no badge');
     reviewTray = { writable: true, items: [{ id: 'a' }, { id: 'b' }], unreadable: ['c', 'd', 'e'], conflicts: [] };
     assert.equal(badgeOf(), 2, 'unreadable rows are never counted as proposals');
-    assert.equal(others().every((badge: unknown) => badge === undefined), true, 'only Más carries it');
+    assert.equal(others().every((badge: unknown) => badge === undefined), true, 'only Finanzas carries it');
     reviewTray = 'unavailable';
     assert.equal(badgeOf(), undefined);
     reviewTray = null;
     assert.equal(badgeOf(), undefined, 'while the store opens');
   } finally { reviewTray = { writable: true, items: [], unreadable: [], conflicts: [] }; }
+});
+
+// ---- the root stack, read as a syntax tree (not regexes over text, so a reformat cannot break it nor a real change pass) -
+function rootStack() {
+  const file = ts.createSourceFile('_layout.tsx', readFileSync(new URL('../app/_layout.tsx', import.meta.url), 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const screens: { name: string; options: string }[] = [];
+  let stackOptions: ts.ObjectLiteralExpression | null = null;
+  const attribute = (node: ts.JsxOpeningLikeElement, name: string) => node.attributes.properties.find(item => ts.isJsxAttribute(item) && item.name.getText() === name) as ts.JsxAttribute | undefined;
+  const visit = (node: ts.Node) => {
+    if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
+      const tag = node.tagName.getText();
+      if (tag === 'Stack.Screen') {
+        const name = attribute(node, 'name')?.initializer;
+        if (name && ts.isStringLiteral(name)) screens.push({ name: name.text, options: attribute(node, 'options')?.initializer?.getText() ?? '' });
+      } else if (tag === 'Stack') {
+        const value = attribute(node, 'screenOptions')?.initializer;
+        if (value && ts.isJsxExpression(value) && value.expression && ts.isObjectLiteralExpression(value.expression)) stackOptions = value.expression;
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  const options = new Map<string, string>();
+  for (const property of (stackOptions as ts.ObjectLiteralExpression | null)?.properties ?? []) {
+    if (ts.isPropertyAssignment(property)) options.set(property.name.getText(), property.initializer.getText().replace(/\s+/g, ' '));
+  }
+  return { screens, options };
+}
+function routeFiles(directory = new URL('../app/', import.meta.url), prefix = ''): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
+    if (entry.isDirectory()) return entry.name === '(tabs)' ? ['(tabs)'] : routeFiles(new URL(entry.name + '/', directory), prefix + entry.name + '/');
+    // Special files are not screens: the layout, the not-found fallback and the inbound-link filter.
+    if (!/\.tsx?$/.test(entry.name) || entry.name.startsWith('_') || entry.name.startsWith('+')) return [];
+    return [prefix + entry.name.replace(/\.tsx?$/, '')];
+  });
+}
+
+test('the root stack registers every route file once, so no screen ever shows its raw file name as a title', () => {
+  const names = rootStack().screens.map(screen => screen.name);
+  assert.equal(new Set(names).size, names.length, 'no route registered twice');
+  assert.deepEqual([...names].sort(), routeFiles().sort());
+});
+
+test('the root stack: Reduce Motion swaps every push for a fade, the back button shows only its chevron, the tabs fade in and the first opening is a cut', () => {
+  const { screens, options } = rootStack();
+  assert.equal(options.get('animation'), "reduced ? 'fade' : 'default'");
+  assert.equal(options.get('headerBackButtonDisplayMode'), "'minimal'");
+  assert.equal(options.get('gestureEnabled'), 'true');
+  const of = (name: string) => screens.find(screen => screen.name === name)!.options.replace(/\s+/g, ' ');
+  assert.match(of('(tabs)'), /headerShown: false/);
+  assert.match(of('(tabs)'), /animation: 'fade'/);
+  assert.match(of('onboarding'), /headerShown: false/);
+  assert.match(of('onboarding'), /gestureEnabled: false/);
+  assert.match(of('onboarding'), /animation: 'none'/);
+});
+
+test('every link from outside the app lands on Inicio: no screen, form or prefill is reachable through the custom scheme', async () => {
+  const { redirectSystemPath } = await import('../app/+native-intent.ts');
+  for (const path of ['finanzapp://new-entry?amountMinor=100000&merchant=x', '/new-transfer?toAccountId=a&note=pagá', '/onboarding', '/backup-import',
+    '/review-sheet/abc', '', 'finanzapp://', '/%E0%A4%A']) {
+    assert.equal(redirectSystemPath({ path, initial: true }), '/', path);
+    assert.equal(redirectSystemPath({ path, initial: false }), null, 'a link while the app is open never navigates: ' + path);
+  }
 });

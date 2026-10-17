@@ -15,7 +15,7 @@ import type { ReviewItem } from '../src/storage/review-database';
 import { AssistantComposer } from '../src/ui/assistant-composer';
 import { AnswerEvidence, AssistantText, ClarificationChoices, ProposalCard, Suggestions, SystemNote, UserMessage, type ProposalState } from '../src/ui/assistant-messages';
 import { AppText, IconButton } from '../src/ui/components';
-import { Appear, impactHaptic } from '../src/ui/motion';
+import { Appear, announce, impactHaptic } from '../src/ui/motion';
 import { availableCurrencies } from '../src/ui/presentation';
 import { space, useCurrentDay, usePalette, useReduceMotion } from '../src/ui/theme';
 
@@ -51,7 +51,7 @@ export default function AssistantScreen() {
   const day = useCurrentDay();
   const p = usePalette();
   const reduced = useReduceMotion();
-  const { t, speechLanguage, region, language } = useI18n();
+  const { t, errorText, speechLanguage, region, language } = useI18n();
   const session = conversationSession();
   const { conversation: state } = useSyncExternalStore(session.subscribe, session.getState, session.getState);
   const dispatch = session.dispatch;
@@ -83,6 +83,24 @@ export default function AssistantScreen() {
       { id: randomUUID(), writeId: randomUUID() }, new Date().toISOString(), todayKey()), preview);
   }, [preview]);
 
+  /** Producto 25D2: iOS has no live regions, so VoiceOver is told what the thread did, once per event and from the handler
+   * that dispatched it (never from the messages: the thread is mounted again on every visit and would read its history
+   * aloud): the request going out, the finished reply (never a streamed piece), the next question after a chip, a note, a
+   * capture that failed. Only while the Assistant is in front (a reply that lands under the review sheet, or after the
+   * person left, is not spoken over another screen), in the words the thread shows, read when they are said, so a language
+   * change mid-answer is followed. The reply sheet a capture presents speaks for itself. */
+  const front = useRef(false);
+  const words = useRef({ t, errorText });
+  words.current = { t, errorText };
+  const say = useCallback((text: string) => { if (front.current) announce(text); }, []);
+  const sayReply = useCallback(() => {
+    const reply = session.getState().conversation.messages.at(-1);
+    if (reply?.role !== 'assistant') return;
+    const text = reply.textKey ? words.current.t(reply.textKey) : reply.text;
+    if (text) say(words.current.t('assistant.message.assistant', { text }));
+  }, [session, say]);
+  const sayNote = useCallback((text: string) => say(words.current.errorText(text)), [say]);
+
   /** While the Assistant is the screen in front it registers, on the session, how to present the review sheet. A capture
    * takes the presenter (clearing it) once its item is stored: at most one sheet at a time, only over an Assistant in
    * front, and the one in front now even if the request was sent from an earlier mount. Coming back (a sheet closed)
@@ -90,7 +108,8 @@ export default function AssistantScreen() {
   useFocusEffect(useCallback(() => {
     const present = (itemId: string) => { router.push({ pathname: '/review-sheet/[id]', params: { id: itemId } }); };
     session.presenter.current = present;
-    return () => { if (session.presenter.current === present) session.presenter.current = null; };
+    front.current = true;
+    return () => { front.current = false; if (session.presenter.current === present) session.presenter.current = null; };
   }, [session]));
 
   /** Stores a proposal in the review store, from the session (so it finishes even if the screen closes). Only a proposal
@@ -113,10 +132,11 @@ export default function AssistantScreen() {
       present?.(frozen.id);
     } catch {
       dispatch({ type: 'proposal', messageId, status: 'failed' });
+      say(words.current.t('assistant.proposal.failed'));
     } finally {
       session.capturing.delete(messageId);
     }
-  }, [session, dispatch, captureReview]);
+  }, [session, dispatch, captureReview, say]);
   /** Every proposal the thread just added that is waiting for its capture. */
   const captureNew = useCallback(() => {
     for (const message of session.getState().conversation.messages) {
@@ -132,10 +152,12 @@ export default function AssistantScreen() {
     const action = classifyIntent(text);
     // Protocol v5 carries every currency of the domain's creation gate (a held three-decimal one never), for recording and
     // for questions: a question's facts travel as exact decimals in that currency's major units (JPY and CLP included).
-    if (!isLedgerCurrency(currency)) { dispatch({ type: 'fail', reason: 'unavailable', text: REASON_TEXT.unavailable, sent: raw }); return; }
+    if (!isLedgerCurrency(currency)) { dispatch({ type: 'fail', reason: 'unavailable', text: REASON_TEXT.unavailable, sent: raw }); sayNote(REASON_TEXT.unavailable); return; }
     const facts = action === 'explain' && snapshot ? monthlyEvidence(snapshot, currency, day) : [];
     const controller = new AbortController();
     session.request.current = controller;
+    // The thinking state, said once as the request leaves (the disconnected build says only its note).
+    if (client.mode !== 'disconnected') say(words.current.t('assistant.message.thinkingLabel'));
     try {
       // The region and the language are the interface's, as configured when the ask is sent (protocol v3): the region lets a
       // regional currency word («pesos») resolve, the language is the one the reply is written in; the message keeps it.
@@ -145,20 +167,25 @@ export default function AssistantScreen() {
         else if (event.type === 'result') {
           const { content, ...rest } = contentFromResult(event.result, event.facts, accounts, entries, currency, day, incomeAccounts);
           dispatch({ type: 'answer', ...rest, content: toContent(content), language });
+          sayReply();
           // 25A-06 (decision A): a name the model copied past its bound was left null at the server, never cut: the thread
           // says which one right under the reply, and the review (the card's row, the sheet's gap, Editar) asks for it.
-          for (const field of event.dropped ?? []) dispatch({ type: 'note', reason: 'info', text: DROPPED_TEXT[field] });
+          for (const field of event.dropped ?? []) { dispatch({ type: 'note', reason: 'info', text: DROPPED_TEXT[field] }); sayNote(DROPPED_TEXT[field]); }
           captureNew();
         }
         // A failure's message is the integration client's catalogue key or empty (then the reason's own note); the note translates it through errorText.
-        else dispatch({ type: 'fail', reason: event.reason, text: event.reason === 'failed' && event.message ? event.message : REASON_TEXT[event.reason], sent: raw });
+        else {
+          const note = event.reason === 'failed' && event.message ? event.message : REASON_TEXT[event.reason];
+          dispatch({ type: 'fail', reason: event.reason, text: note, sent: raw });
+          sayNote(note);
+        }
       }
     } catch {
-      if (!controller.signal.aborted) dispatch({ type: 'fail', reason: 'failed', text: REASON_TEXT.failed, sent: raw });
+      if (!controller.signal.aborted) { dispatch({ type: 'fail', reason: 'failed', text: REASON_TEXT.failed, sent: raw }); sayNote(REASON_TEXT.failed); }
     } finally {
       if (session.request.current === controller) session.request.current = null;
     }
-  }, [client, session, dispatch, snapshot, accounts, incomeAccounts, entries, currency, region, language, day, toContent, captureNew]);
+  }, [client, session, dispatch, snapshot, accounts, incomeAccounts, entries, currency, region, language, day, toContent, captureNew, say, sayReply, sayNote]);
 
   const stop = useCallback(() => { session.request.current?.abort(); session.request.current = null; dispatch({ type: 'stop' }); }, [session, dispatch]);
 
@@ -167,8 +194,9 @@ export default function AssistantScreen() {
     const resolved = state.pending && ownsPending(state, messageId) ? completeDraft(state.pending, option.id, accounts, entries, day, incomeAccounts) : null;
     const next = resolved ? { ...resolved, content: toContent(resolved.content)! } : null;
     dispatch({ type: 'choose', messageId, optionId: option.id, label: shown ?? optionText(option, t), next });
+    if (next) sayReply();
     captureNew();
-  }, [dispatch, state, accounts, incomeAccounts, entries, day, t, toContent, captureNew]);
+  }, [dispatch, state, accounts, incomeAccounts, entries, day, t, toContent, captureNew, sayReply]);
 
   // A captured proposal that is not in the tray is read from the store itself. Confirmed or dismissed there, the card
   // keeps that item (a confirmed card draws what was recorded, edits included) and it is never looked up again. Still
@@ -209,7 +237,10 @@ export default function AssistantScreen() {
   };
 
   const open = useCallback((href: EvidenceLink['href']) => {
-    const to = href.params ? { pathname: href.pathname, params: href.params } : href.pathname;
+    // 25Q4: Movimientos opens whole and from the top on a fresh `reset`, made at the tap, so the same evidence followed twice
+    // resets twice (the dock keeps a search, a filter and the scroll).
+    const params = href.pathname === '/activity' ? { ...href.params, reset: String(Date.now()) } : href.params;
+    const to = params ? { pathname: href.pathname, params } : href.pathname;
     if (TAB_ROOTS.has(href.pathname)) router.dismissTo(to);
     else router.push(to);
   }, []);

@@ -11,7 +11,7 @@ import ts from 'typescript';
 //
 // (a) A VoiceOver string never carries a number in the region's visible
 //     format. An accessibilityLabel/Hint/Value expression, an
-//     announceForAccessibility argument and a spoken twin (spokenValue,
+//     announceForAccessibility or announce argument and a spoken twin (spokenValue,
 //     spokenDetail, spokenCaption, spokenLabel, spokenDescribe) are not built
 //     with moneyText, formatAmount, formatMoneyAmount, codedAmount, formatPercent, formatCount,
 //     formatNumericDate, formatDateTime, formatDayMonth or rowAmountText,
@@ -34,7 +34,7 @@ import ts from 'typescript';
 //     no inherited language, and UIKit reads an element without one in the
 //     device's language.
 // (c) The wrappers in components.tsx (AppText, PressFeedback, Money, Field,
-//     SearchField, AmountField, Choice, ErrorMessage, SelectionRow) do that themselves and
+//     SearchField, AmountField, Choice, ErrorMessage, SelectionRow, DetailRow) do that themselves and
 //     are the only raw focusable elements there; the ones that forward props
 //     let a caller's explicit language (an autonym) win.
 //
@@ -62,7 +62,7 @@ function memoryProgram(modules: Record<string, string>): ts.Program {
 /** The visible formatters: the region's separators and grouping, for the screen only. */
 const VISIBLE = new Set(['moneyText', 'formatAmount', 'formatMoneyAmount', 'codedAmount', 'formatPercent', 'formatCount', 'formatNumericDate', 'formatDateTime', 'formatDayMonth', 'rowAmountText']);
 /** Attributes VoiceOver reads, and the spoken twins the wrappers turn into labels. */
-const SPOKEN = new Set(['accessibilityLabel', 'accessibilityHint', 'accessibilityValue', 'spokenValue', 'spokenDetail', 'spokenCaption', 'spokenLabel', 'spokenDescribe']);
+const SPOKEN = new Set(['accessibilityLabel', 'accessibilityHint', 'accessibilityValue', 'spokenValue', 'spokenDetail', 'spokenCaption', 'spokenLabel', 'spokenDescribe', 'captionLabel']);
 /** A wrapper's visible prop that becomes (part of) its VoiceOver label, and the twin read instead. */
 const TWINS: Record<string, [visible: string, spoken: string][]> = {
   DetailRow: [['value', 'spokenValue']],
@@ -72,6 +72,8 @@ const TWINS: Record<string, [visible: string, spoken: string][]> = {
   SelectionRow: [['detail', 'spokenDetail']],
   AmountShortcut: [['caption', 'spokenCaption']],
   ActionButton: [['label', 'spokenLabel']],
+  // 25D2: a section's caption that holds an amount (a card's refunds, a purchase's devoluciones) is read through captionLabel.
+  SectionTitle: [['caption', 'captionLabel']],
 };
 /** Wrapper props with no spoken twin that the wrapper itself writes into its accessibilityLabel (components.tsx,
  * form-controls.tsx): a visible format passed there reaches VoiceOver as surely as one written in the label.
@@ -85,7 +87,7 @@ const LABEL_PROPS: Record<string, string[]> = {
   SearchField: ['label'],
 };
 /** The wrappers in components.tsx that own a raw focusable element and give it speechLanguage. */
-const WRAPPERS = ['AppText', 'PressFeedback', 'Field', 'SearchField', 'AmountField', 'Choice', 'ErrorMessage', 'Money', 'SelectionRow'];
+const WRAPPERS = ['AppText', 'PressFeedback', 'Field', 'SearchField', 'AmountField', 'Choice', 'ErrorMessage', 'Money', 'SelectionRow', 'DetailRow'];
 /** Of those, the ones that spread the caller's props and let an explicit accessibilityLanguage win (24UX6C: SearchField,
  * the search pill's TextInput, forwards like Field). */
 const FORWARDING = ['AppText', 'PressFeedback', 'Field', 'SearchField', 'AmountField'];
@@ -317,6 +319,9 @@ function voiceover(program: ts.Program, root: string) {
       }
       if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text.startsWith('announceForAccessibility')
         && node.arguments[0] && taint(node.arguments[0], NONE)) report(node, node.expression.name.text);
+      // 25D2: motion.tsx's `announce`, the app's one door to an iOS announcement, is followed like the call it wraps.
+      if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'announce'
+        && node.arguments[0] && taint(node.arguments[0], NONE)) report(node, 'announce');
       if ((ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) && ts.isIdentifier(node.tagName) && Object.hasOwn(TWINS, node.tagName.text)) {
         const attributes = attributesOf(node);
         for (const [visible, spoken] of TWINS[node.tagName.text]) {
@@ -439,6 +444,8 @@ test('(a) the scanner follows helpers per call, memo and helper results per memb
         const { fraction, label } = share(minor, total, locale);
         AccessibilityInfo.announceForAccessibility?.(withDefault(value => spokenMoney(value, 'ARS')));
         AccessibilityInfo.announceForAccessibility?.(i18n.formatCount(total)); // leak: announceForAccessibility
+        announce(withDefault(value => spokenMoney(value, 'ARS')), 'leave');
+        announce(money(minor, 'ARS')); // leak: announce
         return [
           <A accessibilityLabel={memo?.spoken} />,
           <A accessibilityLabel={memo?.text} />, // leak: accessibilityLabel
@@ -456,11 +463,14 @@ test('(a) the scanner follows helpers per call, memo and helper results per memb
           <ActionButton label={'Guardar' + withDefault()} />, // leak: <ActionButton label> without spokenLabel
           <NavigationRow title="Copia" subtitle={money(minor, 'ARS')} />, // leak: <NavigationRow subtitle> reaches VoiceOver
           <NavigationRow title="Copia" subtitle={spokenMoney(minor, 'ARS')} />,
+          <SectionTitle caption={'devoluciones ' + money(minor, 'ARS')}>Movimientos</SectionTitle>, // leak: <SectionTitle caption> without captionLabel
+          <SectionTitle caption={'devoluciones ' + money(minor, 'ARS')} captionLabel={'devoluciones ' + spokenMoney(minor, 'ARS')}>Movimientos</SectionTitle>,
+          <SectionTitle caption="Cuotas" captionLabel={money(minor, 'ARS')}>Cuotas</SectionTitle>, // leak: captionLabel
         ];
       }`,
   };
   const expected = marked(modules, '/probe', 'leak');
-  assert.equal(expected.length, 10);
+  assert.equal(expected.length, 13);
   assert.deepEqual(voiceover(memoryProgram(modules), '/probe').leaks(), expected);
 });
 

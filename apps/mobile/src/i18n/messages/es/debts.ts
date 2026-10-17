@@ -9,8 +9,9 @@ export const debts = {
     list: {
       title: 'Deudas y cobros',
       add: 'Agregar deuda',
-      emptyTitle: 'Lo que debés y lo que te deben',
-      emptyDetail: 'Registrá un préstamo, una deuda con alguien o un monto que te deben. Cada pago o cobro parcial baja el saldo pendiente sin crear gastos ni ingresos falsos.',
+      /** 25O1: one line; that a payment or a collection is never an expense or an income is said in the form (form.explainOwed). */
+      emptyTitle: 'Sin deudas ni cobros',
+      emptyDetail: 'Anotá lo que debés o lo que te deben.',
       /** Section and total label: what I owe. */
       owed: 'Debo',
       /** Section and total label: what others owe me. */
@@ -34,9 +35,9 @@ export const debts = {
       closed: 'Cerrada',
     },
     row: {
-      /** VoiceOver: "Debo a Juan, 300,00 ARS, Vence 1 de octubre de 2026" (24UX6E: `{status}` with the day written out). */
-      owedLabel: 'Debo a {name}, {amount} {currency}, {status}',
-      receivableLabel: 'Me debe {name}, {amount} {currency}, {status}',
+      /** VoiceOver: "Debo a Juan, 300,00 pesos, Vence 1 de octubre de 2026" (24UX6E: `{status}` with the day written out; 25D2: the unit in words). */
+      owedLabel: 'Debo a {name}, {amount}, {status}',
+      receivableLabel: 'Me debe {name}, {amount}, {status}',
       /** 24UX6E: VoiceOver hint of a debt row. */
       openHint: 'Abre el detalle de la deuda',
     },

@@ -28,6 +28,15 @@ export interface FinanceView {
   missingIn(startISO: string, endISO: string, kind?: Entry['kind']): Unconverted[];
 }
 
+/** The mode and currency a view takes (25B2): with zero or one currency in the whole history there is nothing to
+ * consolidate or filter, so the view is that currency's own ledger, whatever the stored preference says (a display currency
+ * chosen for a ledger that never held it is kept, never applied, and never asks the provider for anything). A route's
+ * currency still wins. */
+export function resolveFinanceTarget(held: readonly Currency[], shared: { mode: DisplayMode; currency: Currency }, currency?: Currency): { mode: DisplayMode; currency: Currency } {
+  const single = held.length <= 1;
+  return { mode: single ? 'single' : shared.mode, currency: currency ?? (single ? held[0] ?? shared.currency : shared.currency) };
+}
+
 export function financeView(snapshot: LedgerSnapshot, mode: DisplayMode, currency: Currency, book: RateBook): FinanceView {
   if (mode === 'single') {
     return { mode, currency, snapshot, consolidated: null, quotes: [], complete: () => true, provenance: () => null, missingIn: () => [] };
@@ -83,8 +92,10 @@ export function spendingFigure(real: LedgerSnapshot, view: FinanceView, period: 
     } catch { /* an unsafe subtotal is left out of the explanation, never shown as zero */ }
   }
   const first = missing[0];
-  return { status: 'unavailable', currency, parts, reason: shortfall(activity, loaded, !!first?.latest),
-    missing: first ? { currency: first.quote ?? first.currency, date: first.dateISO, ...(first.latest ? { latest: first.latest } : {}) } : null };
+  // Stale only when the last publication held is before the day: a day earlier than every row held has no rate yet (missing).
+  const latest = first?.latest && first.latest < first.dateISO ? first.latest : undefined;
+  return { status: 'unavailable', currency, parts, reason: shortfall(activity, loaded, !!latest),
+    missing: first ? { currency: first.quote ?? first.currency, date: first.dateISO, ...(latest ? { latest } : {}) } : null };
 }
 
 /** Disponible: recorded liquid money as of `today` (cards, debts and receivables never netted in),
