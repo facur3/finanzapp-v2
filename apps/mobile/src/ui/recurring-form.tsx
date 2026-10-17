@@ -160,7 +160,9 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
         placeholder={t(kind === 'expense' ? 'recurring.form.merchantExpensePlaceholder' : 'recurring.form.merchantIncomePlaceholder')}
         onChangeText={setMerchant} maxLength={120} autoCapitalize="sentences" editable={!locked} />
       <ViewFrequency value={frequency} onChange={setFrequency} disabled={locked} />
-      <Surface grouped><DateField value={date} onChange={setDate} disabled={locked} allowFuture label={t('recurring.form.nextDate')} /></Surface>
+      {/* 25T: the wheel starts at today (it spanned every day since 1900 and refused a past one only at Save); the Save check stays. */}
+      <Surface grouped><DateField value={date} onChange={setDate} disabled={locked} allowFuture minimumDate={new Date(todayKey() + 'T00:00:00')}
+        label={t('recurring.form.nextDate')} /></Surface>
       {/* 25O1: what a rule does, said where it is created (Recurrentes' empty state no longer carries it): one line, the
           whole story (today's save, the catch-up, never twice, never a payment) behind its information button. */}
       <FieldNote help={{ title: t('recurring.form.noteHelpTitle'), detail: t('recurring.form.noteHelp') }}>{t('recurring.form.note')}</FieldNote>

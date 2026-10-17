@@ -220,6 +220,7 @@ test('25D1: a row keeps the amount beside the merchant up to 1.2×; above, the a
     assert.equal(merchant.props.numberOfLines, stacked ? undefined : 1, 'at ' + fontScale);
     for (const text of rest.slice(0, 2)) assert.equal(text.props.numberOfLines, stacked ? undefined : 2, 'at ' + fontScale);
     assert.equal(all(row, 'Money')[0].props.minor, 1500000);
+    assert.equal(row.props.style.paddingHorizontal, 16, '25T: the row keeps the grouped list\'s 16 pt inset, as every other row');
   }
 });
 

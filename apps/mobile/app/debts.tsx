@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { View } from 'react-native';
+import { View, useWindowDimensions } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { debtTotalsByCurrency } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
@@ -10,12 +10,14 @@ import { useI18n } from '../src/i18n/provider';
 import { DebtRow } from '../src/ui/liability-rows';
 import { debtsByUrgency } from '../src/ui/liability-presentation';
 import { useCurrentDay } from '../src/ui/theme';
+import { pairStacks } from '../src/ui/geometry';
 
 /** Open debts and receivables with their totals, then the closed ones (24UX4). Each row settles, closes, reopens
  * or deletes with a trailing swipe; a deleted tracker leaves the screen while its payments stay in Movimientos. */
 export default function DebtsScreen() {
   const { archive, snapshot } = useLedger();
-  const { t } = useI18n();
+  const { t, moneyText } = useI18n();
+  const { width, fontScale } = useWindowDimensions();
   const manage = useDebtManagement();
   const day = useCurrentDay();
   const debts = useMemo(() => (archive?.debts ?? []).filter(debt => debt.active), [archive?.debts]);
@@ -38,7 +40,9 @@ export default function DebtsScreen() {
       {/* 24UX6E: the totals as one calm block on the canvas (no padded card per currency), in ink: what I owe is not
           a warning and what I am owed is not income; colour is kept for a row's due state. */}
       {!!totals.length && <View style={{ gap: 14 }}>
-        {totals.map(item => item.status === 'ready' ? <StatRow key={item.currency}>
+        {/* 25T: both totals keep their 22 pt; a pair too wide for half the row each goes one under the other, never shrunk. */}
+        {totals.map(item => item.status === 'ready' ? <StatRow key={item.currency}
+          stacked={pairStacks(width, fontScale, [moneyText(item.owedMinor, item.currency), moneyText(item.receivableMinor, item.currency)], 22)}>
           <Stat label={withCurrencyCode(t('debts.list.owed'), item.currency)}><Money minor={item.owedMinor} currency={item.currency} size={22} weight="700" /></Stat>
           <Stat label={withCurrencyCode(t('debts.list.receivable'), item.currency)}><Money minor={item.receivableMinor} currency={item.currency} size={22} weight="700" /></Stat>
         </StatRow>

@@ -315,6 +315,10 @@ test('debts screen separates what I owe from what they owe me and never mixes cu
   const totals = nodes(root).filter(node => node.type === 'Money').map(node => [node.props.currency, node.props.minor]);
   assert.deepEqual(totals, [['ARS', 30000], ['ARS', 0], ['USD', 0], ['USD', 4000]]);
   assert.equal(find(harness('debts.tsx', {}, empty).render(), 'EmptyState').props.title, 'Sin deudas ni cobros');
+  // 25T: short totals share the row; an eight-figure peso total gives the pair a line each at 393 pt instead of shrinking.
+  assert.deepEqual(nodes(root).filter(node => node.type === 'StatRow').map(node => node.props.stacked), [false, false]);
+  const large = { ...data, accounts: data.accounts.map(account => account.id === debtAccount.id ? { ...account, openingMinor: -1_234_567_890 } : account) };
+  assert.deepEqual(nodes(harness('debts.tsx', {}, large).render()).filter(node => node.type === 'StatRow').map(node => node.props.stacked), [true, false]);
 });
 
 test('debt detail offers a capped payment into the debt and lists its settlements with debt context', () => {

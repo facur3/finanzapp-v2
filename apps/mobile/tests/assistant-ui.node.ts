@@ -203,6 +203,18 @@ const proposal = (draft = reviewDraft(), status: conversation.ProposalContent['s
 const itemOf = (draft: domain.ReviewDraft) => ({ id: 'item-1', source: 'assistant', captureKey: 'assistant:item-1', draft, writeId: 'write-1', status: 'pending',
   attempt: null, receipt: null, createdAt: '2026-09-21T10:00:00.000Z', updatedAt: '2026-09-21T10:00:00.000Z', revision: 0 });
 
+test('25T: the draft card\'s rows put the value under its label above 1.2×, whole and left-aligned, as DetailRow does', () => {
+  const handlers = { archive: proposalArchive, onReview: () => {}, onRetry: () => {}, onOpenRecord: () => {} };
+  for (const [fontScale, stacked] of [[1, false], [1.2, false], [2.643, true]] as const) {
+    const card = nodes(load('assistant-messages.tsx', { fontScale }).render('ProposalCard', { content: proposal(), state: { kind: 'pending', item: itemOf(reviewDraft({ merchant: 'Carrefour Express' })), conflict: false, writable: true }, ...handlers }));
+    const row = card.find(node => node.type === 'View' && /^Comercio: /.test(node.props.accessibilityLabel ?? ''))!;
+    const style = Object.assign({}, ...[row.props.style].flat(Infinity).filter(Boolean));
+    assert.equal(style.flexDirection, stacked ? 'column' : 'row', 'at ' + fontScale);
+    const value = nodes(row).filter(node => node.type === 'AppText')[1];
+    assert.deepEqual([value.props.numberOfLines, value.props.style.textAlign], stacked ? [undefined, 'left'] : [2, 'right'], 'at ' + fontScale);
+  }
+});
+
 test('25A-04: a proposal card shows what the review item holds, says what it needs, and leads to «Para revisar»; it never confirms', () => {
   const ui = load('assistant-messages.tsx');
   const calls: string[] = [];

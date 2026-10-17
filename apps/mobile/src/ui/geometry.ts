@@ -8,6 +8,25 @@ export const SEGMENT_GAP = 2;
  * `minimumFontScale`) and follows Dynamic Type up to 1.3×; its segments are 40 pt, so the track is 44 pt. */
 export const PROMINENT_SEGMENT = { fontSize: 15, lineHeight: 20, maxScale: 1.3, minHeight: 40 } as const;
 
+/** 25T: the width each of `count` equal segments gets inside a measured track (0 before it is measured). A segment's minimum
+ * width never exceeds it, so a five-way control fits a 320 pt screen instead of pushing its last segment off it, and the
+ * thumb (`segmentLayout`, the same division) stays under its label. */
+export function segmentSlot(trackWidth: number, count: number): number {
+  if (!(trackWidth > 0) || !(count > 0)) return 0;
+  return Math.floor((trackWidth - SEGMENT_PADDING * 2 - SEGMENT_GAP * (count - 1)) / count);
+}
+/** 25T: a segment label never shrinks below this (iOS's own shrink-to-fit floors at 4 pt on the new architecture). */
+export const SEGMENT_MIN_FONT = 11;
+/** Below this window width (an iPhone SE, or Display Zoom on a 375 pt one) a segment label starts at 12 pt instead of 13. */
+export const NARROW_WINDOW = 340;
+/** 25T: a segment label's size, fitted in JavaScript to its `room` at the text scale: `base` when it fits, smaller in half
+ * points as far as `SEGMENT_MIN_FONT`, never further (measured as semibold, the chosen weight). Before layout, `base`. */
+export function segmentFontSize(label: string, room: number, base: number, fontScale = 1): number {
+  if (!(room > 0)) return base;
+  const fitting = room / (labelWidthEm(label) * WEIGHT_WIDTH.semibold * Math.max(fontScale, 0.5));
+  return Math.max(SEGMENT_MIN_FONT, Math.min(base, Math.floor(fitting * 2) / 2));
+}
+
 /** Geometry of a segmented control's sliding thumb: equal segments inside the padded track. */
 export function segmentLayout(trackWidth: number, count: number, index: number): { width: number; offset: number } {
   if (!(trackWidth > 0) || !(count > 0)) return { width: 0, offset: 0 };
@@ -164,6 +183,9 @@ export const ROW_CHEVRON = 28;
 export const AMOUNT_SHARE = 0.56;
 /** Row amounts render at the body size. */
 export const ROW_AMOUNT_SIZE = 17;
+/** 25T: the smallest size a row amount is fitted to before it is drawn (`Money`), Footnote's size: never the 4 pt of iOS's own
+ * shrink-to-fit. */
+export const ROW_MIN_FONT = 13;
 
 /** Whether a row must put its amount under the name instead of beside it:
  * always at large text, and otherwise when the amount, at its full row size,
@@ -220,6 +242,16 @@ export function labelAmountStacks(windowWidth: number, fontScale: number, label:
   const room = Math.max(0, windowWidth - chrome);
   const gap = 8;
   return labelWidthEm(label) * ROW_AMOUNT_SIZE * scale + gap + amountWidthEm(amountText) * ROW_AMOUNT_SIZE * scale > room;
+}
+
+/** 25T: two totals side by side in a `StatRow` on the screen's padding (20 + 20, its 16 pt gap): each has half the content
+ * width. When either amount, at `size` and the text scale, would not fit its half, the pair stacks instead of shrinking
+ * (Deudas' «Debo · ARS» and «Me deben · ARS»: an eight-figure peso total drew at 0.89× beside its twin at 375 pt). */
+export function pairStacks(windowWidth: number, fontScale: number, texts: readonly string[], size: number): boolean {
+  if (fontScale > ROW_STACK_SCALE) return true;
+  if (!(windowWidth > 0)) return false;
+  const half = (windowWidth - 40 - 16) / 2;
+  return texts.some(text => amountWidthEm(text) * size * Math.max(fontScale, 0.5) > half);
 }
 
 /** The largest font size, at most `base` and at least `min`, at which `text`

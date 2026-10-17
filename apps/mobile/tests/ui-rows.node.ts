@@ -354,15 +354,38 @@ test('EntryRow gives the merchant two lines beside a bounded amount column at no
   assert.equal(texts(ui.render('TransferRow', { transfer: { ...transfer, amountMinor: 150000 }, accounts: [account, usd] }))[0].props.numberOfLines, 2);
 });
 
-test('segmented labels cap their scaling and fit their segment instead of truncating', () => {
+test('segmented labels cap their scaling at 1.3× and are fitted in JavaScript with an 11 pt floor, never by iOS\'s 4 pt shrink', () => {
   const ui = load('components.tsx');
-  const control = ui.render('Choices', { value: 'expense', onChange: () => {}, options: [{ value: 'expense', label: 'Gasto' }, { value: 'income', label: 'Ingreso' }, { value: 'transfer', label: 'Transferencia' }] });
-  const labels = nodes(control).filter(node => node.type === 'Animated.Text');
+  const props = { value: 'expense', onChange: () => {}, options: [{ value: 'expense', label: 'Gasto' }, { value: 'income', label: 'Ingreso' }, { value: 'transfer', label: 'Transferencia' }] };
+  let labels = nodes(ui.render('Choices', props)).filter(node => node.type === 'Animated.Text');
   assert.equal(labels.length, 3);
   for (const label of labels) {
-    assert.equal(label.props.adjustsFontSizeToFit, true);
-    assert.equal(label.props.minimumFontScale, 0.8);
+    assert.equal(label.props.adjustsFontSizeToFit, undefined);
+    assert.equal(label.props.minimumFontScale, undefined);
     assert.equal(label.props.maxFontSizeMultiplier, 1.3);
+    assert.equal(flat(label.props.style).fontSize, 13, 'before the track is measured, the default size');
+  }
+  ui.render('Choices', props).props.onLayout({ nativeEvent: { layout: { width: 240 } } });
+  labels = nodes(ui.render('Choices', props)).filter(node => node.type === 'Animated.Text');
+  const sizes = labels.map(label => flat(label.props.style).fontSize);
+  assert.deepEqual(sizes.slice(0, 2), [13, 13], 'a label that fits keeps its size');
+  assert.ok(sizes[2] < 13 && sizes[2] >= geometry.SEGMENT_MIN_FONT, '«Transferencia» in a 77 pt segment is fitted, not below 11 pt: ' + sizes[2]);
+});
+
+test('25T: at 320 pt every segment fits its share of the track (the five instalment counts, Movimientos\' four filters) with 12 pt labels', () => {
+  for (const [options, track] of [[['3', '6', '12', '18', 'Otra'], 280], [['Todos', 'Gastos', 'Ingresos', 'Transf.'], 280], [['All', 'Expenses', 'Income', 'Transfers'], 280]] as const) {
+    const ui = load('components.tsx', {}, 1, 320);
+    const props = { value: options[0], onChange: () => {}, compact: options.length === 5, options: options.map(label => ({ value: label, label })) };
+    ui.render('Choices', props).props.onLayout({ nativeEvent: { layout: { width: track } } });
+    const control = ui.render('Choices', props);
+    const segments = [...new Set(nodes(control).filter(node => node.type === 'Pressable'))];
+    const slot = geometry.segmentSlot(track, options.length);
+    for (const segment of segments) assert.ok(styleOf(segment).minWidth <= slot, `${options.join('|')}: ${styleOf(segment).minWidth} pt in a ${slot} pt share`);
+    assert.ok(segments.length * styleOf(segments[0]).minWidth + (segments.length - 1) * geometry.SEGMENT_GAP + 2 * geometry.SEGMENT_PADDING <= track, 'the row fits the track');
+    const sizes = nodes(control).filter(node => node.type === 'Animated.Text').map(label => flat(label.props.style).fontSize);
+    assert.ok(sizes.every(size => size <= 12 && size >= geometry.SEGMENT_MIN_FONT), sizes.join(','));
+    // The thumb is as wide as each segment, so it sits under its label.
+    assert.equal(Math.floor(flat(nodes(control).find(node => node.type === 'Animated.View')!.props.style).width), slot);
   }
 });
 
@@ -384,10 +407,9 @@ test('24T3 carry-in: Reportes\' prominent switch reads at the subhead size, semi
   const segments = [...new Set(nodes(control).filter(node => node.type === 'Pressable'))];
   assert.equal(segments.length, 2);
   for (const segment of segments) assert.ok(styleOf(segment).minHeight + 2 * geometry.SEGMENT_PADDING >= 44, 'a 44 pt track');
-  // Every other caller keeps the 13 pt default with its shrink (Movimientos' four short labels need it).
+  // Every other caller keeps the 13 pt default, fitted in JavaScript when it must (25T).
   const plain = nodes(ui.render('Choices', { value: 'categories', onChange: () => {}, options })).filter(node => node.type === 'Animated.Text');
   assert.equal(flat(plain[0].props.style).fontSize, 13);
-  assert.equal(plain[0].props.adjustsFontSizeToFit, true);
 });
 
 test('A filled semantic ActionButton paints its label and glyph in onSemantic, readable in light and dark (Tarjetas «Pagar tarjeta»)', () => {
@@ -1235,4 +1257,15 @@ test('25N1: a locked appearance picker draws every icon and colour at 60 % and s
   assert.ok(options(true).length > 0);
   assert.ok(options(true).every(node => flat(node.props.style).opacity === 0.6 && node.props.accessibilityState.disabled === true));
   assert.ok(options(false).every(node => flat(node.props.style).opacity === undefined));
+});
+
+test('25T: a row amount is fitted in JavaScript to the widest column a row gives it, with a 13 pt floor; a short one keeps growing with the text', () => {
+  const size = (fontScale: number, minor: number) => flat(load('components.tsx', {}, fontScale, 375).render('Money', { minor, currency: 'ARS' }).props.style).fontSize;
+  assert.equal(size(1, 123_456), 17, 'a short amount at its body size');
+  assert.equal(size(3.571, 1_234), 17, 'short at AX5: the whole 53 pt (17 × 53/17), nothing taken away');
+  const long = size(3.571, 1_234_567_890_123);
+  assert.ok(long < 17 && long >= geometry.ROW_MIN_FONT, 'thirteen digits at AX5 fit the 251 pt column, above the floor: ' + long);
+  // The drawn size times the capped scale fits the column (the native fit is only a net).
+  const text = bindLocale('es-AR').moneyText(1_234_567_890_123, 'ARS');
+  assert.ok(geometry.amountWidthEm(text) * long * (53 / 17) <= 375 - geometry.ROW_CHROME || long === geometry.ROW_MIN_FONT);
 });

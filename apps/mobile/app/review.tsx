@@ -59,7 +59,7 @@ function ReviewRow({ item, facts, last }: { item: ReviewItem; facts: ReviewFacts
     facts.dateISO ? formatDate(facts.dateISO, 'long') : t('review.fields.date') + ': ' + missing, purchase, t(`review.source.${item.source}`), state].filter(Boolean).join(', ');
   return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={spoken} accessibilityLanguage={speechLanguage}
     onPress={() => router.push({ pathname: '/review/[id]', params: { id: item.id } })}
-    style={{ flexDirection: 'row', gap: 12, paddingVertical: 12, minHeight: 64, borderBottomColor: p.line, borderBottomWidth: last ? 0 : 0.5 }}>
+    style={{ flexDirection: 'row', gap: 12, paddingVertical: 12, paddingHorizontal: 16, minHeight: 64, borderBottomColor: p.line, borderBottomWidth: last ? 0 : 0.5 }}>
     <GlyphTile icon={facts.kind === 'income' ? 'arrow-down' : facts.kind === 'expense' ? 'arrow-up' : 'help'} tone={facts.kind === 'income' ? 'income' : 'neutral'} />
     <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
       <View style={stacked ? { gap: 2 } : { flexDirection: 'row', alignItems: 'center', gap: 8 }}>

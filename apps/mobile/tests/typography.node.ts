@@ -496,3 +496,13 @@ test('24B3: Money shows a dash and says the amount is out of range for a value b
   assert.equal((loadComponents().module.exports.rowAmountText as (minor: number, currency: string) => string)(Infinity, 'ARS'), '—');
   assert.equal(loadComponents().module.exports.UNAVAILABLE_AMOUNT, '—');
 });
+
+test('25T: two 22 pt totals share a row only while each fits half of it; a seven-figure peso total stacks the pair at 375 pt, never shrinks', () => {
+  const { pairStacks } = geometry;
+  const ars = (minor: number) => bindLocale('es-AR').moneyText(minor, 'ARS');
+  assert.equal(pairStacks(375, 1, [ars(123_456), ars(0)], 22), false, 'short totals side by side');
+  assert.equal(pairStacks(375, 1, [ars(123_456_789), ars(0)], 22), true, '$ 1.234.567,89 needs about 165 pt of a 159.5 pt half');
+  assert.equal(pairStacks(430, 1, [ars(123_456_789), ars(0)], 22), false, 'a wider phone keeps them side by side');
+  assert.equal(pairStacks(393, 1, [ars(0), ars(1_234_567_890)], 22), true, 'either total decides');
+  assert.equal(pairStacks(430, 1.3, [ars(0), ars(0)], 22), true, 'large text always stacks, as every row');
+});

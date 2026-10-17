@@ -1314,6 +1314,9 @@ test('24B6: a recurring income offers cash accounts only, a card chosen for a re
   const view = harness('src/ui/recurring-form.tsx', { accountId: 'card-acc' }, { data: liabilityData });
   let root = view.render();
   assert.deepEqual([find(root, 'AccountField').props.value, find(root, 'AccountField').props.accounts.map((item: domain.Account) => item.id)], ['card-acc', ['a', 'u', 'card-acc']], 'a recurring purchase on the card is fine');
+  // 25T: the «Próxima fecha» wheel starts at today, never 1900; a past day cannot be picked (Save still refuses one).
+  const wheel = find(root, 'DateField');
+  assert.deepEqual([wheel.props.allowFuture, domain.todayKey(wheel.props.minimumDate), wheel.props.minimumDate.getHours()], [true, domain.todayKey(), 0]);
   find(root, 'Choices').props.onChange('income');
   root = view.render();
   assert.deepEqual([find(root, 'AccountField').props.value, find(root, 'AccountField').props.accounts.map((item: domain.Account) => item.id)], ['a', ['a', 'u']], 'Ingreso: cash in the card\'s currency');

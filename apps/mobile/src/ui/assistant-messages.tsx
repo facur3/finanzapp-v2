@@ -288,11 +288,15 @@ export function ProposalCard({ content, state, archive, onReview, onRetry, onOpe
 function ProposalRow({ label, value, spoken, leading, missing = false, last = false }: { label: string; value: string; spoken?: string; leading?: ReactNode; missing?: boolean; last?: boolean }) {
   const p = usePalette();
   const { t, speechLanguage } = useI18n();
-  return <View accessible accessibilityLabel={t('assistant.proposal.row', { label, value: spoken ?? value })} accessibilityLanguage={speechLanguage} style={[styles.draftRow, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
-    <AppText secondary variant="subhead" style={{ minWidth: 96, flexShrink: 1 }}>{label}</AppText>
-    <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'flex-end' }}>
+  // 25T: above the shared threshold the value goes under its label, whole, as DetailRow does: beside a label at AX3 a
+  // merchant or a category had about five characters a line.
+  const stacked = useStacked();
+  return <View accessible accessibilityLabel={t('assistant.proposal.row', { label, value: spoken ?? value })} accessibilityLanguage={speechLanguage}
+    style={[styles.draftRow, stacked && styles.draftStacked, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
+    <AppText secondary variant="subhead" style={stacked ? undefined : { minWidth: 96, flexShrink: 1 }}>{label}</AppText>
+    <View style={{ flex: stacked ? undefined : 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: stacked ? 'flex-start' : 'flex-end' }}>
       {leading}
-      <AppText numberOfLines={2} style={{ flexShrink: 1, textAlign: 'right', fontWeight: '500', color: missing ? p.secondary : p.text }}>{value}</AppText>
+      <AppText numberOfLines={stacked ? undefined : 2} style={{ flexShrink: 1, textAlign: stacked ? 'left' : 'right', fontWeight: '500', color: missing ? p.secondary : p.text }}>{value}</AppText>
     </View>
   </View>;
 }
@@ -314,4 +318,5 @@ const styles = StyleSheet.create({
   link: { flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: 44 },
   collapsed: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4 },
   draftRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, minHeight: 44 },
+  draftStacked: { flexDirection: 'column', alignItems: 'flex-start', gap: 4 },
 });
