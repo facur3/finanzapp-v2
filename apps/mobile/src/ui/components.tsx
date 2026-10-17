@@ -14,7 +14,7 @@ import { useDockInset } from './dock-clearance';
 import { useAccountLook, useAccountNameOf, useCategoryLook } from './category-hues';
 import { AMOUNT_FIELD, HERO_MAX_SCALE, PROMINENT_SEGMENT, ROW_CHEVRON, ROW_STACK_SCALE, SEGMENT_GAP, SEGMENT_PADDING, TEXT_STYLE_MAX_SCALE, amountFieldLayout, amountMaxScale, fitFontSize,
   rowStacks, segmentLayout } from './geometry';
-import { duration, easeOut, selectionHaptic, timing } from './motion';
+import { duration, easeOut, easeOutCss, selectionHaptic, timing } from './motion';
 import { AmountInput, displayAmount, precisionOf, splitAmount, type AmountNotice, type PasteRejection } from './money-input';
 import { BUILD_MERCHANT_MARK_PREVIEW, merchantMark } from './merchant-mark';
 import { presentedAmount } from './movement-amount';
@@ -106,7 +106,7 @@ export function Screen({ children, gap = space.xl, scrollRef }: { children: Reac
 
 /** Light: white card with a soft shadow. Dark: a surface step, no shadow. */
 export function surfaceShadow(p: Palette): ViewStyle {
-  return p.isDark ? {} : { shadowColor: '#0A0A0C', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } };
+  return p.isDark ? {} : { shadowColor: p.shadow, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } };
 }
 
 /** A card (padded, soft shadow in light) or a grouped list (flat, clipped rows,
@@ -176,7 +176,7 @@ export function PressFeedback({ children, style, containerStyle, feedback = 'sca
     onPressIn={event => { pressed.value = active ? withTiming(1, { duration: duration.press, easing: easeOut }) : 0; props.onPressIn?.(event); }}
     onPressOut={event => { pressed.value = withTiming(0, { duration: active ? duration.release : 0, easing: easeOut }); props.onPressOut?.(event); }}>
     {backdrop}
-    {feedback === 'highlight' && <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: p.isDark ? 'rgba(255,255,255,0.07)' : 'rgba(10,10,12,0.05)' }, highlightStyle]} />}
+    {feedback === 'highlight' && <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: p.pressWash }, highlightStyle]} />}
     {children}
   </Pressable></Animated.View>;
 }
@@ -433,10 +433,10 @@ function Choice({ label, spokenLabel, selected, disabled, onPress, compact = fal
     {/* 24T3: the prominent label has no shrink-to-fit at all (its labels fit at the 1.3× cap; see PROMINENT_SEGMENT). */}
     {prominent ? <Animated.Text numberOfLines={1} maxFontSizeMultiplier={PROMINENT_SEGMENT.maxScale}
       style={{ fontSize: PROMINENT_SEGMENT.fontSize, lineHeight: PROMINENT_SEGMENT.lineHeight, textAlign: 'center', fontWeight: selected ? '600' : '500',
-        color, transitionProperty: 'color', transitionDuration: reduced ? 0 : duration.state }}>{label}</Animated.Text>
+        color, transitionProperty: 'color', transitionDuration: reduced ? 0 : duration.state, transitionTimingFunction: easeOutCss }}>{label}</Animated.Text>
     : <Animated.Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={1.3}
       style={{ fontSize: onField ? 15 : 13, lineHeight: onField ? 20 : 18, textAlign: 'center', fontWeight: (compact || onField) && !selected ? '500' : '600',
-        color, transitionProperty: 'color', transitionDuration: reduced ? 0 : duration.state }}>{label}</Animated.Text>}
+        color, transitionProperty: 'color', transitionDuration: reduced ? 0 : duration.state, transitionTimingFunction: easeOutCss }}>{label}</Animated.Text>}
   </Pressable>;
 }
 
@@ -479,11 +479,11 @@ export function Choices<T extends string>({ value, options, onChange, disabled, 
   const track = onField ? p.heroControl : compact && p.isDark ? p.surface : p.inset;
   const thumb = onField ? p.heroThumb : p.isDark ? (compact ? p.thumb : p.elevated) : p.surface;
   // The compact thumb carries a hairline edge in both themes, so the chosen segment reads as a state, not a tint.
-  const thumbEdge = compact && !onField ? { borderWidth: StyleSheet.hairlineWidth, borderColor: p.isDark ? 'rgba(255,255,255,0.10)' : 'rgba(10,10,12,0.08)' } : {};
+  const thumbEdge = compact && !onField ? { borderWidth: StyleSheet.hairlineWidth, borderColor: p.edge } : {};
   // A disabled switch looks disabled (25VIS2), as a disabled button does: the whole track at half opacity.
   return <View style={[styles.choices, onField && styles.choicesField, { backgroundColor: track, opacity: disabled ? 0.5 : 1 }]} onLayout={event => setTrackWidth(event.nativeEvent.layout.width)}>
     {width > 0 && found >= 0 && <Animated.View pointerEvents="none" style={[styles.thumb, onField && styles.thumbField, { width, backgroundColor: thumb }, thumbEdge,
-      p.isDark || onField ? {} : { shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } }, thumbStyle]} />}
+      p.isDark || onField ? {} : { shadowColor: p.shadow, shadowOpacity: 0.1, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } }, thumbStyle]} />}
     {options.map(option => <Choice key={option.value} label={option.label} spokenLabel={option.spokenLabel} selected={value === option.value} compact={compact}
       onField={onField} prominent={prominent} disabled={disabled} onPress={() => { if (option.value !== value) { selectionHaptic(); onChange(option.value); } }} />)}
   </View>;
@@ -590,7 +590,8 @@ export function Money({ minor, currency, large = false, color, signed = false, s
   minor: number; currency: Currency; large?: boolean; color?: string; signed?: boolean; size?: number; tone?: Tone; weight?: '500' | '600' | '700';
   align?: 'left' | 'center';
   /** On Inicio's field (25A-03): a hero's symbol and cents take the field's solid quiet tones (`heroMoneySymbol`,
-   * `heroMoneyCents`) instead of the ink at an alpha. The whole units keep `color`. */
+   * `heroMoneyCents`) instead of the ink at an alpha. The whole units keep `color`. 25N1: a hero drawn quieter than the
+   * field's ink (the zero month's `heroSecondary`) is one tone throughout, never units dimmer than their own symbol. */
   onField?: boolean;
 }) {
   const p = usePalette();
@@ -615,7 +616,7 @@ export function Money({ minor, currency, large = false, color, signed = false, s
   // With iOS's Increase Contrast on, nothing steps back: the quiet parts are a
   // composition choice, never one a person who asked for contrast pays for.
   const parts = hero && safe ? splitAmount(text, amountFormat) : null;
-  const quiet = p.increaseContrast ? { symbol: ink, cents: ink } : onField ? { symbol: p.heroMoneySymbol, cents: p.heroMoneyCents }
+  const quiet = p.increaseContrast || (onField && ink !== p.heroInk) ? { symbol: ink, cents: ink } : onField ? { symbol: p.heroMoneySymbol, cents: p.heroMoneyCents }
     : ink === p.text ? { symbol: p.secondary, cents: p.tertiary }
     // 25O1 review: the light palette's ink only sits on a light ground (the close's sand-white card): its quiet pair in both themes.
     : ink === lightPalette.text ? { symbol: lightPalette.secondary, cents: lightPalette.tertiary }
@@ -974,3 +975,6 @@ const styles = StyleSheet.create({
   navigationGlyph: { width: 30, alignItems: 'center' },
   selectionRow: { minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 10 },
 });
+
+/** The geometry of a list row (EntryRow, AccountRow, TransferRow), for a row drawn elsewhere (DebtRow). */
+export const rowStyle = styles.row;

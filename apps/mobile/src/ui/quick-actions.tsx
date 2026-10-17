@@ -18,7 +18,7 @@ export const ACTION_PILL_HEIGHT = 40;
  * Android, Reduce Transparency): the surface step with a hairline edge, no shadow. Three quiet capsules read as tools
  * under the number, not as buttons competing with it. On iOS 26 the same geometry is regular glass. */
 export function actionPillMaterial(p: Palette): ViewStyle {
-  return { backgroundColor: p.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: p.isDark ? 'rgba(255,255,255,0.08)' : 'rgba(10,10,12,0.10)' };
+  return { backgroundColor: p.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: p.edge };
 }
 
 /** The three ways to record money, as one row of compact pills (24UX3; they were four round actions with the

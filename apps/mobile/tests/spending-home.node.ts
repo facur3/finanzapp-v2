@@ -32,7 +32,7 @@ const glyphAliases = new Map<string, string>();
 let dark = false;
 const harnessPalette = () => {
   const base = dark ? darkPalette : lightPalette;
-  return { ...base, isDark: dark, positive: base.income, negative: base.expense, positiveSoft: base.incomeSoft, negativeSoft: base.expenseSoft };
+  return { ...base, isDark: dark };
 };
 /** The day the harness's `useCurrentDay` answers; a test may move it and must restore it. */
 let today = '2026-09-12';

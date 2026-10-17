@@ -43,6 +43,8 @@ function load(file: string, extra: Record<string, unknown> = {}, fontScale = 1, 
       FlatList: 'FlatList', Modal: 'Modal', Platform: { OS: 'ios' }, Keyboard: { dismiss() { keyboard.push('dismiss'); } }, StyleSheet: { hairlineWidth: 0.5, create: (styles: unknown) => styles, flatten: (style: any) => Object.assign({}, ...(Array.isArray(style) ? style.flat(Infinity).filter(Boolean) : [style])), absoluteFill: {} },
       useWindowDimensions: () => ({ fontScale, width, height: 844 }), Alert: { alert: (title: string, message: string, buttons?: { text: string }[]) => alerts.push({ title, message, buttons }) } },
     'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View', Text: 'Animated.Text' }, useSharedValue: (value: number) => ({ value }), withTiming: (value: number) => value, useAnimatedStyle: (fn: () => unknown) => fn() },
+    // The sheet hands its exit back to React Native with react-native-worklets' scheduleOnRN (runOnJS is deprecated).
+    'react-native-worklets': { scheduleOnRN: (fn: (...args: unknown[]) => void, ...args: unknown[]) => fn(...args) },
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
     '@react-native-community/datetimepicker': 'DateTimePicker',
     '@expo/vector-icons/Ionicons': 'Ionicons',

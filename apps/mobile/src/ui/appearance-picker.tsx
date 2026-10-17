@@ -4,7 +4,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { AppText, GlyphTile, PressFeedback } from './components';
 import { ACCOUNT_ICON_CHOICES, appearanceHex, appearanceName, type ColorChoice, type IconChoice } from './appearance';
 import { tintOf } from './category-color';
-import { duration, selectionHaptic } from './motion';
+import { duration, easeOutCss, selectionHaptic } from './motion';
 import { space, usePalette, useReduceMotion, type Palette } from './theme';
 import { useI18n } from '../i18n/provider';
 import type { MessageKey, Translate } from '../i18n/messages';
@@ -70,7 +70,7 @@ function IconOption({ item, name, selected, hex, disabled, onPress, p }: { item:
   return <PressFeedback accessibilityRole="radio" accessibilityLabel={name} accessibilityState={{ selected, checked: selected, disabled }}
     disabled={disabled} onPress={onPress} hitSlop={2} style={styles.option}>
     <Animated.View style={[styles.iconTile, { backgroundColor: selected ? tintOf(hex, p) : p.inset, borderColor: selected ? hex : 'transparent',
-      transitionProperty: ['backgroundColor', 'borderColor'], transitionDuration: reduced ? 0 : duration.state }]}>
+      transitionProperty: ['backgroundColor', 'borderColor'], transitionDuration: reduced ? 0 : duration.state, transitionTimingFunction: easeOutCss }]}>
       <Ionicons name={item.glyph} size={20} color={selected ? hex : p.secondary} accessible={false} />
     </Animated.View>
   </PressFeedback>;
@@ -81,7 +81,7 @@ function ColorOption({ item, name, selected, disabled, onPress, p }: { item: Col
   const hex = appearanceHex(item.id, p);
   return <PressFeedback accessibilityRole="radio" accessibilityLabel={name} accessibilityState={{ selected, checked: selected, disabled }}
     disabled={disabled} onPress={onPress} hitSlop={2} style={styles.option}>
-    <Animated.View style={[styles.ring, { borderColor: selected ? hex : 'transparent', transitionProperty: 'borderColor', transitionDuration: reduced ? 0 : duration.state }]}>
+    <Animated.View style={[styles.ring, { borderColor: selected ? hex : 'transparent', transitionProperty: 'borderColor', transitionDuration: reduced ? 0 : duration.state, transitionTimingFunction: easeOutCss }]}>
       <View style={[styles.dot, { backgroundColor: hex }]}>
         {/* 25D1: the check takes onSemantic, white in light and ink in dark, where white fell to 2:1 on the brighter dots. */}
         {selected && <Ionicons name="checkmark" size={16} color={p.onSemantic} accessible={false} />}

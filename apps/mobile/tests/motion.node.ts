@@ -234,7 +234,9 @@ test('form selectors keep the category hue and give the account the interaction 
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': { FlatList: 'FlatList', Keyboard: { dismiss() {} }, Modal: 'Modal', Platform: { OS: 'ios' }, Pressable: 'Pressable', StyleSheet: { absoluteFill: 'absoluteFill' }, View: 'View' },
     // The date field's compact sheet (24B6) animates with Reanimated and reads the safe area; date-field.node.ts exercises it.
-    'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View' }, useSharedValue: (value: unknown) => ({ value }), useAnimatedStyle: (fn: () => unknown) => fn(), runOnJS: (fn: unknown) => fn, withTiming: (value: unknown) => value },
+    'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View' }, useSharedValue: (value: unknown) => ({ value }), useAnimatedStyle: (fn: () => unknown) => fn(), withTiming: (value: unknown) => value },
+    // The sheet hands its exit back to React Native with react-native-worklets' scheduleOnRN (runOnJS is deprecated).
+    'react-native-worklets': { scheduleOnRN: (fn: (...args: unknown[]) => void, ...args: unknown[]) => fn(...args) },
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView', useSafeAreaInsets: () => ({ top: 59, bottom: 34, left: 0, right: 0 }) },
     '@react-native-community/datetimepicker': 'DateTimePicker',
     '@expo/vector-icons/Ionicons': 'Ionicons',
@@ -315,4 +317,33 @@ test('25Q4: every haptic comes from motion.tsx, and a write that taps Success al
   assert.ok(body('errorHaptic').includes('NotificationFeedbackType.Error)'));
   assert.ok(body('warningHaptic').includes('NotificationFeedbackType.Warning)'));
   assert.ok(body('selectionHaptic').includes('selectionAsync()'));
+});
+
+test('every timing and curve comes from motion.tsx: Reflow on the state duration, colour transitions on easeOut, one named ambient pulse, no runOnJS', () => {
+  const read = (path: string) => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
+  const walk = (dir: string): string[] => readdirSync(new URL('../' + dir, import.meta.url), { withFileTypes: true })
+    .flatMap(entry => entry.isDirectory() ? walk(dir + entry.name + '/') : /\.tsx?$/.test(entry.name) ? [dir + entry.name] : []);
+  const files = [...walk('src/'), ...walk('app/')];
+  const motion = read('src/ui/motion.tsx');
+  assert.match(motion, /const reflow = LinearTransition\.duration\(duration\.state\)\.easing\(easeOut\);/, 'Reflow is a state change (200 ms), not a 220 ms literal');
+  assert.equal(/\.duration\(\d/.test(motion), false, 'no layout animation on a literal duration');
+  // The CSS curve is easeOut's own four points.
+  const points = /export const easeOut = Easing\.bezier\(([^)]*)\);/.exec(motion)![1];
+  assert.match(motion, new RegExp('export const easeOutCss = cubicBezier\\(' + points.replace(/\./g, '\\.') + '\\);'));
+  assert.match(motion, /export const pulseTiming: WithTimingConfig = \{ duration: 600, easing: Easing\.inOut\(Easing\.quad\) \};/);
+  let transitions = 0;
+  for (const file of files) {
+    const source = read(file);
+    if (file !== 'src/ui/motion.tsx') assert.equal(/\bEasing\b/.test(source), false, `${file}: a curve outside motion.tsx`);
+    assert.equal(/\brunOnJS\b/.test(source), false, `${file}: runOnJS is deprecated in Reanimated 4 (react-native-worklets' scheduleOnRN)`);
+    for (const line of source.split('\n').filter(line => line.includes('transitionDuration'))) {
+      transitions++;
+      assert.ok(line.includes('transitionTimingFunction: easeOutCss'), `${file}: a colour transition on the default «ease»: ${line.trim()}`);
+    }
+  }
+  assert.equal(transitions, 7, 'the segmented labels (2), the month bars (2), the appearance picker (2) and the first opening\'s pages');
+  assert.match(read('src/ui/assistant-messages.tsx'), /withRepeat\(withSequence\(withTiming\(0\.3, pulseTiming\), withTiming\(1, pulseTiming\)\), -1, false\)/);
+  const sheet = read('src/ui/form-controls.tsx');
+  assert.match(sheet, /^import \{ scheduleOnRN \} from 'react-native-worklets';$/m);
+  assert.match(sheet, /if \(finished\) scheduleOnRN\(unmount\);/);
 });

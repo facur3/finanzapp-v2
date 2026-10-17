@@ -65,7 +65,7 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
   const names = ['ActionButton', 'AppText', 'CategoryBadge', 'MerchantBadge', 'Choices', 'DetailRow', 'EmptyState', 'EntryRow', 'ErrorMessage', 'IconButton', 'Money', 'PressFeedback',
     'Screen', 'SectionTitle', 'Stat', 'StatRow', 'Surface', 'AccountRow', 'AccountBadge', 'LifecycleNote'];
   let backs = 0;
-  const theme = { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, useCurrentDay: () => '2026-09-20', useReduceMotion: () => true,
+  const theme = { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, radius: { group: 16 }, useCurrentDay: () => '2026-09-20', useReduceMotion: () => true,
     usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', line: '#ddd', inset: '#eee', expense: '#c00', income: '#080', warning: '#a60', primary: '#2557D6', link: '#1D5647', background: '#fff', surface: '#fff' }) };
   const modules: Record<string, unknown> = {
     // 24UX6C: the transaction presentation rule, a pure module.

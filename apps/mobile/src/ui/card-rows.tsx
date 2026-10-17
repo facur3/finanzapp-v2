@@ -2,7 +2,7 @@ import { StyleSheet, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { Currency } from '@finanzapp/domain';
 import { useI18n } from '../i18n/provider';
-import { cardFaceTone } from './card-faces';
+import { FACE_RIM, cardFaceTone } from './card-faces';
 import { AppText, GlyphTile, MerchantBadge, Money, PressFeedback, useStacked, type IconName } from './components';
 import { planProgress, planStateWord, scheduleRowOpens, type PlanProgress, type PlanScheduleRow, type PlanSummary, type ScheduleRowState } from './installment-presentation';
 import type { CardSummary } from './liability-presentation';
@@ -211,5 +211,5 @@ const styles = StyleSheet.create({
   glyph: { width: 28, alignItems: 'center' },
   bar: { height: 8, borderRadius: 4, overflow: 'hidden' },
   segment: { flex: 1, height: 8, borderRadius: 3 },
-  swatch: { width: 40, height: 26, borderRadius: radius.tile / 2, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.18)' },
+  swatch: { width: 40, height: 26, borderRadius: radius.tile / 2, borderWidth: StyleSheet.hairlineWidth, borderColor: FACE_RIM },
 });

@@ -22,7 +22,7 @@ export function SwitchRow({ label, value, onValueChange, detail, icon, disabled 
       {detail ? <AppText secondary variant="footnote">{detail}</AppText> : null}
     </View>
     <Switch value={value} disabled={disabled} accessibilityLabel={detail ? label + ', ' + detail : label} accessibilityLanguage={speechLanguage}
-      trackColor={{ false: p.inset, true: p.toggle }}
+      trackColor={{ false: p.switchTrack, true: p.toggle }} ios_backgroundColor={p.switchTrack}
       onValueChange={next => { selectionHaptic(); onValueChange(next); }} />
   </View>;
 }

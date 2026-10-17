@@ -76,7 +76,9 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     'react-native': { View: 'View', FlatList: 'FlatList', Modal: 'Modal', Platform: { OS: 'ios' }, Keyboard: { dismiss() {} }, Pressable: 'Pressable', StyleSheet: { absoluteFill: 'absoluteFill' },
       Alert: { alert: (title: string, message: string, buttons: any[]) => alerts.push({ title, message, buttons }) } },
     // The date field's compact sheet (24B6) animates with Reanimated and reads the safe area; date-field.node.ts exercises it.
-    'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View' }, useSharedValue: (value: unknown) => ({ value }), useAnimatedStyle: (fn: () => unknown) => fn(), runOnJS: (fn: unknown) => fn, withTiming: (value: unknown) => value },
+    'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View' }, useSharedValue: (value: unknown) => ({ value }), useAnimatedStyle: (fn: () => unknown) => fn(), withTiming: (value: unknown) => value },
+    // The sheet hands its exit back to React Native with react-native-worklets' scheduleOnRN (runOnJS is deprecated).
+    'react-native-worklets': { scheduleOnRN: (fn: (...args: unknown[]) => void, ...args: unknown[]) => fn(...args) },
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView', useSafeAreaInsets: () => ({ top: 59, bottom: 34, left: 0, right: 0 }) },
     '@react-native-community/datetimepicker': 'DateTimePicker',
     '@expo/vector-icons/Ionicons': 'Ionicons',

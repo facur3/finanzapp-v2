@@ -123,12 +123,14 @@ export function resolveAccountLook(accountId: string, appearances: AccountAppear
 }
 
 /** Más → Finanzas: a soft, meaningful identity per row, from the same palette
- * accounts and categories use, so the hub reads as one system. */
+ * accounts and categories use, so the hub reads as one system. 25N1: none of them is the brand's sapphire or a
+ * semantic tone (cobalt was ΔE 6.7 from the sapphire, ochre 8 from the warning, slate 6 from the transfer):
+ * the guard is tests/appearance.node.ts. A stored account or category look is untouched. */
 export const FINANCE_ROW_LOOKS: Record<'accounts' | 'cards' | 'budgets' | 'recurring' | 'debts' | 'categories', { glyph: IconName; color: AppearanceColorId }> = {
-  accounts: { glyph: 'wallet-outline', color: 'cobalt' },
+  accounts: { glyph: 'wallet-outline', color: 'azure' },
   cards: { glyph: 'card-outline', color: 'graphite' },
   budgets: { glyph: 'speedometer-outline', color: 'teal' },
   recurring: { glyph: 'repeat-outline', color: 'indigo' },
-  debts: { glyph: 'people-outline', color: 'ochre' },
-  categories: { glyph: 'pricetags-outline', color: 'slate' },
+  debts: { glyph: 'people-outline', color: 'rose' },
+  categories: { glyph: 'pricetags-outline', color: 'olive' },
 };

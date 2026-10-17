@@ -18,7 +18,7 @@ import { InlineFlag } from '../src/ui/marks';
 import { languageName, regionName, showsPreference } from '../src/ui/locale-options';
 import { useDisplayCurrency } from '../src/ui/display-currency-provider';
 import { TEXT_STYLE_MAX_SCALE, WEIGHT_WIDTH, titleFit, widestWordEm } from '../src/ui/geometry';
-import { ValueTransition, duration, errorHaptic, successHaptic, warningHaptic } from '../src/ui/motion';
+import { ValueTransition, duration, easeOutCss, errorHaptic, successHaptic, warningHaptic } from '../src/ui/motion';
 import { AccountCard, AvailableArt, CommitmentsArt, RecordArt } from '../src/ui/onboarding-art';
 import { ACCOUNT_PRESETS, STORY_PAGES, markOnboardingDone, onboardingDecision, previousStep, suggestedCurrency, type AccountPreset,
   type OnboardingStep } from '../src/ui/onboarding-flow';
@@ -190,7 +190,7 @@ export default function OnboardingScreen() {
         accessibilityLanguage={speechLanguage} style={{ flex: 1, alignSelf: 'stretch', flexDirection: 'row', alignItems: 'center', gap: 6 }}>
         {/* 25O1 review: the pages to come in the idle bars' ink, 3:1 on the canvas (the line colour was 1.3:1). */}
         {STORY.map((item, index) => <Animated.View key={item.lead} style={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: index <= page ? p.text : idleBarColor(p),
-          transitionProperty: 'backgroundColor', transitionDuration: reduced ? 0 : duration.state }} />)}
+          transitionProperty: 'backgroundColor', transitionDuration: reduced ? 0 : duration.state, transitionTimingFunction: easeOutCss }} />)}
       </View>
       : <View style={{ flex: 1, alignItems: 'flex-start', marginLeft: -10 }}>
         <IconButton name="chevron-back" label={t('onboarding.back')} onPress={back} disabled={step === 'account' && locked} color={p.primary} />

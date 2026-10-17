@@ -52,7 +52,7 @@ function harness(os: 'ios' | 'android' = 'ios', { reduced = true, systemReduceMo
       useWindowDimensions: () => ({ width: 393, height: 852 }) },
     // A shared value persists across renders by call order, like a hook.
     'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View' }, useSharedValue: (value: unknown) => { const index = cursor++; if (!(index in state)) state[index] = { value }; return state[index]; },
-      useAnimatedStyle: (fn: () => unknown) => fn(), runOnJS: (fn: (...args: unknown[]) => void) => fn,
+      useAnimatedStyle: (fn: () => unknown) => fn(),
       // Reanimated 4's onStart: with the policy resolved to "reduce", the value lands on the target in one frame whatever the duration.
       withTiming: (to: number, config: { duration: number; easing?: unknown; reduceMotion?: string }, callback?: (finished: boolean) => void) => {
         const instant = reducedByPolicy(config.reduceMotion, systemReduced);
@@ -60,6 +60,8 @@ function harness(os: 'ios' | 'android' = 'ios', { reduced = true, systemReduceMo
         if (callback) { if (manual) pending.push(callback); else callback(true); }
         return to;
       } },
+    // The sheet hands its exit back to React Native with react-native-worklets' scheduleOnRN (runOnJS is deprecated).
+    'react-native-worklets': { scheduleOnRN: (fn: (...args: unknown[]) => void, ...args: unknown[]) => fn(...args) },
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView', useSafeAreaInsets: () => insets },
     '@react-native-community/datetimepicker': 'DateTimePicker',
     '@expo/vector-icons/Ionicons': 'Ionicons',
@@ -110,7 +112,9 @@ function realMotion(reduced: boolean): Record<string, unknown> {
   const modules: Record<string, unknown> = {
     react: { useEffect() {}, useRef: (initial: unknown) => ({ current: initial }) },
     'react/jsx-runtime': { jsx: (type: unknown, props: unknown) => ({ type, props }), jsxs: (type: unknown, props: unknown) => ({ type, props }) },
-    'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View' }, Easing: { bezier: (...points: number[]) => 'bezier(' + points.join(',') + ')' },
+    'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View' },
+      Easing: { bezier: (...points: number[]) => 'bezier(' + points.join(',') + ')', quad: 'quad', inOut: (curve: string) => 'inOut(' + curve + ')' },
+      cubicBezier: (...points: number[]) => 'cubicBezier(' + points.join(',') + ')',
       FadeIn: chain(['FadeIn']), FadeInUp: chain(['FadeInUp']), FadeOut: chain(['FadeOut']), LinearTransition: chain(['LinearTransition']), ReduceMotion: REDUCE_MOTION },
     'expo-haptics': {},
     './theme': { useReduceMotion: () => reduced },

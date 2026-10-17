@@ -39,7 +39,7 @@ export function CurrencySwitch({ value, currencies, onChange, disabled = false, 
       hitSlop={compact ? 6 : { top: 4, bottom: 4 }}
       style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: compact ? 32 : 36, paddingVertical: compact ? 4 : 6, paddingHorizontal: 12,
         borderRadius: compact ? 16 : radius.button, backgroundColor: compact && p.isDark ? p.surface : p.inset, alignSelf: 'flex-start', maxWidth: '100%',
-        ...(compact ? { borderWidth: StyleSheet.hairlineWidth, borderColor: p.isDark ? 'rgba(255,255,255,0.12)' : 'rgba(10,10,12,0.10)' } : {}) }}>
+        ...(compact ? { borderWidth: StyleSheet.hairlineWidth, borderColor: p.edge } : {}) }}>
       <AppText accessible={false} numberOfLines={1} variant={compact ? 'footnote' : 'subhead'} style={{ fontWeight: '600', color: compact ? p.text : p.primary, flexShrink: 1 }}>{label(value)}</AppText>
       <Ionicons name="chevron-down" size={compact ? 12 : 14} color={compact ? p.secondary : p.primary} accessible={false} />
     </PressFeedback>
@@ -75,7 +75,7 @@ export function DisplayCurrencyButton({ mode, currency, held, gate, onMode, onCu
           backgroundColor: p.heroControl, alignSelf: 'flex-start', maxWidth: '100%' }
         : { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: compact ? 32 : 36, paddingVertical: compact ? 4 : 6, paddingHorizontal: 12,
           borderRadius: compact ? 16 : radius.button, backgroundColor: compact && p.isDark ? p.surface : p.inset, alignSelf: 'flex-start', maxWidth: '100%',
-          ...(compact ? { borderWidth: StyleSheet.hairlineWidth, borderColor: p.isDark ? 'rgba(255,255,255,0.12)' : 'rgba(10,10,12,0.10)' } : {}) }}>
+          ...(compact ? { borderWidth: StyleSheet.hairlineWidth, borderColor: p.edge } : {}) }}>
       <AppText accessible={false} numberOfLines={1} variant={onField ? 'subhead' : compact ? 'footnote' : 'subhead'}
         style={{ fontWeight: onField ? '500' : '600', color: onField ? p.heroInk : compact ? p.text : p.primary, flexShrink: 1 }}>{label}</AppText>
       <Ionicons name="chevron-down" size={compact ? 12 : 14} color={onField ? p.heroSecondary : compact ? p.secondary : p.primary} accessible={false} />

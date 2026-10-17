@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
+import { readdirSync, readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { darkPalette, lightPalette } from '../src/ui/palette.ts';
-import { contrast, luminance } from './contrast.ts';
+import { radius, space, type } from '../src/ui/tokens.ts';
+import { contrast, deltaE, lab, luminance } from './contrast.ts';
 
 // WCAG 2 contrast over the actual palette. A pure check of the numbers: the
 // rendered look, blending on device and Dynamic Type still need the iPhone.
@@ -18,15 +20,7 @@ function saturationLightness(hex: string): { s: number; l: number } {
   const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2;
   return { s: max === min ? 0 : (max - min) / (1 - Math.abs(2 * l - 1)), l };
 }
-/** CIE L*a*b* (D65), to tell a grey-blue from a saturated blue where the hue alone cannot: chroma and colour distance. */
-function lab(hex: string): [number, number, number] {
-  const lin = [1, 3, 5].map(index => { const c = parseInt(hex.slice(index, index + 2), 16) / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; });
-  const xyz = [[0.4124, 0.3576, 0.1805], [0.2126, 0.7152, 0.0722], [0.0193, 0.1192, 0.9505]].map(row => row.reduce((sum, k, i) => sum + k * lin[i], 0));
-  const [x, y, z] = [xyz[0] / 0.95047, xyz[1], xyz[2] / 1.08883].map(t => t > 216 / 24389 ? Math.cbrt(t) : (24389 / 27 * t + 16) / 116);
-  return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
-}
 const chroma = (hex: string) => { const [, a, b] = lab(hex); return Math.hypot(a, b); };
-const deltaE = (one: string, two: string) => { const [p, q] = [lab(one), lab(two)]; return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]); };
 const ratio = (a: string, b: string) => contrast(a, b).toFixed(2);
 
 for (const [name, p] of [['light', lightPalette], ['dark', darkPalette]] as const) {
@@ -66,11 +60,17 @@ for (const [name, p] of [['light', lightPalette], ['dark', darkPalette]] as cons
     assert.ok(sat <= 0.3, `restrained, not saturated: ${sat.toFixed(2)}`);
     assert.notEqual(p.transfer, p.secondary, 'its own tone, not body text');
     assert.ok(contrast(p.transfer, p.transferSoft) >= 4.5, `transfer text on its soft tile: ${ratio(p.transfer, p.transferSoft)}`);
+    // The error message, a toned secondary button and the fixture banner draw the tone on its own soft tint: light is
+    // the closest to the floor (4.62, 4.55, 4.64; dark 6.23, 7.65, 7.38).
+    for (const [tone, ink, soft] of [['expense', p.expense, p.expenseSoft], ['income', p.income, p.incomeSoft], ['warning', p.warning, p.warningSoft]] as const) {
+      assert.ok(contrast(ink, soft) >= 4.5, `${tone} text on its soft tint: ${ratio(ink, soft)}`);
+    }
     // Red never means "spent": the negative tone and the positive tone are apart from each other and from the brand.
     assert.notEqual(p.expense, p.income);
     assert.ok(contrast(p.text, p.surface) >= 12, 'normal text stays high-contrast neutral');
-    // 24UX4: white labels on the trailing swipe actions.
-    for (const fill of [p.swipeDestructive, p.swipeNeutral, p.swipeAccent]) assert.ok(contrast('#FFFFFF', fill) >= 4.5, `white on swipe action ${fill}: ${ratio('#FFFFFF', fill)}`);
+    // 24UX4: white labels on the trailing swipe actions (drawn in onPrimary, the label of every filled action).
+    assert.equal(p.onPrimary, '#FFFFFF');
+    for (const fill of [p.swipeDestructive, p.swipeNeutral, p.swipeAccent]) assert.ok(contrast(p.onPrimary, fill) >= 4.5, `onPrimary on swipe action ${fill}: ${ratio(p.onPrimary, fill)}`);
     assert.ok(contrast(p.secondary, p.surface) >= 4.5);
   });
   test(`${name}: secondary text and tertiary glyphs read on every ground (24UX1)`, () => {
@@ -113,6 +113,10 @@ for (const [name, p] of [['light', lightPalette], ['dark', darkPalette]] as cons
     assert.ok(contrast(p.heroInk, p.hero) > contrast(p.heroMoneySymbol, p.hero) && contrast(p.heroMoneySymbol, p.hero) > contrast(p.heroMoneyCents, p.hero),
       'the symbol is quieter than the units, the cents quieter still');
     assert.ok(contrast(p.heroMoneySymbol, p.heroMoneyCents) >= 1.25, 'the two quiet steps are distinguishable');
+    // 25N1: the zero month's units (heroSecondary) sit under the symbol's grey (light 0.717 against 0.762, dark 0.661), so a
+    // quiet hero is drawn in heroSecondary throughout (Money onField), and that one tone still reads on the field.
+    assert.ok(luminance(p.heroSecondary) < luminance(p.heroMoneySymbol), 'why the quiet hero cannot keep the grey symbol');
+    assert.ok(contrast(p.heroSecondary, p.hero) >= 4.5, `the quiet hero on the field: ${ratio(p.heroSecondary, p.hero)}`);
   });
   test(`${name}: the dock and its «+» read in both themes; the selected capsule separates from the pill (24UX6A)`, () => {
     assert.ok(contrast(p.onAccent, p.accent) >= 4.5, `the «+» glyph on the accent: ${ratio(p.onAccent, p.accent)}`);
@@ -163,9 +167,33 @@ for (const [name, p] of [['light', lightPalette], ['dark', darkPalette]] as cons
     assert.ok(luminance(p.dock) < 0.03, `the dock is graphite: ${p.dock}`);
     assert.ok(contrast(p.accent, p.background) >= 3, `the «+» stands apart from the canvas: ${ratio(p.accent, p.background)}`);
   });
-  test(`${name}: a switch that is on keeps its white knob visible and differs from the off track (25VIS1)`, () => {
+  test(`${name}: a switch's tracks are measured on the surface it sits on, on and off; the white knob reads on both (25VIS1)`, () => {
+    // SwitchRow lives in a grouped surface. On: 7.45 light, 3.52 dark. Off: 1.41 light, 1.53 dark (the inset it used was
+    // 1.25 and 1.11, and on iOS `trackColor.false` alone is only the tint: ios_backgroundColor draws the off track).
     assert.ok(contrast('#FFFFFF', p.toggle) >= 4.5, `white knob on the on track: ${ratio('#FFFFFF', p.toggle)}`);
-    assert.ok(contrast(p.toggle, p.inset) >= 3, `on track against the off track: ${ratio(p.toggle, p.inset)}`);
+    assert.ok(contrast(p.toggle, p.surface) >= 3, `on track on the surface: ${ratio(p.toggle, p.surface)}`);
+    assert.ok(contrast(p.switchTrack, p.surface) >= 1.4, `off track on the surface: ${ratio(p.switchTrack, p.surface)}`);
+    assert.ok(contrast('#FFFFFF', p.switchTrack) >= 1.4, `white knob on the off track: ${ratio('#FFFFFF', p.switchTrack)}`);
+    // The knob's side carries the state; the two fills still differ (5.28 light, 2.30 dark).
+    assert.ok(contrast(p.toggle, p.switchTrack) >= 2, `on track against the off track: ${ratio(p.toggle, p.switchTrack)}`);
+    assert.equal(p.switchTrack, p === lightPalette ? p.line : p.thumb, 'an existing step, not a new colour');
+  });
+  test(`${name}: every hairline edge, press wash and shadow is one token, an alpha of the ink in light and of white in dark`, () => {
+    const alpha = (value: string, base: string) => {
+      const match = /^rgba\((\d+), (\d+), (\d+), (0\.\d+)\)$/.exec(value);
+      assert.ok(match, `${value} is an rgba token`);
+      assert.equal(match.slice(1, 4).map(Number).map(c => c.toString(16).padStart(2, '0')).join('').toUpperCase(), base.slice(1).toUpperCase(), value);
+      return Number(match[4]);
+    };
+    const base = p === lightPalette ? p.text : '#FFFFFF';
+    assert.ok(alpha(p.edge, base) <= 0.12, `edge ${p.edge}`);
+    assert.ok(alpha(p.pressWash, base) < alpha(p.edge, base), 'a press wash is quieter than an edge');
+    assert.match(p.shadow, /^#[0-9A-F]{6}$/, 'shadowColor is solid: each site sets its own shadowOpacity');
+    // The dock's rim is solid so it can be measured. In dark it is what separates the pill from a surface: the fills
+    // differ by 1.06:1 (pinned below), the rim 1.53 on the surface and 1.73 on the canvas.
+    assert.match(p.dockEdge, /^#[0-9A-F]{6}$/);
+    assert.ok(contrast(p.dockEdge, p.dock) >= 1.3, `the rim on the pill: ${ratio(p.dockEdge, p.dock)}`);
+    if (p === darkPalette) for (const ground of [p.surface, p.background]) assert.ok(contrast(p.dockEdge, ground) >= 1.5, `the dark rim on ${ground}: ${ratio(p.dockEdge, ground)}`);
   });
   test(`${name}: the status bar over Inicio's field follows the field's lightness, and its controls separate from it (25VIS1, 25VIS2)`, () => {
     assert.equal(p.heroStatusBar, luminance(p.hero) > 0.4 ? 'dark' : 'light');
@@ -178,6 +206,51 @@ test('the dark canvas is a warm near-black, not crushed #000, with surfaces in v
   assert.ok(luminance(darkPalette.background) < 0.01, `near-black: ${darkPalette.background}`);
   assert.ok(contrast(darkPalette.surface, darkPalette.background) >= 1.1, 'a surface is a visible step above the canvas');
   assert.ok(contrast(darkPalette.elevated, darkPalette.surface) >= 1.3, 'elevated is a step above the surface');
-  assert.ok(contrast(darkPalette.dock, darkPalette.background) >= 1.15, 'the dock separates from the canvas (a hairline helps too)');
+  assert.ok(contrast(darkPalette.dock, darkPalette.background) >= 1.15, `the dock separates from the canvas (its rim helps too): ${ratio(darkPalette.dock, darkPalette.background)}`);
+  // Over a surface the dark pill's fill is all but the same grey (1.06:1): the rim (dockEdge, pinned above) separates it.
+  assert.ok(contrast(darkPalette.dock, darkPalette.surface) >= 1.05, `the dark dock over a surface: ${ratio(darkPalette.dock, darkPalette.surface)}`);
   assert.ok(luminance(lightPalette.background) > 0.85 && lightPalette.background !== lightPalette.surface, 'off-white, a step under the white surfaces');
+});
+
+test('hairlines and shadows are drawn from palette tokens: no edge, shadow or wash literal in a screen or a component', () => {
+  const roots = ['../src/ui/', '../app/'];
+  const files: string[] = [];
+  const walk = (dir: URL) => { for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory()) walk(new URL(entry.name + '/', dir)); else if (/\.tsx?$/.test(entry.name)) files.push(new URL(entry.name, dir).pathname);
+  } };
+  for (const root of roots) walk(new URL(root, import.meta.url));
+  assert.ok(files.length > 50, 'the scan reaches the screens and the components');
+  for (const file of files) {
+    const source = readFileSync(file, 'utf8');
+    assert.equal(/(border\w*Color|shadowColor): (p\.isDark \? )?'/.test(source), false, `${file}: an edge or shadow colour literal`);
+    // rgba lives in the palette, and on a card face (its rim and its white text, card-faces.ts and card-visual.tsx).
+    if (!/\/(palette|card-faces)\.ts$|\/card-visual\.tsx$/.test(file)) assert.equal(source.includes('rgba('), false, `${file}: an rgba literal`);
+  }
+  const switchRow = readFileSync(new URL('../src/ui/switch-row.tsx', import.meta.url), 'utf8');
+  assert.match(switchRow, /trackColor=\{\{ false: p\.switchTrack, true: p\.toggle \}\} ios_backgroundColor=\{p\.switchTrack\}/,
+    'the off track is drawn explicitly on iOS (trackColor.false is only the tint there)');
+});
+
+test('the type scale, radii and spacing are pure tokens, pinned: the scale descends and every line holds its size', () => {
+  const order = ['hero', 'display', 'largeTitle', 'title1', 'title2', 'title3', 'body', 'subhead', 'footnote', 'caption'] as const;
+  for (let index = 1; index < order.length; index++) assert.ok(type[order[index]].fontSize! <= type[order[index - 1]].fontSize!, order[index]);
+  for (const [name, style] of Object.entries(type)) assert.ok(style.lineHeight! >= style.fontSize! * 1.15, `${name}: ${style.fontSize}/${style.lineHeight}`);
+  assert.deepEqual([type.footnote.fontSize, type.footnote.lineHeight], [13, 18], 'the caption and note size every field shares');
+  assert.deepEqual(radius, { chip: 14, tile: 12, group: 16, card: 20, sheet: 24, creditCard: 18, button: 14 });
+  assert.deepEqual(space, { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 });
+});
+
+test('the account, debt and recurring screens draw the scale and the radii from tokens, and DebtRow shares the list row', () => {
+  const read = (path: string) => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
+  for (const file of ['app/accounts.tsx', 'src/ui/entry-list.tsx']) {
+    assert.equal(/Radius: [^,}]*\? 16 :/.test(read(file)), false, `${file}: a grouped corner is radius.group`);
+    assert.equal((read(file).match(/\? radius\.group : 0/g) ?? []).length, 4, `${file}: the four corners of a grouped section`);
+  }
+  // A note under a form is a footnote (13/18), the same as the debt form's; a caption over a control is footnote at 500, as Field's.
+  for (const file of ['app/new-account.tsx', 'app/edit-account/[id].tsx', 'src/ui/recurring-form.tsx']) {
+    assert.equal(/fontSize: 1[34]\b/.test(read(file)), false, `${file}: no raw 13 or 14 pt beside the type scale`);
+  }
+  assert.match(read('src/ui/recurring-form.tsx'), /<AppText secondary variant="footnote" style=\{\{ fontWeight: '500' \}\}>\{t\('recurring\.form\.frequency'\)\}/);
+  assert.match(read('src/ui/liability-rows.tsx'), /style=\{\[rowStyle, \{ borderBottomWidth/, 'DebtRow reuses the list row geometry');
+  assert.equal(/paddingVertical: 12, paddingHorizontal: 16, minHeight: 64/.test(read('src/ui/liability-rows.tsx')), false, 'no copied row geometry');
 });
