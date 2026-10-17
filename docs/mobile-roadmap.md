@@ -1,6 +1,8 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-17 (**25O1 — first impression**, on its branch stacked on #118: the first opening rebuilt as a short
+Updated: 2026-10-17 (**25N1 — Finanzas, Ajustes and the shared controls**, on its branch stacked on #119: Más becomes
+the Finanzas tab with Ajustes behind a gear, Licencias, Movimientos deshechos in Movimientos, shared controls, forms
+and tokens; «Producto 25N1», §1, §2). Before (**25O1 — first impression**, on its branch stacked on #118: the first opening rebuilt as a short
 story drawn with the app's own figures, «¿Dónde tenés tu plata?» with three presets and «Restaurar una copia», the
 opening balance with the currency's flag, and a sapphire close that continues into Inicio; «Primeros pasos» on a new
 Inicio; round graphic flags for regions, currencies and languages (their variety) with written semantics; a development QA
@@ -441,7 +443,10 @@ history file keeps the evidence of when and why.
 
 ## 1. Implemented (current state)
 
-- **25O1 — first impression (on its branch, stacked on 25Q4).** «Producto 25O1». The first opening is a three-page story
+- **25N1 — Finanzas, Ajustes and the shared controls (on its branch, stacked on #119).** «Producto 25N1». The fourth
+  tab is Finanzas, Ajustes sits behind its gear with Licencias; Movimientos deshechos moved to Movimientos; shared
+  controls, forms and tokens cleaned up.
+- **25O1 — first impression (PR #119, stacked on 25Q4).** «Producto 25O1». The first opening is a three-page story
   (scenes drawn with the app's components from fixed sample figures, played once, still under Reduce Motion), «¿Dónde
   tenés tu plata?» (cash, bank or digital wallet as presets; the region pill with its flag, the language pill with its variety's;
   «Restaurar una copia», which ends the setup when the copy brings accounts), the opening balance (the currency chip with
@@ -1014,6 +1019,8 @@ item unless a section says a new native build is needed. The checklist sections 
   symbol and cents on the sand, «Otras», the chosen colour's check, Enviar/Detener, the currency chips and the date
   sheet. Device QA no longer follows each change: the steps below accumulate for a milestone session over the critical
   journeys, then a final regression. A test that passes never counts as a device result.
+- **25N1 (on its branch, stacked on #119):** the checklist's «Producto 25N1», in milestone **M2** (with 25D2), in a QA
+  profile; the owner approves the navigation there.
 - **Milestone M1 — the next QA session (recommended now):** #112, #117, #118 and 25O1 together on the same build, the
   checklist's «Milestone M1»: every write in a development QA profile (`EXPO_PUBLIC_QA_PROFILE`, its own empty files, so
   the owner's data is never opened): the first opening, the critical journeys, a restore and the legibility pass; then
@@ -4665,7 +4672,34 @@ nothing of it is on a screen yet.
   passed, 0 failed; `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0 errors, 0 stale; `check` OK;
   `export:ios` OK. No account, handle, ad account or campaign created.
 
-### Producto 25O1 — first impression (this PR, stacked on #118)
+### Producto 25N1 — Finanzas, Ajustes and the shared controls (this PR, stacked on #119)
+
+- **Why.** The owner (2026-10-17) found Más mixing financial tools and settings, asked to reconsider the navigation
+  without adding tabs by inertia, and to accelerate with substantial deliveries closing groups of the private register's
+  findings. This one closes the navigation proposal of §3 and the shared controls, forms and token findings around it.
+- **Navigation.** The fourth tab is **Finanzas** (`app/(tabs)/settings.tsx` keeps its route): one list of the ledger's
+  tools, the review badge on the tab, a gear pushing **Ajustes** (`app/preferences.tsx`: Preferencias, Tus datos, Acerca
+  de, the version footer and the development diagnostics). **Licencias** (`app/licenses.tsx`, `app/license/[id].tsx`,
+  `src/ui/licenses.ts`): every production dependency's notice and the data licences (circle-flags, Unicode CLDR), full
+  texts in English. **Movimientos deshechos** is a button in Movimientos' bar while something is undone; undone rows are
+  dimmed and spoken as such. Decision 005 amended (25N1); routes kept.
+- **Controls.** No app haptic over the native switch; a held dock tab switches; React Native's press retention; one
+  disabled look; Clear on text fields and «Listo» on number pads; distinct devolución and undo glyphs; informational
+  alerts with «OK», recoverable actions not destructive-red.
+- **Forms.** The last account per kind (`src/ui/last-account.ts`, a device preference outside the ledger and backups);
+  «Hacia» preselected after adding its account; a pointer to Pagar tarjeta on plain transfers; the card form's live
+  date check and «Más datos (opcional)»; a plan's actions above its calendar; budgets never offer a taken scope; debts by
+  urgency (`debtsByUrgency`).
+- **Tokens.** `edge`, `dockEdge`, `pressWash`, `switchTrack` and a pure `src/ui/tokens.ts`; colour transitions on
+  ease-out, `pulseTiming`, Reflow on `duration.state`; `scheduleOnRN` replaces the deprecated `runOnJS`; distinct card
+  faces (smallest ΔE 12.7), Finanzas tiles off the brand and semantic hues (ΔE ≥ 12), no 1.1:1 partial outline; a source
+  scan rejects new edge, shadow or rgba literals outside the palette.
+- **Not in this delivery.** Moving blocked choices into action sheets; a row action «Recuperar» in Movimientos
+  deshechos (it would duplicate the detail's guarded restore); the default account colour (a stored-look change, the
+  owner's); generating the licence list from the dependency tree.
+- **Gates.** After #112 → #117 → #118 → #119 merge; the owner approves the navigation on the iPhone (M2).
+
+### Producto 25O1 — first impression (PR #119, stacked on #118)
 
 - **Why.** The owner (2026-10-17) found the first opening too basic, with little visual personality and too much text,
   asked for a premium, clear and memorable one coherent with Sapphire + Sand, for country marks in the Region chooser and

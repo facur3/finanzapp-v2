@@ -57,6 +57,40 @@ copies' locations (25Q4 step 9 needs Xcode's Devices window), the cold links of 
 merges `master` and keeps its CI green before its own merge; never a force-push). A failure fixes forward on the branch
 it belongs to and the stack above merges it in.
 
+## Producto 25N1 — Finanzas, Ajustes and the shared controls (on its branch, stacked on #119; milestone M2)
+
+JavaScript only, the same development build; Metro from this branch, in a QA profile for anything that writes
+(`EXPO_PUBLIC_QA_PROFILE=m2`). The version line reads «FinanzApp 0.1.0 (25N1)». The owner approves the navigation here
+before its merge (decision 005, amendment 25N1).
+
+1. **Finanzas:** the fourth tab has the wallet glyph and the title Finanzas; one list (Para revisar only with something
+   pending; its badge on the tab); the gear at the bar's trailing edge reads «Ajustes, botón» and pushes Ajustes with a
+   native back and swipe.
+2. **Ajustes**, light and dark: Preferencias (Idioma and Región with their flags, Apariencia: Sistema → Oscuro without a
+   flash), Tus datos (Copia de seguridad), Acerca de (Licencias); the footer «FinanzApp 0.1.0 (25N1)» and, on a
+   development build, the diagnostics. Reduce Motion on: the pushes cross-fade.
+3. **Licencias:** each row pushes its full text, scrollable above the dock area; at an AX size it still reads; with
+   the interface in Spanish VoiceOver reads the licence in English.
+4. **Movimientos deshechos:** with nothing undone, no button in Movimientos' bar; undo a movement — the alert says
+   «…desde Movimientos deshechos, en Movimientos.» with no red button — and the button appears; the list's amounts are
+   dimmed, an income has no «+», VoiceOver says «deshecho»; recover the last one and the button goes.
+5. **Controls:** hold a dock tab about a second and lift: it switches. Toggle «Con interés»: one tick (the system's).
+   Drift about 15 pt off Guardar and lift: it still fires. Comercio, Nota and the name fields show the clear button;
+   «Últimos 4 dígitos» and the instalment count show «Listo» over the number pad (Voice Control «Tocar Listo»).
+   «Registrar devolución» and «Deshacer movimiento» look different.
+6. **Forms:** save a Gasto on a card, open «+» › Gasto: it opens on that card; Ingreso keeps its own. From a
+   Transferencia, «Agregar cuenta» in the same currency, back: «Hacia» shows it. With one card that owes, a plain transfer
+   shows «¿Pagás …? Usá «Pagar tarjeta».» and it opens the payment.
+7. **Cards and plans:** in Nueva tarjeta move the closing past the due date: the warning appears while editing and
+   «Crear tarjeta» waits; «Más datos (opcional)» opens in place and VoiceOver reads it as a button. In a 12-instalment
+   plan the actions are reachable without scrolling past the calendar.
+8. **Budgets and debts:** with a general budget set, Presupuestos › «+» offers no General/Por categoría switch; an
+   overdue debt is listed first in Deudas y cobros.
+9. **Tokens, light and dark:** the off switch track is a visible warm step against its row (also with Increase
+   Contrast); the dark dock's rim separates it from what scrolls under it; three or more uncoloured cards never look
+   alike; the Finanzas tiles never read as the sapphire link or a transfer; Reportes › Evolución's current month has no
+   outline and says «Mes en curso hasta hoy»; a zero month on Inicio is one pale tone.
+
 ## Producto 25O1 — first impression (on its branch, stacked on #118; milestone M1)
 
 1. **A new installation** (the QA profile of M1, never a deletion of the owner's app): the splash lifts straight onto the story; Inicio is

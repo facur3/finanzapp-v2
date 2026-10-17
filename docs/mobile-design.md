@@ -407,8 +407,8 @@ Forest; ver «Producto 24UX6A».*
   tocar una fila edita nombre, ícono y color o la archiva con confirmación. Sin borrado. *(→ 24UX6E: filas en la
   geometría de Forest sin chevron; una archivada ya no se atenúa y en Archivadas dice su tipo; el editor de una
   archivada abre con su nota de ciclo de vida.)*
-- **Más.** Solo el grupo Finanzas lleva tiles tintados (cobalto, verde azulado, índigo,
-  ocre, pizarra) sobre la superficie neutra; App y datos sigue neutro.
+- **Finanzas (antes Más; 25N1).** Una sola lista con tiles tintados (celeste, grafito, verde azulado, índigo, rosa,
+  oliva), elegidos lejos del zafiro y de los cuatro colores semánticos (ΔE ≥ 12, fijado por test); Ajustes es neutro.
 
 ## Producto 21 — el Asistente como capacidad principal
 
@@ -427,7 +427,7 @@ conversación, el borrador, la confirmación y la evidencia siguen como se descr
   para la fase de development build.
 - **Conversación silenciosa.** Mensaje propio: píldora compacta gris (`inset`) a la
   derecha, sin color de marca. Respuesta: texto corrido a la izquierda, sin contenedor.
-  "Pensando…" con un punto cobalto que late (quieto con Reduce Motion) antes de la primera
+  "Pensando…" con un punto del primario que late (`pulseTiming`, quieto con Reduce Motion) antes de la primera
   palabra; un cursor cobalto mientras llega texto; "Respuesta interrumpida." si se detuvo.
   Nunca burbujas grandes, nunca violeta, nunca bordes brillantes.
 - **Estado vacío.** Un tile sparkles de 44 pt, "¿En qué te ayudo?" y cuatro sugerencias
@@ -574,8 +574,8 @@ siguen la misma familia (valores en `palette.ts`).
   blanco de 48 pt de alto y de unos 65 pt de ancho a 375 pt (unos 70 a 393 pt). En iOS, VoiceOver dice «Inicio, pestaña, 1 de
   4» (un botón que nombra su posición, porque el rol `tab` de React Native no le da rasgo a iOS) y «Seleccionado» en la
   actual; en otras plataformas, el rol `tab` con su nombre. Una pulsación larga muestra el nombre en el visor de
-  contenido grande de iOS. Se emiten `tabPress` y `tabLongPress` como en la barra del sistema, y tocar la pestaña
-  actual no navega.
+  contenido grande de iOS. Se emite `tabPress`; un toque sostenido y soltado también cambia de pestaña (sin `tabLongPress`), y tocar la
+  pestaña actual no navega.
 - **El «+» es una acción, no una quinta pestaña.** Queda fuera de la lista de pestañas, sin estado elegido y fuera del
   «n de 4». VoiceOver: «Registrar», con la pista «Abre las opciones para registrar». Un círculo de 60 pt con relleno
   `accent` y el glifo `add` en `onAccent`, hairline y sombra leve en claro; un impacto háptico leve; solo toque (no
@@ -879,6 +879,32 @@ La selección de porciones dentro de la dona (solo visual, dentro del reporte) *
 barras de Día a día y una cabecera fija sólida. Siguen permitidos para una pasada siguiente; no hay ruta de detalle por comercio. El orden
 vinculante del roadmap no cambia: la próxima entrega de producto es 24T3; 24UX6C (Movimientos y Más) y 24UX6D
 (Tarjetas) siguen a 24UX6B en el carril UX, y su lugar frente a 24T3 lo decide el dueño (ver `docs/mobile-roadmap.md`).
+
+## Producto 25N1 — Finanzas, Ajustes y los controles compartidos (en su rama, sobre #119)
+
+- **Finanzas.** La cuarta pestaña deja de ser «Más»: se llama Finanzas (billetera) y es una sola lista de las
+  herramientas que dan forma al registro (Para revisar cuando hay algo, Cuentas, Tarjetas, Presupuestos, Recurrentes,
+  Deudas y cobros, Categorías), sin rótulo de grupo que repita el título. La insignia de Para revisar sigue en la pestaña.
+- **Ajustes.** Un engranaje al final de la barra de Finanzas (44 pt, «Ajustes» para VoiceOver) empuja Ajustes:
+  Preferencias (Idioma y Región con sus banderas, Apariencia), Tus datos (Copia de seguridad), Acerca de (Licencias), y
+  al pie la versión y, en desarrollo, los diagnósticos. Ninguna pestaña nueva, ningún engranaje en Inicio (decisión 005,
+  enmienda 25N1).
+- **Licencias.** Cada aviso de terceros que viaja en la app, con su texto completo tal como se publicó (en inglés,
+  seleccionable, leído por VoiceOver en inglés); un test exige que cada dependencia de producción tenga el suyo.
+- **Movimientos deshechos** sale de Más: un botón en la barra de Movimientos, visible mientras haya algo deshecho; las
+  filas deshechas se ven apagadas (sin «+», importe terciario) y VoiceOver dice «deshecho».
+- **Controles.** El switch no suma un toque háptico al del sistema; una pulsación sostenida en el dock cambia de
+  pestaña; lo deshabilitado se ve deshabilitado; los campos de texto tienen el botón de borrar y los teclados numéricos
+  un «Listo»; la devolución y el deshacer ya no comparten la flecha; las alertas informativas dicen «OK» y lo
+  recuperable no se pinta de rojo.
+- **Formularios.** Gasto e Ingreso abren en la última cuenta usada para cada uno (una preferencia del dispositivo, nunca
+  del registro); «Hacia» vuelve elegida tras agregar la cuenta; una transferencia común con una tarjeta que debe señala
+  «Pagar tarjeta»; la tarjeta avisa mientras se completa si el vencimiento cae antes del cierre y guarda tres datos
+  opcionales en «Más datos (opcional)»; las acciones de un plan quedan arriba de su calendario; un presupuesto nunca
+  ofrece un alcance ya tomado; las deudas vencidas encabezan su lista.
+- **Tokens.** Bordes, lavados, sombras y la pista del switch como tokens (`edge`, `dockEdge`, `pressWash`,
+  `switchTrack`); los colores de transición en la curva de salida; las caras de tarjeta sin dos tonos iguales; sin el
+  contorno de 1,1:1 del mes en curso en Evolución; un mes en cero en un solo tono.
 
 ## Producto 25O1 — primera impresión (en su rama, sobre #118; rediseño de la primera apertura)
 
@@ -3385,6 +3411,9 @@ crédito, marca elegida) y los filetes de las píldoras, el chip y el compositor
 color propio.
 
 ## Pendiente de revisión en iPhone
+
+- Producto 25N1, en el hito M2: Finanzas y su engranaje, Ajustes, Licencias, Movimientos deshechos desde Movimientos, los
+  controles y formularios nuevos y los tokens en claro y oscuro (docs/mobile-device-checklist.md, «Producto 25N1»).
 
 - Producto 25O1, en el hito M1 (un perfil de prueba vacío, `EXPO_PUBLIC_QA_PROFILE`, nunca los datos del dueño): la historia, sus escenas y su
   movimiento, el paso de la plata, el saldo y su chip de moneda, «Todo listo.» y su paso a Inicio, restaurar una copia
