@@ -1017,3 +1017,35 @@ test('while an item read from the store is read again, it stays drawn but offers
   root = view.render();
   assert.equal(all(root, 'Money')[0].props.minor, 1500000);
 });
+
+test('a refusal line does not outlive the repair: Editar takes it away in the sheet and the detail; a new refusal sets it again', async () => {
+  for (const file of ['review-sheet/[id].tsx', 'review/[id].tsx']) {
+    const item = itemOf(drafted());
+    const ledger: Ledger = { review: trayOf([item]), calls: [], confirmResult: () => Promise.reject(new Error(domain.REVIEW_STALE_MESSAGE)) };
+    const view = harness(file, ledger, { id: item.id });
+    button(view.render(), 'Confirmar')!.props.onPress();
+    await settle();
+    assert.equal(all(view.render(), 'ErrorMessage')[0].props.message, domain.REVIEW_STALE_MESSAGE, file + ': the refusal is shown, so the person sees why');
+    button(view.render(), 'Editar')!.props.onPress();
+    // Back from the editor (saved and re-based): the sheet or detail draws the item with no old red sentence.
+    ledger.review = trayOf([{ ...item, revision: 1 }]);
+    view.refocus();
+    assert.equal(all(view.render(), 'ErrorMessage')[0].props.message, null, file);
+    button(view.render(), 'Confirmar')!.props.onPress();
+    await settle();
+    assert.equal(all(view.render(), 'ErrorMessage')[0].props.message, domain.REVIEW_STALE_MESSAGE, file + ': refused again, said again');
+  }
+});
+
+test('a quick double tap on Editar presents one editor, in the sheet and in the detail; back in front, Editar opens it again', () => {
+  for (const file of ['review-sheet/[id].tsx', 'review/[id].tsx']) {
+    const item = itemOf(drafted());
+    const view = harness(file, { review: trayOf([item]), calls: [] }, { id: item.id });
+    button(view.render(), 'Editar')!.props.onPress();
+    button(view.render(), 'Editar')!.props.onPress();
+    assert.equal(view.pushed.length, 1, file + ': one editor, never two stacked on the same revision');
+    view.refocus();
+    button(view.render(), 'Editar')!.props.onPress();
+    assert.equal(view.pushed.length, 2, file + ': the latch opens again once the screen is in front');
+  }
+});

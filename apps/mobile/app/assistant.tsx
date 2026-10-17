@@ -99,6 +99,14 @@ export default function AssistantScreen() {
    * person left, is not spoken over another screen), in the words the thread shows, read when they are said, so a language
    * change mid-answer is followed. The reply sheet a capture presents speaks for itself. */
   const front = useRef(false);
+  // One push per tap on «Revisar» or «Ver movimiento»: a second tap while the sheet rises never stacks a second one. Open
+  // again once the Assistant is in front again.
+  const navigating = useRef(false);
+  const pushOnce = useCallback((to: Parameters<typeof router.push>[0]) => {
+    if (navigating.current) return;
+    navigating.current = true;
+    router.push(to);
+  }, []);
   const words = useRef({ t, errorText });
   words.current = { t, errorText };
   const say = useCallback((text: string) => { if (front.current) announce(text); }, []);
@@ -118,6 +126,7 @@ export default function AssistantScreen() {
     const present = (itemId: string) => { router.push({ pathname: '/review-sheet/[id]', params: { id: itemId } }); };
     session.presenter.current = present;
     front.current = true;
+    navigating.current = false;
     return () => { front.current = false; if (session.presenter.current === present) session.presenter.current = null; };
   }, [session]));
 
@@ -304,8 +313,8 @@ export default function AssistantScreen() {
           complete; a request carries no previous turn) or of an older one would only echo its words. Those are answered by typing. */}
       {item.content?.kind === 'clarification' && ownsPending({ messages, pending }, item.id) && <ClarificationChoices options={item.content.options} chosen={item.content.chosen} onChoose={(option, shown) => choose(item.id, option, shown)} />}
       {item.content?.kind === 'proposal' && <ProposalCard content={item.content} state={proposalState(item.content)} archive={archive as ReviewArchive | null}
-        onReview={id => router.push({ pathname: '/review-sheet/[id]', params: { id } })} onRetry={() => void capture(item.id)}
-        onOpenRecord={(record, id) => router.push(record === 'plan' ? { pathname: '/installment/[id]', params: { id } } : { pathname: '/entry/[id]', params: { id } })} />}
+        onReview={id => pushOnce({ pathname: '/review-sheet/[id]', params: { id } })} onRetry={() => void capture(item.id)}
+        onOpenRecord={(record, id) => pushOnce(record === 'plan' ? { pathname: '/installment/[id]', params: { id } } : { pathname: '/entry/[id]', params: { id } })} />}
     </View>;
   };
 

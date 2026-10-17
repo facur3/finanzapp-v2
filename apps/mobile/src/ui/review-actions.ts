@@ -1,5 +1,6 @@
-import { useRef, useState, type MutableRefObject } from 'react';
+import { useCallback, useRef, useState, type MutableRefObject } from 'react';
 import { Alert } from 'react-native';
+import { router, useFocusEffect, type Href } from 'expo-router';
 import { useLedger } from '../storage/LedgerProvider';
 import type { ReviewItem } from '../storage/review-database';
 import { useI18n } from '../i18n/provider';
@@ -63,5 +64,20 @@ export function useReviewActions(item: ReviewItem, options: { leaving: MutableRe
       }, 'review.detail.dismissFailed') },
     ], { cancelable: true });
   };
-  return { busy, error, confirm, dismiss };
+  // A refusal's line explains the item as it was; the person going to Editar to repair it takes it away (a new refusal after
+  // the edit sets it again), so the repaired item is never drawn under the old red sentence.
+  const clearError = () => setError(null);
+  return { busy, error, confirm, dismiss, clearError };
+}
+
+/** One push per tap: a second tap during the presentation (expo-router's push always adds a route) never stacks a second
+ * sheet or editor over the same item. The latch opens again when this screen is in front again. */
+export function usePushOnce() {
+  const latch = useRef(false);
+  useFocusEffect(useCallback(() => { latch.current = false; }, []));
+  return (to: Href) => {
+    if (latch.current) return;
+    latch.current = true;
+    router.push(to);
+  };
 }

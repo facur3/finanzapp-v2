@@ -8,7 +8,7 @@ import { ActionButton, AppText, DetailRow, EmptyState, ErrorMessage, IconButton,
 import { reviewSheetScrolls } from '../../src/ui/geometry';
 import { useAccountNameOf, useCategoryLabel } from '../../src/ui/category-hues';
 import { reviewFacts } from '../../src/ui/review-presentation';
-import { useReviewActions } from '../../src/ui/review-actions';
+import { usePushOnce, useReviewActions } from '../../src/ui/review-actions';
 import { useReviewItem } from '../../src/ui/use-review-item';
 import { space, usePalette } from '../../src/ui/theme';
 import { useI18n } from '../../src/i18n/provider';
@@ -102,7 +102,8 @@ function ReviewSheet({ item, leaving, reload, leave, refreshing, onHeld }: {
   const { t, formatDate, moneyText, spokenMoney } = useI18n();
   const nameOf = useAccountNameOf();
   const categoryLabel = useCategoryLabel(item.draft.category ?? '', item.draft.kind ?? 'expense');
-  const { busy, error, confirm, dismiss } = useReviewActions(item, { leaving, reload, leave });
+  const { busy, error, confirm, dismiss, clearError } = useReviewActions(item, { leaving, reload, leave });
+  const push = usePushOnce();
   useEffect(() => { onHeld(busy); }, [busy]);
   useEffect(() => () => onHeld(false), []);
   const idle = busy || refreshing;
@@ -146,7 +147,7 @@ function ReviewSheet({ item, leaving, reload, leave, refreshing, onHeld }: {
     {tray.writable && <View style={{ gap: space.s }}>
       {!conflict && <ActionButton label={confirmText.text} spokenLabel={confirmText.spoken} icon="checkmark" onPress={confirm} busy={busy} disabled={!facts.canConfirm || refreshing} />}
       {!conflict && <ActionButton label={t('review.detail.edit')} icon="create-outline" secondary disabled={idle}
-        onPress={() => router.push({ pathname: '/edit-review/[id]', params: { id: item.id } })} />}
+        onPress={() => { clearError(); push({ pathname: '/edit-review/[id]', params: { id: item.id } }); }} />}
       {/* Descartar is explicit and asks first; closing the sheet is not discarding. A conflict with a frozen write cannot be
           dismissed (the store refuses it). */}
       {(!conflict || item.attempt === null) && <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('review.sheet.discard')}

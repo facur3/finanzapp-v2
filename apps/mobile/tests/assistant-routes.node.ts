@@ -492,6 +492,24 @@ test('25A-04: one review sheet at a time: a capture that lands while a sheet is 
   assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/review-sheet/[id]', params: { id: third.props.content.capture.id } }));
 });
 
+test('a quick double tap on «Revisar» presents one review sheet; back in the Assistant, «Revisar» opens it again', async () => {
+  const scripted = scriptedClient();
+  const view = harness({ client: scripted.client });
+  view.render().empty.props.onPick('Gasté 18.500 en Carrefour con la Visa');
+  await tick();
+  scripted.reply([{ type: 'result', result: FIXTURE_DRAFT, facts: [] }]);
+  await settle();
+  assert.equal(view.pushed.length, 1, 'presented once after the capture');
+  view.refocus(); // The sheet was closed for later.
+  const card = find([view.render().items[1]], 'ProposalCard')[0];
+  card.props.onReview(card.props.content.capture.id);
+  card.props.onReview(card.props.content.capture.id);
+  assert.equal(view.pushed.length, 2, 'the second tap during the presentation stacks nothing');
+  view.refocus();
+  find([view.render().items[1]], 'ProposalCard')[0].props.onReview(card.props.content.capture.id);
+  assert.equal(view.pushed.length, 3);
+});
+
 test('25A-04: an answer that lands after the Assistant was left and reopened presents the sheet over the Assistant now in front', async () => {
   const scripted = scriptedClient();
   const review = memoryReview();

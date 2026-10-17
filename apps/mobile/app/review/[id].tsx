@@ -7,7 +7,7 @@ import type { ReviewItem } from '../../src/storage/review-database';
 import { ActionButton, AppText, DetailRow, EmptyState, ErrorMessage, LifecycleNote, Money, Screen, SectionTitle, Surface } from '../../src/ui/components';
 import { useAccountNameOf, useCategoryLabel } from '../../src/ui/category-hues';
 import { reviewFacts, stateTone, type ReviewFacts } from '../../src/ui/review-presentation';
-import { useReviewActions } from '../../src/ui/review-actions';
+import { usePushOnce, useReviewActions } from '../../src/ui/review-actions';
 import { useReviewItem } from '../../src/ui/use-review-item';
 import { space, usePalette } from '../../src/ui/theme';
 import { useI18n } from '../../src/i18n/provider';
@@ -41,7 +41,8 @@ function ReviewDetail({ item, leaving, reload, refreshing }: { item: ReviewItem;
   // Opened from a link with nothing under it, the tray replaces it instead.
   const leave = () => { if (router.canGoBack()) router.back(); else router.replace('/review'); };
   // 25A-04: the same Confirmar and Descartar as the review sheet (src/ui/review-actions.ts).
-  const { busy, error, confirm, dismiss } = useReviewActions(item, { leaving, reload, leave });
+  const { busy, error, confirm, dismiss, clearError } = useReviewActions(item, { leaving, reload, leave });
+  const push = usePushOnce();
   const tray = review && review !== 'unavailable' ? review : null;
   const facts: ReviewFacts | null = archive && tray ? reviewFacts(item, archive as ReviewArchive, { todayISO: todayKey(), writable: tray.writable, conflicts: tray.conflicts }) : null;
   const categoryLabel = useCategoryLabel(item.draft.category ?? '', item.draft.kind ?? 'expense');
@@ -103,7 +104,7 @@ function ReviewDetail({ item, leaving, reload, refreshing }: { item: ReviewItem;
     {tray.writable && <View style={{ gap: 10 }}>
       {!conflict && <ActionButton label={confirmText.text} spokenLabel={confirmText.spoken} icon="checkmark" onPress={confirm} busy={busy} disabled={!facts.canConfirm || refreshing} />}
       {!conflict && <ActionButton label={t('review.detail.edit')} icon="create-outline" secondary disabled={busy || refreshing}
-        onPress={() => router.push({ pathname: '/edit-review/[id]', params: { id: item.id } })} />}
+        onPress={() => { clearError(); push({ pathname: '/edit-review/[id]', params: { id: item.id } }); }} />}
       {(!conflict || item.attempt === null) && <ActionButton label={t('review.detail.dismiss')} icon="close" secondary disabled={busy || refreshing} onPress={dismiss} />}
     </View>}
   </Screen>;
