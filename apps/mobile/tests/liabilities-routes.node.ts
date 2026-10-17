@@ -119,7 +119,7 @@ function harness(file: string, params: Record<string, unknown> = {}, initial: do
   Object.assign(components, { StatRow: 'StatRow' });
   const cardRows = { ArchivedCardRow: 'ArchivedCardRow', PlanRow: 'PlanRow', ScheduleRow: 'ScheduleRow' };
   Object.assign(modules, { '../src/ui/card-rows': cardRows, '../../src/ui/card-rows': cardRows, '../../src/ui/installment-presentation': installmentPresentation,
-    './liability-presentation': liabilityPresentation, './motion': modules['../src/ui/motion'], '@expo/vector-icons/Ionicons': 'Ionicons' });
+    './liability-presentation': liabilityPresentation, './presentation': presentation, './motion': modules['../src/ui/motion'], '@expo/vector-icons/Ionicons': 'Ionicons' });
   const require = (name: string) => {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected liabilities dependency: ' + name);
     return modules[name];

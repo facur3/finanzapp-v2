@@ -7,6 +7,7 @@ import * as domain from '@finanzapp/domain';
 import * as currencies from '../src/ui/currencies.ts';
 import * as moneyInput from '../src/ui/money-input.ts';
 import * as cardCycleForm from '../src/ui/card-cycle-form.ts';
+import * as presentation from '../src/ui/presentation.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 import type { AppLocale } from '../src/i18n/locale.ts';
 import { realModule } from './real-module.ts';
@@ -66,6 +67,8 @@ function harness(props: { original?: domain.CreditCardProfile } = {}, options: O
     './currencies': currencies,
     './form-controls': { DateField: 'DateField' },
     './money-input': moneyInput,
+    // The real management hook reads the committed-before-refresh rule from it.
+    './presentation': presentation,
     './switch-row': { SwitchRow: 'SwitchRow' },
     './theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, useCurrentDay: () => day },
   };

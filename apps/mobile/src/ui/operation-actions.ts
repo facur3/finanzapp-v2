@@ -29,6 +29,14 @@ export function useOperationChange() {
   const writing = useRef(false);
   const confirming = useRef(false);
 
+  // 25R1: the ledger already shows the change sent with an unknown outcome (it committed; a later read brought it): nothing is
+  // left to retry, so «Reintentar cambio» gives way. Set during render.
+  const applied = pending && !busyId && archive?.purchaseOperations?.find(item => item.id === pending.after.id);
+  if (pending && applied && applied.revision === pending.after.revision && applied.voided === pending.after.voided) {
+    setPending(null);
+    if (error?.id === pending.after.id) setError(null);
+  }
+
   const check = (operation: PurchaseOperation): OperationCheck => archive
     ? checkOperationChange(archive, operation, todayKey(), new Date().toISOString()) : { ok: false, reason: '' };
 

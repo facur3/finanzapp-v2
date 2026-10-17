@@ -47,6 +47,10 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
   // to record another only when the domain would accept one now (a dry run with what is still returnable).
   const refunds = archive ? entryRefundSummary(archive, entry.id) : null;
   const liveRefunds = refunds ? [...refunds.refunds].sort((a, b) => b.dateISO.localeCompare(a.dateISO) || b.createdAt.localeCompare(a.createdAt)) : [];
+  // 25R1: a change sent with an unknown outcome that the ledger now shows applied (it committed; a later read brought it):
+  // nothing is left to retry, so «Reintentar cambio» and the locked Editar give way. Set during render, React's pattern for
+  // information from previous renders.
+  if (pending && !busy && record.revision === pending.after.revision && record.voided === pending.after.voided) { setPending(null); setError(null); }
   const refundable = !!archive && !record.voided && !pending && canRefundEntry(archive, entry.id, todayKey(), new Date().toISOString());
   async function apply(change: EntryChange) {
     if (saving.current) return;

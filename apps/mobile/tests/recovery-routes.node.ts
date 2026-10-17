@@ -6,6 +6,7 @@ import ts from 'typescript';
 import * as currencies from '../src/ui/currencies.ts';
 import * as domain from '@finanzapp/domain';
 import * as presentation from '../src/ui/presentation.ts';
+import { VIEW_REFRESH_MESSAGE } from '../src/storage/ledger-session.ts';
 import * as budgetPresentation from '../src/ui/budget-presentation.ts';
 import * as liabilityPresentation from '../src/ui/liability-presentation.ts';
 import * as installmentPresentation from '../src/ui/installment-presentation.ts';
@@ -39,7 +40,9 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   add?: (value: domain.Entry) => Promise<void>; update?: (value: domain.EntryChange) => Promise<void>;
   addTransfer?: (value: domain.Transfer) => Promise<void>; updateTransfer?: (value: domain.TransferChange) => Promise<void>;
   updateAccount?: (value: domain.AccountChange) => Promise<void>; addAccount?: (value: domain.Account) => Promise<void>; saveRecurring?: (value: domain.RecurringRule) => Promise<void>;
-  restore?: (value: domain.LedgerArchive, baseline: string) => Promise<void>; picker?: () => Promise<any>; locale?: AppLocale } = {}) {
+  restore?: (value: domain.LedgerArchive, baseline: string) => Promise<void>; picker?: () => Promise<any>; locale?: AppLocale;
+  /** The day the archive's catch-ups last ran through (the provider's `asOfISO`); absent: as the screen's own day. */
+  asOfISO?: string } = {}) {
   const source = readFileSync(new URL('../' + file, import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const state: any[] = [];
@@ -54,7 +57,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   let locale: AppLocale = options.locale ?? 'es-AR';
   const i18nProvider = { useI18n: () => bindLocale(locale) };
   const jsx = (type: Node['type'], props: Node['props']) => ({ type, props });
-  const ledger = { useLedger: () => ({ archive: data, snapshot: data ? domain.snapshotFromArchive(data) : null,
+  const ledger = { useLedger: () => ({ archive: data, snapshot: data ? domain.snapshotFromArchive(data) : null, asOfISO: options.asOfISO ?? null,
     addEntry: async (value: domain.Entry) => { additions.push(value); await options.add?.(value); },
     saveRecurring: async (value: domain.RecurringRule) => { rules.push(value); await options.saveRecurring?.(value); },
     updateEntry: async (value: domain.EntryChange) => { updates.push(value); await options.update?.(value); },
@@ -100,7 +103,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     './form-controls': { AccountField: 'AccountField', CategoryField: 'CategoryField', CurrencyField: 'CurrencyField', DateField: 'DateField', SelectorCard: 'SelectorCard' },
     '../src/ui/form-controls': { CurrencyField: 'CurrencyField' }, '../../src/ui/form-controls': { CurrencyField: 'CurrencyField' },
     '../src/ui/currencies': currencies, '../../src/ui/currencies': currencies,
-    './presentation': presentation, '../../src/ui/presentation': presentation, './entry-prefill': entryPrefill,
+    './presentation': presentation, '../src/ui/presentation': presentation, '../../src/ui/presentation': presentation, './entry-prefill': entryPrefill,
     './budget-presentation': budgetPresentation, '../../src/ui/budget-presentation': budgetPresentation,
     './money-input': moneyInput, '../../src/ui/money-input': moneyInput, '../src/ui/money-input': moneyInput,
     // 25Q4: the movement and transfer details word a card's or a debt's state after an undo or a restore.
@@ -318,6 +321,39 @@ test('25Q4: an import that fails with an engine\'s error says the import\'s own 
   assert.notEqual(bindLocale('en-US').errorText(message), message);
   assert.equal(view.restores.length, 2);
   assert.equal(nodes(view.render()).some(node => node.props.title === 'Copia incorporada'), false);
+});
+test('25R1: an import that committed but whose view could not be read again is done: «Copia incorporada», never «Confirmar importación» again under the save-finished sentence', async () => {
+  const json = JSON.stringify(domain.createRecoveryBackup(archive));
+  const view = harness('app/backup-import.tsx', {}, { data: { accounts: [], records: [] },
+    picker: async () => ({ canceled: false, result: { size: json.length, name: 'copia.json', text: async () => json } }),
+    restore: async () => { throw new Error(VIEW_REFRESH_MESSAGE); } });
+  await find(view.render(), 'ActionButton', 'Elegir copia').props.onPress();
+  find(view.render(), 'ActionButton', 'Confirmar importación').props.onPress();
+  view.alerts[0].buttons[1].onPress();
+  await flush();
+  const root = view.render();
+  assert.equal(find(root, 'EmptyState').props.title, 'Copia incorporada');
+  assert.equal(nodes(root).some(node => node.props.label === 'Confirmar importación'), false);
+  assert.equal(view.restores.length, 1);
+});
+test('25R1: a refused import keeps the review: «Volver a revisar» previews the copy again against the stored ledger, and «Elegir otra copia» picks again', async () => {
+  const json = JSON.stringify(domain.createRecoveryBackup(archive));
+  let picks = 0;
+  const view = harness('app/backup-import.tsx', {}, { data: { accounts: [], records: [] },
+    picker: async () => { picks++; return { canceled: false, result: { size: json.length, name: 'copia.json', text: async () => json } }; },
+    restore: async () => { throw new Error('La copia contradice cambios locales. No se importó nada. Conservá ambas versiones.'); } });
+  await find(view.render(), 'ActionButton', 'Elegir copia').props.onPress();
+  find(view.render(), 'ActionButton', 'Confirmar importación').props.onPress();
+  view.alerts[0].buttons[1].onPress();
+  await flush();
+  // The provider re-read the archive before the refusal arrived: the copy is now all there.
+  view.setData(archive);
+  find(view.render(), 'ActionButton', 'Volver a revisar').props.onPress();
+  const root = view.render();
+  assert.equal(nodes(root).some(node => node.type === 'ErrorMessage' && node.props.message), false, 'the refusal is cleared');
+  assert.equal(nodes(root).some(node => node.props.label === 'Confirmar importación'), false, 'nothing left to import');
+  await find(root, 'ActionButton', 'Elegir otra copia').props.onPress();
+  assert.deepEqual([picks, view.restores.length], [2, 1]);
 });
 test('oversized files are rejected before reading their content', async () => {
   let reads = 0;
@@ -2441,4 +2477,39 @@ test('25O1: the recurring form says what a rule does right under its date (Recur
   view.setLocale('en-AR');
   root = view.render();
   assert.equal(find(root, 'FieldNote').props.children, 'It’s recorded on each due date; it doesn’t pay or collect anything.');
+});
+
+test('25R1: between a change of day and the catch-up for it, a rule due meanwhile is not «behind»: Revisar and Continuar desde hoy wait for the pass', () => {
+  // The screen's day is 2026-09-20; the rule fell due on the 19th.
+  const data: domain.LedgerArchive = { ...archive, recurring: [{ ...streaming, nextDateISO: '2026-09-19' }] };
+  const labels = (asOfISO?: string) => nodes(harness('app/recurring/[id].tsx', {}, { data, params: { id: 'netflix' }, asOfISO }).render())
+    .filter(node => node.type === 'ActionButton').map(node => node.props.label);
+  assert.ok(!labels('2026-09-19').includes('Continuar desde hoy'), 'the archive is current to the 19th: its catch-up for the 20th has not run yet');
+  assert.ok(labels('2026-09-20').includes('Continuar desde hoy'), 'a pass for the 20th ran and left it behind: review');
+  assert.ok(labels().includes('Continuar desde hoy'), 'without a pass day, the screen\'s own day');
+});
+
+test('25R1: a movement or transfer change whose outcome was unknown gives way once the ledger shows it applied: no «Reintentar cambio», the applied state\'s own action', async () => {
+  const view = harness('app/entry/[id].tsx', {}, { params: { id: entry.id }, update: async () => { throw new Error(VIEW_REFRESH_MESSAGE); } });
+  find(view.render(), 'ActionButton', 'Deshacer movimiento').props.onPress();
+  view.alerts[0].buttons[1].onPress(); await flush();
+  assert.ok(find(view.render(), 'ActionButton', 'Reintentar cambio'), 'unknown outcome: the change stays frozen');
+  // A later read (the foreground, the banner's retry) brings the undo: committed.
+  view.setData({ ...archive, records: archive.records.map(record => record.entry.id === entry.id ? view.updates[0].after : record) });
+  view.render();
+  let root = view.render();
+  assert.equal(nodes(root).some(node => node.props.label === 'Reintentar cambio'), false);
+  assert.ok(find(root, 'ActionButton', 'Recuperar movimiento'));
+  assert.equal(nodes(root).some(node => node.type === 'ErrorMessage' && node.props.message), false);
+  // The same for a transfer; Editar comes back unlocked once its restore shows.
+  const transfers = harness('app/transfer/[id].tsx', {}, { data: { ...transferData, transfers: [domain.initialTransferRecord(transfer)] }, params: { id: transfer.id },
+    updateTransfer: async () => { throw new Error(VIEW_REFRESH_MESSAGE); } });
+  find(transfers.render(), 'ActionButton', 'Deshacer transferencia').props.onPress();
+  transfers.alerts[0].buttons[1].onPress(); await flush();
+  assert.ok(find(transfers.render(), 'ActionButton', 'Reintentar cambio'));
+  transfers.setData({ ...transferData, transfers: [transfers.transferChanges[0].after] });
+  transfers.render();
+  root = transfers.render();
+  assert.equal(nodes(root).some(node => node.props.label === 'Reintentar cambio'), false);
+  assert.ok(find(root, 'ActionButton', 'Recuperar transferencia'));
 });

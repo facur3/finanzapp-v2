@@ -7,12 +7,14 @@ import { useLedger } from '../storage/LedgerProvider';
 import { useI18n } from '../i18n/provider';
 import type { MessageKey } from '../i18n/messages';
 import { errorHaptic, selectionHaptic, successHaptic } from './motion';
+import { committedBeforeRefresh } from './presentation';
 import type { SwipeAction } from './swipe-actions';
 
 /** Producto 24UX4: managing commitments from a list row (trailing swipe) and from the detail screen, with one set of
  * rules. Every change is a revision of the stored row, saved before anything confirms it; a failed save keeps the row
  * as it was, says so (`error`, a catalogue key or the thrown message) and taps Error (25Q4: nothing is kept frozen, the
- * action is offered again). Deleting asks first and names what stays:
+ * action is offered again). 25R1: a save that committed but whose view could not be read again is done (the banner says
+ * to verify), never a failure. Deleting asks first and names what stays:
  * the movements, payments and collections already recorded are never touched. `done` runs after a durable save
  * (a detail screen closes itself there). */
 export function useRecurringManagement() {
@@ -32,6 +34,8 @@ export function useRecurringManagement() {
       if (feedback === 'success') successHaptic(); else selectionHaptic();
       done?.();
     } catch (cause) {
+      // 25R1: committed, only the view is stale (the banner says so): done, never a failure offered again.
+      if (committedBeforeRefresh(cause)) { done?.(); return; }
       setError(failureMessage(cause, failure));
       errorHaptic();
     } finally {
@@ -88,6 +92,8 @@ export function useDebtManagement() {
       if (feedback === 'success') successHaptic(); else selectionHaptic();
       done?.();
     } catch (cause) {
+      // 25R1: committed, only the view is stale (the banner says so): done, never a failure offered again.
+      if (committedBeforeRefresh(cause)) { done?.(); return; }
       setError(failureMessage(cause, failure));
       errorHaptic();
     } finally {
@@ -181,6 +187,7 @@ export function useAccountManagement() {
       successHaptic();
       done?.();
     } catch (cause) {
+      if (committedBeforeRefresh(cause)) { done?.(); return; }
       setError(failureMessage(cause, 'accounts.manage.deleteFailed'));
       errorHaptic();
     } finally {
@@ -240,6 +247,7 @@ export function useCardManagement() {
       successHaptic();
       done?.();
     } catch (cause) {
+      if (committedBeforeRefresh(cause)) { done?.(); return; }
       setError(failureMessage(cause, failure));
       errorHaptic();
     } finally {

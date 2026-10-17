@@ -399,6 +399,18 @@ test('24T3: an undo whose outcome is unknown keeps the change for «Reintentar c
   assert.equal(JSON.stringify(view.changes[1]), JSON.stringify(view.changes[0]), 'the same change, resent');
   assert.equal(JSON.stringify([view.failures.join(','), view.haptics()]), JSON.stringify(['Warning', 1]));
 
+  // 25R1: once a later read shows the undo applied (it committed), the frozen change gives way: the restore is offered.
+  const late = harness('app/operation/[id].tsx', { params: { id: 'r1' }, data, change: async () => { throw new Error('Refresh failed after commit'); } });
+  find(late.render(), 'ActionButton', 'Deshacer devolución').props.onPress();
+  late.alerts[0].buttons[1].onPress?.();
+  await flush();
+  assert.ok(has(late.render(), 'ActionButton', 'Reintentar cambio'));
+  late.setData(domain.applyOperationChange(data, late.changes[0], TODAY).archive);
+  late.render();
+  const shown = late.render();
+  assert.equal(has(shown, 'ActionButton', 'Reintentar cambio'), false);
+  assert.equal(find(shown, 'ErrorMessage').props.message, null, 'its unknown-outcome sentence goes with it');
+
   // Undone, then another devolución took everything that was left: restoring it would exceed the purchase.
   const blocked = refundOf(undoOf(data, 'r1'), 'r2', 50000, '2026-09-25');
   const detail = harness('app/operation/[id].tsx', { params: { id: 'r1' }, data: blocked }).render();

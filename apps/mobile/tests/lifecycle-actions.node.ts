@@ -5,6 +5,8 @@ import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import * as domain from '@finanzapp/domain';
 import { bindLocale } from '../src/i18n/bind.ts';
+import * as presentation from '../src/ui/presentation.ts';
+import { VIEW_REFRESH_MESSAGE } from '../src/storage/ledger-session.ts';
 
 // Producto 25B2: the account and card deletion flows of `src/ui/commitment-actions.ts`, run as source with their hosts
 // replaced: the confirmation names what stays and what stops, nothing is written before the destructive button,
@@ -36,7 +38,7 @@ const rules: domain.RecurringRule[] = [
   { id: 'r2', accountId: 'cash', kind: 'expense', amountMinor: 100, merchant: 'Pausado', category: 'Salud', frequency: 'monthly', anchorDateISO: '2026-09-15', nextDateISO: '2026-10-15', active: false, deleted: false, createdAt, revision: 1, updatedAt: createdAt },
 ];
 
-function harness({ fail = false, language = 'es-AR' as const, paid = false, deletedAccount = false, debtTransfers = [] as domain.Transfer[], plans = [] as domain.InstallmentPlan[] } = {}) {
+function harness({ fail = false as boolean | string, language = 'es-AR' as const, paid = false, deletedAccount = false, debtTransfers = [] as domain.Transfer[], plans = [] as domain.InstallmentPlan[] } = {}) {
   const source = readFileSync(new URL('../src/ui/commitment-actions.ts', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, esModuleInterop: true } }).outputText;
   const alerts: { title: string; message: string; buttons: { text: string; style?: string; onPress?: () => void }[] }[] = [];
@@ -58,12 +60,13 @@ function harness({ fail = false, language = 'es-AR' as const, paid = false, dele
       errorHaptic: () => { haptics.push('Error'); }, warningHaptic: () => { haptics.push('Warning'); } },
     '@finanzapp/domain': domain,
     '../storage/LedgerProvider': { useLedger: () => ({ snapshot, archive: { accounts: snapshot.accounts, records: entries.map(domain.initialRecord), recurring: rules, cards: [card], installmentPlans: plans },
-      removeAccount: async (id: string) => { if (fail) throw new Error('disk full'); removed.push(id); },
-      saveCard: async (next: domain.CreditCardProfile) => { if (fail) throw new Error('disk full'); savedCards.push(next); },
-      removeCard: async (id: string) => { if (fail) throw new Error('disk full'); removedCards.push(id); },
-      saveDebt: async (next: domain.PersonalDebtProfile) => { if (fail) throw new Error('disk full'); savedDebts.push(next); },
-      removeDebt: async (id: string) => { if (fail) throw new Error('disk full'); removedDebts.push(id); },
-      saveRecurring: async () => {} }) },
+      removeAccount: async (id: string) => { if (fail) throw new Error(fail === true ? 'disk full' : fail); removed.push(id); },
+      saveCard: async (next: domain.CreditCardProfile) => { if (fail) throw new Error(fail === true ? 'disk full' : fail); savedCards.push(next); },
+      removeCard: async (id: string) => { if (fail) throw new Error(fail === true ? 'disk full' : fail); removedCards.push(id); },
+      saveDebt: async (next: domain.PersonalDebtProfile) => { if (fail) throw new Error(fail === true ? 'disk full' : fail); savedDebts.push(next); },
+      removeDebt: async (id: string) => { if (fail) throw new Error(fail === true ? 'disk full' : fail); removedDebts.push(id); },
+      saveRecurring: async () => { if (fail) throw new Error(fail === true ? 'disk full' : fail); } }) },
+    './presentation': presentation,
     '../i18n/provider': { useI18n: () => bindLocale(language) },
   };
   const module = { exports: {} as Record<string, () => any> };
@@ -387,4 +390,22 @@ test('24T3 (owner review): a card held by more than one fact names them all in o
   const snapshot = (transfers: domain.Transfer[]) => ({ accounts: [cash, other, cardAccount], entries, transfers });
   assert.throws(() => domain.assertCardDeletable(card, snapshot(transfers), [], [], []), { message: domain.CARD_DEBT_MESSAGE });
   assert.throws(() => domain.assertCardDeletable(card, snapshot(transfers.concat(overpaid)), [], [], []), { message: domain.CARD_CREDIT_MESSAGE });
+});
+
+test('25R1: a management action that committed but whose view could not be read again is done: no failure said, nothing offered again, `done` runs', async () => {
+  const view = harness({ fail: VIEW_REFRESH_MESSAGE });
+  let done = 0;
+  const recurring = view.render('useRecurringManagement');
+  await recurring.pause(rules[0], () => done++);
+  assert.equal(view.render('useRecurringManagement').error, null);
+  view.render('useAccountManagement').remove(cash, () => done++);
+  view.alerts.at(-1)!.buttons[1].onPress!();
+  await settle();
+  assert.equal(view.render('useAccountManagement').error, null);
+  assert.equal(done, 2, 'a detail closes as after any durable save');
+  assert.ok(!view.haptics.includes('Error'), 'never the failure tap');
+  // An engine failure is still a failure, said and offered again.
+  const failing = harness({ fail: true });
+  await failing.render('useRecurringManagement').pause(rules[0]);
+  assert.equal(failing.render('useRecurringManagement').error, 'recurring.manage.failed');
 });

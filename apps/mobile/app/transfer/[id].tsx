@@ -46,6 +46,9 @@ function TransferDetail({ record, accounts }: { record: TransferRecord; accounts
   const [pending, setPending] = useState<TransferChange | null>(null);
   const [error, setError] = useState<string | null>(null);
   const working = useRef(false), confirming = useRef(false);
+  // 25R1: the ledger already shows the change sent with an unknown outcome (it committed; a later read brought it): nothing
+  // is left to retry. Set during render.
+  if (pending && !busy && record.revision === pending.after.revision && record.voided === pending.after.voided) { setPending(null); setError(null); }
   async function apply(change: TransferChange) {
     if (working.current) return;
     working.current = true; setBusy(true); setPending(change); setError(null);

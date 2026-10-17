@@ -6,6 +6,7 @@ import { BACKUP_MAX_BYTES, parsePilotBackup, previewBackupImport, sortCurrencies
   type ParsedBackup } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { isPickerCopy, restoreCatchUp } from '../src/ui/backup-file';
+import { committedBeforeRefresh } from '../src/ui/presentation';
 import { ActionButton, AppText, DetailRow, EmptyState, ErrorMessage, Money, Screen, SectionTitle, Surface } from '../src/ui/components';
 import { errorHaptic, successHaptic } from '../src/ui/motion';
 import { useCurrentDay } from '../src/ui/theme';
@@ -82,6 +83,9 @@ export default function BackupImportScreen() {
       setDone(true);
       successHaptic();
     } catch (cause) {
+      // 25R1: the import committed and only the view could not be read again (the banner says to verify): the copy is in, so
+      // the screen says so and never offers «Confirmar importación» again under a sentence that says the save finished.
+      if (committedBeforeRefresh(cause)) { setDone(true); return; }
       setError(failureMessage(cause, 'backup.import.verifyFailed'));
       // 25Q4: nothing stays frozen here; the review offers the import again.
       errorHaptic();

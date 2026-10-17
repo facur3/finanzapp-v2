@@ -46,7 +46,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   const added: { account: domain.Account; appearance?: domain.AccountAppearance }[] = [];
   const changed: { change: domain.AccountChange; appearance?: domain.AccountAppearance }[] = [];
   const looks: domain.AccountAppearance[] = [], definitions: domain.CategoryDefinition[] = [];
-  const data = options.data ?? archive;
+  let data = options.data ?? archive;
   const jsx = (type: Node['type'], props: Node['props']) => ({ type, props });
   const ledger = { useLedger: () => ({ archive: data, snapshot: domain.snapshotFromArchive(data), ...(options.gate ? { gate: options.gate } : {}),
     addAccount: async (account: domain.Account, look?: domain.AccountAppearance) => { added.push({ account, appearance: look }); options.fail?.(); },
@@ -114,6 +114,8 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     render: (component?: string) => { cursor = 0; refCursor = 0; let node = (component ? module.exports[component] : module.exports.default ?? module.exports.CategoryForm)(props);
       while (typeof node.type === 'function') node = node.type(node.props); return node; },
     pushed, alerts, added, changed, looks, definitions, removed, dismissed, haptics, backs: () => backs, setLocale: (next: AppLocale) => { locale = next; },
+    /** A write landing while the screen stays mounted (the provider's archive changes). */
+    setData: (next: domain.LedgerArchive) => { data = next; },
   };
 }
 function nodes(value: any): Node[] {
@@ -817,4 +819,16 @@ test('24UX6E: after «Eliminar cuenta» the editor dismisses to Cuentas in one s
   const alone = harness('app/edit-account/[id].tsx', {}, { params: { id: 'cash' }, root: true });
   await find(alone.render(), 'ActionButton', 'Guardar cambios').props.onPress();
   assert.deepEqual([alone.backs(), alone.dismissed, alone.changed.length], [0, ['/accounts'], 0], 'an unchanged save closes to Cuentas');
+});
+
+test('25R1: a budget deleted from its edit modal keeps its form while the modal closes; an id never seen live is not found', () => {
+  const budget: domain.MonthlyBudget = { id: 'b1', scope: 'total', currency: 'ARS', monthISO: '2026-09', amountMinor: 100000, active: true, createdAt: '2026-09-01T12:00:00.000Z', revision: 0, updatedAt: '2026-09-01T12:00:00.000Z' };
+  const data = { ...archive, budgets: [budget] };
+  const view = harness('app/edit-budget/[id].tsx', {}, { data, params: { id: 'b1' } });
+  assert.equal(view.render().type, 'BudgetForm');
+  view.setData({ ...data, budgets: [{ ...budget, active: false, revision: 1 }] });
+  const closing = view.render();
+  assert.equal(closing.type, 'BudgetForm', 'no «No encontramos este presupuesto» flash while the modal slides away');
+  const never = harness('app/edit-budget/[id].tsx', {}, { data: { ...data, budgets: [{ ...budget, active: false, revision: 1 }] }, params: { id: 'b1' } });
+  assert.ok(find(never.render(), 'EmptyState'));
 });
