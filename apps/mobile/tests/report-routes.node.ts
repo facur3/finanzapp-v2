@@ -89,6 +89,8 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
     '../src/ui/display-currency-provider': displayProvider, '../src/ui/display-currency': displayCurrency,
     '../src/fx/rates-provider': ratesProvider, '../src/fx/finance-view': financeView, '../src/fx/fx-copy': fxCopy, '../src/fx/rates-store': ratesStore,
     '../src/ui/home-modules': { CurrencyParts: 'CurrencyParts', MetricHelp: 'MetricHelp' },
+    // The spending detail (an Assistant link) names its period; its own screen is pinned in tests/spending-home.node.ts.
+    '../src/ui/spending-timeline': { periodLabel: (period: domain.ReportPeriod) => period.startISO + '–' + period.endISO },
     '@finanzapp/domain': domain,
     '../src/storage/LedgerProvider': { useLedger: () => ({ snapshot: data, archive: { accounts: data.accounts, records: [], ...archive } }) },
     '../src/ui/geometry': geometry,
@@ -575,7 +577,8 @@ test('24C1: a consolidated month with an expense that has no rate shows per-curr
   assert.equal(JSON.stringify(parts.props.parts), JSON.stringify([{ currency: 'ARS', minor: 606 }, { currency: 'USD', minor: 999 }]));
   assert.match(parts.props.detail, /^No hay una cotización USD → ARS para el 31\/8\/2026\./);
   const comparison = routeHarness('report-comparison.tsx', { currency: 'EUR', month: '2026-08' }, snapshot, { display }).render();
-  assert.equal(find(comparison, 'EmptyState').props.detail, 'Sin cotización para sumarlo en EUR', 'no difference is claimed');
+  // 25R1: no difference is claimed, and the screen says why, in Reportes' own words.
+  assert.match(find(comparison, 'EmptyState').props.detail, /^No hay una cotización USD → ARS para el 31\/8\/2026\./);
 });
 
 test('25Q1 (REPORTS-02): a consolidated month waiting for a rate keeps its budgets, which need no rate; the drill-downs carry no day net', () => {
@@ -1314,4 +1317,57 @@ test('25OPS1: Reportes ends its content the dock\'s height above the window\'s b
     assert.equal(root.props.scrollIndicatorInsets, dock.indicator, 'the indicator ends above the dock');
     assert.equal(root.props.contentInsetAdjustmentBehavior, 'never', 'and the system adds no inset of its own');
   } finally { dock = { extraPadding: 0, indicator: undefined }; }
+});
+
+test('25R1: «Comparar con el mes anterior» is offered only when it can compare; the comparison says why a rate is missing, still arriving or offline', () => {
+  const consolidated = () => displayCurrency.createDisplayCurrencyStore(memoryPreferences({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated', [displayCurrency.DISPLAY_CURRENCY_KEY]: 'USD' }).store);
+  const book = domain.rateBook([
+    { base: 'USD', quote: 'ARS', rate: '1000', effectiveDate: '2026-08-07', source: 'Frankfurter', fetchedAt: '2026-09-01T00:00:00.000Z' },
+    { base: 'USD', quote: 'ARS', rate: '1000', effectiveDate: '2026-08-28', source: 'Frankfurter', fetchedAt: '2026-09-01T00:00:00.000Z' },
+  ]);
+  // August is complete; July has no expense at all, so the comparison can run: the row stays.
+  const rowOf = (root: Node) => nodes(root).some(n => n.type === 'NavigationRow' && n.props.title === 'Comparar con el mes anterior');
+  assert.equal(rowOf(routeHarness('(tabs)/reports.tsx', { month: '2026-08' }, snapshot, { display: consolidated(), book }).render()), true);
+  // September is complete but August, its previous month, lacks the rates of its last week: no dead end offered.
+  const later: domain.LedgerSnapshot = { ...snapshot, entries: [...snapshot.entries,
+    { id: 'sep', accountId: 'u', kind: 'expense', amountMinor: 500, merchant: 'Prueba', category: 'Salud', dateISO: '2026-09-11', createdAt }] };
+  const partial = domain.rateBook([{ base: 'USD', quote: 'ARS', rate: '1000', effectiveDate: '2026-08-07', source: 'Frankfurter', fetchedAt: '2026-09-01T00:00:00.000Z' }]);
+  const september = routeHarness('(tabs)/reports.tsx', { month: '2026-09' }, later, { display: consolidated(), book: partial }).render();
+  assert.equal(rowOf(september), false);
+  // One currency at a time (single mode) needs no rate: always offered.
+  assert.equal(rowOf(routeHarness('(tabs)/reports.tsx', { month: '2026-09' }, later).render()), true);
+  // The comparison itself, reached by a link: fetching, offline (its own icon) and missing each say themselves.
+  const comparison = (activity: ratesStore.RatesActivity) => find(routeHarness('report-comparison.tsx', { currency: 'USD', month: '2026-09' }, later, { display: consolidated(), book: partial, activity }).render(), 'EmptyState');
+  assert.equal(comparison('fetching').props.detail, 'Obteniendo cotizaciones');
+  assert.equal(comparison('offline').props.icon, 'cloud-offline-outline');
+  assert.match(comparison('offline').props.detail, /^Sin conexión/);
+  assert.match(comparison('idle').props.detail, /^La última cotización USD → ARS disponible es del 7\/8\/2026/, 'stale: the last one held is named');
+});
+
+test('25R1: a drill-down whose total waits for a rate says so with its reason behind ⓘ; the precision sentence is only for a total too large', () => {
+  const display = displayCurrency.createDisplayCurrencyStore(memoryPreferences({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated', [displayCurrency.DISPLAY_CURRENCY_KEY]: 'EUR' }).store);
+  const screens = [routeHarness('report-day.tsx', { currency: 'EUR', date: '2026-08-10' }, snapshot, { display, activity: 'offline' }).render(),
+    routeHarness('report-category.tsx', { currency: 'EUR', month: '2026-08', category: 'salud' }, snapshot, { display, activity: 'offline' }).render(),
+    routeHarness('spending-detail.tsx', { currency: 'EUR', startISO: '2026-08-01', endISO: '2026-08-31' }, snapshot, { display, activity: 'offline' }).render()];
+  for (const root of screens) {
+    const line = find(root, 'CurrencyParts');
+    assert.equal(JSON.stringify([line.props.parts, line.props.line]), JSON.stringify([[], 'Sin cotización para sumarlo en EUR']));
+    assert.match(line.props.detail, /^Sin conexión/);
+    assert.equal(texts(root).some(text => /precisión/.test(text)), false);
+  }
+  const fetching = find(routeHarness('report-day.tsx', { currency: 'EUR', date: '2026-08-10' }, snapshot, { display, activity: 'fetching' }).render(), 'CurrencyParts');
+  assert.equal(fetching.props.line, 'Obteniendo cotizaciones');
+});
+
+test('25R1: a malformed month or date in a link never reaches the rate store; the screen says the link is invalid', () => {
+  const display = displayCurrency.createDisplayCurrencyStore(memoryPreferences({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated', [displayCurrency.DISPLAY_CURRENCY_KEY]: 'EUR' }).store);
+  for (const [file, params] of [['report-category.tsx', { currency: 'EUR', month: '2026-00', category: 'salud' }], ['report-category.tsx', { currency: 'EUR', month: '2026-0x', category: 'salud' }],
+    ['report-day.tsx', { currency: 'EUR', date: '2026-13-01' }], ['spending-detail.tsx', { currency: 'EUR', startISO: '2026-00-01', endISO: '2026-00-02' }]] as const) {
+    const ensured: { months: readonly string[]; quotes: readonly string[] }[] = [];
+    const root = routeHarness(file, params, snapshot, { display, ensured }).render();
+    assert.ok(find(root, 'EmptyState'), file);
+    // Inicio no longer chooses dates: the invalid period never sends the person there.
+    assert.doesNotMatch(String(find(root, 'EmptyState').props.detail), /Inicio/, file);
+    assert.ok(ensured.every(request => request.months.every(month => domain.validMonthISO(month))), file + ': ' + JSON.stringify(ensured));
+  }
 });

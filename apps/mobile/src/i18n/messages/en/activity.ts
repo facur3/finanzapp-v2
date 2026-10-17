@@ -109,7 +109,7 @@ export const activity: Pick<Messages, 'activity' | 'rows' | 'entryDetail' | 'tra
   },
   spendingDetail: {
     invalidTitle: 'Invalid period',
-    invalidDetail: 'Go back to Home to choose the dates.',
+    invalidDetail: 'The link does not name a period that can be shown. Open Reports to see your spending by month.',
     allExpenses: 'Recorded spending',
     totalUnavailable: 'We cannot show this total precisely.',
     count: { one: '{count} recorded expense', other: '{count} recorded expenses' },

@@ -2,7 +2,10 @@ import { FlatList, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo } from 'react';
 import { isStorableCurrency, shiftMonthISO, spendingComparison, type CategoryChange, type ReportPeriod } from '@finanzapp/domain';
+import { useLedger } from '../src/storage/LedgerProvider';
 import { useFinanceView } from '../src/fx/rates-provider';
+import { spendingFigure } from '../src/fx/finance-view';
+import { shortfallDetail } from '../src/fx/fx-copy';
 import { AppText, DetailRow, EmptyState, Money, Screen, SectionTitle, Surface } from '../src/ui/components';
 import { useCategoryLookOf } from '../src/ui/category-hues';
 import { changePercent, dateRangeLabel, requestedReportMonth, strictReportSelection } from '../src/ui/report-presentation';
@@ -11,20 +14,29 @@ import { useCurrentDay, usePalette } from '../src/ui/theme';
 
 export default function ReportComparisonScreen() {
   const params = useLocalSearchParams<{ currency?: string; month?: string }>();
+  const { snapshot: real } = useLedger();
   const lookOf = useCategoryLookOf('expense');
   const today = useCurrentDay(), p = usePalette();
-  const { t, locale, codedAmount, spokenAmount } = useI18n();
+  const { t, locale, codedAmount, spokenAmount, formatNumericDate, currencyName } = useI18n();
   // 24C1: both months as Reportes counts them (converted in consolidated mode, each movement at its own day's rate).
   const month = requestedReportMonth(params.month, today);
   const months = useMemo(() => [shiftMonthISO(month, -1), month], [month]);
   const view = useFinanceView(months, isStorableCurrency(params.currency) ? params.currency : undefined);
   const snapshot = view?.snapshot;
-  if (!snapshot || !view) return null;
+  if (!snapshot || !view || !real) return null;
   // A drill-down never falls back to another currency: an unknown or unheld code is an invalid link.
   const selection = strictReportSelection(snapshot, params.currency, params.month, today);
   if (!selection) return <Screen><EmptyState title={t('reports.comparison.invalidTitle')} detail={t('reports.comparison.invalidDetail')} /></Screen>;
-  // Two months compared only when every expense in both had a rate; otherwise no difference is claimed.
-  if (!view.complete(months[0] + '-01', month === today.slice(0, 7) ? today : month + '-31', 'expense')) return <Screen><EmptyState title={t('fx.infoTitle')} detail={t('fx.unavailable', { currency: selection.currency })} /></Screen>;
+  // Two months compared only when every expense in both had a rate; otherwise no difference is claimed. 25R1: and the screen
+  // says why, as Reportes does: still arriving, offline, the provider, or no rate published.
+  const span = { startISO: months[0] + '-01', endISO: month === today.slice(0, 7) ? today : month + '-31' };
+  if (!view.complete(span.startISO, span.endISO, 'expense')) {
+    const figure = spendingFigure(real, view, span, view.activity, view.loaded);
+    const reason = figure.status === 'unavailable' ? figure.reason : 'missing';
+    return <Screen><EmptyState title={t('fx.infoTitle')} icon={reason === 'offline' ? 'cloud-offline-outline' : undefined}
+      detail={reason === 'fetching' ? t('fx.fetching') : figure.status === 'unavailable' ? shortfallDetail(figure, { t, date: formatNumericDate, currencyName })
+        : t('fx.unavailable', { currency: selection.currency })} /></Screen>;
+  }
   const comparison = spendingComparison(snapshot, selection.currency, selection.monthISO, today);
   const { current, previous, deltaMinor } = comparison;
   const amount = (minor: number) => codedAmount(minor, selection.currency);

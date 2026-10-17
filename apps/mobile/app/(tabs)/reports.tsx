@@ -109,6 +109,9 @@ export default function ReportsScreen() {
   const complete = !!view && !!report && view.complete(report.startISO, report.endISO, 'expense');
   const incomeComplete = !!view && !!report && view.complete(report.startISO, report.endISO, 'income');
   const previousComplete = !!view && !!selection && view.complete(shiftMonthISO(selection.monthISO, -1) + '-01', shiftMonthISO(selection.monthISO, -1) + '-31', 'expense');
+  // 25R1: «Comparar con el mes anterior» only when it can compare: one currency, or a previous month whose every expense has a
+  // rate (the comparison would otherwise open on a missing rate).
+  const compare = view?.mode === 'single' || previousComplete;
   const trendComplete = !!view && !!report && view.complete(months[0] + '-01', report.endISO, 'expense');
   // One function per locale and currency, so the insights below recompute when either changes and only then.
   const money = useMemo(() => (minor: number) => moneyText(minor, selection?.currency ?? 'ARS'), [moneyText, selection?.currency]);
@@ -370,15 +373,15 @@ export default function ReportsScreen() {
           </InsightSurface>)}
         </View>
       </View>}
-      {ready && <Surface grouped>
+      {ready && (incomeComplete || compare) && <Surface grouped>
         {/* Income is converted like spending; a month whose income lacks a rate shows no income or net figure rather than a partial one. */}
         {incomeComplete && <DetailRow label={t('reports.incomeRecorded')} value={money(report.incomeMinor)} spokenValue={spoken(report.incomeMinor)} icon="add-circle-outline" />}
-        {incomeComplete && <DetailRow label={t('reports.netFlow')} value={money(report.incomeMinor - report.expenseMinor)} spokenValue={spoken(report.incomeMinor - report.expenseMinor)} icon="swap-vertical-outline" />}
+        {incomeComplete && <DetailRow label={t('reports.netFlow')} value={money(report.incomeMinor - report.expenseMinor)} spokenValue={spoken(report.incomeMinor - report.expenseMinor)} icon="swap-vertical-outline" last={!compare} />}
         {/* 24UX6D: the change against last month (the same days, or the full month), only when both months are complete. */}
         {delta && <DetailRow label={t(delta.mode === 'matching-days' ? 'reports.delta.matchingDays' : 'reports.delta.previousMonth')}
           value={deltaWords(delta.percent)} spokenValue={spokenDelta} icon={delta.minor > 0 ? 'trending-up-outline' : delta.minor < 0 ? 'trending-down-outline' : 'remove-outline'} />}
-        <NavigationRow title={t('reports.compare')} subtitle={t('reports.compareSubtitle')} icon="git-compare-outline" last
-          onPress={() => router.push({ pathname: '/report-comparison', params: { currency, month: monthISO } })} />
+        {compare && <NavigationRow title={t('reports.compare')} subtitle={t('reports.compareSubtitle')} icon="git-compare-outline" last
+          onPress={() => router.push({ pathname: '/report-comparison', params: { currency, month: monthISO } })} />}
       </Surface>}
     </View>} />;
 }

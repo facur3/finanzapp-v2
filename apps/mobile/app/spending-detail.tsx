@@ -4,7 +4,9 @@ import { categoryKey, expensesInPeriod, isStorableCurrency, spendingOverview, va
 import { useMemo } from 'react';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { useFinanceView } from '../src/fx/rates-provider';
-import { lineCounts, listingSnapshot, recordedCountLabel } from '../src/fx/finance-view';
+import { lineCounts, listingSnapshot, recordedCountLabel, spendingFigure } from '../src/fx/finance-view';
+import { shortfallLine } from '../src/fx/fx-copy';
+import { CurrencyParts } from '../src/ui/home-modules';
 import { AppText, CategoryBadge, EmptyState, Money, Screen, SectionTitle } from '../src/ui/components';
 import { withCurrencyCode } from '../src/i18n/format';
 import { useI18n } from '../src/i18n/provider';
@@ -13,17 +15,18 @@ import { selectEntries } from '../src/ui/presentation';
 import { periodLabel } from '../src/ui/spending-timeline';
 import { useCategoryLookOf } from '../src/ui/category-hues';
 import { useCurrentDay } from '../src/ui/theme';
-import { heldCurrency } from '../src/ui/report-presentation';
+import { heldCurrency, requestedReportMonth } from '../src/ui/report-presentation';
 
 export default function SpendingDetailScreen() {
   const { snapshot: real } = useLedger();
   const today = useCurrentDay();
   const lookOf = useCategoryLookOf('expense');
-  const { t, locale } = useI18n();
+  const { t, locale, formatNumericDate, currencyName } = useI18n();
   const params = useLocalSearchParams<{ currency?: string; startISO?: string; endISO?: string; category?: string }>();
   const { startISO, endISO, category } = params;
   // 24C1: the period as Inicio counts it (converted in consolidated mode); its rows keep their original amounts.
-  const month = typeof startISO === 'string' ? startISO.slice(0, 7) : today.slice(0, 7);
+  // A malformed date never becomes a month the rate store is asked for (the screen says the period is invalid below).
+  const month = requestedReportMonth(typeof startISO === 'string' ? startISO.slice(0, 7) : undefined, today);
   const months = useMemo(() => [month], [month]);
   const view = useFinanceView(months, isStorableCurrency(params.currency) ? params.currency : undefined);
   const snapshot = view?.snapshot;
@@ -40,7 +43,10 @@ export default function SpendingDetailScreen() {
   const key = category ? categoryKey(category) : undefined;
   const entries = selectEntries(expensesInPeriod(listingSnapshot(real, view), period, key), real.accounts);
   const group = key ? report.categories.find(c => c.key === key) : undefined;
-  const total = report.status === 'ready' && view.complete(startISO, endISO, 'expense') ? category ? group?.amountMinor ?? 0 : report.expenseMinor : null;
+  const complete = view.complete(startISO, endISO, 'expense');
+  const total = report.status === 'ready' && complete ? category ? group?.amountMinor ?? 0 : report.expenseMinor : null;
+  // 25R1: a missing rate is said as Reportes says it (with its reason behind ⓘ); the precision sentence is for an overflow only.
+  const shortfall = complete ? null : shortfallLine(spendingFigure(real, view, { startISO, endISO }, view.activity, view.loaded), { t, date: formatNumericDate, currencyName });
   // Same header as the report's category screen: the category as its tile, the name, the period, the total.
   // The day headings carry no «Neto del día»: these rows are one category's (or all) expenses, not the day's movements.
   return <EntryList entries={entries} accounts={real.accounts} dayNet={false} header={<View style={{ gap: 22 }}>
@@ -51,7 +57,8 @@ export default function SpendingDetailScreen() {
       <AppText secondary variant="subhead">{withCurrencyCode(periodLabel(period, locale), currency)}</AppText>
     </View>
     <View style={{ gap: 10 }}>
-      {total !== null ? <Money minor={total} currency={currency} large /> : <AppText secondary>{t('spendingDetail.totalUnavailable')}</AppText>}
+      {total !== null ? <Money minor={total} currency={currency} large /> : shortfall ? <CurrencyParts parts={[]} line={shortfall.line} detail={shortfall.detail} />
+        : <AppText secondary>{t('spendingDetail.totalUnavailable')}</AppText>}
       {/* 24T3 (A23): purchases and devoluciones counted apart (the same words as Reportes' drill-downs); every line stays listed. */}
       <AppText secondary variant="subhead">{recordedCountLabel(lineCounts(entries), t)}</AppText>
     </View>

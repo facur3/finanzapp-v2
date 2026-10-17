@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
@@ -143,4 +143,66 @@ test('25A-03: Más carries the number of readable pending proposals as its badge
     reviewTray = null;
     assert.equal(badgeOf(), undefined, 'while the store opens');
   } finally { reviewTray = { writable: true, items: [], unreadable: [], conflicts: [] }; }
+});
+
+// ---- the root stack, read as a syntax tree (not regexes over text, so a reformat cannot break it nor a real change pass) -
+function rootStack() {
+  const file = ts.createSourceFile('_layout.tsx', readFileSync(new URL('../app/_layout.tsx', import.meta.url), 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const screens: { name: string; options: string }[] = [];
+  let stackOptions: ts.ObjectLiteralExpression | null = null;
+  const attribute = (node: ts.JsxOpeningLikeElement, name: string) => node.attributes.properties.find(item => ts.isJsxAttribute(item) && item.name.getText() === name) as ts.JsxAttribute | undefined;
+  const visit = (node: ts.Node) => {
+    if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
+      const tag = node.tagName.getText();
+      if (tag === 'Stack.Screen') {
+        const name = attribute(node, 'name')?.initializer;
+        if (name && ts.isStringLiteral(name)) screens.push({ name: name.text, options: attribute(node, 'options')?.initializer?.getText() ?? '' });
+      } else if (tag === 'Stack') {
+        const value = attribute(node, 'screenOptions')?.initializer;
+        if (value && ts.isJsxExpression(value) && value.expression && ts.isObjectLiteralExpression(value.expression)) stackOptions = value.expression;
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  const options = new Map<string, string>();
+  for (const property of (stackOptions as ts.ObjectLiteralExpression | null)?.properties ?? []) {
+    if (ts.isPropertyAssignment(property)) options.set(property.name.getText(), property.initializer.getText().replace(/\s+/g, ' '));
+  }
+  return { screens, options };
+}
+function routeFiles(directory = new URL('../app/', import.meta.url), prefix = ''): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
+    if (entry.isDirectory()) return entry.name === '(tabs)' ? ['(tabs)'] : routeFiles(new URL(entry.name + '/', directory), prefix + entry.name + '/');
+    // Special files are not screens: the layout, the not-found fallback and the inbound-link filter.
+    if (!/\.tsx?$/.test(entry.name) || entry.name.startsWith('_') || entry.name.startsWith('+')) return [];
+    return [prefix + entry.name.replace(/\.tsx?$/, '')];
+  });
+}
+
+test('the root stack registers every route file once, so no screen ever shows its raw file name as a title', () => {
+  const names = rootStack().screens.map(screen => screen.name);
+  assert.equal(new Set(names).size, names.length, 'no route registered twice');
+  assert.deepEqual([...names].sort(), routeFiles().sort());
+});
+
+test('the root stack: Reduce Motion swaps every push for a fade, the back button shows only its chevron, the tabs fade in and the first opening is a cut', () => {
+  const { screens, options } = rootStack();
+  assert.equal(options.get('animation'), "reduced ? 'fade' : 'default'");
+  assert.equal(options.get('headerBackButtonDisplayMode'), "'minimal'");
+  assert.equal(options.get('gestureEnabled'), 'true');
+  const of = (name: string) => screens.find(screen => screen.name === name)!.options.replace(/\s+/g, ' ');
+  assert.match(of('(tabs)'), /headerShown: false/);
+  assert.match(of('(tabs)'), /animation: 'fade'/);
+  assert.match(of('onboarding'), /headerShown: false/);
+  assert.match(of('onboarding'), /gestureEnabled: false/);
+  assert.match(of('onboarding'), /animation: 'none'/);
+});
+
+test('every link from outside the app lands on Inicio: no screen, form or prefill is reachable through the custom scheme', async () => {
+  const { redirectSystemPath } = await import('../app/+native-intent.ts');
+  for (const path of ['finanzapp://new-entry?amountMinor=100000&merchant=x', '/new-transfer?toAccountId=a&note=pagá', '/onboarding', '/backup-import',
+    '/review-sheet/abc', '', 'finanzapp://', '/%E0%A4%A']) {
+    for (const initial of [true, false]) assert.equal(redirectSystemPath({ path, initial }), '/', path);
+  }
 });

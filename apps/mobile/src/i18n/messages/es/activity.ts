@@ -125,7 +125,7 @@ export const activity = {
   },
   spendingDetail: {
     invalidTitle: 'Período no válido',
-    invalidDetail: 'Volvé a Inicio para elegir las fechas.',
+    invalidDetail: 'El enlace no indica un período que se pueda mostrar. Abrí Reportes para ver tus gastos por mes.',
     allExpenses: 'Gastos registrados',
     totalUnavailable: 'No podemos mostrar este total con precisión.',
     count: { one: '{count} gasto registrado', other: '{count} gastos registrados' },
