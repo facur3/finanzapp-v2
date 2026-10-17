@@ -6,7 +6,7 @@ import { AppText, Money, PressFeedback } from './components';
 import { useI18n } from '../i18n/provider';
 import { categoryColor, othersColor } from './category-color';
 import { AMOUNT_AX5_SIZE, ROW_STACK_SCALE, TEXT_STYLE_MAX_SCALE, WEIGHT_WIDTH, amountWidthEm, labelWidthEm } from './geometry';
-import { ValueTransition, duration, timing } from './motion';
+import { ValueTransition, duration, easeOutCss, timing } from './motion';
 import { usePalette, useReduceMotion, type Palette } from './theme';
 import type { Currency } from '@finanzapp/domain';
 
@@ -323,7 +323,7 @@ export function MonthBars({ points, selected, onSelect, currency, height = 120 }
         ticks (HIG, charts: hide axis labels from assistive technology), and a tick stays one line inside its column. */}
     <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{ flexDirection: 'row', gap: 6 }}>
       {points.map((point, index) => <Animated.Text key={point.monthISO} numberOfLines={1} maxFontSizeMultiplier={axis.maxScale} style={{ flex: 1, fontSize: 12, lineHeight: 16, textAlign: 'center', fontWeight: point.monthISO === selected ? '600' : '400',
-        color: point.monthISO === selected ? p.primary : p.secondary, transitionProperty: 'color', transitionDuration: reduced ? 0 : duration.state }}>
+        color: point.monthISO === selected ? p.primary : p.secondary, transitionProperty: 'color', transitionDuration: reduced ? 0 : duration.state, transitionTimingFunction: easeOutCss }}>
         {axis.labels[index]}
       </Animated.Text>)}
     </View>
@@ -363,6 +363,6 @@ function Bar({ point, fraction, selected, onPress, currency, height }: {
     <Animated.View style={[{ borderRadius: 6, backgroundColor: selected ? p.primary : idleBarColor(p), borderWidth: point.partial ? StyleSheet.hairlineWidth * 2 : 0,
       // The month in progress stays outlined: ink on an idle bar (the idle fill is too close to the secondary ink), secondary on the shown one.
       borderColor: selected ? p.secondary : p.text,
-      transitionProperty: 'backgroundColor', transitionDuration: reduced ? 0 : duration.state }, style]} />
+      transitionProperty: 'backgroundColor', transitionDuration: reduced ? 0 : duration.state, transitionTimingFunction: easeOutCss }, style]} />
   </PressFeedback>;
 }

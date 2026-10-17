@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { FlatList, Keyboard, Modal, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
-import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -328,7 +329,7 @@ export function BottomSheet({ visible, title, onClose, onDone, onDismissed, floa
       if (shown) rise();
       else { ready.current.presented = false; ready.current.measured = false; setShown(true); }
     } else if (shown) {
-      progress.value = withTiming(0, sheetTiming('sheetExit', reduced), finished => { if (finished) runOnJS(unmount)(); });
+      progress.value = withTiming(0, sheetTiming('sheetExit', reduced), finished => { if (finished) scheduleOnRN(unmount); });
     }
     // `shown` is read, not depended on: the exit runs once, when `visible` drops, not again when it unmounts the modal.
   }, [visible, reduced, progress]);
