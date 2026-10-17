@@ -45,7 +45,7 @@ export function integrationClient(baseURL: string, getAccessToken: () => Promise
     },
     async assistant({ action, text, todayISO, currency, region, language, facts }: AssistantQuery) {
       const wire = facts.length ? toWireFacts(facts, minorUnitExponent(currency)) : [];
-      const request = validateAssistantRequest({ version: ASSISTANT_PROTOCOL_VERSION, requestId: newId(), action, text, todayISO, currency, region, language, facts: wire });
+      const request = validateAssistantRequest({ version: ASSISTANT_PROTOCOL_VERSION, requestId: newId(), action, text: withoutInvisibles(text), todayISO, currency, region, language, facts: wire });
       // The server's reply is validated again here, against the request this device sent; its copy of the evidence is
       // dropped: the evidence is this device's own facts, the ones the validated result cites or offers as candidates.
       // `dropped` (25A-06, decision A) names the optional names the server boundary left null because the model copied
@@ -58,4 +58,13 @@ export function integrationClient(baseURL: string, getAccessToken: () => Promise
       return { ...result, evidence: facts.filter(f => named.has(f.id)), dropped };
     },
   };
+}
+
+/** The person's text as the request carries it: the invisible characters a paste brings along (web pages, PDFs and bank
+ * apps add them) that the request admits but the reply refuses in a name are taken out, so a merchant the model copies
+ * verbatim is never refused (and billed) for a character nobody can see: the zero-width space, the word joiner and the
+ * invisible operators, the BOM and the interlinear annotations go; a line or paragraph separator becomes a line break.
+ * Visible words are unchanged; the joiners of emoji and scripts (U+200C, U+200D) stay. The thread shows what was typed. */
+export function withoutInvisibles(text: string): string {
+  return text.replace(/[\u200b\u2060-\u2064\ufeff\ufff9-\ufffb]/g, '').replace(/[\u2028\u2029]/g, '\n');
 }

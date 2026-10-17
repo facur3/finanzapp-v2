@@ -5,11 +5,11 @@ import type { Account, Entry } from '@finanzapp/domain';
 import { REASON_TEXT, SUGGESTIONS, answerContent, categoryOptions, classifyIntent, completeDraft, contentFromResult, conversationReducer,
   emptyConversation, evidenceLabel, optionText, ownsPending, resolveDraft, shouldAutoscroll, type ConversationState } from '../src/assistant/conversation.ts';
 import { FACT_LABELS, monthlyEvidence } from '../src/integrations/evidence.ts';
-import { integrationClient } from '../src/integrations/client.ts';
+import { integrationClient, withoutInvisibles } from '../src/integrations/client.ts';
 import { translator } from '../src/i18n/messages.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 import { assistantForEnvironment, disconnectedAssistant, failureMessage, failureReason, remoteAssistant, type AssistantEvent } from '../src/assistant/client.ts';
-import { PROTOCOL_LIMITS, validateAssistantRequest, validateAssistantResultV2, type AssistantRequestV3 } from '../../../packages/integrations/assistant-protocol.js';
+import { PROTOCOL_LIMITS, isSafeInputText, isSafeModelText, validateAssistantRequest, validateAssistantResultV2, type AssistantRequestV3 } from '../../../packages/integrations/assistant-protocol.js';
 import type { DraftInput } from '../src/assistant/conversation.ts';
 import { assistantForBuild } from '../src/assistant/runtime.ts';
 import { FIXTURE_ANSWER, FIXTURE_CATEGORY_ANSWER, FIXTURE_CLARIFICATION, FIXTURE_DRAFT, FIXTURE_DRAFT_DROPPED, FIXTURE_DRAFT_NO_ACCOUNT, FIXTURE_FACTS, FIXTURE_OUT_OF_SCOPE,
@@ -745,4 +745,35 @@ test('on the last days of a month after a shorter one, «this month» ends where
   const midMonth = monthlyEvidence(snapshot, 'ARS', '2026-10-12');
   assert.equal(answerContent({ evidenceIds: ['current.expenses'] }, midMonth, 'ARS', '2026-10-12').untilISO, undefined, 'a window that reaches today needs no caption');
   assert.equal(answerContent({ evidenceIds: [] }, midMonth, 'ARS', '2026-10-31').untilISO, undefined, 'no rows, no caption');
+});
+
+test('the request and the reply agree on what is invisible: a pasted zero-width character never reaches the model, so a copied merchant is never refused for it', async () => {
+  // Every BMP character the device would send (after its own cleaning) is one a reply may also hold in a name, apart from
+  // the line breaks and the tab a message may have. A character in the gap would be admitted at the door and refused at
+  // the exit, after the ask was billed.
+  const gap: string[] = [];
+  for (let code = 0; code <= 0xffff; code++) {
+    if (code >= 0xd800 && code <= 0xdfff) continue;
+    const sent = withoutInvisibles('a' + String.fromCharCode(code) + 'b');
+    if (!isSafeInputText(sent, PROTOCOL_LIMITS.textChars)) continue;
+    for (const char of sent) if (!['\t', '\n', '\r'].includes(char) && !isSafeModelText('a' + char + 'b', PROTOCOL_LIMITS.merchantChars)) gap.push(code.toString(16));
+  }
+  assert.deepEqual(gap, []);
+  // Visible words, and the joiners of emoji and scripts, are untouched; a line separator is a line break.
+  const coder = '👩' + String.fromCharCode(0x200d) + '💻';
+  assert.equal(withoutInvisibles('Café ' + coder + ' ' + String.fromCharCode(0xfeff) + 'Coto' + String.fromCharCode(0x200b)), 'Café ' + coder + ' Coto');
+  assert.equal(withoutInvisibles('uno' + String.fromCharCode(0x2028) + 'dos'), 'uno\ndos');
+  const bodies: any[] = [];
+  const fetcher = (async (_url: string, init: any) => { bodies.push(JSON.parse(init.body)); return { ok: true, status: 200, json: async () => FIXTURE_CLARIFICATION }; }) as unknown as typeof fetch;
+  const client = integrationClient('https://finanzapp.example', async () => 'jwt', fetcher);
+  await client.assistant({ action: 'parse', text: 'Gasté 3 mil en Ca' + String.fromCharCode(0x200b) + 'rrefour', todayISO: today, currency: 'ARS', region: 'AR', language: 'es', facts: [] });
+  assert.equal(bodies[0].text, 'Gasté 3 mil en Carrefour');
+  // A stored category name with such a character is left out of the facts (the model would quote it), the rest travel.
+  const opened = '2026-01-01T12:00:00.000Z';
+  const account: Account = { id: 'cash', name: 'Efectivo', currency: 'ARS', openingMinor: 0, createdAt: opened };
+  const hidden = 'Ki' + String.fromCharCode(0x200b) + 'osco';
+  const snapshot = { accounts: [account], transfers: [], entries: [hidden, 'Comida'].map((category, index): Entry => ({ id: 'z' + index, accountId: 'cash', kind: 'expense', amountMinor: 1000, merchant: 'M', category, dateISO: '2026-09-02', createdAt: opened })) };
+  const labels = monthlyEvidence(snapshot, 'ARS', today).map(fact => fact.label);
+  assert.ok(labels.includes(FACT_LABELS.categoryPrefix + 'Comida'));
+  assert.ok(!labels.some(label => label.includes(hidden)));
 });

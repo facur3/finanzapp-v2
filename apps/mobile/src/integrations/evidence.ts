@@ -1,6 +1,6 @@
 import { spendingComparison, spendingFacts, type Currency, type LedgerSnapshot } from '@finanzapp/domain';
 import type { AssistantFact } from '../../../../packages/integrations/contracts.js';
-import { PROTOCOL_LIMITS, isSafeInputText } from '../../../../packages/integrations/assistant-protocol.js';
+import { PROTOCOL_LIMITS, isSafeInputText, isSafeModelText } from '../../../../packages/integrations/assistant-protocol.js';
 
 /** Fact labels are protocol data, not interface copy: they are what the
  * server (and the model) reads, validated by `packages/integrations/assistant-protocol.js`,
@@ -46,9 +46,10 @@ export function monthlyEvidence(snapshot: LedgerSnapshot, currency: Currency, to
     if (side.refundCount) facts.push({ id: prefix + '.refunds', label: FACT_LABELS.refunds, amountMinor: side.refundsMinor, count: side.refundCount, ...period });
     side.categories.slice(0, 26).forEach((category, index) => {
       // 25A-05: a stored name the protocol refuses (a direction override, a control or a tag character) is left out, never
-      // cleaned: one such category must not make every question fail, and its exact spelling is what links resolve.
+      // cleaned: one such category must not make every question fail, and its exact spelling is what links resolve. A name
+      // the request would admit but a reply could not quote (a zero-width space) is left out too: the model would copy it.
       const label = FACT_LABELS.categoryPrefix + category.category;
-      if (isSafeInputText(label, PROTOCOL_LIMITS.factLabelChars)) facts.push({ id: prefix + '.category.' + index, label, amountMinor: category.amountMinor, count: category.count, ...period });
+      if (isSafeInputText(label, PROTOCOL_LIMITS.factLabelChars) && isSafeModelText(label, PROTOCOL_LIMITS.factLabelChars)) facts.push({ id: prefix + '.category.' + index, label, amountMinor: category.amountMinor, count: category.count, ...period });
     });
   }
   return facts;
