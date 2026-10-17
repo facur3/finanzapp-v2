@@ -1147,3 +1147,54 @@ test('25VIS2 (V7): a fixed SelectorCard reads as a fact: full strength, no chevr
   assert.equal(chooser.props.accessibilityRole, 'button');
   assert.ok(nodes(chooser).some(node => node.type === 'Ionicons'), 'a chooser keeps its chevron');
 });
+
+test('25N1: a press keeps React Native\'s own retention (20/20/20/30 pt of drift) unless its caller sets one', () => {
+  const ui = load('components.tsx');
+  const pressable = (props: Record<string, unknown> = {}) => ui.render('PressFeedback', { onPress: () => {}, children: 'x', ...props }).props.children;
+  assert.equal(pressable().props.pressRetentionOffset, undefined, 'never a tighter 12 pt');
+  assert.equal(pressable({ pressRetentionOffset: 40 }).props.pressRetentionOffset, 40, 'a caller may widen it');
+  const deck = readFileSync(new URL('../src/ui/card-visual.tsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(deck, /pressRetentionOffset/, 'the deck slot keeps the default too');
+});
+
+test('25N1: a text field offers Clear while editing, and a field on a keyboard with no Return key gets the «Listo» bar', () => {
+  const ui = load('components.tsx');
+  const input = (root: Node) => nodes(root).find(node => node.type === 'TextInput')!;
+  const name = ui.render('Field', { label: 'Nombre', value: 'Banco' });
+  assert.equal(input(name).props.clearButtonMode, 'while-editing');
+  assert.equal(input(name).props.inputAccessoryViewID, undefined, 'a Return key already dismisses it');
+  assert.equal(nodes(name).some(node => is(node, 'InputAccessoryView') || node.type === 'InputAccessoryView'), false);
+  assert.equal(input(ui.render('Field', { label: 'Buscar', value: '', clearButtonMode: 'never' })).props.clearButtonMode, 'never', 'a caller may opt out');
+  for (const keyboardType of ['number-pad', 'decimal-pad', 'numeric', 'phone-pad']) {
+    const digits = ui.render('Field', { label: 'Últimos 4 dígitos', value: '', keyboardType });
+    const accessory = nodes(digits).find(node => node.type === 'InputAccessoryView')!;
+    assert.ok(accessory, keyboardType + ' has no Return key');
+    assert.equal(input(digits).props.inputAccessoryViewID, accessory.props.nativeID);
+    const done = nodes(accessory).find(node => is(node, 'PressFeedback') && node.props.onPress)!;
+    assert.equal(done.props.accessibilityLabel, 'Listo');
+    done.props.onPress();
+  }
+  assert.deepEqual(ui.keyboard, ['dismiss', 'dismiss', 'dismiss', 'dismiss']);
+});
+
+test('25N1: a locked field, amount or date row looks disabled (60 %), as a locked selector card does; a live one is full strength', async () => {
+  const ui = load('components.tsx', { '@finanzapp/domain': await import('@finanzapp/domain') });
+  const strength = (root: Node) => flat(root.props.style).opacity;
+  assert.deepEqual([strength(ui.render('Field', { label: 'Comercio', value: 'x' })), strength(ui.render('Field', { label: 'Comercio', value: 'x', editable: false }))], [1, 0.6]);
+  const amount = (editable?: boolean) => strength(ui.render('AmountField', { label: 'Gasto', currency: 'ARS', value: '10', onChangeText: () => {}, editable }));
+  assert.deepEqual([amount(), amount(true), amount(false)], [1, 1, 0.6]);
+  const row = (disabled: boolean) => nodes(ui.render('DetailRow', { label: 'Fecha', value: 'Hoy', onPress: () => {}, disabled })).find(node => is(node, 'PressFeedback'))!;
+  assert.deepEqual([styleOf(row(false)).opacity, styleOf(row(true)).opacity, row(true).props.accessibilityState.disabled], [1, 0.6, true]);
+});
+
+test('25N1: a locked appearance picker draws every icon and colour at 60 % and says each is disabled', async () => {
+  const appearance = await import('../src/ui/appearance.ts');
+  const ui = load('appearance-picker.tsx', { './appearance': appearance, './motion': { duration: { state: 200 }, selectionHaptic: () => {} },
+    './theme': { space: { l: 16 }, usePalette: () => ({ ...lightPalette, isDark: false }), useReduceMotion: () => false } });
+  const options = (disabled: boolean) => nodes(ui.render('IconColorPicker', { icons: appearance.ACCOUNT_ICON_CHOICES, colors: appearance.COLOR_CHOICES,
+    icon: appearance.ACCOUNT_ICON_CHOICES[0].id, color: appearance.COLOR_CHOICES[0].id, onIconChange: () => {}, onColorChange: () => {}, disabled }))
+    .filter(node => node.type === 'PressFeedback' && node.props.accessibilityRole === 'radio');
+  assert.ok(options(true).length > 0);
+  assert.ok(options(true).every(node => flat(node.props.style).opacity === 0.6 && node.props.accessibilityState.disabled === true));
+  assert.ok(options(false).every(node => flat(node.props.style).opacity === undefined));
+});

@@ -103,7 +103,8 @@ export function useOperationChange() {
     Alert.alert(t(restore ? (payoff ? 'operations.change.restorePayoffQuestion' : 'operations.change.restoreRefundQuestion')
       : payoff ? 'operations.change.voidPayoffQuestion' : 'operations.change.voidRefundQuestion'), outcome(operation, result.inserts), [
       { text: t('common.cancel'), style: 'cancel', onPress: () => { confirming.current = false; } },
-      { text: t(restore ? 'operations.change.restore' : 'operations.change.void'), style: restore ? 'default' : 'destructive',
+      // Red only when the undo cannot be restored (an adelanto whose catch-up records instalments); any other is reversible.
+      { text: t(restore ? 'operations.change.restore' : 'operations.change.void'), style: !restore && payoff && result.inserts.length ? 'destructive' : 'default',
         onPress: () => { confirming.current = false; void apply(change); } },
     ], { cancelable: true, onDismiss: () => { confirming.current = false; } });
   }

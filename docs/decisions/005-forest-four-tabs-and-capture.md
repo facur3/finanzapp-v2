@@ -84,7 +84,10 @@ borra ninguna entrega pasada.
 - **El estado elegido nunca es solo color:** glifo relleno más una cápsula `dockActive` detrás
   del glifo; las demás pestañas, glifo de contorno en `dockInk`.
 - **Eventos.** Tocar emite `tabPress` (prevenible) y navega solo a una pestaña no elegida y no
-  prevenida; mantener presionado emite `tabLongPress`.
+  prevenida; mantener presionado emite `tabLongPress`. *(Corregido por Producto 25Q3: ninguna pestaña
+  tiene pulsación larga ni emite `tabLongPress`, que nadie escuchaba; con ella React Native cancelaba el toque
+  sostenido más de medio segundo. Soltar elige la pestaña por largo que sea el toque, como en la barra del sistema, y
+  el visor de contenido grande no la necesita.)*
 - **El «+» no es una pestaña.** Un botón «Registrar» («Abre las opciones para registrar»), fuera
   de la lista de pestañas, sin estado elegido, con un toque háptico liviano. **Solo toque:** sin
   pulsación larga en esta versión.

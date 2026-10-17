@@ -109,7 +109,7 @@ function OperationDetail({ operation }: { operation: PurchaseOperation }) {
     </View>
     <ErrorMessage message={error} />
     {check.ok || frozen
-      ? <ActionButton label={actionLabel} icon={voided ? 'arrow-redo-outline' : 'arrow-undo-outline'} onPress={() => changes.ask(operation)} busy={busy} secondary={!voided} />
+      ? <ActionButton label={actionLabel} onPress={() => changes.ask(operation)} busy={busy} secondary={!voided} />
       : <LifecycleNote icon="information-circle-outline" title={t(voided ? 'operations.detail.blockedRestoreTitle' : 'operations.detail.blockedTitle')} detail={errorText(check.reason)} />}
   </Screen>;
 }

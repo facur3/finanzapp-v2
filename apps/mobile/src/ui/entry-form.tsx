@@ -13,6 +13,7 @@ import { AccountField, CategoryField, DateField } from './form-controls';
 import { InstallmentPurchase } from './installment-purchase';
 import { accountKindLabel, postingAccounts } from './liability-presentation';
 import { errorHaptic, successHaptic, warningHaptic } from './motion';
+import { readLastAccount, writeLastAccount } from './last-account';
 import { initialAccountId, releasesDraft } from './presentation';
 import { installmentOfEntry } from './installment-presentation';
 import { INITIAL_PURCHASE, buildPurchasePlan, purchaseState, type PurchaseDraft } from './purchase-plan';
@@ -58,7 +59,15 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
   const [operation] = useState(() => ({ id: randomUUID(), createdAt: new Date().toISOString() }));
   const [ownKind, setKind] = useState<EntryKind>(before?.entry.kind ?? (requestedKind === 'income' ? 'income' : 'expense'));
   const kind: EntryKind = onKindChange ? (requestedKind === 'income' ? 'income' : 'expense') : ownKind;
-  const [chosenAccountId, setAccountId] = useState(() => before?.entry.accountId ?? initialAccountId(accounts, requestedAccount, currency));
+  // 25N1: a new Gasto or Ingreso opens on the account last saved with that kind (`last-account.ts`) when the form offers it
+  // (and, for a prefilled amount, in its currency); an account asked for by the screen still wins, and without either the rule is today's.
+  const [chosenAccountId, setAccountId] = useState(() => {
+    if (before) return before.entry.accountId;
+    const opening: EntryKind = requestedKind === 'income' ? 'income' : 'expense';
+    const remembered = requestedAccount ? undefined : readLastAccount(opening, postingAccountsFor(opening, accounts, archive?.cards ?? [], archive?.debts ?? [])
+      .filter(item => !prefill?.currency || item.currency === prefill.currency));
+    return initialAccountId(accounts, requestedAccount ?? remembered, currency);
+  });
   // An edit is prefilled in the movement's own currency (its account's); a prefill in another currency is never reinterpreted.
   // While the text stays exactly that prefill (same currency), saving keeps the stored minor units themselves: a stored amount
   // may exceed the entry bound (a restored backup), and re-reading it would lock every other correction.
@@ -205,6 +214,11 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
       if (submission.plan) await addInstallmentPlan(submission.plan);
       else if (submission.change) await updateEntry(submission.change);
       else await addEntry(submission.entry);
+      // Saved: remember where a new one went, for the next form of that kind (a device preference, never the ledger).
+      if (!before) {
+        const where = submission.plan ? cards.find(card => card.id === submission.plan!.cardId)?.accountId : submission.entry.accountId;
+        if (where) writeLastAccount(submission.plan ? 'expense' : submission.entry.kind, where);
+      }
       successHaptic();
       saving.current = false;
       close();

@@ -133,7 +133,7 @@ function DeckSlot({ top, zIndex, reduced, tone, hitHeight, selected, label, hint
     {/* Inside the slot, so a card stacked above still covers it; never a target. */}
     {reduced && <Animated.View pointerEvents="none" style={[styles.wash, washStyle]} />}
     <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityHint={hint} accessibilityState={{ selected }} accessibilityLanguage={speechLanguage}
-      onPress={onPress} pressRetentionOffset={12}
+      onPress={onPress}
       onPressIn={() => { pressed.value = withTiming(1, { duration: reduced ? 0 : duration.press, easing: easeOut }); }}
       onPressOut={() => { pressed.value = withTiming(0, { duration: reduced ? 0 : duration.release, easing: easeOut }); }}
       style={[styles.hit, { height: hitHeight }]} />

@@ -150,7 +150,7 @@ function ReviewSheet({ item, leaving, reload, leave, refreshing, onHeld }: {
       {/* Descartar is explicit and asks first; closing the sheet is not discarding. A conflict with a frozen write cannot be
           dismissed (the store refuses it). */}
       {(!conflict || item.attempt === null) && <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('review.sheet.discard')}
-        accessibilityState={{ disabled: idle }} disabled={idle} onPress={dismiss} style={{ alignSelf: 'center', minHeight: 44, justifyContent: 'center', paddingHorizontal: space.m }}>
+        accessibilityState={{ disabled: idle }} disabled={idle} onPress={dismiss} style={{ alignSelf: 'center', minHeight: 44, justifyContent: 'center', paddingHorizontal: space.m, opacity: idle ? 0.5 : 1 }}>
         <AppText variant="subhead" style={{ color: p.expense, fontWeight: '500' }}>{t('review.sheet.discard')}</AppText>
       </PressFeedback>}
     </View>}
