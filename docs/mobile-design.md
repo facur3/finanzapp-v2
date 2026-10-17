@@ -382,7 +382,8 @@ Forest; ver «Producto 24UX6A».*
 
 ## Producto 20 — identidad de cuentas y categorías (sin rediseño)
 
-- **Un solo cimiento.** Íconos curados (Ionicons, nunca emoji) y una paleta fija de
+- **Un solo cimiento.** Íconos curados (Ionicons, nunca emoji; las banderas de región y de moneda de 25O1 son marcas
+  de datos, no íconos de identidad) y una paleta fija de
   once colores contenidos — cobalto, celeste, verde azulado, verde, oliva, ocre,
   terracota, rosa, índigo, pizarra, grafito — con nombre accesible en español y par
   claro/oscuro medido en Node (`tests/appearance.node.ts`). El coral de gasto no está:
@@ -593,7 +594,8 @@ siguen la misma familia (valores en `palette.ts`).
   «Decilo con tus palabras o preguntá lo que quieras». Solo si esta sesión de la app ya tiene una conversación,
   un chip «Continuar: «…»» con las últimas palabras reales de la persona; nunca una línea inventada.
 - **Debajo, tres filas neutras** (tile `inset` con el glifo en el primario) *(→ reemplazado en 24UX6C, ver «Producto 24UX6C — presentación de movimientos, Inicio y Más»)*: Gasto «Una compra o un pago», Ingreso
-  «Sueldo, cobro u otro ingreso», Transferencia «Entre cuentas o pago de tarjeta». La elección es la palabra, no un
+  «Sueldo, cobro u otro ingreso», Transferencia «Entre cuentas o pago de tarjeta» *(→ 25O1: las cuatro leyendas cambian;
+  ver «Producto 25O1 — primera impresión»)*. La elección es la palabra, no un
   color.
 - **Sin micrófono.** Un micrófono que no puede dictar sería un callejón sin salida; el dictado es trabajo posterior
   del Asistente.
@@ -638,7 +640,8 @@ abajo), que empieza detrás de la barra de estado (relleno superior: el área se
 - **Vacíos.** Sin ninguno de los dos: «Todavía no hay movimientos este mes» / «Registrá un gasto con el botón
   Registrar (+) o contáselo al Asistente.» (el «+» por el nombre que le da VoiceOver), sin botón. Con una moneda de
   varias mostrada sola («Solo X»), el título nombra la moneda: «Todavía no hay movimientos en X este mes» (la regla de
-  24UX2, restituida). Sin cuentas: el estado vacío con «Empezar» → nueva cuenta.
+  24UX2, restituida). Sin cuentas: el estado vacío con «Empezar» → nueva cuenta. *(→ 25O1: «Primeros pasos», sin botón
+  lleno.)*
 - **Salieron de Inicio** «＋ Registrar» (ahora es el «+» del dock), la línea de atención, los rankings, las tarjetas de
   presupuesto, los gráficos y el banner del Asistente. Siguen en Presupuestos, Reportes y la hoja de Registrar.
   *(→ Desde 24UX6C2 vuelve una sola fila contextual del presupuesto general, solo cuando pide atención; la tarjeta
@@ -877,7 +880,66 @@ barras de Día a día y una cabecera fija sólida. Siguen permitidos para una pa
 vinculante del roadmap no cambia: la próxima entrega de producto es 24T3; 24UX6C (Movimientos y Más) y 24UX6D
 (Tarjetas) siguen a 24UX6B en el carril UX, y su lugar frente a 24T3 lo decide el dueño (ver `docs/mobile-roadmap.md`).
 
-## Producto 25Q4 — ediciones, fallas y recuperación (en su rama, sobre #117; sin rediseño)
+## Producto 25O1 — primera impresión (en su rama, sobre #118; rediseño de la primera apertura)
+
+- **Por qué.** El dueño (2026-10-17) pidió una primera apertura premium, clara y memorable, con menos texto y coherente
+  con Sapphire + Sand, y marcas de país en Región y, donde signifiquen algo, cerca de cuentas y monedas. De las
+  referencias (Revolut, Wise, Slack) se tomaron principios y no su estética: una idea por pantalla, una ilustración
+  propia, una narrativa hecha con la interfaz del producto, un cierre celebrado. Nada de mayúsculas sostenidas, renders
+  3D, personajes ni confeti (docs/brand-brief.md §1 y §5): los números son el héroe y el calendario de compromisos, el
+  motivo.
+- **La historia, tres páginas.** Sobre la arena: arriba el progreso (tres segmentos: los recorridos en tinta, los que vienen en la tinta inactiva de las
+  barras de Reportes, 3:1 o más) y «Omitir»; en el medio,
+  una escena armada con los componentes de la app a partir de cifras de muestra fijas, en la moneda sugerida y el formato
+  de la persona (se dibujan, nunca se guardan); abajo un titular Display de 40 pt con su énfasis en zafiro y
+  «Siguiente» / «Continuar». Se pasa deslizando o con el botón. «Anotá un gasto en segundos.»: un importe tecleado cifra
+  por cifra que se vuelve un movimiento delante de dos anteriores. «Tarjetas y cuotas, mes a mes.»: una compra en seis
+  cuotas como calendario (pagadas llenas, la del mes con anillo, las que vienen en silencio). «Sabé cuánto te queda.»:
+  Disponible como lo dibuja Inicio, contando hasta su cifra. Cada escena se mueve una sola vez, al llegar su página;
+  con Reducir movimiento se dibuja quieta. Las escenas no crecen con el texto: se achican para dejarle lugar al titular y
+  no se dibujan por debajo de 160 pt; el titular sube hasta los 60 pt de Large Title o menos si su palabra más larga no
+  entra entera.
+- **«¿Dónde tenés tu plata?»** Título grande y una línea verificable («Tus movimientos quedan en tu iPhone. Sin
+  registrarte ni conectar un banco.»; «cuenta» queda solo para la cuenta que se crea). Tres respuestas en una tarjeta
+  agrupada: Efectivo, Cuenta bancaria y Billetera virtual, cada una un preajuste de la primera cuenta (nombre e ícono).
+  Abajo, dos píldoras: la región con su bandera y el idioma por su nombre, que abren los selectores de Más, y «¿Venís de
+  otro teléfono? Restaurar una copia», que abre la importación; si la copia trae cuentas, la configuración termina sola y
+  nunca pide una primera cuenta duplicada.
+- **El saldo de esa cuenta.** La pregunta del preajuste («¿Cuánto tenés en efectivo?») y «Si no lo sabés, dejalo en
+  cero.»; la moneda como chip (la bandera de su emisor y el código; abre la hoja de monedas sobre el gate) y, debajo, el
+  importe a 46 pt con todo el ancho, sin rótulo repetido (un saldo de siete cifras no se achica); el nombre precargado y editable; «Crear cuenta» guarda con las reglas de Nueva cuenta
+  (reintento sin duplicar; error, aviso y éxito como en 25Q4) y siembra la moneda de los totales.
+- **«Todo listo.»** El campo zafiro llena la pantalla, la barra de estado incluida: la cuenta creada como una tarjeta
+  arena con su saldo, bajo un tilde que se dibuja; «Todo listo.», «Ya podés anotar tu primer gasto.» y «Empezar», el botón
+  sobre el campo (arena con tinta). Inicio abre con el mismo zafiro arriba: el color continúa.
+- **Llegada, transiciones y VoiceOver.** Para una instalación nueva la pantalla de arranque espera a que la configuración
+  se dibuje (con un límite de 1,5 s), así nunca se ve Inicio debajo; las pestañas entran con un fundido. Los pasos
+  cambian con el fundido de siempre y VoiceOver va al título nuevo tras cada paso o página; las páginas que no están al
+  frente no existen para VoiceOver; el progreso es un solo elemento («Página 1 de 3»); las escenas son decoración. Una
+  primera apertura interrumpida (cambiar el idioma de la app en Configuración reinicia la app) sigue en el próximo
+  inicio mientras no haya cuentas; una copia restaurada o una cuenta creada la dan por terminada.
+- **Banderas: qué marcan.** Una región lleva su bandera (Región y sus recientes, la fila de Más, la primera apertura) y
+  «Según el dispositivo» un ícono neutro de teléfono. Un idioma nunca lleva bandera: su nombre lo dice. Una moneda lleva la
+  bandera de su emisor junto al código (el euro, la de la Unión Europea; las supranacionales, el ícono neutro) en la hoja
+  de monedas, el campo Moneda, la hoja de visualización y las secciones de Cuentas. Una cuenta no tiene país: una cuenta
+  en dólares de un banco argentino sigue en la Argentina. Son el emoji del sistema y VoiceOver no las lee.
+- **Región, Idioma y Apariencia.** Cada nota dice el único dato útil: Región «Cambia cómo se escriben fechas y números.
+  Tus importes y monedas no cambian.», bajo la tarjeta fija y antes de la lista larga; Idioma, cómo hacer que iOS también
+  use el idioma en sus menús, con «Abrir Configuración» (el nombre de Ajustes en los iPhone de Latinoamérica); Apariencia,
+  sin nota. Un guardado rechazado se dice con una alerta, siempre a la vista, y la elección actual encabeza Recientes.
+  Desde el texto grande, la bandera de una fila de Región deja su lugar al nombre, que entra entero. La nota de almacenamiento local de Más se fue.
+- **Inicio: Primeros pasos.** Mientras el registro no tiene movimientos, transferencias ni planes en cuotas, Inicio
+  muestra «Primeros pasos»: Creá tu primera cuenta, Anotá tu primer gasto y Sumá tu tarjeta (opcional). Un paso hecho
+  queda con un tilde gris y deja de ser botón. Sin botones llenos: debajo del campo, el «+» es el único objeto brillante.
+  Movimientos vacío, con cuentas, usa un botón secundario.
+- **Estados vacíos y formularios.** Tarjetas, Deudas y cobros y Recurrentes: un título y una línea; las reglas viven en
+  sus ⓘ y en los formularios. Nueva y Editar cuenta: nombre, moneda y saldo primero; «Apariencia» (ícono y color) al
+  final. Agregar la primera cuenta desde un movimiento vuelve a ese movimiento.
+- **Leyendas del «+»** (enmienda de la decisión 005, solo texto): Asistente «Registrá un gasto o preguntá por tus
+  gastos», Gasto «Una compra o un servicio», Ingreso «Sueldo u otro ingreso», Transferencia «Entre tus cuentas».
+- **Oscuro.** El botón lleno y el deslizamiento de acento usan el #4568DA del interruptor: dos rellenos de marca.
+
+## Producto 25Q4 — ediciones, fallas y recuperación (PR #118, sobre #117; sin rediseño)
 
 En la rama `fix/25q4-edits-and-failures`, apilada sobre #117. Solo JavaScript; no cambia dominio, esquema (14), backup
 (v14) ni el modelo de navegación.
@@ -996,7 +1058,8 @@ decorativas; ningún logo elegido.
 
 - **Marca.** Un zafiro real (≈225°, ni violeta ni azul marino): #2148C0 como campo de Inicio, botón principal y «+» en
   claro; en oscuro el campo #2446AE, el botón #3D60D4, el interruptor #4568DA y el texto de marca y el «+» #7E9BF7
-  (periwinkle, con tinta encima). Sobre el campo, blanco; el símbolo y los centavos del monto, grises sólidos
+  (periwinkle, con tinta encima). *(→ 25O1: en oscuro el botón y el deslizamiento de acento pasan al #4568DA del
+  interruptor; quedan dos rellenos de marca.)* Sobre el campo, blanco; el símbolo y los centavos del monto, grises sólidos
   (#E2E2E5, #C9C9CD; 5,9 y 4,6:1); la barra de estado clara sobre el campo en los dos temas.
 - **Arena.** Lienzo #F3EFE6, superficies #FFFCF6, tinta #19191C; en oscuro, casi negro cálido #0C0B0A. Todo lo que no
   es marca es un neutro cálido (30–60°), nunca verde ni azul.
@@ -2426,6 +2489,9 @@ se materializa o se guarda el dinero.
 
 ## Producto 25B — primera apertura nativa
 
+*(Reemplazada por 25O1: ver «Producto 25O1 — primera impresión». Se conservan la elegibilidad, Omitir y las reglas de
+guardado.)*
+
 - **Dos etapas, una sola ruta.** Bienvenida y Tu primera cuenta cambian en el mismo lugar (el mismo
   `ValueTransition` en fundido que el número de Inicio; con Reduce Motion, un fundido igual). Sin
   barra de navegación ni gesto de volver: no es una pila. Arriba a la derecha, "Omitir" en el azul
@@ -2490,9 +2556,10 @@ de Ajustes de iOS y sin rediseñar nada más:
   (nombre sin acentos, código de dos o tres letras, código numérico, moneda), «Recientes» con las
   tres últimas elecciones leídas al abrir (la lista nunca salta bajo el dedo), y secciones
   alfabéticas por inicial con encabezados que VoiceOver anuncia como encabezados. Una sola lista
-  virtualizada, filas sin alto fijo (Dynamic Type), sin banderas ni colores por país.
+  virtualizada, filas sin alto fijo (Dynamic Type), sin banderas ni colores por país. *(→ 25O1: cada región lleva su bandera; ver «Producto 25O1 — primera impresión».)*
 - **Una región elegida en la vista previa y no publicada** sigue guardada y marcada, con el subtítulo
-  «Todavía no disponible en esta versión · formatos de Estados Unidos»; la fila de Más dice «Japón ·
+  «Todavía no disponible en esta versión · formatos de Estados Unidos» *(→ 25O1: «Aún no disponible · formatos de …»)*;
+  la fila de Más dice «Japón ·
   formatos de Estados Unidos». Nunca se presenta como si sus formatos estuvieran en uso.
 - **Las notas** (qué define la región, que no cambia la moneda ni los datos, y en la vista previa que
   sus regiones no se verificaron en un iPhone) van debajo de la lista, nunca dentro.
@@ -2519,13 +2586,14 @@ publicada. Lo que queda preparado para 24R2:
   coincide, aunque «Según el dispositivo» siga a la vista. Una sola lista
   virtualizada, sin altura fija por fila: el texto escala con Dynamic Type. Los encabezados tienen
   rol de encabezado; un idioma en su propio nombre lleva su idioma para VoiceOver. Un guardado
-  rechazado deja la marca donde estaba y lo dice bajo la lista. La nota explicativa va debajo,
+  rechazado deja la marca donde estaba y lo dice bajo la lista *(→ 25O1: con una alerta; en la lista larga la nota va bajo
+  la tarjeta fija)*. La nota explicativa va debajo,
   nunca dentro de la lista. *(→ 24UX6E: la tarjeta fijada se separa 20 pt de la tarjeta de opciones que la sigue
   enseguida; antes se tocaban.)*
 - **La fila resumida en Más** sigue siendo `NavigationRow` («Región · Argentina · según el
   dispositivo»); en 24R2 nombra también la región del catálogo elegida.
 - Sin banderas, sin colores por país, sin lista interminable en Más: filas compactas que abren una
-  pantalla con búsqueda, como las monedas.
+  pantalla con búsqueda, como las monedas. *(→ 25O1: cada región lleva su bandera; ver «Producto 25O1 — primera impresión».)*
 
 ## Producto 24B6 — hoja de fecha compacta, moneda compartida y reglas de tarjeta (sin rediseño)
 
@@ -2565,7 +2633,7 @@ está listo para cuando el gate se abra:
   con el nombre en el idioma de la interfaz, el código ISO y el símbolo de la región, y a partir de seis
   monedas un campo de búsqueda que encuentra por código, nombre, símbolo, código numérico o país
   («yen», «japón», «€», «840»). Filas compactas, sin banderas ni colores por moneda; nunca una lista
-  enorme en la pantalla principal.
+  enorme en la pantalla principal. *(→ 25O1: cada moneda lleva la bandera de su emisor junto al código; ver «Producto 25O1 — primera impresión».)*
 - **La moneda antes del importe** en cuenta, tarjeta, deuda, presupuesto y recurrente (en el
   recurrente la cuenta, que fija la moneda, pasa arriba del importe): el campo usa la precisión
   correcta desde la primera tecla (teclado numérico en yenes, tres decimales en dinares).
@@ -2674,7 +2742,7 @@ Detalle en docs/currency.md §8–§10.
   CLDR en el idioma de la interfaz ("Yenes japoneses"), nunca en otro idioma.
 - **El selector buscable** (24B) seguirá la hoja actual de moneda (fila agrupada con
   chevron, tilde en la actual): búsqueda por código, nombre, símbolo o país, las monedas
-  del libro primero, sin banderas ni colores por moneda. Diseño en docs/currency.md.
+  del libro primero, sin banderas ni colores por moneda. Diseño en docs/currency.md. *(→ 25O1: cada moneda lleva la bandera de su emisor junto al código; ver «Producto 25O1 — primera impresión».)*
 
 ## Producto 23.1C2 — inglés y Estados Unidos publicados (sin rediseño)
 
@@ -3261,7 +3329,8 @@ esquema para esta entrega. Las notas buscables de gastos e ingresos quedan en la
 - Más: el pie era diagnóstico del proyecto («Piloto nativo 0.1.0 · Producto 24UX4 · Material opaco ·
   Idioma: módulo nativo») para todos. Ahora es la línea de versión, como el «Acerca de» de iOS:
   «FinanzApp 0.1.0 (24UX5)»; el material y el origen del idioma aparecen debajo solo en una build de
-  desarrollo (`__DEV__`). La nota de almacenamiento local se conserva, dicha como hecho: «Tus registros
+  desarrollo (`__DEV__`). *(→ 25O1: la nota de almacenamiento local se fue.)* La nota de almacenamiento local se
+  conserva, dicha como hecho: «Tus registros
   se guardan solo en este dispositivo y funcionan sin conexión. No se sincronizan con otros
   dispositivos.»
 
@@ -3311,6 +3380,11 @@ color propio.
 
 ## Pendiente de revisión en iPhone
 
+- Producto 25O1, en el hito M1 (una instalación nueva con Metro desde la rama): la historia, sus escenas y su
+  movimiento, el paso de la plata, el saldo y su chip de moneda, «Todo listo.» y su paso a Inicio, restaurar una copia
+  desde la primera apertura, VoiceOver y el texto más grande en la primera apertura, Primeros pasos, las banderas de
+  Región y de las monedas, «Abrir Configuración» de Idioma y las leyendas del «+» (docs/mobile-device-checklist.md, «Producto
+  25O1»).
 - Producto 25Q4, en la próxima sesión por hito: editar un pago de tarjeta y de deuda, el techo dicho mientras se
   escribe, recuperar un pago que pagaría de más, las confirmaciones de deshacer en tarjetas y deudas, el toque de error
   en un guardado rechazado, «Cerrar» en las ediciones sin nada para editar, la revisión de una copia con vencimientos y

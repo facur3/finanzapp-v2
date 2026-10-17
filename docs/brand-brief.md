@@ -301,7 +301,9 @@ until physical iPhone QA and the owner's explicit approval; no logo is selected.
    «+» keeps the brand fill or takes ink with a sapphire glyph is an exploration item. Electric Lime's «+» holds 7:1
    against the graphite dock; a sapphire «+» cannot (2.21 light, 6.21 dark), so that rule becomes «+» against the canvas
    it floats on, at least 3:1 (6.65 / 7.42). Dark mode also has three brand fills (#3D60D4 buttons and swipe, #4568DA
-   switch, #7E9BF7 «+»); one shared dark fill is an option for the iPhone.
+   switch, #7E9BF7 «+»); one shared dark fill is an option for the iPhone. *(Decided 2026-10-17 under the owner's
+   design delegation, Producto 25O1: buttons and the accent swipe take the switch's #4568DA, white 4.8:1; two dark
+   brand fills remain.)*
 4. **The theme tests.** About a third of `tests/theme.node.ts` encodes Electric Lime itself (the 68–82° window, a light
    field, ink on the fill). Before any non-lime theme, or a 25F theme pack, the file is split:
    - accessibility assertions that every theme must pass;
@@ -321,7 +323,7 @@ until physical iPhone QA and the owner's explicit approval; no logo is selected.
 | background / surface / inset / elevated | #F3EFE6 / #FFFCF6 / #E9E3D6 / #FFFFFF | #0C0B0A / #1B1A18 / #24231F / #34322D |
 | text / secondary / tertiary / line | #19191C / #514E47 / #625E56 / #DDD6C8 | #F3F0E8 / #ADA89C / #A09B90 / #2C2A26 |
 | primary = link / primarySoft | #2148C0 / #E4E9F7 | #7E9BF7 / #19223F |
-| primaryFill / onPrimary | #2148C0 / #FFFFFF | #3D60D4 / #FFFFFF |
+| primaryFill / onPrimary | #2148C0 / #FFFFFF | #3D60D4 / #FFFFFF (#4568DA since 25O1) |
 | thumb / toggle | #FFFFFF / #2148C0 | #3C3A35 / #4568DA |
 | hero / heroInk / heroSecondary / heroControl | #2148C0 / #FFFFFF / #D3DCF6 / #1A3A9E | #2446AE / #FFFFFF / #C9D4F5 / #1A3790 |
 | heroThumb / heroThumbInk | #FFFCF6 / #19191C | #FFFCF6 / #19191C |
@@ -332,7 +334,7 @@ until physical iPhone QA and the owner's explicit approval; no logo is selected.
 | income / expense / warning | #1F7A4F / #B3432E / #9A5B00 | #5CCB93 / #EE8A72 / #E8A94A |
 | transfer | #48606F, the slate kept (item 2) | #A3B5C4 (item 2) |
 | onSemantic (PR #107) | #FFFFFF | #19191C |
-| swipeDestructive / swipeNeutral / swipeAccent | #B3432E / #5E5A52 / #2148C0 | #B8412D / #524F48 / #3D60D4 |
+| swipeDestructive / swipeNeutral / swipeAccent | #B3432E / #5E5A52 / #2148C0 | #B8412D / #524F48 / #3D60D4 (#4568DA since 25O1) |
 | shadow | rgba(25, 25, 28, 0.08) | rgba(0, 0, 0, 0) |
 
 The soft semantic tints (`incomeSoft`, `expenseSoft`, `warningSoft`, `transferSoft`) and `scrim` keep their current

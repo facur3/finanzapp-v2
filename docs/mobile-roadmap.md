@@ -1,6 +1,12 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-16, later (**25Q4 — edits, failures and recovery that keep the money right**, on its branch stacked on
+Updated: 2026-10-17 (**25O1 — first impression**, on its branch stacked on #118: the first opening rebuilt as a short
+story drawn with the app's own figures, «¿Dónde tenés tu plata?» with three presets and «Restaurar una copia», the
+opening balance with the currency's flag, and a sapphire close that continues into Inicio; «Primeros pasos» on a new
+Inicio; region flags and currency marks with written semantics; empty states in one line; account forms money first;
+the «+» captions corrected (decision 005, text only); two dark brand fills; JavaScript only; the owner widened the
+design delegation and the deferred findings were re-triaged; the next QA milestone M1 covers the four stacked drafts;
+«Producto 25O1», §1, §2, §3). Before (2026-10-16, later, **25Q4 — edits, failures and recovery that keep the money right**, on its branch stacked on
 #117: an edited card or debt payment keeps its card or debt and offers only sides storage accepts; a debt payment or
 collection never settles more than is pending, new, edited or restored; undo and restore say how a card or a debt will
 read; a failed action says its own sentence, never an engine's text, with one Error or Warning tap; a failed catch-up
@@ -433,7 +439,15 @@ history file keeps the evidence of when and why.
 
 ## 1. Implemented (current state)
 
-- **25Q4 — edits, failures and recovery that keep the money right (on its branch, stacked on 25D1).** «Producto 25Q4».
+- **25O1 — first impression (on its branch, stacked on 25Q4).** «Producto 25O1». The first opening is a three-page story
+  (scenes drawn with the app's components from fixed sample figures, played once, still under Reduce Motion), «¿Dónde
+  tenés tu plata?» (cash, bank or digital wallet as presets; the region pill with its flag, the language pill without;
+  «Restaurar una copia», which ends the setup when the copy brings accounts), the opening balance (the currency chip with
+  the issuer's flag) and «Todo listo.» on the sapphire field Inicio opens with; VoiceOver moves to each new title. A new
+  Inicio shows «Primeros pasos» without a filled button. Region rows lead with their flag, currencies with their issuer's
+  (never a language, never an account), the chooser notes say one useful fact. Empty states in one line; account forms
+  name, currency and balance first; the «+» captions say what each form records; two dark brand fills.
+- **25Q4 — edits, failures and recovery that keep the money right (PR #118, stacked on #117).** «Producto 25Q4».
   Editing a card payment, a debt payment or a collection keeps its card or debt and offers only the sides storage
   accepts (no choice ends frozen); a debt payment or collection settles at most what is pending, new, edited or
   restored, said in red while it is typed; undo and restore confirmations say how a card or a debt will read and where
@@ -996,8 +1010,14 @@ item unless a section says a new native build is needed. The checklist sections 
   symbol and cents on the sand, «Otras», the chosen colour's check, Enviar/Detener, the currency chips and the date
   sheet. Device QA no longer follows each change: the steps below accumulate for a milestone session over the critical
   journeys, then a final regression. A test that passes never counts as a device result.
-- **25Q4 — edits, failures and recovery (on its branch, stacked on #117; JavaScript only, the same build):** the
-  checklist's «Producto 25Q4», at the next milestone session.
+- **Milestone M1 — the next QA session (recommended now):** #112, #117, #118 and 25O1 together on the same build, the
+  checklist's «Milestone M1»: the first opening on a fresh install, then the critical journeys on the owner's data and a
+  short regression, about 45 minutes. Its results decide the four drafts, merged in order (#112 → #117 → #118 → 25O1).
+  VoiceOver announcements beyond the first opening wait for M2, after 25D2 reworks them.
+- **25O1 — first impression (on its branch, stacked on #118; JavaScript only, the same build):** the checklist's
+  «Producto 25O1», in M1.
+- **25Q4 — edits, failures and recovery (PR #118, stacked on #117; JavaScript only, the same build):** the
+  checklist's «Producto 25Q4», in M1.
 - **QA session — 25VIS2, 25D1 and the merged 25Q1–25Q3 together (paused; the owner's development build from `master`
   42f6e9a):** the checklist's «QA session»: the order, the acceptance rules and the walk over every
   screen; the sections below hold the steps. Its results decide #112 (the Sapphire verdict and its five choices) and #117.
@@ -1270,6 +1290,13 @@ item unless a section says a new native build is needed. The checklist sections 
   TestFlight.
 
 ## 3. Next deliveries
+
+*(2026-10-17: the owner widened the design delegation (consult only for financial rules, data semantics, important
+functionality, the business model or launch decisions) and put the first opening first. 25O1 (first impression) is on
+its branch; the deferred findings were re-triaged, and the design-only ones moved into deliveries. Next: milestone M1
+(the four stacked drafts on the iPhone, then their merge), 25D2 VoiceOver and Voice Control, the forms and commitments
+delivery (the last account used, the card faces, the recurring date wheel), Reportes and the Assistant's interface, Más
+(Licencias) and robustness, a copy pass (one meaning per term, impersonal system messages).)*
 
 *(2026-10-16, the owner's working mode: deliveries are drawn from the iOS review's private register in the owner's
 order of priorities, each with tests and an independent review, and the iPhone checks accumulate for milestone sessions.
@@ -3037,6 +3064,7 @@ nothing of it is on a screen yet.
   Assistant comes first and largest (a pine tile with the accent sparkle, «Asistente» · «Decilo con tus palabras o
   preguntá lo que quieras»; «Continuar: «…»» only when the session holds the person's real last words), then Gasto
   «Una compra o un pago», Ingreso «Sueldo, cobro u otro ingreso» and Transferencia «Entre cuentas o pago de tarjeta»
+  *(captions replaced by 25O1: decision 005's amendment of 2026-10-17)*
   on neutral inset tiles. `captureDestination` is the one table: expense and income → /new-entry with the kind (and
   the display currency only while a live account holds it), transfer → /new-transfer, assistant → /assistant with the
   display currency; each is pushed once the hub has left. The first choice holds while it leaves (a second row, the
@@ -4554,7 +4582,67 @@ nothing of it is on a screen yet.
   passed, 0 failed; `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0 errors, 0 stale; `check` OK;
   `export:ios` OK. No account, handle, ad account or campaign created.
 
-### Producto 25Q4 — edits, failures and recovery that keep the money right (this PR, stacked on #117)
+### Producto 25O1 — first impression (this PR, stacked on #118)
+
+- **Why.** The owner (2026-10-17) found the first opening too basic, with little visual personality and too much text,
+  asked for a premium, clear and memorable one coherent with Sapphire + Sand, for country marks in the Region chooser and
+  near accounts where they mean something, and widened the design delegation to the whole app. References (Revolut,
+  Wise, Slack) were read for principles, not looks: the brand brief keeps caps-lock headlines, 3D renders, mascots and
+  confetti out; numerals are the hero and the commitments calendar the motif.
+- **The first opening.** `app/onboarding.tsx` and `src/ui/onboarding-flow.ts`: four steps on one route (story, start,
+  account, done). The story's scenes (`src/ui/onboarding-art.tsx`) are built from the app's own components with fixed
+  sample figures in the suggested currency and the person's formats (`sampleFigures`, never stored), each played once on
+  its page's first arrival and drawn still under Reduce Motion or on a return; they scale down to their room and are not
+  drawn under 160 pt. A display style (40 pt, capped at the Large Title's 60 pt or where the longest word fits). The
+  start step offers three presets (name and icon of the first account), the region and language pills (the Más
+  choosers), and «Restaurar una copia» (back with an account in the ledger, the setup ends). The account step asks the
+  preset's question, with the currency chip (`src/ui/currency-chip.tsx`) and the opening balance; saving keeps 25Q4's
+  rules. The close is the sapphire field with the account's card and a drawn check. The splash waits for a new
+  installation's first frame (a 1.5 s ceiling) and the tabs fade in; VoiceOver moves to each new title. A started mark
+  (`ONBOARDING_STARTED`, written by the layout for a new installation) lets a first opening interrupted by a relaunch
+  (an app-language change in iOS Settings) resume while the ledger has no account. AGENTS.md rule 15 is amended to
+  this flow, with every guarantee kept.
+- **Marks.** `src/i18n/flags.ts` and `src/ui/marks.tsx`: a region's emoji flag, a currency's issuer flag beside its
+  code (the euro's is the EU's, supranational codes get a neutral glyph), never a language's, never an account's (an
+  account has no country; adding one is an open owner decision). Region rows, recents, Más and the onboarding pill show
+  the flag; the device row a phone glyph; the currency sheets, the Moneda rows and Cuentas' headers the currency mark.
+  docs/i18n.md §11a.2 and docs/currency.md §1 record the semantics; Sark (CQ) falls back to the neutral mark until iOS
+  18.4 can be assumed.
+- **Choosers and Más.** Región's note says what it changes, under the pinned card on the long list; a refused save is
+  said in an alert, always in view; the current choice leads Recientes; from the stacking text size a region row gives
+  its flag's room back to the name. Idioma's note says how iOS uses the language in its own menus, with «Abrir
+  Configuración» (iOS's name for Settings on Latin American iPhones); Apariencia has no note; Más drops its
+  local-storage footnote.
+- **A new Inicio.** «Primeros pasos» (create the first account, log the first expense, add a card, optional) while the
+  ledger has no movement, transfer or instalment plan; a done step is a grey check, not a button; no filled button below
+  the field. Movimientos' empty state turns secondary when an account exists.
+- **Empty states, forms and the «+».** Tarjetas, Deudas y cobros and Recurrentes empty in one title and one line;
+  Nueva and Editar cuenta put name, currency and balance first and «Apariencia» last; adding the first account from a
+  movement returns to it; the hub's captions say what each form records (decision 005 amended, text only).
+- **Dark.** `primaryFill` and `swipeAccent` take the switch's #4568DA (white 4.8:1): two dark brand fills (the
+  25VIS2 owner sheet's choice, decided under the delegation).
+- **Not in this delivery.** The native splash colour (#F5F6F8 / #080B10) still predates Sapphire + Sand and changes with
+  the next native build; the illustration figures of small-unit two-decimal currencies (NGN, INR…) read dollar-like.
+- **Tests.** New `tests/flags.node.ts`; extended `onboarding` (the four steps, the story's pages and focus, Omitir, back,
+  the restore path, the save's retry and haptics, Reduce Motion, `sampleFigures`, the splash and the handoff),
+  `typography` (the display cap), `choice-list`, `locale-switch`, `locale-release`, `regions-integration`, `more-routes`,
+  `ui-rows` (the marks), `spending-home` (Primeros pasos), `capture-hub` (captions), `liabilities-routes`,
+  `recovery-routes`, `personalization-routes`, `polish-routes` (empty states, forms, the first-account return).
+- **Independent review.** Five lenses (design, accessibility, correctness, copy, tests), each finding put to a skeptic:
+  17 confirmed, none high, all fixed in this branch (a refused preference is an alert, a row's flag yields to large text,
+  the close's quiet tones, the progress's idle ink at 3:1, a scene per currency when the iPhone's Region changes, the
+  Android back scoped to focus, restored accounts ending the setup in front, the next 12th, a resumable first opening,
+  Cuentas' empty copy, «Configuración», and the missing pins); a verifier re-applied each mutation and each now fails a
+  test. The chip-beside-amount row the review asked for was measured against seven-digit balances and returned to a
+  column, so the figure keeps 46 pt.
+- **Gates.** #112, #117 and #118 merge first, after milestone M1; this branch then merges `master` (no force-push).
+- **Checks (local, Linux, worktree, 2026-10-17):** typecheck clean; `test:storage` 1481 tests, 1480 pass, 0 fail, 1
+  skipped (the currency catalogue's existing «no cached sources» skip); `currency:verify` and `regions:verify` OK;
+  `i18n:check -- --strict` 0 errors, 0 stale (21 notes); `check` OK offline and live; `npm ls --all` OK; `export:ios` OK
+  and the bundle names no server secret; root `npm test` 704 passed + 1 todo; `check:repo` OK (466 files). None of this
+  is iPhone QA.
+
+### Producto 25Q4 — edits, failures and recovery that keep the money right (PR #118, stacked on #117; unmerged)
 
 - **Why.** The first delivery under the owner's working mode of 2026-10-16: the iOS quality review's findings (record
   private) are the source of work, implemented in coherent deliveries with tests and independent review, and validated on

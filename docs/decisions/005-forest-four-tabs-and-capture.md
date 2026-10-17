@@ -23,7 +23,9 @@ de vida en Cuentas, Presupuestos, Recurrentes, Deudas y Categorías; sin chevron
 ámbar de Recurrentes solo para un gasto): ver «Enmienda 2026-10-01 — Producto 24UX6E» al final. Con ella se cierra la
 línea visual amplia de Forest.* *Enmendada el 2026-10-03 por Producto 25VIS1, **aceptada por el dueño en el iPhone** el
 mismo día como la paleta actual del producto (los colores de Forest reemplazados por Electric Lime con los mismos tokens; navegación, composición y
-reglas semánticas sin cambio): ver «Enmienda 2026-10-03 — Producto 25VIS1» al final.*
+reglas semánticas sin cambio): ver «Enmienda 2026-10-03 — Producto 25VIS1» al final.* *Enmendada el 2026-10-17 por
+Producto 25O1, solo en el texto de las leyendas del «+» (dicen lo que registra cada formulario): ver «Enmienda
+2026-10-17 — Producto 25O1» al final.*
 
 ## Decisión
 
@@ -98,7 +100,7 @@ borra ninguna entrega pasada.
 - **Orden fijo:** el tile del Asistente (fondo de pino, destello sobre un círculo de acento,
   «Asistente» y «Decilo con tus palabras o preguntá lo que quieras»), luego Gasto («Una compra o
   un pago»), Ingreso («Sueldo, cobro u otro ingreso») y Transferencia («Entre cuentas o pago de
-  tarjeta»).
+  tarjeta»). *(Leyendas reemplazadas el 2026-10-17 por 25O1: ver «Enmienda 2026-10-17 — Producto 25O1», abajo.)*
 - **«Continuar: «…»»** aparece en el tile del Asistente **solo** cuando la conversación de esta
   sesión tiene un mensaje de la persona, y muestra sus últimas palabras reales
   (`lastUserWords`). Nunca un texto de ejemplo.
@@ -521,3 +523,15 @@ quedaba arriba del dock (corregido por 25OPS1, abajo). La verificación en Linux
 
 **Estado.** Implementado en `apps/mobile`, mergeado como PR #83 (commit de merge 0ff9859, 2026-10-04); paleta aceptada por
 el dueño en el iPhone el 2026-10-03; el símbolo y los centavos del monto de Inicio pasaron a grafito sólido en 25A-03; los demás puntos de `docs/mobile-device-checklist.md`, «Producto 25VIS1», siguen abiertos.
+
+## Enmienda 2026-10-17 — Producto 25O1 (leyendas del «+»)
+
+- **Solo texto, con la delegación de diseño del dueño (2026-10-17).** Las leyendas prometían lo que sus formularios no
+  registran: la Transferencia del «+» abre la transferencia entre cuentas, que nunca lista una tarjeta ni una deuda, y
+  «un pago» y «cobro» son palabras que el glosario reserva para saldar una tarjeta o una deuda. Ahora dicen lo que cada
+  formulario hace: Asistente «Registrá un gasto o preguntá por tus gastos» (el alcance de la primera versión), Gasto
+  «Una compra o un servicio», Ingreso «Sueldo u otro ingreso», Transferencia «Entre tus cuentas».
+- **No cambia:** el orden, los íconos, el hub, sus gestos ni ninguna regla contable. Un pago de tarjeta sigue en
+  Tarjetas › Pagar tarjeta y un pago o cobro de deuda en la deuda.
+
+**Estado.** Implementado en su rama, sobre 25Q4; sin revisar en un iPhone (`docs/mobile-device-checklist.md`, «Producto 25O1»).

@@ -1058,7 +1058,8 @@ to publish.
 - **In the app: «Ayuda y comentarios», a pre-launch requirement in Más** (Producto 26). One compact row with three
   choices: «Reportar un problema», «Sugerir una mejora», «Hacer una consulta». The first implementation may open the
   system mail composer to the public support alias. Más also shows a quiet app version and build line, and drops the
-  long explanatory footer copy that is not needed (today the «Datos de la app» footnote, `settings.localNote`).
+  long explanatory footer copy that is not needed (the «Datos de la app» footnote, `settings.localNote`, dropped in
+  Producto 25O1).
 - **What the message may carry automatically:** only non-sensitive technical metadata: app version and build, iOS
   version, device family, app language, configured product region.
 - **What it never carries automatically:** balances, movements, amounts, account or card names, merchants, the

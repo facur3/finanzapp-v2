@@ -171,7 +171,7 @@ test('Más groups permanent navigation into Finanzas and App y datos, with live 
   assert.equal(value('Apariencia'), 'Sistema', '24UX6A: the default follows the device');
   assert.equal(nodes(root).some(node => node.type === 'ActionButton'), false);
   const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
-  assert.match(texts, /FinanzApp 0\.1\.0 \(25Q4\)/, 'the version line, like the About line of an iOS app');
+  assert.match(texts, /FinanzApp 0\.1\.0 \(25O1\)/, 'the version line, like the About line of an iOS app');
   assert.match(texts, /Material opaco \(Expo Go\)/, 'a development build says which control material this session draws, so a tester can confirm the mode');
   assert.doesNotMatch(texts, /Piloto nativo|Producto 24/, '24UX5: no project vocabulary on the settings screen');
   assert.equal(value('Categorías'), 'Gastos e ingresos');
@@ -402,7 +402,7 @@ test('23.1B2 English Más: every row, count, note and the diagnostic footer are 
   for (const row of rows(root)) row.props.onPress();
   assert.equal(view.pushed.join(','), '/accounts,/cards,/budgets,/recurring,/debts,/categories,/backup,/undone-entries,/language,/region,/appearance');
   const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
-  assert.match(texts, /FinanzApp 0\.1\.0 \(25Q4\)/);
+  assert.match(texts, /FinanzApp 0\.1\.0 \(25O1\)/);
   assert.match(texts, /Opaque material \(Expo Go\) · Language: default/);
   assert.doesNotMatch(texts, /saved only on this device/, '25O1: no local-storage footnote in either language');
   assert.doesNotMatch(texts, /Material opaco|Idioma|Región|sincronización/);
@@ -450,7 +450,7 @@ test('24UX5: a preview or store build shows the version, never the diagnostics (
   for (const locale of [null, 'en-AR'] as const) {
     const root = harness('(tabs)/settings.tsx', archive, undefined, locale, undefined, false).render();
     const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
-    assert.match(texts, /FinanzApp 0\.1\.0 \(25Q4\)/);
+    assert.match(texts, /FinanzApp 0\.1\.0 \(25O1\)/);
     assert.doesNotMatch(texts, /Material|material|Idioma:|Language:/, 'no material or locale diagnostics outside a development build');
     assert.doesNotMatch(texts, locale ? /saved only on this device/ : /se guardan solo en este dispositivo/, 'the first opening says where the records live; Más does not repeat it');
   }
