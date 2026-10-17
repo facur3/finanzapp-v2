@@ -57,6 +57,28 @@ copies' locations (25Q4 step 9 needs Xcode's Devices window), the cold links of 
 merges `master` and keeps its CI green before its own merge; never a force-push). A failure fixes forward on the branch
 it belongs to and the stack above merges it in.
 
+## Producto 25A-UI — the Assistant's interface (on its branch, stacked on 25D2; milestone M2)
+
+Metro from this branch in a QA profile; steps 1–6 with `EXPO_PUBLIC_ASSISTANT_FIXTURES=1`, step 7 without it. The
+version line reads «FinanzApp 0.1.0 (25A-UI)».
+
+1. **The wait:** ask «¿Por qué gasté más este mes?»: «Pensando…» only after about 400 ms (or never, if quick); Detener
+   only after the same delay; a double tap on Enviar never cancels. Detener before the first word: the bubble goes and
+   the words come back to the field.
+2. **The keyboard:** in a long thread at its end, focus the field: the last answer stays above the composer, moving with
+   the keyboard without an animation; scrolled up, focusing moves nothing; the interactive dismiss works.
+3. **Reopen:** leave and come back through «+» › Asistente: earlier rows do not rise or fade; a new one does.
+4. **Coverage:** with ARS and USD accounts, an answer says «Solo cuentas en ARS, sin conversiones.»; on the 31st of a
+   long month (or with the date set), «Del 1 al 30».
+5. **Limits:** typing in a long thread feels smooth; a paste over 2 000 characters is cut at the limit.
+6. **Review:** «Revisar» or «Ver movimiento» double-tapped opens one screen; delete a pending item's destination or
+   archive its category: the sheet, detail, tray row and card say «(ya no disponible)» / «(archivada)» with the reason;
+   a refused Confirmar, Editar and save: the red line is gone; a merchant with a zero-width space shows the note and
+   Guardar waits; «Otra» with 1 instalment shows the count note; an archived category starts empty.
+7. **Disconnected:** any suggestion: no haptic; the note «El Asistente todavía no está disponible en esta versión. Tu
+   mensaje sigue en el cuadro.» and «Registrar a mano» (44 pt; VoiceOver: the note, then the button; AX5) opening the
+   empty expense form in the screen's currency.
+
 ## Producto 25D2 — VoiceOver and Voice Control (on its branch, stacked on 25R1; milestone M2)
 
 VoiceOver on, Spanish, then the key steps in English; Metro from this branch in a QA profile, with

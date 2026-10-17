@@ -880,6 +880,21 @@ barras de Día a día y una cabecera fija sólida. Siguen permitidos para una pa
 vinculante del roadmap no cambia: la próxima entrega de producto es 24T3; 24UX6C (Movimientos y Más) y 24UX6D
 (Tarjetas) siguen a 24UX6B en el carril UX, y su lugar frente a 24T3 lo decide el dueño (ver `docs/mobile-roadmap.md`).
 
+## Producto 25A-UI — la interfaz del Asistente (en su rama, sobre 25D2)
+
+- **La espera se ve y es segura.** El lugar de la respuesta se reserva al enviar; «Pensando…» aparece recién a los 400 ms
+  (si la respuesta tarda) y Enviar pasa a Detener al mismo tiempo, así un segundo toque rápido no detiene nada. Detener
+  antes de la primera palabra devuelve la pregunta al cuadro.
+- **El hilo sigue al teclado** sin animar: quien está al final se queda al final; quien subió a leer no se mueve. Lo que
+  ya estaba no vuelve a entrar con animación al reabrir.
+- **El build desconectado dice lo cierto:** sin toque háptico de envío, la nota de no disponible y «Registrar a mano»
+  (el formulario vacío, en la moneda de la pantalla); un límite nunca es «de hoy».
+- **Una respuesta dice lo que cubre:** «Del 1 al N» cuando los datos del mes terminan antes de hoy y «Solo cuentas en
+  ARS, sin conversiones.» cuando hay otras monedas.
+- **Revisión:** Editar borra la línea de rechazo; un doble toque abre una sola hoja o editor; el editor marca al escribir
+  los caracteres invisibles y una cantidad de cuotas fuera de rango, y nunca muestra una categoría archivada como
+  elegida; un destino o categoría que dejó de valer se dibuja con su motivo («ya no disponible», «archivada»).
+
 ## Producto 25D2 — VoiceOver y Voice Control (en su rama, sobre 25R1)
 
 - **Lo que pasa se dice.** iOS no tiene regiones vivas: un solo ayudante (`announce`) dice el resultado de una acción
@@ -2308,8 +2323,8 @@ comportamiento ni de escritura.
 ### El Asistente
 
 - **Sin leyenda permanente.** Salió «No conectado en esta versión…» de debajo del compositor. En el build desconectado,
-  un mensaje enviado recibe en el hilo la nota «El Asistente todavía no está conectado en esta versión. Tu mensaje
-  quedó escrito para cuando lo esté.»: el límite, dicho donde se usa.
+  un mensaje enviado recibe en el hilo la nota «El Asistente todavía no está disponible en esta versión. Tu mensaje sigue
+  en el cuadro.» con «Registrar a mano» al lado (25A-UI): el límite, dicho donde se usa, y el paso siguiente.
 - **Sin micrófono.** El micrófono del compositor y su nota salieron hasta que exista el dictado (Producto 25A): un
   micrófono que no dicta es un callejón sin salida, como en la hoja de Registrar.
 - **El glifo del vacío** es el círculo de acento con los sparkles en `onAccent`, como en la hoja. Las sugerencias, la
@@ -3422,6 +3437,8 @@ crédito, marca elegida) y los filetes de las píldoras, el chip y el compositor
 color propio.
 
 ## Pendiente de revisión en iPhone
+
+- Producto 25A-UI, en el hito M2: la espera, Detener, el teclado, el build desconectado y la revisión (docs/mobile-device-checklist.md, «Producto 25A-UI»).
 
 - Producto 25D2, en el hito M2: el guion de VoiceOver y Voice Control (docs/mobile-device-checklist.md, «Producto 25D2»).
 

@@ -1,6 +1,8 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-17 (**25D2 — VoiceOver and Voice Control**, on its branch stacked on #121: the Assistant and every
+Updated: 2026-10-17 (**25A-UI — the Assistant's interface**, on its branch stacked on #122: a visible and safe wait,
+a thread that follows the keyboard, a disconnected build that says what is true, answers that say what they cover;
+«Producto 25A-UI»). Before (**25D2 — VoiceOver and Voice Control**, PR #122, stacked on #121: the Assistant and every
 ledger outcome spoken on iOS, in-place changes announced, names that match the visible words, one stop per row;
 «Producto 25D2»). Before (**25R1 — robustness**, PR #121, stacked on #120: catch-ups that follow the day and the
 foreground, rates that back off and recover, links that only open Inicio, committed changes reported as done; «Producto
@@ -447,7 +449,9 @@ history file keeps the evidence of when and why.
 
 ## 1. Implemented (current state)
 
-- **25D2 — VoiceOver and Voice Control (on its branch, stacked on #121).** «Producto 25D2». The Assistant and the
+- **25A-UI — the Assistant's interface (on its branch, stacked on #122).** «Producto 25A-UI». The wait, Stop, the
+  keyboard follow, the disconnected build, coverage captions and the review editor's states.
+- **25D2 — VoiceOver and Voice Control (PR #122, stacked on #121).** «Producto 25D2». The Assistant and the
   outcomes of writes spoken on iOS, in-place changes announced, Voice Control names, one stop per row.
 - **25R1 — robustness (PR #121, stacked on #120).** «Producto 25R1». Catch-ups per day change and real return,
   rates with back-off and refresh, links that open Inicio only, committed changes reported as done, tests in three zones.
@@ -1027,7 +1031,8 @@ item unless a section says a new native build is needed. The checklist sections 
   symbol and cents on the sand, «Otras», the chosen colour's check, Enviar/Detener, the currency chips and the date
   sheet. Device QA no longer follows each change: the steps below accumulate for a milestone session over the critical
   journeys, then a final regression. A test that passes never counts as a device result.
-- **25D2 (on its branch, stacked on #121):** the checklist's «Producto 25D2», in M2 (VoiceOver and Voice Control).
+- **25A-UI (on its branch, stacked on #122):** the checklist's «Producto 25A-UI», in M2.
+- **25D2 (PR #122, stacked on #121):** the checklist's «Producto 25D2», in M2 (VoiceOver and Voice Control).
 - **25R1 (PR #121, stacked on #120):** the checklist's «Producto 25R1», in M2.
 - **25N1 (PR #120, stacked on #119):** the checklist's «Producto 25N1», in milestone **M2** (with 25D2), in a QA
   profile; the owner approves the navigation there.
@@ -3359,7 +3364,8 @@ nothing of it is on a screen yet.
   `transferSoft` with the transfer glyph (24UX6A had three neutral tiles). No behaviour or write change.
 - **What changed: the Assistant.** The permanent caption «No conectado en esta versión…» is removed (key
   `assistant.disconnectedNote` deleted); in the disconnected build a sent message still gets the in-thread
-  `unavailable` note «El Asistente todavía no está conectado en esta versión. Tu mensaje quedó escrito para cuando lo
+  `unavailable` note *(25A-UI: now «El Asistente todavía no está disponible en esta versión. Tu mensaje sigue en el
+  cuadro.» with «Registrar a mano»)* «El Asistente todavía no está conectado en esta versión. Tu mensaje quedó escrito para cuando lo
   esté.» («The Assistant isn’t connected in this version yet. Your message stays in the text field until it is.»): the
   limitation at the point of use. The composer microphone and its note are removed (keys `composer.dictate`,
   `dictateHint`, `dictationNote` deleted) until dictation exists in 25A. The empty conversation's glyph is the accent
@@ -4682,7 +4688,31 @@ nothing of it is on a screen yet.
   passed, 0 failed; `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0 errors, 0 stale; `check` OK;
   `export:ios` OK. No account, handle, ad account or campaign created.
 
-### Producto 25D2 — VoiceOver and Voice Control (this PR, stacked on #121)
+### Producto 25A-UI — the Assistant's interface (this PR, stacked on #122)
+
+- **Why.** The register's Assistant-interface group: a wait that was invisible and a Stop that shared Send's place, a
+  thread that lost its end under the keyboard, a disconnected build that promised more than it kept, answers that did
+  not say what they covered, and the review editor's stale or hidden states.
+- **The wait.** The reply's place is reserved on send; «Pensando…» and Stop appear after `WAIT_REVEAL_MS` (400 ms); a
+  Stop before the first word gives the question back; the composer takes the protocol's 2 000 characters; a '?' beside
+  an amount stays a movement (a question starts with «¿» or a question word).
+- **The thread.** Following the end is decided by the reader's own drags; the keyboard keeps a reader at the end there
+  without animation; history does not replay its entrances (`Restored`); typing re-renders only the composer; chips only
+  where a choice completes something.
+- **Disconnected.** No send haptic; the note says the Assistant is not available in this version and the message stays
+  in the field, with «Registrar a mano» (the empty expense form); a limit is never «de hoy».
+- **Coverage.** «Del 1 al N» when this month's facts end before today; «Solo cuentas en ARS, sin conversiones.» when
+  other currencies exist. The request and the reply agree on invisible characters (`withoutInvisibles`; the domain
+  exports `hasHiddenCharacters`).
+- **Review.** Editar clears the refusal line; one sheet or editor per double tap (`usePushOnce`); live validation of
+  hidden characters and the instalment count; an archived category is never shown as chosen; a destination or category
+  that stopped being valid is drawn with its reason on every surface.
+- **Owner decisions left (none blocks the merge).** Whether the Assistant's facts come from the consolidated view the
+  screens use (today: the display currency's accounts, said in words); whether «este mes» runs through today; what a
+  chip does for a question the model asked (today: none; typing answers it); refusing invisible characters at the
+  server's input (a protocol change).
+
+### Producto 25D2 — VoiceOver and Voice Control (PR #122, stacked on #121)
 
 - **Why.** The register's VoiceOver group, the two P1s among it: the Assistant was silent for VoiceOver on iOS, and no
   outcome of a write was ever spoken (iOS has no live regions).
