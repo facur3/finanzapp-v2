@@ -26,7 +26,8 @@ region never implies a currency (Argentina is not "ARS by default"; `territories
 the data is a search hint only), and the **display currency** Inicio and Reportes express totals
 in (§2.8, since 24C1 the "main currency for reports" of §8.3) is a fifth, separate preference.
 
-**Marks (Producto 25O1).** A currency is marked by the flag of its issuer beside its code («🇺🇸 USD»): ISO 4217 names
+**Marks (Producto 25O1).** A currency is marked by the round flag of its issuer beside its code (USD with the United
+States' flag; vector art, `src/i18n/flag-art.ts`): ISO 4217 names
 the issuer in the code's first two letters, the euro's is the European Union's, and a supranational code (XAF, XCD,
 XCG, XOF, XPF) gets a neutral glyph instead (`src/i18n/flags.ts`, pinned by `tests/flags.node.ts`). The flag marks the
 currency, never the account: an Argentine bank's dollar account is still in Argentina, and an account stores no country

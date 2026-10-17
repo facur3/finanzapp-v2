@@ -1,29 +1,71 @@
 # Physical iPhone acceptance checklist
 
-## Milestone M1 — the stacked drafts together (#112, #117, #118 and 25O1), one session
+## Milestone M1 — the stacked drafts together (#112, #117, #118 and #119), one session, no risk to the owner's data
 
 The owner's working mode since 2026-10-16: device QA accumulates per milestone, as representative critical journeys and
 a final regression, never one session per change. M1 validates the four stacked drafts on the owner's development build
-of 2026-10-16 (5d1453b2, `master` 42f6e9a; everything here is JavaScript, Metro from the 25O1 branch). The version line
-reads «FinanzApp 0.1.0 (25O1)». Keep a backup first (Más › Copia de seguridad) and do the first opening on a reinstall or
-a second device, never on the owner's data. About 45 minutes; VoiceOver announcements beyond the first opening wait for
-M2, after the VoiceOver delivery (25D2) reworks them.
+of 2026-10-16 (5d1453b2, `master` 42f6e9a, fingerprint 7672beac): everything in them is JavaScript, so Metro from #119's
+branch carries all four. About 40 minutes. A passed step validates only the findings it walks through; what M1 does not
+walk stays «pending» in the register (below, «Not in M1»).
 
-Order: (1) «Producto 25O1» below, on a fresh install; (2) on the owner's data, the journeys: record an expense, an income
-and a transfer; edit and undo one (25Q4 steps 1–4); pay a card and a debt; Reportes and Presupuestos for this month;
-import a copy (25Q4 step 8); (3) light and dark, the largest text on one screen of each tab (the 25D1 and 25VIS2 items
-left in «QA session» below, only those marked there as unresolved); (4) the regression: open every tab and Más row once.
-Mark each step here; a passed journey validates the findings it walks through, nothing else.
+**Never on the owner's data.** Every write of M1 happens in a **QA profile** (`EXPO_PUBLIC_QA_PROFILE`, development
+bundles only): the app opens its own empty ledger, rate and review files and its own prefixed preference keys (in the
+same key-value store, beside the owner's), so it behaves as a new installation while the owner's ledger is never opened
+and the owner's keys are never read or written. No reinstall, no deletion. Part B returns to the owner's
+data for reading only.
+
+**Setup.**
+1. On the iPhone, with today's bundle: Más › Copia de seguridad › export a copy to Files (reading only; it is also the
+   file A3 restores). Note Inicio's Disponible and this month's Gastado.
+2. On the computer, in the worktree of #119 (branch `feat/25o1-first-impression`, at its head): `cd apps/mobile`,
+   `npm ci`, then
+   `EXPO_PUBLIC_QA_PROFILE=m1 EXPO_PUBLIC_ASSISTANT_FIXTURES=1 npm run start:dev-client -- --clear`
+   and open FinanzApp Dev on the same Wi-Fi.
+3. **Safety check:** the app must open on the first opening's story. If Inicio shows your data, stop: the variable did
+   not reach the bundle (quit the app, restart Metro with `--clear`). Más ends «FinanzApp 0.1.0 (25O1)» and, under it,
+   «Perfil de prueba «m1»: tus datos no se abren…».
+
+**Part A — the QA profile «m1» (a new installation).**
+- **A1 · First opening** (≈10 min): «Producto 25O1» steps 1–5 and the flags of step 8 (the pills, Región and Idioma,
+  the currency chip). VoiceOver once over steps 1–5: focus lands on each new title (step 6); Reduce Motion once over the
+  story (step 2's last line).
+- **A2 · Journeys** (≈12 min) on what A1 created: a second account; an expense, an income and a transfer; a card with a
+  purchase and Pagar tarjeta; a debt and a payment; then «Producto 25Q4» steps 1–4 and 7. Inicio's Primeros pasos
+  fades after the first expense (25O1 step 7).
+- **A3 · Restore** (≈5 min): stop Metro, start it with `EXPO_PUBLIC_QA_PROFILE=m1b` (a second empty profile), and in
+  the first opening use «Restaurar una copia» with the file from setup 1: the review screen («Copia del …») and, once
+  imported, Inicio with the copy's accounts and no first-account step (25O1 step 3; 25Q4 step 8). The copy lands in the
+  m1b files only.
+- **A4 · Legibility** (≈8 min, back in m1): light and dark, then the largest text size, one screen per tab and one form
+  and one sheet: every text and amount whole, one obvious primary action, every control reachable (the acceptance list
+  of «QA session» below, items 1–5); 25O1 steps 9–10.
+
+**Part B — the owner's data, reading only** (≈5 min). Stop Metro; start it **without** the variable:
+`npm run start:dev-client -- --clear`. Más has no «Perfil de prueba» line; Disponible and Gastado equal the setup's;
+open every tab and every Más row once, light and dark, writing nothing.
+
+**Acceptance.** A wrong figure, lost or changed data, a crash or a frozen screen, or a text or control that cannot be
+read or reached blocks the merge of the PR it belongs to; taste is scored, not failed. Record one line per step (pass,
+fail with what you saw, or not run) with the iPhone model, iOS version, theme and text size.
+
+**Not in M1 (stays pending in the register, not validated):** VoiceOver beyond the first opening (M2, after the
+VoiceOver delivery 25D2), Increase Contrast, Bold Text, Smart Invert and Display Zoom, English at AX5, the temporary
+copies' locations (25Q4 step 9 needs Xcode's Devices window), the cold links of 25Q4 step 6, and the remaining items of
+«QA session» below.
+
+**Then, if M1 passes:** the merge order is #112 → #117 → #118 → #119 (each merged into `master` in turn; the next one
+merges `master` and keeps its CI green before its own merge; never a force-push). A failure fixes forward on the branch
+it belongs to and the stack above merges it in.
 
 ## Producto 25O1 — first impression (on its branch, stacked on #118; milestone M1)
 
-1. **A fresh install** (delete the app, start Metro from the branch): the splash lifts straight onto the story; Inicio is
+1. **A new installation** (the QA profile of M1, never a deletion of the owner's app): the splash lifts straight onto the story; Inicio is
    never seen under it (a grey-to-sand tint change of the native splash is known: its colour changes with the next
    native build). Three pages, swiped or with Siguiente; the progress follows; Omitir on any of them lands on Inicio.
 2. **The scenes, once each:** page 1 types the amount key by key (the caret blinks twice) and the row rises in front of
    two faint ones; page 2 fills the paid months, rings this month, then the pill; page 3 counts up to the figure and
    fills the bar, ending exactly. Going back never replays a scene. With Reduce Motion: every scene still, no slide.
-3. **«¿Dónde tenés tu plata?»:** three answers; the region pill shows its flag, the language pill never one; both open
+3. **«¿Dónde tenés tu plata?»:** three answers; the region pill shows its round flag, the language pill its variety's; both open
    Más' choosers and come back retitled. «Restaurar una copia» → import a copy → back: the setup ends on Inicio with the
    copy's accounts, and never asks for a first account.
 4. **The balance:** Efectivo asks «¿Cuánto tenés en efectivo?»; the currency chip shows the issuer's flag and code and
@@ -37,10 +79,13 @@ Mark each step here; a passed journey validates the findings it walks through, n
 7. **Primeros pasos on Inicio** (after the setup): the account step done (grey check, the account's name, not a button),
    «Anotá tu primer gasto» and «Sumá tu tarjeta» pending; no filled button, the «+» the only bright object; the section
    fades out after the first expense. With no account (Omitir), «Agregar cuenta» from the expense form comes back to it.
-8. **Flags:** Más › Región shows the region's flag; the list leads each region with its flag, «Según el dispositivo»
-   with a phone tile, the note under it; search keeps the flags. Más › Idioma: no flags; «Abrir Configuración» opens the
+8. **Flags** (round, graphic, never emoji): Más › Región and Idioma lead with a round flag (Idioma: Argentina's for
+   Español). The Región list leads each region with its flag, «Según el dispositivo» with a phone on the same circle, the
+   note under it; search keeps the flags; Sark and Japan draw whole (Japan's white keeps its edge on sand). Idioma:
+   Español «Variante: Argentina», English «Variant: United States», each flag beside it; «Abrir Configuración» opens the
    app's page in Settings (record whether its language row is there). The currency sheets and Moneda rows show the
-   issuer's flag (🇪🇺 for euros); Cuentas' currency headers read «🇦🇷 Pesos argentinos», account rows have none.
+   issuer's flag (the EU's for euros, a neutral glyph for XOF); Cuentas' headers lead «Pesos argentinos» with Argentina's
+   flag, centred on the name; account rows have none. At the largest text the inline flags grow with their text.
 9. **Empty states, forms and the «+»:** Tarjetas, Deudas y cobros and Recurrentes empty: one title, one line, one
    button. Nueva cuenta: name, currency and balance first, «Apariencia» last. The «+» hub's four captions fit at 375 pt.
    Movimientos with an account and nothing recorded: a grey secondary button.
@@ -125,7 +170,8 @@ accessibility settings with each result):
    form and a sheet.
 5. Optional, a narrower screen: Display Zoom (Settings → Display & Brightness → Display Zoom → Larger Text) over Inicio,
    Reportes, Presupuestos, a form and Deudas.
-6. Last: the first opening on a clean install (delete FinanzApp Dev, reinstall from the same EAS page; «Producto 25B»
+6. *(Superseded 2026-10-17 by M1's QA profile: the first opening and a restore are checked in an empty profile, never by
+   deleting the app.)* Last: the first opening on a clean install (delete FinanzApp Dev, reinstall from the same EAS page; «Producto 25B»
    and 25D1's AX5 step). Then delete and reinstall once more, tap **Omitir** (never Crear cuenta: importing after a
    first account duplicates it, a known open issue) and import the backup from step 3: your data is back.
 

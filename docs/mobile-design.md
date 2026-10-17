@@ -382,7 +382,7 @@ Forest; ver «Producto 24UX6A».*
 
 ## Producto 20 — identidad de cuentas y categorías (sin rediseño)
 
-- **Un solo cimiento.** Íconos curados (Ionicons, nunca emoji; las banderas de región y de moneda de 25O1 son marcas
+- **Un solo cimiento.** Íconos curados (Ionicons, nunca emoji; las banderas redondas de región, idioma y moneda de 25O1 son marcas
   de datos, no íconos de identidad) y una paleta fija de
   once colores contenidos — cobalto, celeste, verde azulado, verde, oliva, ocre,
   terracota, rosa, índigo, pizarra, grafito — con nombre accesible en español y par
@@ -902,7 +902,7 @@ vinculante del roadmap no cambia: la próxima entrega de producto es 24T3; 24UX6
 - **«¿Dónde tenés tu plata?»** Título grande y una línea verificable («Tus movimientos quedan en tu iPhone. Sin
   registrarte ni conectar un banco.»; «cuenta» queda solo para la cuenta que se crea). Tres respuestas en una tarjeta
   agrupada: Efectivo, Cuenta bancaria y Billetera virtual, cada una un preajuste de la primera cuenta (nombre e ícono).
-  Abajo, dos píldoras: la región con su bandera y el idioma por su nombre, que abren los selectores de Más, y «¿Venís de
+  Abajo, dos píldoras: la región con su bandera y el idioma con la de su variante, que abren los selectores de Más, y «¿Venís de
   otro teléfono? Restaurar una copia», que abre la importación; si la copia trae cuentas, la configuración termina sola y
   nunca pide una primera cuenta duplicada.
 - **El saldo de esa cuenta.** La pregunta del preajuste («¿Cuánto tenés en efectivo?») y «Si no lo sabés, dejalo en
@@ -918,11 +918,17 @@ vinculante del roadmap no cambia: la próxima entrega de producto es 24T3; 24UX6
   frente no existen para VoiceOver; el progreso es un solo elemento («Página 1 de 3»); las escenas son decoración. Una
   primera apertura interrumpida (cambiar el idioma de la app en Configuración reinicia la app) sigue en el próximo
   inicio mientras no haya cuentas; una copia restaurada o una cuenta creada la dan por terminada.
-- **Banderas: qué marcan.** Una región lleva su bandera (Región y sus recientes, la fila de Más, la primera apertura) y
-  «Según el dispositivo» un ícono neutro de teléfono. Un idioma nunca lleva bandera: su nombre lo dice. Una moneda lleva la
-  bandera de su emisor junto al código (el euro, la de la Unión Europea; las supranacionales, el ícono neutro) en la hoja
-  de monedas, el campo Moneda, la hoja de visualización y las secciones de Cuentas. Una cuenta no tiene país: una cuenta
-  en dólares de un banco argentino sigue en la Argentina. Son el emoji del sistema y VoiceOver no las lee.
+- **Banderas: qué marcan y cómo se ven.** Banderas gráficas redondas (vectoriales, recortadas en círculo, con un filete
+  del color de las líneas para que un campo blanco no se pierda sobre la arena), no emoji: 36 pt en las filas de los
+  selectores, 34 pt en Más, del alto del texto (y creciendo con él hasta 1,6×) en píldoras, chips y encabezados. Una
+  región lleva su bandera (Región y sus recientes, la fila de Más, la primera apertura) y «Según el dispositivo» un
+  ícono neutro en el mismo círculo. Un idioma lleva la bandera de la variante en la que está escrito (rioplatense:
+  Argentina; inglés estadounidense: Estados Unidos) y el selector de Idioma lo dice con palabras bajo cada idioma, en su
+  propio idioma («Variante: Argentina»; en Más y en la píldora de la primera apertura la bandera va junto al nombre), así
+  la bandera nunca afirma que el español es de un país. Una moneda lleva la bandera de su emisor junto
+  al código (el euro, la de la Unión Europea; las supranacionales, el ícono neutro) en la hoja de monedas, el campo
+  Moneda, la hoja de visualización y las secciones de Cuentas. Una cuenta no tiene país: una cuenta en dólares de un
+  banco argentino sigue en la Argentina. VoiceOver no las lee: el nombre ya lo dice.
 - **Región, Idioma y Apariencia.** Cada nota dice el único dato útil: Región «Cambia cómo se escriben fechas y números.
   Tus importes y monedas no cambian.», bajo la tarjeta fija y antes de la lista larga; Idioma, cómo hacer que iOS también
   use el idioma en sus menús, con «Abrir Configuración» (el nombre de Ajustes en los iPhone de Latinoamérica); Apariencia,
@@ -3380,10 +3386,10 @@ color propio.
 
 ## Pendiente de revisión en iPhone
 
-- Producto 25O1, en el hito M1 (una instalación nueva con Metro desde la rama): la historia, sus escenas y su
+- Producto 25O1, en el hito M1 (un perfil de prueba vacío, `EXPO_PUBLIC_QA_PROFILE`, nunca los datos del dueño): la historia, sus escenas y su
   movimiento, el paso de la plata, el saldo y su chip de moneda, «Todo listo.» y su paso a Inicio, restaurar una copia
-  desde la primera apertura, VoiceOver y el texto más grande en la primera apertura, Primeros pasos, las banderas de
-  Región y de las monedas, «Abrir Configuración» de Idioma y las leyendas del «+» (docs/mobile-device-checklist.md, «Producto
+  desde la primera apertura, VoiceOver y el texto más grande en la primera apertura, Primeros pasos, las banderas redondas de
+  Región, Idioma y las monedas, «Abrir Configuración» de Idioma y las leyendas del «+» (docs/mobile-device-checklist.md, «Producto
   25O1»).
 - Producto 25Q4, en la próxima sesión por hito: editar un pago de tarjeta y de deuda, el techo dicho mientras se
   escribe, recuperar un pago que pagaría de más, las confirmaciones de deshacer en tarjetas y deudas, el toque de error

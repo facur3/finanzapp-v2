@@ -3,7 +3,9 @@
 Updated: 2026-10-17 (**25O1 — first impression**, on its branch stacked on #118: the first opening rebuilt as a short
 story drawn with the app's own figures, «¿Dónde tenés tu plata?» with three presets and «Restaurar una copia», the
 opening balance with the currency's flag, and a sapphire close that continues into Inicio; «Primeros pasos» on a new
-Inicio; region flags and currency marks with written semantics; empty states in one line; account forms money first;
+Inicio; round graphic flags for regions, currencies and languages (their variety) with written semantics; a development QA
+profile so M1 never touches the owner's data; three product proposals recorded (§3: Finanzas and Ajustes, shared
+expenses, Theme Packs); empty states in one line; account forms money first;
 the «+» captions corrected (decision 005, text only); two dark brand fills; JavaScript only; the owner widened the
 design delegation and the deferred findings were re-triaged; the next QA milestone M1 covers the four stacked drafts;
 «Producto 25O1», §1, §2, §3). Before (2026-10-16, later, **25Q4 — edits, failures and recovery that keep the money right**, on its branch stacked on
@@ -441,11 +443,13 @@ history file keeps the evidence of when and why.
 
 - **25O1 — first impression (on its branch, stacked on 25Q4).** «Producto 25O1». The first opening is a three-page story
   (scenes drawn with the app's components from fixed sample figures, played once, still under Reduce Motion), «¿Dónde
-  tenés tu plata?» (cash, bank or digital wallet as presets; the region pill with its flag, the language pill without;
+  tenés tu plata?» (cash, bank or digital wallet as presets; the region pill with its flag, the language pill with its variety's;
   «Restaurar una copia», which ends the setup when the copy brings accounts), the opening balance (the currency chip with
   the issuer's flag) and «Todo listo.» on the sapphire field Inicio opens with; VoiceOver moves to each new title. A new
-  Inicio shows «Primeros pasos» without a filled button. Region rows lead with their flag, currencies with their issuer's
-  (never a language, never an account), the chooser notes say one useful fact. Empty states in one line; account forms
+  Inicio shows «Primeros pasos» without a filled button. Round vector flags: region rows lead with their own, currencies
+  with their issuer's, languages with their variety's (said in words), never an account; the chooser notes say one
+  useful fact. A development-only QA profile (`EXPO_PUBLIC_QA_PROFILE`) lets the first opening be checked on the owner's
+  iPhone without opening their data. Empty states in one line; account forms
   name, currency and balance first; the «+» captions say what each form records; two dark brand fills.
 - **25Q4 — edits, failures and recovery that keep the money right (PR #118, stacked on #117).** «Producto 25Q4».
   Editing a card payment, a debt payment or a collection keeps its card or debt and offers only the sides storage
@@ -1011,8 +1015,10 @@ item unless a section says a new native build is needed. The checklist sections 
   sheet. Device QA no longer follows each change: the steps below accumulate for a milestone session over the critical
   journeys, then a final regression. A test that passes never counts as a device result.
 - **Milestone M1 — the next QA session (recommended now):** #112, #117, #118 and 25O1 together on the same build, the
-  checklist's «Milestone M1»: the first opening on a fresh install, then the critical journeys on the owner's data and a
-  short regression, about 45 minutes. Its results decide the four drafts, merged in order (#112 → #117 → #118 → 25O1).
+  checklist's «Milestone M1»: every write in a development QA profile (`EXPO_PUBLIC_QA_PROFILE`, its own empty files, so
+  the owner's data is never opened): the first opening, the critical journeys, a restore and the legibility pass; then
+  the owner's data for reading only; about 40 minutes. Its results decide the four drafts, merged in order (#112 → #117
+  → #118 → #119).
   VoiceOver announcements beyond the first opening wait for M2, after 25D2 reworks them.
 - **25O1 — first impression (on its branch, stacked on #118; JavaScript only, the same build):** the checklist's
   «Producto 25O1», in M1.
@@ -1290,6 +1296,68 @@ item unless a section says a new native build is needed. The checklist sections 
   TestFlight.
 
 ## 3. Next deliveries
+
+*(2026-10-17, later the same day: the owner clarified the flags (round graphic flags, and a representative one for
+Idioma), done in 25O1 before M1, and asked for three product proposals. They are recorded below as **proposals**:
+nothing in them is programmed, tested or validated on an iPhone, and the private register lists them as such. No new PR
+opens before M1; after it: the navigation delivery (25N1), then 25D2 and the register's deliveries. Shared expenses wait
+for the owner's decision on the ledger; Theme Packs belong to 25F.)*
+
+#### Proposal — Más becomes «Finanzas», with Ajustes as its own screen (25N1, the first delivery after M1)
+
+- **Problem.** Más mixes seven financial destinations (Para revisar, Cuentas, Tarjetas, Presupuestos, Recurrentes,
+  Deudas y cobros, Categorías) with five device and data utilities (Copia de seguridad, Movimientos deshechos, Idioma,
+  Región, Apariencia) under a tab whose name says nothing; every visit scans twelve rows (Hick), and the coming Theme
+  Packs, privacy controls, Licencias and «Compartidos» would make it longer.
+- **Proposal (design delegation; the owner approves navigation on the device before merge).** The fourth tab keeps its
+  place and becomes **Finanzas** (a wallet glyph): Para revisar while something waits (its badge stays on the tab), then
+  Cuentas, Tarjetas, Presupuestos, Recurrentes, Deudas y cobros, Categorías, and later Compartidos. **Ajustes** is a
+  pushed screen behind a gear button in Finanzas' navigation bar (labelled «Ajustes» for VoiceOver, 44 pt): Preferencias
+  (Idioma, Región, Apariencia; later Temas), Tus datos (Copia de seguridad; later the pre-launch privacy controls),
+  Acerca de (the version, Licencias, Ayuda; a development build's diagnostics). **Movimientos deshechos** moves to
+  Movimientos' own menu: it is records, not a preference.
+- **Not chosen.** A fifth tab (decision 005 keeps four; settings are rare, and tabs are for top-level content); a gear on
+  Inicio (it would compete with the sapphire hero and the snapshot's one job); a modal Ajustes (its rows push further
+  screens, so a push keeps the back gesture).
+- **Cost and evidence.** Routes stay (`/language`, `/region`, `/appearance`, `/backup`), so links and the first
+  opening's pills keep working; `more-routes` and the navigation tests change; decision 005 gets an amendment. Licencias
+  must exist before a release anyway: the round flags carry an MIT notice (`src/i18n/flag-art.ts`).
+
+#### Proposal — Shared expenses (owner decision first)
+
+Design, accounting and minimum scope: [shared-expenses.md](shared-expenses.md). In short: a group is one internal
+account holding the person's net position with it; a group expense posts the person's **share** as the expense (funded
+by the group account) and what they **put in** as a transfer into it; repayments are transfers; who owes whom among the
+others is metadata with suggested settlements; a purchase paid by card is one card purchase split between the share and
+the group account (a card is never a transfer's source), and instalment purchases stay out of v1. It changes several
+of decision 003's invariants (a fourth account kind netting several people, an expense funded by it, the split card
+purchase), the schema and the backup version, so it waits for the owner's decision. Entry: «Dividir» in the
+expense form, groups under Finanzas › Compartidos, their balances also in «Deudas y cobros»; no new tab.
+
+#### Proposal — Theme Packs (25F, Pro)
+
+The owner's sketch (2026-10-17): a theme screen with a scrollable preview of real FinanzApp screens over the chosen
+palette and a row of colour swatches below. Recorded under 25F; not built.
+
+- **Experience.** Ajustes › Preferencias › Temas. On top, a paged preview (Inicio, Movimientos, Reportes, a card) drawn by
+  the app's own components under the candidate palette, scaled into a phone frame, never screenshots; page dots under it.
+  Below, the swatches as one row of round buttons (the selected one ringed, a lock glyph on a Pro theme). Tapping a
+  swatch previews it at once (selection haptic); «Usar este tema» applies it; a Pro theme can be previewed freely and
+  offers «Desbloquear con Pro» instead (the 25F paywall, contextual, never on first launch). Sapphire + Sand stays the
+  default identity and is always free; a theme changes the accent, the paper and the hero field, never the layout.
+- **Semantics and accessibility (the gates of every pack).** Each pack defines light, dark and Increase Contrast and
+  passes the palette's contrast tests (`theme.node.ts`); the semantic colours keep their meaning in every theme (expense,
+  income, transfer, warning), so an accent may not sit near them in hue: a green or coral accent, as in the sketch, would
+  read as income or as an expense and is either re-tuned or refused; the brand brief's guardrails apply (no acid green,
+  never navy as the field). Swatches are labelled («Zafiro y arena, en uso»; «Coral, Pro»), colour is never the only cue,
+  the preview is one VoiceOver element described in words, and with Reduce Motion the pages cross-fade.
+- **Engineering readiness.** The palette is already one token object per scheme read through `usePalette`; packs become
+  more token sets plus a stored choice (a device preference, like Apariencia, outside backups). Alternative app icons
+  would need a native build and are not part of v1.
+- **StoreKit.** Gated by the same Pro entitlement as the rest of 25F (app-store-launch.md §1–§5): StoreKit 2 needs a
+  native module, so a new EAS build, App Store Connect products and the paid applications agreement, all with the
+  owner's authorization; restore purchases; the entitlement cached for offline use; losing Pro returns to Sapphire +
+  Sand without touching any record. No purchase code until 25F.
 
 *(2026-10-17: the owner widened the design delegation (consult only for financial rules, data semantics, important
 functionality, the business model or launch decisions) and put the first opening first. 25O1 (first impression) is on
@@ -4602,12 +4670,23 @@ nothing of it is on a screen yet.
   (`ONBOARDING_STARTED`, written by the layout for a new installation) lets a first opening interrupted by a relaunch
   (an app-language change in iOS Settings) resume while the ledger has no account. AGENTS.md rule 15 is amended to
   this flow, with every guarantee kept.
-- **Marks.** `src/i18n/flags.ts` and `src/ui/marks.tsx`: a region's emoji flag, a currency's issuer flag beside its
-  code (the euro's is the EU's, supranational codes get a neutral glyph), never a language's, never an account's (an
-  account has no country; adding one is an open owner decision). Region rows, recents, Más and the onboarding pill show
-  the flag; the device row a phone glyph; the currency sheets, the Moneda rows and Cuentas' headers the currency mark.
-  docs/i18n.md §11a.2 and docs/currency.md §1 record the semantics; Sark (CQ) falls back to the neutral mark until iOS
-  18.4 can be assumed.
+- **Marks.** `src/i18n/flags.ts` and `src/ui/marks.tsx`: round vector flags (the owner, later on 2026-10-17: graphic
+  flags, cropped and rounded, not emoji), generated from circle-flags 2.8.3 (MIT; `npm run flags:generate`,
+  `src/i18n/flag-art.ts`, 258 flags drawn with react-native-svg paths, no runtime parsing, no new dependency), clipped to
+  a circle with a hairline of the palette's line so a white field keeps its edge on sand. A region shows its own flag; a
+  currency its issuer's beside its code (the euro's is the EU's, supranational codes a neutral glyph on the same
+  circle); a language the flag of the variety its catalogue is written in (rioplatense Spanish, American English:
+  `SPEECH_REGIONS`), with the variety said in words in its own language («Variante: Argentina», «Variant: United
+  States»), so the flag never stands alone for a country the language merely comes from; never an account (it has no
+  country; adding one is an open owner decision). Region and language rows, recents, Más (Idioma and Región) and the
+  onboarding pills show them; the device rows a phone glyph; the currency sheets, the Moneda rows and Cuentas' headers
+  the currency mark. Sark draws like every region (vector art does not wait for iOS 18.4's emoji). docs/i18n.md §11a.2
+  and docs/currency.md §1 record the semantics.
+- **QA profile (milestone M1).** `src/dev/qa-profile.ts`: a development bundle started with
+  `EXPO_PUBLIC_QA_PROFILE=<name>` opens its own ledger, rate and review files and prefixed preference keys, so it is a
+  new installation (the first opening included) while the person's ledger files are never opened and their preference
+  keys never read or written (the profile's prefixed keys share the key-value store); Más names it under
+  the footer; a release compiles it away. It replaces «reinstall the app» in M1.
 - **Choosers and Más.** Región's note says what it changes, under the pinned card on the long list; a refused save is
   said in an alert, always in view; the current choice leads Recientes; from the stacking text size a region row gives
   its flag's room back to the name. Idioma's note says how iOS uses the language in its own menus, with «Abrir
@@ -4623,7 +4702,7 @@ nothing of it is on a screen yet.
   25VIS2 owner sheet's choice, decided under the delegation).
 - **Not in this delivery.** The native splash colour (#F5F6F8 / #080B10) still predates Sapphire + Sand and changes with
   the next native build; the illustration figures of small-unit two-decimal currencies (NGN, INR…) read dollar-like.
-- **Tests.** New `tests/flags.node.ts`; extended `onboarding` (the four steps, the story's pages and focus, Omitir, back,
+- **Tests.** New `tests/flags.node.ts` (every region's art, issuers, varieties) and `tests/qa-profile.node.ts`; extended `onboarding` (the four steps, the story's pages and focus, Omitir, back,
   the restore path, the save's retry and haptics, Reduce Motion, `sampleFigures`, the splash and the handoff),
   `typography` (the display cap), `choice-list`, `locale-switch`, `locale-release`, `regions-integration`, `more-routes`,
   `ui-rows` (the marks), `spending-home` (Primeros pasos), `capture-hub` (captions), `liabilities-routes`,
@@ -4635,6 +4714,15 @@ nothing of it is on a screen yet.
   Cuentas' empty copy, «Configuración», and the missing pins); a verifier re-applied each mutation and each now fails a
   test. The chip-beside-amount row the review asked for was measured against seven-digit balances and returned to a
   column, so the figure keeps 46 pt.
+- **Second round (2026-10-17, later, after the owner's clarification).** Round graphic flags (emoji retired), a
+  language's variety flag and words, the QA profile for M1, and three proposals in §3. An independent review found six
+  points, none in the code's data safety, all fixed: the shared-expenses proposal now covers a purchase paid by card (a
+  split card purchase; instalments out of v1) and names every decision 003 invariant it touches; Cuentas' header centres
+  name, flag and total; the claims about the QA profile say the prefixed keys share the key-value store; the language's
+  words are claimed for the chooser only; no local path in the checklist; a catalogue comment back on its key. Local
+  checks: typecheck clean; `test:storage` 1485 tests, 1484 pass, 0 fail, 1 skipped; `currency:verify`,
+  `regions:verify`, `i18n:check -- --strict` (0 errors, 0 stale), `check`, `npm ls`, `export:ios` and the bundle
+  secret scan OK; root `npm test` 704 passed, 1 todo; `check:repo` OK.
 - **Gates.** #112, #117 and #118 merge first, after milestone M1; this branch then merges `master` (no force-push).
 - **Checks (local, Linux, worktree, 2026-10-17):** typecheck clean; `test:storage` 1481 tests, 1480 pass, 0 fail, 1
   skipped (the currency catalogue's existing «no cached sources» skip); `currency:verify` and `regions:verify` OK;
@@ -7034,8 +7122,9 @@ unlimited (production-plan.md §6.6).
 - **Depends on.** 25A in production use with measured costs.
 - **Owner decisions recorded 2026-10-04 (not implemented; no pricing or entitlement decided here):**
   - **Theme packs: a pre-launch 25F Pro launch candidate** (promoted from a post-launch idea; confirmed 2026-10-04).
-    Electric Lime stays the default and current identity; additional packs such as Forest and Sapphire are gated behind
-    the same entitlement once StoreKit and the paywall exist. Each theme passes light, dark, accessibility and
+    *(2026-10-17: Sapphire + Sand is the default identity (#112, kept by the owner); the experience, accessibility gates and StoreKit
+    relation are in §3 «Proposal — Theme Packs».)* Electric Lime stayed the default when this was recorded; additional
+    packs are gated behind the same entitlement once StoreKit and the paywall exist. Each theme passes light, dark, accessibility and
     semantic-colour QA before launch. Not built now and not blocking 25A: placed after the core AI and Apple
     architecture (25A, 25A2, 25D) and before launch if the schedule allows, and before the optional Mercado Pago
     consumer-sync research.
