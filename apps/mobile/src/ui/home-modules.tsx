@@ -92,15 +92,18 @@ function FirstStep({ icon, title, detail, done, onPress, last = false }: {
 /** Each currency's own figure when a consolidated total cannot be given (24C1): a rate is missing, stale, not
  * fetched yet, or the phone is offline. The subtotals stand where the total would, one per line, a step below the
  * hero's size, followed by one quiet line and the info button with the reason. Never a partial sum, never a zero. */
-export function CurrencyParts({ parts, line, detail, onField = false }: {
+export function CurrencyParts({ parts, line, detail, onField = false, spokenPrefix }: {
   parts: readonly { currency: Currency; minor: number }[]; line: string; detail: string;
   /** On Inicio's field (24UX6A): the field's ink and secondary ink instead of the canvas's. */
   onField?: boolean;
+  /** 25D2: the metric the lines are (Inicio: «Gastado»), said before the first one so VoiceOver never hears a bare amount. */
+  spokenPrefix?: string;
 }) {
   const p = usePalette();
-  const { t } = useI18n();
+  const { t, spokenMoney } = useI18n();
   return <View style={{ gap: 4 }}>
-    {parts.map(part => <Money key={part.currency} minor={part.minor} currency={part.currency} size={28} weight="700" color={onField ? p.heroInk : undefined} onField={onField} />)}
+    {parts.map((part, index) => <Money key={part.currency} minor={part.minor} currency={part.currency} size={28} weight="700" color={onField ? p.heroInk : undefined} onField={onField}
+      spokenLabel={index === 0 && spokenPrefix ? spokenPrefix + ', ' + spokenMoney(part.minor, part.currency) : undefined} />)}
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
       <AppText secondary variant="footnote" style={[{ flexShrink: 1 }, onField ? { color: p.heroSecondary } : null]}>{line}</AppText>
       <MetricHelp title={t('fx.infoTitle')} detail={detail} color={onField ? p.heroSecondary : undefined} />
@@ -194,7 +197,7 @@ export function BudgetAttentionRow({ attention, currency, labelsCurrency, onPres
   const reached = !exceeded && progress.remainingMinor === 0;
   const tone = exceeded ? p.expense : p.warning;
   const money = (minor: number) => labelsCurrency ? codedAmount(minor, currency) : moneyText(minor, currency);
-  // The whole percent Presupuestos shows (`percentUsed`: Math.round), as a fraction for the formatters, so the row and the
+  // The whole percent Presupuestos shows (`percentUsed`: the whole percent not above what was spent), as a fraction for the formatters, so the row and the
   // screen it opens agree; formatPercent rounds on the decimal value, so the product's binary tail never shows.
   const shown = percentUsed(progress) * 0.01;
   const percent = formatPercent(shown);

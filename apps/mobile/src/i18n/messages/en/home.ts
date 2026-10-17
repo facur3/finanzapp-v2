@@ -17,6 +17,8 @@ export const home: Pick<Messages, 'home' | 'quickActions'> = {
     },
     spending: 'Spent',
     available: 'Available',
+    heroSpending: 'Spent in {month}, {amount}',
+    heroAvailable: 'Available, {amount}',
     availableHelp: 'The money recorded in your accounts in this currency: opening balance plus income, minus expenses and transfers. '
       + 'It excludes cards and debts, and it is not a bank balance or your net worth.',
     spendingOutOfRange: 'The total is beyond the range we can show precisely. Your transactions are still saved.',

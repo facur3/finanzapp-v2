@@ -66,6 +66,7 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
   const state: unknown[] = [];
   const deps: unknown[][] = [];
   const pushed: any[] = [];
+  const announced: string[] = [];
   let cursor = 0, effectCursor = 0;
   const componentNames = ['AppText', 'Choices', 'DetailRow', 'EmptyState', 'IconButton', 'Money', 'PressFeedback', 'SectionTitle', 'Surface', 'CategoryBadge', 'Screen', 'GlyphTile', 'InfoButton', 'NavigationRow'];
   const modules: Record<string, unknown> = {
@@ -114,7 +115,9 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
     '../src/ui/quick-actions': { QuickActions: 'QuickActions', AssistantEntry: 'AssistantEntry' },
     'react-native-reanimated': { __esModule: true, default: { FlatList: 'FlatList' } },
     '../src/ui/dock-clearance': { useDockInset: () => dock },
-    '../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', rowReorder: 'rowReorder', selectionHaptic: () => {}, impactHaptic: () => {}, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
+    '../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', rowReorder: 'rowReorder', selectionHaptic: () => {}, impactHaptic: () => {}, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }),
+      // 25D2: what VoiceOver is told through motion.tsx's `announce` (its iOS-only queue is tested in motion.node.ts).
+      announce: (text: string) => { announced.push(text); } },
     '../src/ui/theme': { useCurrentDay: () => '2026-09-12', useReduceMotion: () => reduced, space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
       usePalette: () => ({ background: '#F5F6F8', surface: '#FFFFFF', primary: '#2557D6', primaryFill: '#2557D6', onPrimary: '#fff', text: '#000', secondary: '#666', tertiary: '#999', line: '#ddd', inset: '#eee', expense: '#c00', warning: '#a60', isDark: false }) },
   };
@@ -125,7 +128,7 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected report dependency: ' + name);
     return modules[name];
   } });
-  return { render: () => { cursor = 0; effectCursor = 0; return module.exports.default!(); }, pushed, display, ensured };
+  return { render: () => { cursor = 0; effectCursor = 0; return module.exports.default!(); }, pushed, display, ensured, announced };
 }
 
 function nodes(value: any): Node[] {
@@ -167,8 +170,13 @@ test('report row pushes a scoped category detail; underlying period and currency
 });
 test('return-to-current-month works even when opened with a historical route parameter', () => {
   const view = routeHarness('(tabs)/reports.tsx', { month: '2026-08', currency: 'ARS' });
-  find(view.render(), 'PressFeedback', 'Volver al mes actual').props.onPress();
+  // 25D2: the link is named by its visible words (Voice Control: «Tocar Este mes»); the longer sentence is its hint.
+  const link = find(view.render(), 'PressFeedback', 'Este mes');
+  assert.equal(link.props.accessibilityHint, 'Volver al mes actual');
+  assert.ok(nodes(link).some(node => node.type === 'AppText' && node.props.children === 'Este mes'), 'the label is what the link shows');
+  link.props.onPress();
   const current = view.render();
+  assert.deepEqual(view.announced, ['Septiembre de 2026. Sin gastos en este período'], 'a month with nothing recorded is never «0,00 pesos»');
   assert.equal(find(current, 'IconButton', 'Mes siguiente').props.disabled, true);
   // September has no spending: no donut (24UX6D: its total lived in the KPI, now gone), the empty card says so.
   assert.equal(nodes(current).some(n => n.type === 'DonutChart' || n.type === 'Money'), false);
@@ -176,16 +184,24 @@ test('return-to-current-month works even when opened with a historical route par
 });
 test('month and currency controls update report data and enforce the available bounds', () => {
   const view = routeHarness('(tabs)/reports.tsx', {});
+  view.render();
+  assert.deepEqual(view.announced, [], '25D2: the first render says nothing');
   find(view.render(), 'IconButton', 'Mes anterior').props.onPress();
   let report = view.render();
   assert.equal(shownTotal(report).minor, 606);
   assert.equal(find(report, 'IconButton', 'Mes anterior').props.disabled, true);
+  // 25D2: the stepped month is said once it is drawn: its title and its total in words; focus stays on the arrow.
+  assert.deepEqual(view.announced, ['Agosto de 2026. Total del período, 6,06 pesos']);
   find(report, 'DisplayCurrencyButton').props.onCurrency('USD');
   report = view.render();
   assert.equal(shownTotal(report).currency, 'USD');
   assert.equal(shownTotal(report).minor, 999);
+  assert.equal(view.announced.length, 1, 'a currency change is the chip\'s, not a month step');
   find(report, 'IconButton', 'Mes siguiente').props.onPress();
   assert.equal(find(view.render(), 'IconButton', 'Mes siguiente').props.disabled, true);
+  assert.deepEqual(view.announced.slice(1), ['Septiembre de 2026. Sin gastos en este período']);
+  view.render();
+  assert.equal(view.announced.length, 2, 'said once');
 });
 test('empty and overflow reports do not render a fake or partial category list', () => {
   const empty = routeHarness('(tabs)/reports.tsx', {}).render();
@@ -874,7 +890,7 @@ test('24UX6D review: a 13-digit total that would not fit at 20 pt (320 pt, AX te
 
 test('24UX6D review: the period line wraps and centres, and the caption gives way, so «Este mes» never spills over the forward arrow at larger text', () => {
   const header = nodes(routeHarness('(tabs)/reports.tsx', { currency: 'ARS', month: '2026-07' }).render().props.ListHeaderComponent);
-  const thisMonth = header.find(n => n.type === 'PressFeedback' && n.props.accessibilityLabel === 'Volver al mes actual')!;
+  const thisMonth = header.find(n => n.type === 'PressFeedback' && n.props.accessibilityLabel === 'Este mes')!;
   assert.ok(thisMonth, 'a past month offers «Este mes»');
   const row = header.find(n => n.type === 'View' && [n.props.children].flat().includes(thisMonth))!;
   assert.equal(JSON.stringify([row.props.style.flexWrap, row.props.style.justifyContent]), JSON.stringify(['wrap', 'center']));
@@ -926,7 +942,7 @@ test('24UX6C2: the choice resets when the month changes, by the arrows, a bar or
   // Chosen in August, «Este mes» returns to September with none chosen.
   find(root, 'DonutChart').props.onChoose('salud');
   assert.equal(find(view.render(), 'DonutChart').props.chosen, 'salud');
-  find(view.render(), 'PressFeedback', 'Volver al mes actual').props.onPress();
+  find(view.render(), 'PressFeedback', 'Este mes').props.onPress();
   root = view.render();
   assert.equal(title(root), 'Septiembre de 2026');
   assert.equal(find(root, 'IconButton', 'Mes siguiente').props.disabled, true);
@@ -944,7 +960,7 @@ test('24UX6C2: the choice resets when the month changes, by the arrows, a bar or
   assert.equal(find(root, 'DonutChart').props.chosen, null);
   assert.equal(rowChoices(root), noneChosen(root));
   // Coming back to the month it was chosen in does not bring the choice back: a month change cleared it.
-  find(root, 'PressFeedback', 'Volver al mes actual').props.onPress();
+  find(root, 'PressFeedback', 'Este mes').props.onPress();
   root = view.render();
   assert.equal(title(root), 'Septiembre de 2026');
   assert.equal(find(root, 'DonutChart').props.chosen, null, 'cleared, not merely hidden');

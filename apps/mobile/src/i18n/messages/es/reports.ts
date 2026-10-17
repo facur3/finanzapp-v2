@@ -128,6 +128,9 @@ export const reports = {
        * pesos, sin gasto neto". */
       barNoNet: '{month} {year}, {amount}, sin gasto neto',
       barPartialNoNet: '{month} {year}, {amount}, sin gasto neto, mes en curso',
+      /** 25D2: a month with nothing recorded is not a month without spending: never «0,00 pesos». */
+      barNoRecords: '{month} {year}, sin gastos registrados',
+      barPartialNoRecords: '{month} {year}, sin gastos registrados, mes en curso',
       /** 24T3 (A24): under the bars, when the shown month nets below zero (its bar stays at zero): the exact net as text. */
       netBelowZero: '{month}: las devoluciones superan lo gastado ({amount})',
       partialMonth: 'Mes en curso hasta hoy',

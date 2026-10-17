@@ -335,6 +335,8 @@ async function budgetsScreen(data: domain.LedgerArchive, locale: AppLocale = 'es
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: Node['type'], props: Node['props']) => ({ type, props });
   const state: unknown[] = [];
+  // 25D2: what VoiceOver is told through motion.tsx's `announce`, and the ticks of the month steps.
+  const announced: string[] = [], ticks: string[] = [];
   let cursor = 0;
   const names = ['ActionButton', 'AppText', 'CategoryBadge', 'EmptyState', 'IconButton', 'Money', 'PressFeedback', 'Screen', 'SectionTitle', 'Stat', 'StatRow', 'Surface'];
   const modules: Record<string, unknown> = {
@@ -358,7 +360,7 @@ async function budgetsScreen(data: domain.LedgerArchive, locale: AppLocale = 'es
     '../src/ui/geometry': geometry,
     '../src/ui/use-default-currency': { useDefaultCurrency: () => 'ARS' },
     '../src/ui/presentation': presentation, '../src/ui/report-presentation': reportPresentation,
-    '../src/ui/motion': { timing: () => ({ duration: 0 }) },
+    '../src/ui/motion': { timing: () => ({ duration: 0 }), selectionHaptic: () => { ticks.push('Selection'); }, announce: (text: string) => { announced.push(text); } },
     '../src/ui/theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, useCurrentDay: () => '2026-09-20', useReduceMotion: () => true,
       usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', line: '#ddd', inset: '#eee', expense: '#c00', warning: '#a60', link: '#1D5647' }) },
   };
@@ -370,7 +372,7 @@ async function budgetsScreen(data: domain.LedgerArchive, locale: AppLocale = 'es
   // The screen's own row and panel components are expanded, so their texts and labels are read too.
   const expand = (value: any): any[] => !value || typeof value !== 'object' ? [] : Array.isArray(value) ? value.flatMap(expand)
     : !value.props ? [] : [value, ...(typeof value.type === 'function' ? expand(value.type(value.props)) : []), ...expand(value.props.children)];
-  return () => { cursor = 0; return expand(module.exports.default!()) as Node[]; };
+  return Object.assign(() => { cursor = 0; return expand(module.exports.default!()) as Node[]; }, { announced, ticks });
 }
 
 test('25Q1 (BUDGETS-02): a budget in a currency no account holds stays reachable: the switch offers it, its panel opens, and a note says there is nothing to compare', async () => {
@@ -454,4 +456,27 @@ test('24T3 (A24): devoluciones above a month\'s purchases leave the whole limit 
   assert.equal(shown.some(text => /Además gastaste/.test(text)), false, 'nothing unbudgeted is invented: the domain clamps it at zero');
   const english = (await budgetsScreen(data, 'en-AR'))().filter(node => node.type === 'AppText').map(textOf);
   assert.ok(english.includes('Refunds exceed what was spent'));
+});
+
+test('25D2: Presupuestos\' month steps tick and tell VoiceOver the month and its state; «Este mes» is named by its visible words', async () => {
+  const render = await budgetsScreen({ ...archive, budgets: [total, food] });
+  const arrow = (label: string) => render().find(node => node.type === 'IconButton' && node.props.label === label)!;
+  arrow('Mes anterior').props.onPress();
+  assert.deepEqual(render.announced, ['Agosto de 2026. Mes cerrado']);
+  const link = render().find(node => node.type === 'PressFeedback' && node.props.accessibilityLabel === 'Este mes')!;
+  assert.ok(link, 'Voice Control: «Tocar Este mes» finds it');
+  assert.equal(link.props.accessibilityHint, 'Volver al mes actual');
+  link.props.onPress();
+  arrow('Mes siguiente').props.onPress();
+  assert.deepEqual(render.announced.slice(1), ['Septiembre de 2026. Mes en curso', 'Octubre de 2026. Mes futuro · podés prepararlo']);
+  assert.deepEqual(render.ticks, ['Selection', 'Selection', 'Selection'], 'each step ticks once, as on Reportes');
+});
+
+test('25D2: the general budget in amber says «Cerca del límite» to VoiceOver, as its status line shows; a calm one does not', async () => {
+  const near = { ...total, amountMinor: 3500 };
+  const render = await budgetsScreen({ ...archive, budgets: [near] });
+  const panel = render().find(node => node.type === 'View' && typeof node.props.accessibilityLabel === 'string' && node.props.accessibilityLabel.startsWith('Presupuesto general'))!;
+  assert.equal(panel.props.accessibilityLabel, 'Presupuesto general: 30,00 pesos de 35,00 pesos, 85 por ciento usado. Cerca del límite. Disponible 5,00 pesos');
+  const calm = (await budgetsScreen(archive))().find(node => node.type === 'View' && typeof node.props.accessibilityLabel === 'string' && node.props.accessibilityLabel.startsWith('Presupuesto general'))!;
+  assert.match(calm.props.accessibilityLabel, /\. Disponible 4970,00 pesos$/);
 });

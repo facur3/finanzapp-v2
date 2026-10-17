@@ -239,6 +239,11 @@ test('24C1/24UX6A: each currency\'s own figure stands in for a missing total; on
   assert.ok(help, 'the reason sits behind the info button');
   assert.deepEqual([help.props.title, help.props.detail, help.props.color], ['Cotizaciones', 'Sin cotización del día.', palette.heroSecondary]);
 
+  // 25D2: with a metric's name, VoiceOver hears it before the first figure (never a bare amount); the others read as before.
+  const named = flatten(exports.CurrencyParts({ ...props, onField: true, spokenPrefix: 'Gastado' })).filter(node => node.type === 'Money');
+  assert.deepEqual(named.map(node => node.props.spokenLabel), ['Gastado, 1500,00 pesos', undefined]);
+  assert.equal(money.every(node => node.props.spokenLabel === undefined), true, 'without a name, the amount alone');
+
   const canvas = flatten(exports.CurrencyParts(props));
   assert.equal(canvas.filter(node => node.type === 'Money').every(node => node.props.color === undefined), true, 'off the field: the canvas\'s own ink');
   assert.equal([canvas.find(node => node.type === 'AppText').props.style].flat().some((style: any) => style && style.color), false);
@@ -304,7 +309,8 @@ test('24UX6D: a general budget at 87 % is a warning progress row: «Presupuesto�
 
 test('24UX6C2 review, 24UX6D: the row shows the whole percent Presupuestos and Reportes show (percentUsed), never a decimal', () => {
   const { exports } = harness();
-  for (const [spent, whole] of [[8_750_000, 88], [8_740_000, 87], [8_500_000, 85], [9_949_000, 99], [10_049_000, 100], [12_345_678, 123]] as const) {
+  // 25D2 (a recorded golden change): the whole percent not above what was spent; 87,5 % reads «87 %», never a rounded «88 %».
+  for (const [spent, whole] of [[8_750_000, 87], [8_740_000, 87], [8_500_000, 85], [9_949_000, 99], [10_049_000, 100], [12_345_678, 123]] as const) {
     const attention = attentionFor(spent);
     const row = exports.BudgetAttentionRow({ attention, currency: 'ARS', labelsCurrency: false, onPress: () => {} });
     assert.equal(textOf(budgetParts(row).percent), whole + NBSP + '%', String(spent));

@@ -14,7 +14,7 @@ import { figureInfo, shortfallDetail } from '../../src/fx/fx-copy';
 import { useI18n } from '../../src/i18n/provider';
 import { BudgetAttentionRow, CurrencyParts, FieldButton, FirstSteps, MetricHelp, UpcomingRecurringRow } from '../../src/ui/home-modules';
 import { homeBudgets, homeCommitments, homeRecent, recentRowLimit } from '../../src/ui/home-focus';
-import { Reflow, ValueTransition } from '../../src/ui/motion';
+import { Reflow, ValueTransition, announce } from '../../src/ui/motion';
 import { availableCurrencies, historyCurrencies, homeNamesCategory, sharedGlyphs, visibleNamesAccount } from '../../src/ui/presentation';
 import { useCategoryLookOf } from '../../src/ui/category-hues';
 import { space, useCurrentDay, usePalette } from '../../src/ui/theme';
@@ -68,7 +68,7 @@ export default function HomeScreen() {
   const p = usePalette();
   const dock = useDockInset();
   const insets = useSafeAreaInsets();
-  const { t, formatDate, formatNumericDate, currencyName } = useI18n();
+  const { t, formatDate, formatNumericDate, currencyName, spokenMoney } = useI18n();
   // 25D1: the month (Title 2, bold) grows to the size iOS gives Title 2 at the person's setting; when its longest name no
   // longer fits beside the accounts button it takes its own line and the button moves under it, on the right. The longest
   // of the twelve names decides, so the layout does not change from one month to the next.
@@ -143,6 +143,18 @@ export default function HomeScreen() {
   const help = info ? <MetricHelp title={t('fx.infoTitle')} detail={info} color={p.heroSecondary} />
     : !spending ? <MetricHelp title={t('home.available')} detail={t('home.availableHelp')} color={p.heroSecondary} /> : null;
   const quiet = hero.status === 'ready' && hero.minor === 0;
+  // 25D2: the number is named before it is read («Gastado en octubre, … pesos»): before, VoiceOver heard a bare amount and
+  // learnt what it measured two stops later. Switching Gastado | Disponible swaps the number away from the segment, so the
+  // new figure is said once, in the same words.
+  const heroSpoken = (metric: HomeMetric) => {
+    const figure = metric === 'spending' ? spendingHero : availableHero;
+    const word = t(metric === 'spending' ? 'home.spending' : 'home.available');
+    if (figure.status === 'ready') return metric === 'spending' ? t('home.heroSpending', { month: formatDate(day, 'month'), amount: spokenMoney(figure.minor, currency) })
+      : t('home.heroAvailable', { amount: spokenMoney(figure.minor, currency) });
+    return word + '. ' + (figure.status === 'unavailable' ? (figure.reason === 'fetching' ? t('fx.fetching') : t('fx.unavailable', { currency }))
+      : t(metric === 'spending' ? 'home.spendingOutOfRange' : 'home.balanceOutOfRange'));
+  };
+  const chooseMetric = (next: HomeMetric) => { setMetric(next); announce(heroSpoken(next)); };
   const scope = currencies.length > 1;
   // 25O1: nothing recorded yet (no movement, no transfer, and no instalment plan, whose purchase records nothing until its
   // statement closes): Primeros pasos stands where the empty states stood. A returning person with a quiet month keeps the
@@ -175,9 +187,10 @@ export default function HomeScreen() {
       <ValueTransition id={heroId} style={{ flexDirection: 'row', alignItems: 'center', gap: space.s }}>
         <View style={{ flex: 1, minWidth: 0 }}>
           {hero.status === 'ready'
-            ? <Money minor={hero.minor} currency={currency} large size={HERO_SIZE} color={quiet ? p.heroSecondary : p.heroInk} onField />
+            ? <Money minor={hero.minor} currency={currency} large size={HERO_SIZE} color={quiet ? p.heroSecondary : p.heroInk} onField spokenLabel={heroSpoken(metric)} />
             : hero.status === 'unavailable'
-              ? <CurrencyParts onField parts={hero.parts} line={hero.reason === 'fetching' ? t('fx.fetching') : t('fx.unavailable', { currency })} detail={shortfallDetail(hero, words)} />
+              ? <CurrencyParts onField parts={hero.parts} line={hero.reason === 'fetching' ? t('fx.fetching') : t('fx.unavailable', { currency })} detail={shortfallDetail(hero, words)}
+                spokenPrefix={t(spending ? 'home.spending' : 'home.available')} />
               : <AppText variant="subhead" style={{ color: p.heroSecondary }}>{t(spending ? 'home.spendingOutOfRange' : 'home.balanceOutOfRange')}</AppText>}
         </View>
         {!scope && help}
@@ -186,7 +199,7 @@ export default function HomeScreen() {
           devoluciones of earlier purchases can leave it below zero; one quiet line says why, only then. */}
       {spending && hero.status === 'ready' && hero.minor < 0 && <AppText variant="footnote" style={{ color: p.heroSecondary }}>{t('home.refundsExceed')}</AppText>}
       {/* 5. What the number counts: it switches the number only. */}
-      <Choices onField value={metric} onChange={setMetric}
+      <Choices onField value={metric} onChange={chooseMetric}
         options={[{ value: 'spending', label: t('home.spending') }, { value: 'available', label: t('home.available') }]} />
     </View>
 

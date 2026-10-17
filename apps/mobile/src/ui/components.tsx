@@ -601,9 +601,12 @@ const AMOUNT_COLUMN = '56%';
  * measured height and collapsed long amounts to a few points. Row amounts keep
  * the native fit with a 3/4 floor and no fixed line height. Dynamic Type still
  * applies, capped so a hero cannot outgrow the screen. */
-export function Money({ minor, currency, large = false, color, signed = false, size, tone = 'neutral', weight, align = 'left', onField = false }: {
+export function Money({ minor, currency, large = false, color, signed = false, size, tone = 'neutral', weight, align = 'left', onField = false, spokenLabel }: {
   minor: number; currency: Currency; large?: boolean; color?: string; signed?: boolean; size?: number; tone?: Tone; weight?: '500' | '600' | '700';
   align?: 'left' | 'center';
+  /** 25D2: what VoiceOver says instead of the bare amount when the number needs its name to mean anything (Inicio's hero:
+   * «Gastado en octubre, 1234,50 pesos»). Built with the spoken formatters; the visible amount is unchanged. */
+  spokenLabel?: string;
   /** On Inicio's field (25A-03): a hero's symbol and cents take the field's solid quiet tones (`heroMoneySymbol`,
    * `heroMoneyCents`) instead of the ink at an alpha. The whole units keep `color`. 25N1: a hero drawn quieter than the
    * field's ink (the zero month's `heroSecondary`) is one tone throughout, never units dimmer than their own symbol. */
@@ -621,7 +624,7 @@ export function Money({ minor, currency, large = false, color, signed = false, s
   const scaleCap = amountMaxScale(base, hero);
   const fontSize = hero ? fitFontSize(text, width, base, Math.round(base / 2), Math.min(fontScale, scaleCap)) : base;
   // An unrepresentable value shows a dash and says so: never NaN, Infinity or a misleading zero (24B3).
-  const label = safe ? spokenMoney(minor, currency) : t('amount.unavailable');
+  const label = safe ? spokenLabel ?? spokenMoney(minor, currency) : t('amount.unavailable');
   const ink = color ?? semantic;
   // A hero is one amount in three weights of the same colour: the symbol and
   // the cents step back so the whole units carry the number. Same size, same

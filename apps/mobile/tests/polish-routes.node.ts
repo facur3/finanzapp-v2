@@ -152,7 +152,8 @@ test('budgets without a general budget list the sublimits, offer a compact gener
   assert.deepEqual(rows.map(node => [node.props.row.budget.category, node.props.row.exceeded, Math.round(node.props.row.ratio * 100)]), [['Café', true, 120], ['Supermercado', false, 90]]);
   const labels = nodes(root).filter(node => node.type === 'PressFeedback').map(node => node.props.accessibilityLabel).filter(Boolean);
   assert.ok(labels.some(label => /Café: 30,00 pesos de 25,00 pesos, 120 por ciento\. Excedido por 5,00 pesos/.test(label)));
-  assert.ok(labels.some(label => /Supermercado.*90 por ciento\. Quedan 10,00 pesos/.test(label)));
+  // 25D2: the amber state, said in words as the screen colours it.
+  assert.ok(labels.some(label => /Supermercado.*90 por ciento\. Cerca del límite\. Quedan 10,00 pesos/.test(label)));
   const section = find(root, 'SectionTitle', 'Agregar');
   assert.equal(section.props.children, 'Por categoría');
   assert.match(section.props.caption, /2 categorías · 1 excedida · 1 cerca del límite/);
@@ -539,7 +540,8 @@ test('24UX6E: a sublimit row is the category\'s own tile, the name beside the pe
   assert.equal(appText(exact, '100' + NB + '%').props.style.color, '#a60');
   appText(exact, 'Límite alcanzado · $' + NB + '30,00');
   const huge = budgetRow(harness('budgets.tsx', { currency: 'ARS' }, { ...archive, budgets: [{ ...budgets[0], amountMinor: 243 }] }).render(), 'Café');
-  appText(huge, '1.235' + NB + '%');
+  // 25D2 (a recorded golden change): 1234,57 % reads «1.234 %», the whole percent not above what was spent.
+  appText(huge, '1.234' + NB + '%');
 });
 
 test('24UX6E: a sublimit\'s name and percent share a line only when both fit; at large text or with a long name the row stacks and the name is never truncated', () => {
@@ -613,7 +615,7 @@ test('24UX6E: Presupuestos never fails on a malformed month or a month it cannot
   root = view.render();
   assert.ok(texts(root).includes(es.formatMonthTitle('2026-08')), 'the month stepper stays usable');
   assert.equal(nodes(root).some(node => node.type === 'EmptyState' && node.props.title === 'No pudimos calcular este mes'), false);
-  const back = find(root, 'PressFeedback', 'Volver al mes actual');
+  const back = find(root, 'PressFeedback', 'Este mes');
   assert.equal(JSON.stringify(back.props.hitSlop), JSON.stringify({ top: 8, bottom: 8, left: 8, right: 8 }));
   assert.equal(nodes(back).find(node => node.type === 'AppText')!.props.style.color, '#1D5647', 'the link token');
   const english = harness('budgets.tsx', { currency: 'ARS' }, data, 'en-AR').render();

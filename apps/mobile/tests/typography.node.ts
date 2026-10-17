@@ -262,6 +262,10 @@ test('25A-03: a hero on Inicio\'s field takes the solid graphite symbol and cent
   const [symbol, , cents] = field.props.children.props.children;
   assert.deepEqual([field.props.style.color, symbol.props.style.color, cents.props.style.color], ['#131411', '#3A3C3F', '#505255']);
   assert.equal(JSON.stringify(field.props.style), JSON.stringify(plain.props.style), 'the amount\'s layout, size and weight are the same');
+  // 25D2: a hero that needs its name is read with it; the drawn amount is the same.
+  const named = render('Money', { minor: 123456, currency: 'ARS', large: true, size: 46, onField: true, spokenLabel: 'Gastado en octubre, 1234,56 pesos' }).props.children;
+  assert.equal(named.props.accessibilityLabel, 'Gastado en octubre, 1234,56 pesos');
+  assert.equal(field.props.accessibilityLabel, '1234,56 pesos', 'without one, the amount in words');
   assert.deepEqual([symbol.props.style.fontWeight, cents.props.style.fontWeight], ['600', '600']);
   // Without the flag nothing changes: another coloured hero keeps its own hue at an alpha, an ink one the canvas greys.
   const [plainSymbol, , plainCents] = plain.props.children.props.children;

@@ -17,6 +17,10 @@ export const home = {
     },
     spending: 'Gastado',
     available: 'Disponible',
+    /** 25D2: VoiceOver's name for Inicio's number, the metric before the amount. {month}: the current month in lowercase
+     * («octubre»); {amount}: the amount in words. */
+    heroSpending: 'Gastado en {month}, {amount}',
+    heroAvailable: 'Disponible, {amount}',
     availableHelp: 'Es el dinero registrado en tus cuentas de esta moneda: saldo inicial más ingresos, menos gastos y transferencias. '
       + 'No incluye tarjetas ni deudas, y no es un saldo bancario ni tu patrimonio.',
     spendingOutOfRange: 'El total supera el rango que podemos mostrar con precisión. Tus movimientos siguen guardados.',

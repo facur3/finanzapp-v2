@@ -21,7 +21,7 @@ import type { Translate } from '../../src/i18n/messages';
 import { useCategoryColor, useCategoryLookOf } from '../../src/ui/category-hues';
 import { DonutChart, MonthBars, OTHERS_KEY, donutSlices } from '../../src/ui/charts';
 import { AMOUNT_AX5_SIZE, TEXT_STYLE_MAX_SCALE, WEIGHT_WIDTH, amountWidthEm, titleFit, widestWordEm } from '../../src/ui/geometry';
-import { ValueTransition, rowReorder, selectionHaptic } from '../../src/ui/motion';
+import { ValueTransition, announce, rowReorder, selectionHaptic } from '../../src/ui/motion';
 import { activityDateLabel, historyCurrencies } from '../../src/ui/presentation';
 import { changePercent, earliestRecordedMonth, insightsBesideRanking, promoteChosen, reportPeriodLabel, reportSelection, requestedReportMonth, shiftReportMonth, spendingShare } from '../../src/ui/report-presentation';
 import { CategoryLegendRow } from '../../src/ui/spending-chart';
@@ -116,6 +116,18 @@ export default function ReportsScreen() {
   // One function per locale and currency, so the insights below recompute when either changes and only then.
   const money = useMemo(() => (minor: number) => moneyText(minor, selection?.currency ?? 'ARS'), [moneyText, selection?.currency]);
   const spoken = (minor: number) => spokenMoney(minor, selection?.currency ?? 'ARS');
+  // 25D2: a month the person stepped to (an arrow, «Este mes», a bar) replaces the title, the donut and the rows away from
+  // the control, which keeps VoiceOver's focus (moving it would break stepping on). So the new month is said once it is
+  // drawn: its title and its total, or that nothing was recorded; only the title while its total cannot be read yet.
+  // Never on the first render, a currency change or a link's month: only after `goToMonth`.
+  const stepped = useRef(false);
+  useEffect(() => {
+    if (!stepped.current || !selection || !report) return;
+    stepped.current = false;
+    const title = formatMonthTitle(selection.monthISO);
+    announce(report.status !== 'ready' || !complete ? title : title + '. ' + (report.categories.length
+      ? t('reports.periodTotalSpoken', { amount: spokenMoney(report.expenseMinor, selection.currency) }) : t('reports.emptyTitle')));
+  }, [selection?.monthISO]);
   const lookOf = useCategoryLookOf('expense');
   const trend = useMemo(() => {
     if (!ledger || !selection || !trendComplete) return [];
@@ -184,7 +196,7 @@ export default function ReportsScreen() {
   const lines = ready ? expensesInPeriod(ledger, report) : [];
   const countOf = (match: (entry: Entry) => boolean) => recordedCountLabel(lineCounts(lines.filter(match)), t, true);
   // A month or currency change clears the donut's choice (24UX6C2): coming back starts with none, like any new view.
-  const goToMonth = (month: string | undefined) => { selectionHaptic(); setChosen(null); setMonth(month); };
+  const goToMonth = (month: string | undefined) => { selectionHaptic(); setChosen(null); stepped.current = (month ?? currentMonth) !== monthISO; setMonth(month); };
   // 25D1: the month (Title 3, semibold) grows to the size iOS gives Title 3 at the person's setting. While its longest
   // word fits between the two 44 pt arrows it stays there; past that the title and its captions take the full width and
   // the arrows move under them. The longest of the year's twelve titles decides, so stepping months never reflows.
@@ -241,7 +253,9 @@ export default function ReportsScreen() {
                 <AppText secondary variant="caption" style={{ flexShrink: 1, textAlign: 'center' }}>{reportPeriodLabel(report, day, t, held.length <= 1)}</AppText>
                 {ready && <InfoButton title={t('reports.method.title')} detail={method ?? t('reports.method.detail', { currency })} />}
               </View>
-              {canNext && <PressFeedback feedback="opacity" accessibilityRole="button" onPress={() => goToMonth(currentMonth)} accessibilityLabel={t('reports.backToCurrentMonth')} hitSlop={8} style={{ minHeight: 28, justifyContent: 'center' }}>
+              {/* 25D2: named by its visible words, so Voice Control's «Tocar Este mes» finds it; the longer sentence is the hint. */}
+              {canNext && <PressFeedback feedback="opacity" accessibilityRole="button" onPress={() => goToMonth(currentMonth)} accessibilityLabel={t('reports.thisMonth')}
+                accessibilityHint={t('reports.backToCurrentMonth')} hitSlop={8} style={{ minHeight: 28, justifyContent: 'center' }}>
                 <AppText variant="caption" style={{ fontWeight: '600', color: p.primary }}>{t('reports.thisMonth')}</AppText>
               </PressFeedback>}
             </View>
@@ -404,7 +418,7 @@ function BudgetStatusRow({ category, spent, limit, progress, money, spoken, last
   const { ratio, exceeded } = progress;
   const tone = budgetTone(progress);
   const color = tone === 'expense' ? p.expense : tone === 'warning' ? p.warning : p.text;
-  const percent = percentUsed(progress);
+  const percent = percentUsed({ spentMinor: spent, budget: { amountMinor: limit } });
   return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={t(exceeded ? 'reports.budgets.labelExceeded' : 'reports.budgets.label', { category, spent: spoken(spent), limit: spoken(limit), percent })}
     onPress={onPress} style={{ paddingHorizontal: 16, paddingVertical: 12, gap: 8, borderBottomWidth: last ? 0 : 0.5, borderBottomColor: p.line }}>
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>

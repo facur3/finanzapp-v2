@@ -91,6 +91,7 @@ function routeHarness(file: string, params: Record<string, unknown>, initialData
   const navigated: any[] = [];
   /** Every `setStatusBarStyle(style)` the screen asked for, in order. */
   const statusBar: string[] = [];
+  const announced: string[] = [];
   // Inicio's focus effect: run once when the screen first renders focused (like React Navigation on mount), its cleanup on blur.
   let focusEffect: (() => void | (() => void)) | undefined, focusCleanup: void | (() => void), focusedOnce = false;
   let cursor = 0, effectCursor = 0, refCursor = 0;
@@ -140,7 +141,8 @@ function routeHarness(file: string, params: Record<string, unknown>, initialData
     '../src/ui/category-color': categoryColor,
     '../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: glyphAliases.get(s) ?? 'glyph-' + String(s).toLowerCase() }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) },
     '../src/ui/dock-clearance': { useDockInset: () => dock },
-    '../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', rowReorder: 'rowReorder', selectionHaptic: () => {}, impactHaptic: () => {}, duration: { press: 100, release: 160, state: 200, data: 260, enter: 200, exit: 100, reveal: 480 }, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
+    // 25D2: what VoiceOver is told through motion.tsx's `announce` (its iOS-only queue is tested in motion.node.ts).
+    '../src/ui/motion': { announce: (text: string) => { announced.push(text); }, ValueTransition: 'ValueTransition', Reflow: 'Reflow', rowReorder: 'rowReorder', selectionHaptic: () => {}, impactHaptic: () => {}, duration: { press: 100, release: 160, state: 200, data: 260, enter: 200, exit: 100, reveal: 480 }, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
     '../src/ui/theme': { useCurrentDay: () => today, useReduceMotion: () => false, space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
       usePalette: harnessPalette },
   };
@@ -151,7 +153,7 @@ function routeHarness(file: string, params: Record<string, unknown>, initialData
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected report dependency: ' + name);
     return modules[name];
   } });
-  return { render: () => { cursor = 0; effectCursor = 0; refCursor = 0; return module.exports.default!(); }, pushed, navigated, statusBar, display,
+  return { render: () => { cursor = 0; effectCursor = 0; refCursor = 0; return module.exports.default!(); }, pushed, navigated, statusBar, display, announced,
     setData: (next: domain.LedgerSnapshot) => { data = next; },
     /** Another screen comes in front (the focus effect's cleanup), and Inicio comes back (the effect again). */
     blur: () => { if (typeof focusCleanup === 'function') focusCleanup(); focusCleanup = undefined; },
@@ -332,6 +334,34 @@ test('24UX6C: with one currency the scope row is absent (no empty row) and the h
   // Consolidated spending: the rate's help, in the same row.
   const consolidated = routeHarness('(tabs)/index.tsx', {}, homeData, {}, displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated' }), { book: consolidatedRates() }).render();
   assert.equal([fieldChildren(consolidated)[1].props.children].flat().filter(Boolean).map((n: Node) => n.type).join('|'), 'DisplayCurrencyButton|MetricHelp');
+});
+
+test('25D2: VoiceOver hears Inicio\'s number with its name, «Gastado en <month>» or «Disponible», and the new figure once when the segment switches it', () => {
+  const es = bindLocale('es-AR');
+  const onlyPesos: domain.LedgerSnapshot = { accounts: [homeData.accounts[0]], entries: homeData.entries.filter(entry => entry.accountId === 'a') };
+  const view = routeHarness('(tabs)/index.tsx', {}, onlyPesos);
+  const heroOf = (root: Node) => nodes(find(root, 'ValueTransition')).find(n => n.type === 'Money')!;
+  let root = view.render();
+  const spent = heroOf(root);
+  assert.equal(spent.props.spokenLabel, 'Gastado en septiembre, ' + es.spokenMoney(spent.props.minor, 'ARS'), 'the name before the amount, never a bare «… pesos»');
+  assert.deepEqual(view.announced, [], 'drawing says nothing');
+  metricOf(root).props.onChange('available');
+  root = view.render();
+  const available = heroOf(root);
+  assert.equal(available.props.spokenLabel, 'Disponible, ' + es.spokenMoney(available.props.minor, 'ARS'));
+  assert.deepEqual(view.announced, [available.props.spokenLabel], 'the swapped figure, said once in the same words');
+  metricOf(root).props.onChange('spending');
+  assert.deepEqual(view.announced.slice(1), [heroOf(view.render()).props.spokenLabel]);
+  // English, and the parts of a total that cannot be converted: the first line carries the metric's name.
+  locale = 'en-AR';
+  try {
+    const english = routeHarness('(tabs)/index.tsx', {}, onlyPesos).render();
+    assert.match(heroOf(english).props.spokenLabel, /^Spent in September, /);
+  } finally { locale = 'es-AR'; }
+  const parts = routeHarness('(tabs)/index.tsx', {}, homeData, {}, displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated' })).render();
+  const split = nodes(parts).find(n => n.type === 'CurrencyParts');
+  assert.ok(split, 'no rate: the parts');
+  assert.equal(split.props.spokenPrefix, 'Gastado');
 });
 
 test('24UX6C: no line under the number in Gastado or Disponible, in Spanish or English, with one or several currencies, in any mode or amount', () => {

@@ -92,6 +92,8 @@ export const reports: Pick<Messages, 'reports'> = {
       barPartial: '{month} {year}, {amount}, month in progress',
       barNoNet: '{month} {year}, {amount}, no net spending',
       barPartialNoNet: '{month} {year}, {amount}, no net spending, month in progress',
+      barNoRecords: '{month} {year}, no recorded expenses',
+      barPartialNoRecords: '{month} {year}, no recorded expenses, month in progress',
       netBelowZero: '{month}: refunds exceed what was spent ({amount})',
       partialMonth: 'Month to date',
       scale: '{status} · scale 0 to {max}',

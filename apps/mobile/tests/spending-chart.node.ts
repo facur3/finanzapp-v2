@@ -706,7 +706,11 @@ test('24T3 (A24): a month that nets to zero or less is a bar at zero, VoiceOver 
   const bars = flat(chart).filter(node => typeof node.type === 'function');
   assert.deepEqual(bars.map(bar => bar.props.fraction), [0, 0, 1, 0], 'clamped at zero on a scale of 0 to the largest positive net');
   const labels = bars.map(bar => bar.type(bar.props).props.accessibilityLabel);
-  assert.equal(labels[0], 'junio 2026, 0,00 pesos', 'a month without records is not «sin gasto neto»: no records is not no spending');
+  // 25D2: a month without records is neither «sin gasto neto» nor «0,00 pesos»: nothing recorded is not no spending.
+  assert.equal(labels[0], 'junio 2026, sin gastos registrados', 'a month without records says so, never «0,00 pesos»');
+  const fresh = chartsModule(i18n).MonthBars({ points: [{ monthISO: '2026-09', amountMinor: 0, partial: true, count: 0 }, { monthISO: '2026-08', amountMinor: 0, partial: false }], selected: '2026-09', onSelect: () => {}, currency: 'ARS' });
+  const freshLabels = flat(fresh).filter(node => typeof node.type === 'function').map(bar => bar.type(bar.props).props.accessibilityLabel);
+  assert.deepEqual(freshLabels, ['septiembre 2026, sin gastos registrados, mes en curso', 'agosto 2026, 0,00 pesos'], 'a point without a count keeps its amount');
   assert.equal(labels[1], 'julio 2026, 0,00 pesos, sin gasto neto');
   assert.equal(labels[2], 'agosto 2026, 10,00 pesos');
   assert.equal(labels[3], 'septiembre 2026, ' + i18n.spokenMoney(-600, 'ARS') + ', sin gasto neto, mes en curso');

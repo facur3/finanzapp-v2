@@ -344,6 +344,11 @@ const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1
 
 /** Whether a point nets to zero or less while it has records (24T3): VoiceOver says «sin gasto neto». A month with no
  * record at all is not «no net spending» (a month without records is not a month without spending), so it is not. */
+/** 25D2: a month with nothing recorded (its count is known and zero): not a month without spending, so it is never
+ * spoken as «0,00 pesos». A point without a count (an older caller) keeps the amount. */
+export function noRecords(point: { amountMinor: number; count?: number }): boolean {
+  return point.count === 0 && point.amountMinor === 0;
+}
 export function noNetSpending(point: { amountMinor: number; count?: number }): boolean {
   return point.amountMinor < 0 || (point.amountMinor === 0 && (point.count ?? 0) > 0);
 }
@@ -358,7 +363,8 @@ function Bar({ point, fraction, selected, onPress, currency, height }: {
   useEffect(() => { value.value = withTiming(fraction, timing('data', reduced)); }, [fraction, reduced, value]);
   const style = useAnimatedStyle(() => ({ height: Math.max(point.amountMinor > 0 ? 3 : 0, value.value * (height - 4)) }));
   return <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityState={{ selected }}
-    accessibilityLabel={t(noNetSpending(point) ? point.partial ? 'reports.chart.barPartialNoNet' : 'reports.chart.barNoNet' : point.partial ? 'reports.chart.barPartial' : 'reports.chart.bar',
+    accessibilityLabel={t(noRecords(point) ? point.partial ? 'reports.chart.barPartialNoRecords' : 'reports.chart.barNoRecords'
+      : noNetSpending(point) ? point.partial ? 'reports.chart.barPartialNoNet' : 'reports.chart.barNoNet' : point.partial ? 'reports.chart.barPartial' : 'reports.chart.bar',
       { month: formatDate(point.monthISO.slice(0, 7) + '-01', 'month'), year: point.monthISO.slice(0, 4), amount: spokenMoney(point.amountMinor, currency) })}
     onPress={onPress} containerStyle={{ flex: 1 }} style={{ height, justifyContent: 'flex-end', minHeight: undefined }}>
     <Animated.View style={[{ borderRadius: 6, backgroundColor: selected ? p.primary : idleBarColor(p),

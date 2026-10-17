@@ -44,6 +44,8 @@ export const budgets = {
       exceededBy: 'Excedido por {amount}',
       reached: 'Límite alcanzado',
       availableAmount: 'Disponible {amount}',
+      /** 25D2: VoiceOver's status of the general budget in the amber state (85 % or more, not yet reached). */
+      nearAvailable: 'Cerca del límite. Disponible {amount}',
       /** 24T3 (A24): the month nets below zero (devoluciones): what is left is shown at the limit, never above it. */
       refundsAvailable: 'Disponible {amount}. Las devoluciones superan lo gastado',
       refundsExceed: 'Las devoluciones superan lo gastado',
@@ -64,6 +66,8 @@ export const budgets = {
       exceededBy: 'Excedido por {amount}',
       reached: 'Límite alcanzado',
       left: 'Quedan {amount}',
+      /** 25D2: VoiceOver's status of a sublimit in the amber state (85 % or more, not yet reached). */
+      nearLeft: 'Cerca del límite. Quedan {amount}',
       /** 24UX6E: the row's one quiet line under its bar. */
       leftOf: 'Quedan {amount} de {limit}',
       overOf: '{amount} por encima de {limit}',
