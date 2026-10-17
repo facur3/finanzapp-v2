@@ -9,6 +9,7 @@ import * as budgetPresentation from '../src/ui/budget-presentation.ts';
 import * as liabilityPresentation from '../src/ui/liability-presentation.ts';
 import * as moneyInput from '../src/ui/money-input.ts';
 import * as entryPrefill from '../src/ui/entry-prefill.ts';
+import { memoryOf } from './preference-memory.ts';
 import * as purchasePlan from '../src/ui/purchase-plan.ts';
 import * as installmentPresentation from '../src/ui/installment-presentation.ts';
 import { INSTALLMENT_COUNT_CHOICES } from '../src/ui/installment-presentation.ts';
@@ -84,7 +85,7 @@ function harness(props: Record<string, unknown> = {}, options: Options = {}) {
     './budget-presentation': budgetPresentation, './money-input': moneyInput, './entry-prefill': entryPrefill,
     './liability-presentation': liabilityPresentation, './presentation': presentation, './purchase-plan': purchasePlan,
     './installment-presentation': installmentPresentation,
-    './switch-row': { SwitchRow: 'SwitchRow' },
+    './switch-row': { SwitchRow: 'SwitchRow' }, './last-account': memoryOf({}),
     './theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, usePalette: () => ({ warning: '#B45309', secondary: '#66686F', text: '#0A0A0C' }) },
   };
   const require = (name: string) => {

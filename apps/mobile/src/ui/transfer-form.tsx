@@ -2,10 +2,10 @@ import { useRef, useState } from 'react';
 import { Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
-import { accountBalanceMinor, accountKind, assertTransferSides, editedDraftFits, hiddenLiabilityAccountIds, isLiveAccount, makeTransferChange, minorFromEditedDraft, sameTransfer, todayKey, type StoredDraft,
+import { accountBalanceMinor, accountKind, assertTransferSides, cardDebtMinor, editedDraftFits, hiddenLiabilityAccountIds, isLiveAccount, makeTransferChange, minorFromEditedDraft, sameTransfer, todayKey, type StoredDraft,
   totalsByCurrency, validateTransfer, validateTransferChange, type Account, type Transfer, type TransferChange, type TransferRecord } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
-import { ActionButton, AmountField, AmountShortcut, AppText, DetailRow, EmptyState, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
+import { ActionButton, AmountField, AmountShortcut, AppText, DetailRow, EmptyState, ErrorMessage, Field, IconButton, PressFeedback, Screen, Surface } from './components';
 import { amountFromMinor, draftFromMinor } from './money-input';
 import { AccountField, DateField, SelectorCard } from './form-controls';
 import { errorHaptic, successHaptic, warningHaptic } from './motion';
@@ -72,7 +72,15 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
   const fits = (id: string, currency?: Account['currency']) => cash.some(a => a.id === id && (!currency || a.currency === currency));
   const fromId = before || lockedFrom || fits(chosenFrom, lockedTo?.currency) ? chosenFrom
     : (lockedTo ? cash.find(a => a.currency === lockedTo.currency)?.id : initialAccountId(cash, accountId)) || chosenFrom;
-  const toId = before || !lockedFrom || fits(chosenTo, lockedFrom.currency) ? chosenTo : cash.find(a => a.currency === lockedFrom.currency)?.id ?? chosenTo;
+  // 25N1: the accounts there were when «Agregar cuenta» was pressed for a missing «Hacia». Back from the account form, the one
+  // account added since in «Desde»'s currency is the obvious destination, so «Hacia» comes back with it (until the person
+  // chooses one). Several added, or none: «Hacia» stays to choose, as before.
+  const known = useRef<ReadonlySet<string> | null>(null);
+  const fromCurrency = accounts.find(a => a.id === fromId)?.currency;
+  const added = !before && !lockedFrom && !lockedTo && !chosenTo && known.current
+    ? cash.filter(a => !known.current!.has(a.id) && a.id !== fromId && a.currency === fromCurrency) : [];
+  const toId = added.length === 1 ? added[0].id
+    : before || !lockedFrom || fits(chosenTo, lockedFrom.currency) ? chosenTo : cash.find(a => a.currency === lockedFrom.currency)?.id ?? chosenTo;
   // An untouched prefill keeps the stored minor units (a stored amount may exceed the entry bound); an edited text is a new entry.
   const [stored] = useState<StoredDraft | null>(() => {
     const own = before ? accounts.find(a => a.id === before.transfer.fromAccountId)?.currency : undefined;
@@ -123,6 +131,13 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
   const amountCurrency = (lockedTo ?? lockedFrom ?? from)?.currency;
   const fit = amountCurrency ? editedDraftFits(amount, amountCurrency, stored) : { ok: true as const };
   const obligation = lockedTo ?? lockedFrom;
+  // 25N1: the active cards that owe something, for the pointer to «Pagar tarjeta» under a new plain transfer.
+  const owing = !before && !obligation && snapshot ? cards.flatMap(card => {
+    const account = card.active && !card.deleted ? accounts.find(a => a.id === card.accountId) : undefined;
+    const debtMinor = account ? cardDebtMinor(card, snapshot) : 0;
+    return account && debtMinor > 0 ? [{ account, debtMinor }] : [];
+  }) : [];
+  const owingCard = owing.length === 1 ? owing[0] : null;
   const obligationKind = obligation ? accountKind(obligation.id, cards, debts) : 'cash';
   // An account's recorded figure without the transfer being edited (the shortcut and the debt cap read it).
   const recorded = (item: Account) => accountBalanceMinor(item, snapshot?.entries ?? [], (snapshot?.transfers ?? []).filter(t => t.id !== before?.transfer.id));
@@ -299,7 +314,10 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
       </View>
       <Surface grouped><DateField value={date} onChange={setDate} disabled={locked} /></Surface>
       {!obligation && !targets.length && <EmptyState title={t('transferForm.missingTitle')} detail={t('transferForm.missingDetail')}
-        action={<ActionButton label={t('common.addAccount')} secondary disabled={locked} onPress={() => router.push({ pathname: '/new-account', params: { currency: from?.currency ?? 'ARS' } })} />} />}
+        action={<ActionButton label={t('common.addAccount')} secondary disabled={locked} onPress={() => {
+          known.current = new Set(cash.map(a => a.id));
+          router.push({ pathname: '/new-account', params: { currency: from?.currency ?? 'ARS' } });
+        }} />} />}
       <Field label={t('transferForm.note')} value={note} onChangeText={setNote} maxLength={120} editable={!locked} />
       {preview && from && to && <Surface grouped>
         <DetailRow label={t('transferForm.after', { name: nameOf(from) })} value={balanceLabel(from, preview.from)} spokenValue={balanceLabel(from, preview.from, spokenMinor)} />
@@ -311,6 +329,12 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
       <AppText secondary variant="footnote">
         {t(obligationKind === 'card' ? 'transferForm.explainCard' : obligationKind === 'debt' ? 'transferForm.explainDebt' : 'transferForm.explainTransfer')}
       </AppText>
+      {/* 25N1: a plain transfer never pays a card (only cash accounts are offered); while a card owes, one quiet line points to
+          «Pagar tarjeta»: that card's payment when there is one, Tarjetas when there are several. No step is added. */}
+      {owingCard ? <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('transferForm.cardPointerOne', { name: nameOf(owingCard.account) })} disabled={locked}
+        onPress={() => router.push({ pathname: '/new-transfer', params: { toAccountId: owingCard.account.id, maxAmountMinor: String(owingCard.debtMinor) } })} style={{ alignSelf: 'flex-start' }}>
+        <AppText variant="footnote" style={{ color: p.primary, fontWeight: '500' }}>{t('transferForm.cardPointerOne', { name: nameOf(owingCard.account) })}</AppText>
+      </PressFeedback> : owing.length > 1 && <AppText secondary variant="footnote">{t('transferForm.cardPointer')}</AppText>}
       {/* 25Q4: an amount over the cap is said while it is typed: shown, not spoken (VoiceOver hears what Save refused), as the
         devolución form does. Save stays enabled and refuses it with the same sentence, one Error tap and the announcement. */}
       <ErrorMessage message={error ?? (!pending && parsed !== null && overCap(parsed) ? overKey : null)} announce={error !== null} />

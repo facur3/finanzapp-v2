@@ -11,6 +11,7 @@ import * as liabilityPresentation from '../src/ui/liability-presentation.ts';
 import * as installmentPresentation from '../src/ui/installment-presentation.ts';
 import * as moneyInput from '../src/ui/money-input.ts';
 import * as entryPrefill from '../src/ui/entry-prefill.ts';
+import { memoryOf } from './preference-memory.ts';
 import * as appearance from '../src/ui/appearance.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
@@ -39,7 +40,9 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   add?: (value: domain.Entry) => Promise<void>; update?: (value: domain.EntryChange) => Promise<void>;
   addTransfer?: (value: domain.Transfer) => Promise<void>; updateTransfer?: (value: domain.TransferChange) => Promise<void>;
   updateAccount?: (value: domain.AccountChange) => Promise<void>; addAccount?: (value: domain.Account) => Promise<void>; saveRecurring?: (value: domain.RecurringRule) => Promise<void>;
-  restore?: (value: domain.LedgerArchive, baseline: string) => Promise<void>; picker?: () => Promise<any>; locale?: AppLocale } = {}) {
+  restore?: (value: domain.LedgerArchive, baseline: string) => Promise<void>; picker?: () => Promise<any>; locale?: AppLocale;
+  /** 25N1: the device's key-value store as the last-account preference sees it (read and written in place). */
+  memory?: Record<string, string> } = {}) {
   const source = readFileSync(new URL('../' + file, import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const state: any[] = [];
@@ -64,7 +67,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     addAccount: async (value: domain.Account) => { newAccounts.push(value); await options.addAccount?.(value); },
     restoreBackup: async (value: domain.LedgerArchive, baseline: string) => { restores.push({ value, baseline }); await options.restore?.(value, baseline); },
   }) };
-  const components = Object.fromEntries(['Screen', 'EmptyState', 'ActionButton', 'AppText', 'AmountField', 'AmountShortcut', 'Choices', 'ErrorMessage', 'Field', 'FieldNote', 'IconButton', 'Surface',
+  const components = Object.fromEntries(['Screen', 'EmptyState', 'ActionButton', 'AppText', 'AmountField', 'AmountShortcut', 'Choices', 'ErrorMessage', 'Field', 'FieldNote', 'IconButton', 'PressFeedback', 'Surface',
     'CategoryBadge', 'DetailRow', 'Money', 'SectionTitle', 'GlyphTile', 'AccountBadge', 'EntryRow', 'MerchantBadge', 'LifecycleNote'].map(name => [name, name]));
   const defaults = { useDefaultCurrency: ({ accountCurrency, requested }: { accountCurrency?: string | null; requested?: unknown } = {}) => accountCurrency ?? (domain.isLedgerCurrency(requested) ? requested : 'ARS') };
   const accountManagement = { useAccountManagement: () => ({ busyId: null, error: null,
@@ -100,7 +103,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     './form-controls': { AccountField: 'AccountField', CategoryField: 'CategoryField', CurrencyField: 'CurrencyField', DateField: 'DateField', SelectorCard: 'SelectorCard' },
     '../src/ui/form-controls': { CurrencyField: 'CurrencyField' }, '../../src/ui/form-controls': { CurrencyField: 'CurrencyField' },
     '../src/ui/currencies': currencies, '../../src/ui/currencies': currencies,
-    './presentation': presentation, '../../src/ui/presentation': presentation, './entry-prefill': entryPrefill,
+    './presentation': presentation, '../../src/ui/presentation': presentation, './entry-prefill': entryPrefill, './last-account': memoryOf(options.memory ?? {}),
     './budget-presentation': budgetPresentation, '../../src/ui/budget-presentation': budgetPresentation,
     './money-input': moneyInput, '../../src/ui/money-input': moneyInput, '../src/ui/money-input': moneyInput,
     // 25Q4: the movement and transfer details word a card's or a debt's state after an undo or a restore.
@@ -236,6 +239,38 @@ test('new-entry mode keeps income/account selection and creates no edit command'
   assert.equal(view.additions[0].amountMinor, 1);
   assert.equal(view.additions[0].accountId, 'u');
   assert.equal(view.updates.length, 0);
+});
+test('25N1: a new Gasto or Ingreso opens on the account last saved with that kind; a requested account wins, and the rule is today\'s without one', async () => {
+  const memory: Record<string, string> = {};
+  const save = async (props: any) => {
+    const view = harness('src/ui/entry-form.tsx', props, { memory });
+    let root = view.render();
+    find(root, 'AmountField').props.onChangeText('1');
+    find(root, 'Field').props.onChangeText('Prueba');
+    find(root, 'CategoryField').props.onChange('Otros');
+    root = view.render();
+    await find(root, 'ActionButton').props.onPress();
+    return view.additions[0];
+  };
+  const opens = (props: any, data?: domain.LedgerArchive) => find(harness('src/ui/entry-form.tsx', props, { memory, data }).render(), 'AccountField').props.value;
+  assert.equal(opens({ kind: 'expense', currency: 'ARS' }), 'a', 'nothing remembered: the first account in the screen\'s currency');
+  assert.equal((await save({ kind: 'expense', currency: 'USD' })).accountId, 'u');
+  assert.equal(memory['finanzapp.lastAccount.expense'], 'u', 'saved, then remembered on the device');
+  assert.equal(opens({ kind: 'expense', currency: 'ARS' }), 'u', 'the last Gasto\'s account, whatever the screen\'s currency');
+  assert.equal(opens({ kind: 'income', currency: 'ARS' }), 'a', 'an Ingreso keeps its own memory');
+  assert.equal(opens({ kind: 'expense', currency: 'ARS', accountId: 'a' }), 'a', 'an account the screen asks for wins');
+  assert.equal(opens({ kind: 'expense', currency: 'ARS', prefill: { amountMinor: '100', currency: 'ARS' } }), 'a', 'a prefilled amount keeps its currency\'s account');
+  const gone = { ...archive, accounts: [archive.accounts[0], { ...archive.accounts[1], deletedAt: createdAt }] } as domain.LedgerArchive;
+  assert.equal(opens({ kind: 'expense', currency: 'ARS' }, gone), 'a', 'a remembered account deleted since: today\'s rule');
+  memory['finanzapp.lastAccount.income'] = 'nowhere';
+  assert.equal(opens({ kind: 'income', currency: 'USD' }), 'u', 'an unknown id is ignored');
+  // An edit never changes what is remembered.
+  const edit = harness('src/ui/entry-form.tsx', { original: archive.records[0] }, { memory });
+  let root = edit.render();
+  find(root, 'Field').props.onChangeText('Otra');
+  await find(edit.render(), 'ActionButton').props.onPress();
+  assert.equal(edit.updates.length, 1);
+  assert.equal(memory['finanzapp.lastAccount.expense'], 'u');
 });
 test('detail opens the native edit route; undo requires confirmation and canceled undo does nothing', async () => {
   const view = harness('app/entry/[id].tsx', {}, { params: { id: entry.id } });
@@ -636,6 +671,53 @@ test('a plain transfer between accounts never lists cards or debts; editing a ca
   assert.equal(nodes(root).some(node => node.type === 'AccountField' && node.props.label === 'Hacia'), false);
   assert.deepEqual(nodes(root).filter(node => node.type === 'SelectorCard').map(node => [node.props.label, node.props.value, node.props.fixed]), [['Tarjeta', 'Visa', true]]);
   assert.deepEqual(find(root, 'AccountField', 'Desde').props.accounts.map((item: domain.Account) => item.id), ['a']);
+});
+
+test('25N1: back from «Agregar cuenta» under a plain transfer, «Hacia» comes back with the one account added in «Desde»\'s currency', () => {
+  const view = harness('src/ui/transfer-form.tsx', { accountId: 'a' }, { data: archive });
+  let root = view.render();
+  assert.deepEqual(find(root, 'AccountField', 'Hacia').props.accounts, []);
+  const added: domain.Account = { ...account, id: 'n', name: 'Nueva', openingMinor: 0 };
+  // An account that appears without the person asking from here (another screen) is not preselected.
+  view.setData({ ...archive, accounts: [...archive.accounts, added] });
+  assert.equal(find(view.render(), 'AccountField', 'Hacia').props.value, '');
+  view.setData(archive);
+  root = view.render();
+  const add = nodes(root).find(node => node.type === 'EmptyState')!.props.action;
+  add.props.onPress();
+  assert.equal(JSON.stringify(view.pushed.pop()), JSON.stringify({ pathname: '/new-account', params: { currency: 'ARS' } }));
+  view.setData({ ...archive, accounts: [...archive.accounts, added, { ...added, id: 'd', name: 'Dólares', currency: 'USD' }] });
+  root = view.render();
+  assert.equal(find(root, 'AccountField', 'Hacia').props.value, 'n', 'the new ARS account, not the USD one');
+  find(root, 'AmountField').props.onChangeText('10');
+  assert.equal(nodes(view.render()).find(node => node.type === 'ActionButton' && /Registrar/.test(node.props.label))?.props.disabled, false, 'ready to save');
+  // Two added in that currency: nothing is obvious, «Hacia» stays to choose.
+  const twice = harness('src/ui/transfer-form.tsx', { accountId: 'a' }, { data: archive });
+  nodes(twice.render()).find(node => node.type === 'EmptyState')!.props.action.props.onPress();
+  twice.setData({ ...archive, accounts: [...archive.accounts, added, { ...added, id: 'm' }] });
+  assert.equal(find(twice.render(), 'AccountField', 'Hacia').props.value, '');
+});
+
+test('25N1: a plain transfer while a card owes points quietly to «Pagar tarjeta»; a payment, an edit or a card owing nothing shows nothing', () => {
+  const pointer = (root: Node) => nodes(root).find(node => node.type === 'PressFeedback');
+  const view = harness('src/ui/transfer-form.tsx', { accountId: 'a' }, { data: liabilityData });
+  const link = pointer(view.render())!;
+  assert.equal(link.props.accessibilityLabel, '¿Pagás Visa? Usá «Pagar tarjeta».');
+  link.props.onPress();
+  assert.equal(JSON.stringify(view.pushed.pop()), JSON.stringify({ pathname: '/new-transfer', params: { toAccountId: 'card-acc', maxAmountMinor: '5000' } }));
+  const english = harness('src/ui/transfer-form.tsx', { accountId: 'a' }, { data: liabilityData, locale: 'en-AR' });
+  assert.equal(pointer(english.render())!.props.accessibilityLabel, 'Paying Visa? Use “Pay card”.');
+  const second: domain.Account = { ...cardAccount, id: 'card-2', name: 'Master' };
+  const two = harness('src/ui/transfer-form.tsx', { accountId: 'a' }, { data: { ...liabilityData, accounts: [...liabilityData.accounts, second], cards: [card, { ...card, id: 'card2', accountId: 'card-2' }] } }).render();
+  assert.equal(pointer(two), undefined);
+  assert.ok(nodes(two).some(node => node.type === 'AppText' && node.props.children === 'Para pagar una tarjeta, usá «Pagar tarjeta» en Tarjetas.'));
+  const clear = { ...liabilityData, accounts: [...archive.accounts, { ...cardAccount, openingMinor: 0 }, debtAccount] };
+  const archived = { ...liabilityData, cards: [{ ...card, active: false }] };
+  for (const [props, data] of [[{ accountId: 'a' }, clear], [{ accountId: 'a' }, archived], [{ toAccountId: 'card-acc', maxAmountMinor: '5000' }, liabilityData]] as const) {
+    const root = harness('src/ui/transfer-form.tsx', props, { data }).render();
+    assert.equal(pointer(root), undefined);
+    assert.equal(nodes(root).some(node => node.type === 'AppText' && /Pagar tarjeta/.test(String(node.props.children))), false);
+  }
 });
 
 test('expense form offers cash accounts and cards but never a personal debt account', () => {

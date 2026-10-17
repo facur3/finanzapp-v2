@@ -142,6 +142,10 @@ export const forms = {
     explainCard: 'El pago baja el saldo pendiente de la tarjeta y el saldo de la cuenta. La compra original ya contó como gasto; esto no lo duplica.',
     explainDebt: 'Mueve saldo entre tu cuenta y la obligación. No es un gasto ni un ingreso.',
     explainTransfer: 'Solo registra un movimiento entre tus cuentas. No envía dinero al banco ni cuenta como gasto o ingreso.',
+    /** Under a plain transfer while one card owes: a quiet link to that card's payment. */
+    cardPointerOne: '¿Pagás {name}? Usá «Pagar tarjeta».',
+    /** The same while several cards owe: where the payment is. */
+    cardPointer: 'Para pagar una tarjeta, usá «Pagar tarjeta» en Tarjetas.',
     retryNote: 'El envío quedó fijo para reintentar sin duplicarlo. Antes de cambiarlo, cerrá y revisá Movimientos.',
     notEditableTitle: 'No se puede editar',
     notEditableDetail: 'Esta transferencia no existe o fue deshecha. Volvé a su detalle para revisarla.',

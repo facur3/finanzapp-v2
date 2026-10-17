@@ -11,6 +11,7 @@ import * as liabilityPresentation from '../src/ui/liability-presentation.ts';
 import * as installmentPresentation from '../src/ui/installment-presentation.ts';
 import * as moneyInput from '../src/ui/money-input.ts';
 import * as entryPrefill from '../src/ui/entry-prefill.ts';
+import { memoryOf } from './preference-memory.ts';
 import * as purchasePlan from '../src/ui/purchase-plan.ts';
 import * as movementAmount from '../src/ui/movement-amount.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
@@ -115,7 +116,7 @@ function harness(file: string, options: { data?: domain.LedgerArchive; params?: 
     ...ui('components', components), ...ui('theme', theme), ...ui('category-hues', hues),
     ...ui('presentation', presentation), ...ui('operation-presentation', operationPresentation), ...ui('money-input', moneyInput),
     ...ui('budget-presentation', budgetPresentation), ...ui('liability-presentation', liabilityPresentation), ...ui('installment-presentation', installmentPresentation),
-    ...ui('movement-amount', movementAmount), ...ui('entry-prefill', entryPrefill), ...ui('purchase-plan', purchasePlan),
+    ...ui('movement-amount', movementAmount), ...ui('entry-prefill', entryPrefill), ...ui('purchase-plan', purchasePlan), ...ui('last-account', memoryOf({})),
     ...ui('form-controls', { AccountField: 'AccountField', CategoryField: 'CategoryField', DateField: 'DateField', SelectorCard: 'SelectorCard' }),
     ...ui('installment-purchase', { InstallmentPurchase: 'InstallmentPurchase' }), ...ui('entry-list', { EntryList: 'EntryList' }),
     ...ui('motion', { successHaptic: () => { haptics++; }, errorHaptic: () => { failures.push('Error'); }, warningHaptic: () => { failures.push('Warning'); } }),
