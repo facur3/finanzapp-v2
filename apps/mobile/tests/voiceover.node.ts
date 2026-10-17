@@ -11,7 +11,7 @@ import ts from 'typescript';
 //
 // (a) A VoiceOver string never carries a number in the region's visible
 //     format. An accessibilityLabel/Hint/Value expression, an
-//     announceForAccessibility argument and a spoken twin (spokenValue,
+//     announceForAccessibility or announce argument and a spoken twin (spokenValue,
 //     spokenDetail, spokenCaption, spokenLabel, spokenDescribe) are not built
 //     with moneyText, formatAmount, formatMoneyAmount, codedAmount, formatPercent, formatCount,
 //     formatNumericDate, formatDateTime, formatDayMonth or rowAmountText,
@@ -317,6 +317,9 @@ function voiceover(program: ts.Program, root: string) {
       }
       if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text.startsWith('announceForAccessibility')
         && node.arguments[0] && taint(node.arguments[0], NONE)) report(node, node.expression.name.text);
+      // 25D2: motion.tsx's `announce`, the app's one door to an iOS announcement, is followed like the call it wraps.
+      if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'announce'
+        && node.arguments[0] && taint(node.arguments[0], NONE)) report(node, 'announce');
       if ((ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) && ts.isIdentifier(node.tagName) && Object.hasOwn(TWINS, node.tagName.text)) {
         const attributes = attributesOf(node);
         for (const [visible, spoken] of TWINS[node.tagName.text]) {
@@ -439,6 +442,8 @@ test('(a) the scanner follows helpers per call, memo and helper results per memb
         const { fraction, label } = share(minor, total, locale);
         AccessibilityInfo.announceForAccessibility?.(withDefault(value => spokenMoney(value, 'ARS')));
         AccessibilityInfo.announceForAccessibility?.(i18n.formatCount(total)); // leak: announceForAccessibility
+        announce(withDefault(value => spokenMoney(value, 'ARS')), 'leave');
+        announce(money(minor, 'ARS')); // leak: announce
         return [
           <A accessibilityLabel={memo?.spoken} />,
           <A accessibilityLabel={memo?.text} />, // leak: accessibilityLabel
@@ -460,7 +465,7 @@ test('(a) the scanner follows helpers per call, memo and helper results per memb
       }`,
   };
   const expected = marked(modules, '/probe', 'leak');
-  assert.equal(expected.length, 10);
+  assert.equal(expected.length, 11);
   assert.deepEqual(voiceover(memoryProgram(modules), '/probe').leaks(), expected);
 });
 

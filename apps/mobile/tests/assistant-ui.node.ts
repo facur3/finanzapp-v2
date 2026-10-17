@@ -308,6 +308,14 @@ test('assistant text, thinking and system notes are said in words; the pulse sto
   assert.equal(nodes(offline).find(node => node.type === 'Ionicons')!.props.name, 'cloud-offline-outline');
   const unavailable = ui.render('SystemNote', { message: { id: 's', role: 'system', reason: 'unavailable', text: 'No conectado.', retryText: null }, onRetry: () => {} });
   assert.equal(byLabel(unavailable, 'Reintentar'), undefined, 'nothing was sent, so there is nothing to retry');
+  // 25D2: inside one accessible element «Reintentar» was never a VoiceOver stop of its own. The note and the button are
+  // siblings now: the text is one element, the button another, and nothing accessible holds the button.
+  assert.notEqual(offline.props.accessible, true, 'the row itself is not one element');
+  const stops = nodes(offline).filter(node => node.props.accessible || node.props.accessibilityRole === 'button');
+  assert.deepEqual(stops.map(node => node.props.accessibilityLabel), ['Sin conexión.', 'Reintentar']);
+  assert.equal(stops[0].props.accessibilityRole, 'text');
+  assert.ok(!nodes(stops[0]).some(node => node.props.accessibilityRole === 'button'), 'the button is not inside the note\'s element');
+  assert.equal(JSON.stringify(stops[1].props.hitSlop), JSON.stringify({ top: 4, bottom: 4 }), 'the row\'s padding takes the 36 pt button to 44 pt');
 });
 
 test('answer evidence renders rows with the shared Money component and links as text buttons; nothing when there is no evidence', () => {
@@ -370,9 +378,9 @@ test('English: every word the Assistant UI says is English; account names, merch
   assert.ok(thinking.some(node => node.type === 'AppText' && node.props.children === 'Thinking…'));
   // A note stored as a key reads in English; a caught sentence nobody translated is shown as it was thrown.
   const note = ui.render('SystemNote', { message: { id: 's', role: 'system', reason: 'offline', text: 'assistant.reasons.offline', retryText: 'hola' }, onRetry: () => {} });
-  assert.equal(note.props.accessibilityLabel, 'No connection. Your transactions didn’t change; you can retry.');
+  assert.equal(nodes(note).find(node => node.props.accessible)!.props.accessibilityLabel, 'No connection. Your transactions didn’t change; you can retry.');
   assert.ok(byLabel(note, 'Retry'));
-  assert.equal(ui.render('SystemNote', { message: { id: 's', role: 'system', reason: 'failed', text: 'Respuesta inválida del servidor.', retryText: null } }).props.accessibilityLabel, 'Respuesta inválida del servidor.');
+  assert.equal(nodes(ui.render('SystemNote', { message: { id: 's', role: 'system', reason: 'failed', text: 'Respuesta inválida del servidor.', retryText: null } })).find(node => node.props.accessible)!.props.accessibilityLabel, 'Respuesta inválida del servidor.');
   // Clarification chips: the app's words translate, account names do not, a built-in category reads localized and is echoed as shown.
   const chosen: string[] = [];
   const kinds = nodes(ui.render('ClarificationChoices', { options: [{ id: 'expense', labelKey: 'movement.expense' }, { id: 'income', labelKey: 'movement.income' }], chosen: null, onChoose: (_o: unknown, shown: string) => chosen.push(shown) }))

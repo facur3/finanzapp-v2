@@ -117,6 +117,7 @@ function realMotion(reduced: boolean): Record<string, unknown> {
       cubicBezier: (...points: number[]) => 'cubicBezier(' + points.join(',') + ')',
       FadeIn: chain(['FadeIn']), FadeInUp: chain(['FadeInUp']), FadeOut: chain(['FadeOut']), LinearTransition: chain(['LinearTransition']), ReduceMotion: REDUCE_MOTION },
     'expo-haptics': {},
+    'react-native': { Platform: { OS: 'ios' }, AccessibilityInfo: {} },
     './theme': { useReduceMotion: () => reduced },
   };
   const module = { exports: {} as Record<string, unknown> };

@@ -86,10 +86,15 @@ export function SystemNote({ message, onRetry }: { message: Message & { role: 's
   const { t, errorText, speechLanguage } = useI18n();
   const text = errorText(message.text);
   const icon: IconName = message.reason === 'offline' ? 'cloud-offline-outline' : message.reason === 'limit' ? 'time-outline' : 'information-circle-outline';
-  return <View accessible accessibilityRole="text" accessibilityLabel={text} accessibilityLanguage={speechLanguage} style={styles.systemRow}>
-    <Ionicons name={icon} size={16} color={p.tertiary} accessible={false} />
-    <AppText secondary variant="footnote" style={{ flex: 1 }}>{text}</AppText>
-    {message.retryText !== null && onRetry && <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('assistant.message.retry')} onPress={() => onRetry(message.retryText!)} style={{ minHeight: 36, paddingLeft: 8 }}>
+  // 25D2: the note and «Reintentar» are two VoiceOver stops, siblings: inside one accessible element the button would never
+  // be reached on its own. The row's 4 pt of padding is the button's vertical slop, so its 36 pt reach 44 pt.
+  return <View style={styles.systemRow}>
+    <View accessible accessibilityRole="text" accessibilityLabel={text} accessibilityLanguage={speechLanguage} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+      <Ionicons name={icon} size={16} color={p.tertiary} accessible={false} />
+      <AppText secondary variant="footnote" style={{ flex: 1 }}>{text}</AppText>
+    </View>
+    {message.retryText !== null && onRetry && <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('assistant.message.retry')} onPress={() => onRetry(message.retryText!)}
+      hitSlop={{ top: 4, bottom: 4 }} style={{ minHeight: 36, paddingLeft: 8, justifyContent: 'center' }}>
       <AppText variant="footnote" style={{ color: p.primary, fontWeight: '600' }}>{t('assistant.message.retry')}</AppText>
     </PressFeedback>}
   </View>;

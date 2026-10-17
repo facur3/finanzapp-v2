@@ -319,6 +319,53 @@ test('25Q4: every haptic comes from motion.tsx, and a write that taps Success al
   assert.ok(body('selectionHaptic').includes('selectionAsync()'));
 });
 
+/** 25D2: `announce` from motion.tsx as compiled, on a given platform, with VoiceOver's queue and the timers recorded. */
+function announcer(os: 'ios' | 'android') {
+  const source = readFileSync(new URL('../src/ui/motion.tsx', import.meta.url), 'utf8');
+  const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
+  const said: [string, unknown][] = [], timers: [() => void, number][] = [];
+  const chain = (): Record<string, unknown> => ({ duration: chain, easing: chain, withInitialValues: chain, reduceMotion: chain });
+  const modules: Record<string, unknown> = {
+    react: { useEffect() {}, useRef: (initial: unknown) => ({ current: initial }) },
+    'react/jsx-runtime': { jsx: () => null, jsxs: () => null },
+    'react-native': { Platform: { OS: os }, AccessibilityInfo: { announceForAccessibilityWithOptions: (text: string, options: unknown) => said.push([text, JSON.parse(JSON.stringify(options))]) } },
+    'react-native-reanimated': { __esModule: true, default: {}, Easing: { bezier: () => 'bezier', quad: 'quad', inOut: () => 'inOut' }, cubicBezier: () => 'cubic',
+      FadeIn: chain(), FadeInUp: chain(), FadeOut: chain(), LinearTransition: chain(), ReduceMotion: {} },
+    'expo-haptics': {}, './theme': { useReduceMotion: () => false },
+  };
+  const module = { exports: {} as { announce: (text: string, after?: 'now' | 'leave') => void; LEAVE_DELAY: number } };
+  runInNewContext(code, { module, exports: module.exports, setTimeout: (fn: () => void, ms: number) => timers.push([fn, ms]),
+    require: (name: string) => { if (!Object.hasOwn(modules, name)) throw new Error('Unexpected motion dependency: ' + name); return modules[name]; } });
+  return { ...module.exports, said, timers };
+}
+
+test('25D2: announce tells VoiceOver once, queued behind what it is saying, on iOS only; an outcome over a leaving screen waits for it', () => {
+  const ios = announcer('ios');
+  ios.announce('Movimiento deshecho');
+  assert.deepEqual(ios.said, [['Movimiento deshecho', { queue: true }]], 'queued, never cutting off the control\'s own reply');
+  ios.announce('');
+  assert.equal(ios.said.length, 1, 'nothing to say says nothing');
+  ios.announce('Gasto guardado', 'leave');
+  assert.equal(ios.said.length, 1, 'not while the screen is still leaving');
+  assert.equal(ios.timers.length, 1);
+  assert.equal(ios.timers[0][1], ios.LEAVE_DELAY);
+  assert.ok(ios.LEAVE_DELAY >= 400 && ios.LEAVE_DELAY <= 700, 'about a dismissal\'s length');
+  ios.timers[0][0]();
+  assert.deepEqual(ios.said[1], ['Gasto guardado', { queue: true }]);
+  // TalkBack reads the live region the same line carries: announcing too would say it twice.
+  const android = announcer('android');
+  android.announce('Movimiento deshecho');
+  android.announce('Gasto guardado', 'leave');
+  assert.deepEqual([android.said, android.timers], [[], []]);
+  // The one door: no screen posts an announcement of its own beside it (Movimientos' count and the paste notice predate it
+  // and stay as they are; ErrorMessage keeps its own iOS guard).
+  const root = new URL('../', import.meta.url);
+  const files = ['app/', 'src/'].flatMap(dir => readdirSync(new URL(dir, root), { recursive: true, encoding: 'utf8' })
+    .filter(name => /\.tsx?$/.test(name)).map(name => dir + name));
+  const direct = files.filter(file => file !== 'src/ui/motion.tsx' && /announceForAccessibility(WithOptions)?(\?\.)?\(/.test(readFileSync(new URL(file, root), 'utf8')));
+  assert.deepEqual(direct.sort(), ['app/(tabs)/activity.tsx', 'src/ui/components.tsx']);
+});
+
 test('every timing and curve comes from motion.tsx: Reflow on the state duration, colour transitions on easeOut, one named ambient pulse, no runOnJS', () => {
   const read = (path: string) => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
   const walk = (dir: string): string[] => readdirSync(new URL('../' + dir, import.meta.url), { withFileTypes: true })

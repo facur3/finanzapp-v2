@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react';
-import type { StyleProp, ViewStyle } from 'react-native';
+import { AccessibilityInfo, Platform, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, { Easing, FadeIn, FadeInUp, FadeOut, LinearTransition, ReduceMotion, cubicBezier, type WithTimingConfig } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useReduceMotion } from './theme';
@@ -86,6 +86,23 @@ export function errorHaptic() {
  * frozen for «Reintentar». Once, in its catch, after the error is set. */
 export function warningHaptic() {
   void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+}
+
+/** Producto 25D2: how long a screen takes to leave (a sheet's dismissal, a pop) before an outcome said over it is posted. */
+export const LEAVE_DELAY = 500;
+
+/** Producto 25D2: what just happened, told to VoiceOver in the app's own words: the outcome of a write the person asked
+ * for (beside its haptic) or a change made in place away from the control they touched (a month stepped, a reply that
+ * finished). iOS has no live regions, so this is how VoiceOver hears it. Android posts nothing: TalkBack reads the live
+ * region such a line carries there, and announcing too would say it twice (AGENTS rule 13). Queued behind what VoiceOver
+ * is saying (the control's own reply), never cutting it off. `after: 'leave'` for an outcome whose screen closes with it:
+ * posted once the destination is up, so its first reading does not swallow it. The caller passes spoken forms only
+ * (tests/voiceover.node.ts follows the argument like any label) and calls it once per outcome, from the handler that
+ * caused it, never from a mount (a screen coming back would repeat its history). */
+export function announce(text: string, after: 'now' | 'leave' = 'now') {
+  if (Platform.OS !== 'ios' || !text) return;
+  const say = () => AccessibilityInfo.announceForAccessibilityWithOptions(text, { queue: true });
+  if (after === 'leave') setTimeout(say, LEAVE_DELAY); else say();
 }
 
 const rise = FadeInUp.duration(duration.enter).easing(easeOut).withInitialValues({ opacity: 0, transform: [{ translateY: 6 }] });

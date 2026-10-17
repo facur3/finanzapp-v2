@@ -128,6 +128,7 @@ function harness({ client, accounts = [visa, cash, usd], cards = [], data = entr
   const subscriptions: unknown[] = [];
   const scrolled: any[] = [];
   const haptics: string[] = [];
+  const announced: string[] = [];
   const effects: (() => void)[] = [];
   let cursor = 0;
   const slot = (initial: () => unknown) => { const index = cursor++; if (!(index in state)) state[index] = initial(); return index; };
@@ -185,7 +186,8 @@ function harness({ client, accounts = [visa, cash, usd], cards = [], data = entr
     '../src/ui/components': { AppText: 'AppText', IconButton: 'IconButton' },
     '../src/ui/liability-presentation': liabilityPresentation,
     '../src/ui/money-input': moneyInput,
-    '../src/ui/motion': { Appear: 'Appear', impactHaptic: () => haptics.push('impact') },
+    // 25D2: what VoiceOver is told, in order (motion.tsx's `announce`; its iOS-only queue is tested in motion.node.ts).
+    '../src/ui/motion': { Appear: 'Appear', impactHaptic: () => haptics.push('impact'), announce: (text: string) => announced.push(text) },
     '../src/ui/presentation': presentation,
     '../src/ui/theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, useCurrentDay: () => '2026-09-21', useReduceMotion: () => reduced,
       usePalette: () => ({ background: '#F2F2F6', warning: '#B45309', warningSoft: '#FCF1E0', isDark: false }) },
@@ -209,7 +211,7 @@ function harness({ client, accounts = [visa, cash, usd], cards = [], data = entr
   /** Leave the screen: React runs the effects' cleanups and drops the component's state; the app session stays. */
   const unmount = () => { for (const cleanup of effects.splice(0)) cleanup(); state.length = 0; };
   const refocus = () => { for (const effect of focusEffects) { const cleanup = effect(); if (typeof cleanup === 'function') effects.push(cleanup as () => void); } };
-  return { render, unmount, refocus, session, review, subscriptions, pushed, storeAtPush, navigated, dismissed, scrolled, haptics, effects, setLocale: (next: AppLocale) => { i18n = bindLocale(next, 'none', deviceLanguage); } };
+  return { render, unmount, refocus, session, review, subscriptions, pushed, storeAtPush, navigated, dismissed, scrolled, haptics, announced, effects, setLocale: (next: AppLocale) => { i18n = bindLocale(next, 'none', deviceLanguage); } };
 }
 function nodes(value: any): Node[] {
   if (!value || typeof value !== 'object') return [];
@@ -939,6 +941,63 @@ test('a remote failure keeps the user message, explains, and Reintentar sends th
   await settle();
   screen = view.render();
   assert.equal(screen.messages.at(-1)?.text, 'Respuesta inválida del servidor.', 'a specific failure message is shown as-is');
+});
+
+test('25D2: VoiceOver hears the thread on iOS: the request leaving, the finished reply once (never a streamed piece), a note, the next question, a failed capture; nothing once the screen is left', async () => {
+  const scripted = scriptedClient();
+  const view = harness({ client: scripted.client });
+  view.render().empty.props.onPick('¿Por qué gasté más este mes?');
+  await tick();
+  assert.deepEqual(view.announced, ['Asistente: pensando'], 'the thinking state, once, as the request leaves');
+  scripted.reply([{ type: 'delta', text: 'Gastaste ' }, { type: 'delta', text: 'más ' }], { more: true });
+  await settle();
+  assert.equal(view.announced.length, 1, 'a streamed piece is never announced');
+  scripted.reply([{ type: 'result', result: FIXTURE_ANSWER, facts: FIXTURE_FACTS }]);
+  await settle();
+  assert.deepEqual(view.announced.slice(1), ['Asistente: ' + FIXTURE_ANSWER.message], 'the finished reply, once, in the thread\'s own words');
+  view.render();
+  assert.equal(view.announced.length, 2, 'rendering the thread again says nothing');
+  // A failure note, in the interface language.
+  view.render().composer.props.onChange('¿Cuánto gasté?');
+  view.render().composer.props.onSend();
+  await tick();
+  scripted.reply([{ type: 'error', reason: 'offline', message: '' }]);
+  await settle();
+  assert.deepEqual(view.announced.slice(2), ['Asistente: pensando', es.errorText(conversation.REASON_TEXT.offline)]);
+
+  // A clarification: the question is the reply; the chip's answer brings the next turn, said once.
+  const asking = scriptedClient();
+  const review = memoryReview();
+  review.failNext();
+  const second = harness({ client: asking.client, review });
+  second.render().empty.props.onPick('Gasté 18 mil en el súper');
+  await tick();
+  asking.reply([{ type: 'result', result: FIXTURE_DRAFT_NO_ACCOUNT, facts: [] }]);
+  await settle();
+  assert.deepEqual(second.announced, ['Asistente: pensando', 'Asistente: ¿Con qué lo pagaste?']);
+  const choices = find([second.render().items[1]], 'ClarificationChoices')[0];
+  choices.props.onChoose(choices.props.options[1]);
+  await settle();
+  assert.deepEqual(second.announced.slice(2), ['Asistente: ' + es.t('assistant.clarify.reviewDraft'), es.t('assistant.proposal.failed')],
+    'the next turn, then the capture that failed (the card\'s line, Android\'s live region)');
+
+  // Left before the answer lands: the reply reaches the session, and nothing is spoken over another screen.
+  const later = scriptedClient();
+  const third = harness({ client: later.client });
+  third.render().empty.props.onPick('¿Por qué gasté más este mes?');
+  await tick();
+  third.unmount();
+  later.reply([{ type: 'result', result: FIXTURE_ANSWER, facts: FIXTURE_FACTS }]);
+  await settle();
+  assert.equal(third.session.getState().conversation.messages.at(-1)?.role, 'assistant');
+  assert.deepEqual(third.announced, ['Asistente: pensando']);
+});
+
+test('25D2: the disconnected build says only its note, and an English interface hears English', async () => {
+  const view = harness({ client: disconnectedAssistant(), locale: 'en-US' });
+  view.render().empty.props.onPick('How much did I spend?');
+  await settle();
+  assert.deepEqual(view.announced, [bindLocale('en-US').errorText(conversation.REASON_TEXT.unavailable)]);
 });
 
 test('the fixture client shows a visible test banner, and its proposal is a preview: never captured, never written', async () => {
