@@ -156,7 +156,8 @@ export default function AssistantScreen() {
   const send = useCallback(async (raw: string) => {
     const text = raw.trim();
     if (!text || session.request.current) return;
-    impactHaptic();
+    // A tick says the message left; the disconnected build sends nothing, so it gives none before its note.
+    if (client.mode !== 'disconnected') impactHaptic();
     dispatch({ type: 'send', text });
     const action = classifyIntent(text);
     // Protocol v5 carries every currency of the domain's creation gate (a held three-decimal one never), for recording and
@@ -246,6 +247,11 @@ export default function AssistantScreen() {
     return { kind: 'unknown' };
   };
 
+  /** The next step when the Assistant cannot help now: the manual expense form, in the screen's currency when an account holds it. */
+  const recordManually = useCallback(() => {
+    router.push({ pathname: '/new-entry', params: { kind: 'expense', ...(currencies.includes(currency) ? { currency } : {}) } });
+  }, [currencies.join(','), currency]);
+
   const open = useCallback((href: EvidenceLink['href']) => {
     // 25Q4: Movimientos opens whole and from the top on a fresh `reset`, made at the tap, so the same evidence followed twice
     // resets twice (the dock keeps a search, a filter and the scroll).
@@ -287,7 +293,7 @@ export default function AssistantScreen() {
   const renderItem = ({ item }: { item: Message }) => restored.current!.has(item.id) ? <Restored>{row(item)}</Restored> : row(item);
   const row = (item: Message) => {
     if (item.role === 'user') return <Appear><UserMessage text={item.text} /></Appear>;
-    if (item.role === 'system') return <Appear><SystemNote message={item} onRetry={text => void send(text)} /></Appear>;
+    if (item.role === 'system') return <Appear><SystemNote message={item} onRetry={text => void send(text)} onRecord={recordManually} /></Appear>;
     return <View style={{ gap: space.m }}>
       {(item.text || item.textKey || item.status === 'streaming') && <AssistantText text={item.textKey ? t(item.textKey) : item.text} ownWords={!!item.textKey} status={item.status} language={item.language} />}
       {item.content?.kind === 'answer' && <AnswerEvidence content={item.content} onOpen={open} />}

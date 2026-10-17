@@ -14,10 +14,10 @@ export const assistant: Pick<Messages, 'assistant'> = {
       budgetProgress: 'How am I doing on my budget?',
     },
     reasons: {
-      unavailable: 'The Assistant isn’t connected in this version yet. Your message stays in the text field until it is.',
-      session: 'Sign in to use the Assistant. Your message is still in the text field.',
+      unavailable: 'The Assistant isn’t available in this version yet. Your message is still in the text field.',
+      session: 'The Assistant isn’t available in this version yet. Your message is still in the text field.',
       offline: 'No connection. Your transactions didn’t change; you can retry.',
-      limit: 'You’ve reached today’s question limit. You can still record transactions manually.',
+      limit: 'You’ve reached the question limit for now. Your transactions didn’t change.',
       failed: 'The request couldn’t be completed. Your transactions didn’t change.',
     },
     dropped: {
@@ -38,6 +38,7 @@ export const assistant: Pick<Messages, 'assistant'> = {
       thinking: 'Thinking…',
       stopped: 'Response stopped.',
       retry: 'Retry',
+      recordManually: 'Record manually',
     },
     clarify: {
       kind: 'Was it an expense or income?',

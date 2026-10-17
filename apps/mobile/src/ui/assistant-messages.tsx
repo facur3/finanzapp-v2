@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { todayKey, type ReviewArchive } from '@finanzapp/domain';
-import type { AnswerContent, ClarificationOption, Message, ProposalContent } from '../assistant/conversation';
+import type { AnswerContent, AssistantReason, ClarificationOption, Message, ProposalContent } from '../assistant/conversation';
 import { evidenceLabel, optionText } from '../assistant/conversation';
 import type { ReviewItem } from '../storage/review-database';
 import type { LanguageCode } from '../i18n/locale';
@@ -85,11 +85,12 @@ function Cursor() {
   return <AppText style={{ color: p.primary }}>▍</AppText>;
 }
 
-/** One calm line for a state the Assistant cannot get past: not connected,
+/** One calm line for a state the Assistant cannot get past: not available,
  * offline, a limit, a failure. It names the state and, when the message did
- * leave the device, offers to send it again. The stored text is a catalogue
+ * leave the device, offers to send it again; when the Assistant cannot help now (not available in this version, a limit)
+ * it offers the next step, «Registrar a mano» (`onRecord`). The stored text is a catalogue
  * key or a caught message; `errorText` shows either in the interface language. */
-export function SystemNote({ message, onRetry }: { message: Message & { role: 'system' }; onRetry?: (text: string) => void }) {
+export function SystemNote({ message, onRetry, onRecord }: { message: Message & { role: 'system' }; onRetry?: (text: string) => void; onRecord?: () => void }) {
   const p = usePalette();
   const { t, errorText, speechLanguage } = useI18n();
   const text = errorText(message.text);
@@ -105,8 +106,15 @@ export function SystemNote({ message, onRetry }: { message: Message & { role: 's
       hitSlop={{ top: 4, bottom: 4 }} style={{ minHeight: 36, paddingLeft: 8, justifyContent: 'center' }}>
       <AppText variant="footnote" style={{ color: p.primary, fontWeight: '600' }}>{t('assistant.message.retry')}</AppText>
     </PressFeedback>}
+    {onRecord && MANUAL_REASONS.has(message.reason) && <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('assistant.message.recordManually')} onPress={onRecord}
+      hitSlop={{ top: 4, bottom: 4 }} style={{ minHeight: 36, paddingLeft: 8, justifyContent: 'center' }}>
+      <AppText variant="footnote" style={{ color: p.primary, fontWeight: '600' }}>{t('assistant.message.recordManually')}</AppText>
+    </PressFeedback>}
   </View>;
 }
+
+/** The notes whose next step is the manual form: the Assistant cannot answer now, whatever is retried. */
+const MANUAL_REASONS: ReadonlySet<AssistantReason> = new Set(['unavailable', 'session', 'limit']);
 
 /** The empty conversation: one question and at most four prompts (already in the interface language). */
 export function Suggestions({ items, onPick, disabled = false }: { items: readonly string[]; onPick: (text: string) => void; disabled?: boolean }) {

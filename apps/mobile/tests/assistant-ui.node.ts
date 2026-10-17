@@ -326,8 +326,19 @@ test('assistant text, thinking and system notes are said in words; the pulse sto
   byLabel(offline, 'Reintentar')!.props.onPress();
   assert.deepEqual(retried, ['hola']);
   assert.equal(nodes(offline).find(node => node.type === 'Ionicons')!.props.name, 'cloud-offline-outline');
-  const unavailable = ui.render('SystemNote', { message: { id: 's', role: 'system', reason: 'unavailable', text: 'No conectado.', retryText: null }, onRetry: () => {} });
+  const recorded: string[] = [];
+  const unavailable = ui.render('SystemNote', { message: { id: 's', role: 'system', reason: 'unavailable', text: 'No conectado.', retryText: null }, onRetry: () => {}, onRecord: () => recorded.push('manual') });
   assert.equal(byLabel(unavailable, 'Reintentar'), undefined, 'nothing was sent, so there is nothing to retry');
+  // The next step instead: «Registrar a mano», a 44 pt target (36 pt drawn, 4 pt of slop above and below).
+  const manual = byLabel(unavailable, 'Registrar a mano')!;
+  manual.props.onPress();
+  assert.deepEqual(recorded, ['manual']);
+  assert.deepEqual([flat(manual.props.style).minHeight, JSON.stringify(manual.props.hitSlop)], [36, JSON.stringify({ top: 4, bottom: 4 })]);
+  const limit = ui.render('SystemNote', { message: { id: 's', role: 'system', reason: 'limit', text: 'assistant.reasons.limit', retryText: 'hola' }, onRetry: () => {}, onRecord: () => {} });
+  assert.ok(byLabel(limit, 'Registrar a mano') && byLabel(limit, 'Reintentar'), 'a limit offers both');
+  assert.equal(byLabel(offline, 'Registrar a mano'), undefined, 'offline is retried, not routed away');
+  assert.doesNotMatch(bindLocale('es-AR').errorText('assistant.reasons.limit'), /de hoy/, 'a limit is never said to be today\'s: the windows are a minute to a month');
+  assert.doesNotMatch(bindLocale('en-US').errorText('assistant.reasons.limit'), /today/);
   // 25D2: inside one accessible element «Reintentar» was never a VoiceOver stop of its own. The note and the button are
   // siblings now: the text is one element, the button another, and nothing accessible holds the button.
   assert.notEqual(offline.props.accessible, true, 'the row itself is not one element');

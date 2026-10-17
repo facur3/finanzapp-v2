@@ -270,10 +270,15 @@ test('in the disconnected build a suggestion or a typed message never leaves the
   // words stay written.
   const unavailable = screen.messages[0];
   assert.equal(unavailable.text, conversation.REASON_TEXT.unavailable);
-  assert.equal(es.errorText(unavailable.text), 'El Asistente todavía no está conectado en esta versión. Tu mensaje quedó escrito para cuando lo esté.');
+  // True: nothing waits for a connection that this version cannot get; the words are in the field.
+  assert.equal(es.errorText(unavailable.text), 'El Asistente todavía no está disponible en esta versión. Tu mensaje sigue en el cuadro.');
   assert.equal(screen.items[0].props.children.props.message.reason, 'unavailable');
   assert.equal(screen.composer.props.note, undefined, 'no caption under the composer either');
-  assert.deepEqual(view.haptics, ['impact'], 'one subtle haptic on send');
+  assert.deepEqual(view.haptics, [], 'no send tick before a note that says nothing was sent');
+  // The next step is one tap away: the manual expense form, in the screen's currency.
+  screen.items[0].props.children.props.onRecord();
+  assert.equal(JSON.stringify(view.pushed), JSON.stringify([{ pathname: '/new-entry', params: { kind: 'expense', currency: 'ARS' } }]));
+  view.pushed.length = 0;
   // Typing keeps the exact text, spaces included, and the send is again refused without a request.
   screen.composer.props.onChange('  Gasté 500 en el kiosco ');
   screen = view.render();
@@ -745,7 +750,10 @@ test('25A-04: New chat, leaving the screen and an app restart never remove a cap
 
 test('25A-04: the Assistant screen has no ledger write path left', () => {
   const source = readFileSync(new URL('../app/assistant.tsx', import.meta.url), 'utf8');
-  assert.doesNotMatch(source, /addEntry|entryFromDraft|validateEntry|createEntry|addInstallmentPlan|confirmReview|session\.writes|setWriting|new-entry/);
+  assert.doesNotMatch(source, /addEntry|entryFromDraft|validateEntry|createEntry|addInstallmentPlan|confirmReview|session\.writes|setWriting/);
+  // The one way to the manual form is «Registrar a mano»: an empty expense form (kind and currency only), never a draft
+  // carried into it; saving there is the form's own explicit button.
+  assert.deepEqual(source.match(/new-entry[^\n]*/g), ["new-entry', params: { kind: 'expense', ...(currencies.includes(currency) ? { currency } : {}) } });"]);
   assert.match(source, /captureReview\(\{ id: frozen\.id, writeId: frozen\.writeId, captureKey: frozen\.captureKey, draft: frozen\.draft, at: frozen\.at \}\)/);
   for (const file of ['../src/assistant/session.ts', '../src/assistant/conversation.ts', '../src/assistant/review-proposal.ts', '../src/ui/assistant-messages.tsx']) {
     assert.doesNotMatch(readFileSync(new URL(file, import.meta.url), 'utf8').replace(/\/\*\*[\s\S]*?\*\//g, ''), /addEntry|createEntry|validateEntry|confirmReview|store\.confirm/, file);
@@ -1417,7 +1425,7 @@ test('English: the screen\'s own words are English, the model\'s answer and the 
   await settle();
   const unavailable = quiet.render();
   assert.equal(unavailable.messages[0].text, conversation.REASON_TEXT.unavailable);
-  assert.equal(bindLocale('en-AR').errorText(unavailable.messages[0].text), 'The Assistant isn’t connected in this version yet. Your message stays in the text field until it is.');
+  assert.equal(bindLocale('en-AR').errorText(unavailable.messages[0].text), 'The Assistant isn’t available in this version yet. Your message is still in the text field.');
   assert.equal(unavailable.composer.props.value, 'How much did I spend on food?');
   const banner = nodes(harness({ client: fixtureAssistant(0), locale: 'en-AR' }).render().root).filter(node => node.type === 'AppText').map(node => String(node.props.children));
   assert.ok(banner.includes('Test view: sample replies, nothing is saved.'));
