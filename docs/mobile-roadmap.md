@@ -1297,6 +1297,21 @@ item unless a section says a new native build is needed. The checklist sections 
 
 ## 3. Next deliveries
 
+*(2026-10-17, the owner's direction to accelerate: substantial deliveries that each close a group of related findings
+of the private register, with tests, an independent review and the register updated; device validation only at
+milestones; Idioma and Región stay separate choosers. The block after M1, ordered to keep conflicts low (each a PR from
+`master` once the four drafts merge; prepared on top of #119 until then):*
+*1. **25N1 — Finanzas, Ajustes and the shared controls:** the navigation proposal below, Licencias, the dock's long
+press, the switch's double haptic, disabled controls that look live, clear buttons and keyboard accessories, undo and
+alert conventions, the last account used, the card and budget forms, token drift. 2. **25D2 — VoiceOver and Voice
+Control:** outcomes spoken on iOS, the Assistant's thread, names that match the visible text, one stop per row. 3.
+**25R1 — robustness** (in parallel with 25D2: storage, rates, routes and tests, few shared files): catch-up and rate
+refresh on foreground, route parameter validation, a committed change whose view could not refresh, the backup's
+untested paths. 4. **25A-UI — the Assistant's interface:** the waiting state, the keyboard follow, disconnected builds,
+the composer's limits, «this month» on long months. 5. **25T — copy and the remaining polish:** one meaning per term,
+impersonal system messages, less permanent text, Increase Contrast, amounts at the largest sizes. **M2** (iPhone) after
+25D2 and 25N1.)*
+
 *(2026-10-17, later the same day: the owner clarified the flags (round graphic flags, and a representative one for
 Idioma), done in 25O1 before M1, and asked for three product proposals. They are recorded below as **proposals**:
 nothing in them is programmed, tested or validated on an iPhone, and the private register lists them as such. No new PR
@@ -4724,7 +4739,7 @@ nothing of it is on a screen yet.
   `regions:verify`, `i18n:check -- --strict` (0 errors, 0 stale), `check`, `npm ls`, `export:ios` and the bundle
   secret scan OK; root `npm test` 704 passed, 1 todo; `check:repo` OK.
 - **Gates.** #112, #117 and #118 merge first, after milestone M1; this branch then merges `master` (no force-push).
-- **Checks (local, Linux, worktree, 2026-10-17):** typecheck clean; `test:storage` 1481 tests, 1480 pass, 0 fail, 1
+- **Checks of the first round (local, Linux, worktree, 2026-10-17; the second round's are above):** typecheck clean; `test:storage` 1481 tests, 1480 pass, 0 fail, 1
   skipped (the currency catalogue's existing «no cached sources» skip); `currency:verify` and `regions:verify` OK;
   `i18n:check -- --strict` 0 errors, 0 stale (21 notes); `check` OK offline and live; `npm ls --all` OK; `export:ios` OK
   and the bundle names no server secret; root `npm test` 704 passed + 1 todo; `check:repo` OK (466 files). None of this
