@@ -1068,7 +1068,7 @@ test('movement detail of an instalment: «Cuota de tarjeta», a «Cuota 2 de 12�
   find(root, 'ActionButton', 'Deshacer movimiento').props.onPress();
   // 25Q4: the card says how it will read afterwards (it owes $ 120.000,00; this instalment is $ 100.000,00 of it), never «Se sumarán … a Visa Gold».
   assert.equal(view.alerts[0].message, 'Visa Gold quedará con un saldo pendiente de 20.000,00 ARS. Este movimiento dejará de contar en tus saldos y reportes. '
-    + 'Podés recuperarlo después desde Movimientos deshechos, en Más. La cuota queda deshecha: no se vuelve a registrar sola y sigue pendiente en su plan.');
+    + 'Podés recuperarlo después desde Movimientos deshechos, en Movimientos. La cuota queda deshecha: no se vuelve a registrar sola y sigue pendiente en su plan.');
   view.alerts[0].buttons[1].onPress();
   await settle();
   assert.equal(view.updates[0].action, 'void');

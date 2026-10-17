@@ -1,11 +1,15 @@
-/** Más: the hub rows, the footer and its diagnostics. */
+/** Finanzas (the fourth tab) and Ajustes (behind its gear, Producto 25N1): the rows, the footer and its diagnostics, and Licencias. */
 export const settings = {
   settings: {
+    /** 25N1: the trailing button of Finanzas' navigation bar that opens Ajustes (VoiceOver and the Large Content Viewer). */
+    open: 'Ajustes',
+    /** Ajustes' three groups. */
     sections: {
-      finance: 'Finanzas',
-      appData: 'App y datos',
+      preferences: 'Preferencias',
+      yourData: 'Tus datos',
+      about: 'Acerca de',
     },
-    /** Hub rows: a title, and a subtitle that is a live count or a placeholder when there is nothing to count. */
+    /** Rows: a title, and a subtitle that is a live count or a placeholder when there is nothing to count. */
     rows: {
       /** 25A-03: «Para revisar», first in Finanzas while something waits (always in a development build). */
       review: 'Para revisar',
@@ -33,11 +37,10 @@ export const settings = {
       categoriesCount: { one: '{count} personalizada', other: '{count} personalizadas' },
       backup: 'Copia de seguridad',
       backupSubtitle: 'Antes de borrar la app o cambiar de teléfono',
-      undone: 'Movimientos deshechos',
-      undoneNone: 'Ninguno',
-      undoneCount: { one: '{count} recuperable', other: '{count} recuperables' },
+      licenses: 'Licencias',
+      licensesSubtitle: 'Software y datos de terceros',
     },
-    /** The version line at the end of Más; `release` is the internal delivery name ("24UX5") and is not translated. */
+    /** The version line at the end of Ajustes; `release` is the internal delivery name ("24UX5") and is not translated. */
     version: 'FinanzApp {version} ({release})',
     /** 24UX5: only in a development build, under the version: the control material and where the languages were read. */
     diagnostics: '{material} · {source}',
@@ -62,5 +65,17 @@ export const settings = {
       intl: 'Idioma: Intl (sin módulo nativo)',
       none: 'Idioma: predeterminado',
     },
+  },
+  /** 25N1, Ajustes › Licencias. A notice's name, licence and text are shown as published (in English), never from here. */
+  licenses: {
+    intro: 'FinanzApp incluye este software y estos datos de terceros. Cada aviso se muestra como fue publicado, en inglés.',
+    software: 'Software',
+    data: 'Datos e imágenes',
+    /** Under the data group: where the reference exchange rates come from, and whose terms apply. */
+    rates: 'Los tipos de cambio de referencia vienen de Frankfurter (frankfurter.dev), que los reúne de bancos centrales y fuentes oficiales. Cada tasa queda sujeta a los términos de su proveedor.',
+    /** On a notice: the npm packages it covers. */
+    covers: 'Incluye: {packages}',
+    notFoundTitle: 'No encontramos este aviso',
+    notFoundDetail: 'Volvé a Licencias para ver la lista.',
   },
 } as const;

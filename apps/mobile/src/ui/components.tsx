@@ -818,8 +818,11 @@ export function AccountBadge({ accountId, large = false, size }: { accountId: st
 /** One transaction line: merchant, then category · account · date; amount on the right. VoiceOver hears the full
  * sentence. (24UX6A: Inicio's «Actividad reciente» uses this same row in a grouped surface, so the open `home` variant
  * of 24UX3/24UX5 is gone.) */
-export function EntryRow({ entry, account, last = false, showDate = true, showAccount = true }: {
+export function EntryRow({ entry, account, last = false, showDate = true, showAccount = true, voided = false }: {
   entry: Entry; account: Account; last?: boolean; showDate?: boolean; showAccount?: boolean;
+  /** 25N1: a row of Movimientos deshechos. It counts nowhere, so it never looks live: the amount in the tertiary ink with no
+   * «+» (as the detail dims a voided amount) and VoiceOver hears «deshecho» after the kind. */
+  voided?: boolean;
 }) {
   const p = usePalette();
   const day = useCurrentDay();
@@ -846,7 +849,7 @@ export function EntryRow({ entry, account, last = false, showDate = true, showAc
     : component === undefined ? [entry.merchant, t(income ? 'movement.incomeWord' : 'movement.expenseWord')]
       : [t('operations.row.payoffWord'), ...(component === 'principal' ? [] : [t(`operations.row.payoffShareSpoken.${component}`)]), entry.merchant];
   return <PressFeedback feedback="highlight" accessibilityRole="button"
-    accessibilityLabel={[...spokenKind, spokenAmount(amount.minor, account.currency), category, account.name, dateLabel].join(', ')}
+    accessibilityLabel={[...spokenKind, ...(voided ? [t('rows.undone')] : []), spokenAmount(amount.minor, account.currency), category, account.name, dateLabel].join(', ')}
     onPress={() => router.push(operationId !== undefined ? { pathname: '/operation/[id]', params: { id: operationId } } : { pathname: '/entry/[id]', params: { id: entry.id } })}
     style={[styles.row, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
     {refund ? <GlyphTile icon="arrow-undo-outline" />
@@ -857,7 +860,7 @@ export function EntryRow({ entry, account, last = false, showDate = true, showAc
         {!!detail && <AppText secondary variant="footnote" numberOfLines={stacked ? undefined : 2}>{detail}</AppText>}
       </View>
       <View style={{ maxWidth: stacked ? '100%' : AMOUNT_COLUMN, alignItems: 'flex-end' }}>
-        <Money minor={amount.minor} currency={account.currency} signed={amount.signed} tone={amount.tone} />
+        <Money minor={amount.minor} currency={account.currency} signed={amount.signed && !voided} tone={amount.tone} color={voided ? p.tertiary : undefined} />
       </View>
     </View>
   </PressFeedback>;
@@ -897,15 +900,17 @@ export function AccountRow({ account, entries, transfers, last = false, accessib
  * a transfer is a payment/collection and reads better without a +/− sign. */
 export type RowContext = 'card' | 'debt';
 
-export function MovementRow({ item, accounts, accountId, last, showDate = true, context }: {
-  item: ActivityItem; accounts: Account[]; accountId?: string; last?: boolean; showDate?: boolean; context?: RowContext;
+export function MovementRow({ item, accounts, accountId, last, showDate = true, context, voided }: {
+  item: ActivityItem; accounts: Account[]; accountId?: string; last?: boolean; showDate?: boolean; context?: RowContext; voided?: boolean;
 }) {
-  return item.type === 'entry' ? <EntryRow entry={item.value} account={accounts.find(a => a.id === item.value.accountId)!} last={last} showDate={showDate} showAccount={!accountId} />
-    : <TransferRow transfer={item.value} accounts={accounts} accountId={accountId} last={last} showDate={showDate} context={context} />;
+  return item.type === 'entry' ? <EntryRow entry={item.value} account={accounts.find(a => a.id === item.value.accountId)!} last={last} showDate={showDate} showAccount={!accountId} voided={voided} />
+    : <TransferRow transfer={item.value} accounts={accounts} accountId={accountId} last={last} showDate={showDate} context={context} voided={voided} />;
 }
 
-export function TransferRow({ transfer: t, accounts, accountId, last = false, showDate = true, context }: {
+export function TransferRow({ transfer: t, accounts, accountId, last = false, showDate = true, context, voided = false }: {
   transfer: Transfer; accounts: Account[]; accountId?: string; last?: boolean; showDate?: boolean; context?: RowContext;
+  /** 25N1: as on EntryRow, a row of Movimientos deshechos: the amount in the tertiary ink, «deshecha» after the kind. */
+  voided?: boolean;
 }) {
   const p = usePalette();
   const day = useCurrentDay();
@@ -925,7 +930,7 @@ export function TransferRow({ transfer: t, accounts, accountId, last = false, sh
   const stacked = useStacked({ minor: amount.minor, currency: from.currency, signed: amount.signed });
   // VoiceOver hears the kind even when a note names the row («Transferencia, Alquiler, de … a …»).
   const kindWord = tr('rows.transfer');
-  const spokenTitle = context || title === kindWord ? title : kindWord + ', ' + title;
+  const spokenTitle = (context || title === kindWord ? title : kindWord + ', ' + title) + (voided ? ', ' + tr('rows.undoneTransfer') : '');
   return <PressFeedback feedback="highlight" accessibilityRole="button"
     accessibilityLabel={tr('rows.transferLabel', { title: spokenTitle, from: fromName, to: toName, amount: spokenAmount(t.amountMinor, from.currency), date }) + (t.note && t.note !== title ? ', ' + t.note : '')}
     onPress={() => router.push({ pathname: '/transfer/[id]', params: { id: t.id } })}
@@ -937,7 +942,7 @@ export function TransferRow({ transfer: t, accounts, accountId, last = false, sh
         <AppText secondary variant="footnote" numberOfLines={stacked ? undefined : 2}>{detail}</AppText>
       </View>
       <View style={{ maxWidth: stacked ? '100%' : AMOUNT_COLUMN, alignItems: 'flex-end' }}>
-        <Money minor={amount.minor} currency={from.currency} signed={amount.signed} tone={amount.tone} />
+        <Money minor={amount.minor} currency={from.currency} signed={amount.signed} tone={amount.tone} color={voided ? p.tertiary : undefined} />
       </View>
     </View>
   </PressFeedback>;

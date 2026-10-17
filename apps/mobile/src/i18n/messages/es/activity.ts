@@ -28,6 +28,9 @@ export const activity = {
     fromAccount: 'desde {name}',
     toAccount: 'hacia {name}',
     transferLabel: '{title}, de {from} a {to}, {amount}, {date}',
+    /** 25N1: what VoiceOver hears after the kind on a row of Movimientos deshechos (a movement, a transfer). */
+    undone: 'deshecho',
+    undoneTransfer: 'deshecha',
   },
   entryDetail: {
     notFoundTitle: 'No encontramos este movimiento',
@@ -43,7 +46,7 @@ export const activity = {
     cardAfterClear: '{account} quedará sin saldo pendiente.',
     /** 25Q4 review: these name the movement, so after a card's sentence they never read as the card stopping or coming back. */
     restoreEffect: 'Este movimiento volverá a contar en tus saldos y reportes.',
-    voidEffect: 'Este movimiento dejará de contar en tus saldos y reportes. Podés recuperarlo después desde Movimientos deshechos, en Más.',
+    voidEffect: 'Este movimiento dejará de contar en tus saldos y reportes. Podés recuperarlo después desde Movimientos deshechos, en Movimientos.',
     restore: 'Recuperar',
     void: 'Deshacer',
     statusVoided: 'Deshecho · no cuenta en saldos ni reportes',
@@ -106,7 +109,7 @@ export const activity = {
     /** Ends every transfer undo or restore. */
     recordOnly: 'Solo cambia el registro en esta app, no mueve dinero en el banco.',
     /** An undo only. 25Q4 review: it names the transfer, so it never reads as the card or debt named before it. */
-    voidRecovery: 'Podés recuperar la transferencia después desde Movimientos deshechos, en Más.',
+    voidRecovery: 'Podés recuperar la transferencia después desde Movimientos deshechos, en Movimientos.',
     /** 25Q4: a restored debt payment or collection may settle at most what is pending now; said before any confirmation, in
      * the debt screens' words. */
     restoreBlockedTitle: 'No se puede recuperar ahora',

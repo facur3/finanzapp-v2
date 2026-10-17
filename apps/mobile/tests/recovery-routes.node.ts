@@ -246,7 +246,7 @@ test('detail opens the native edit route; undo requires confirmation and cancele
   assert.equal(view.updates.length, 0);
   assert.match(view.alerts[0].message, /Se sumarán 123,45 ARS a Prueba ARS/);
   // 25Q4: an undo names where it can be restored from.
-  assert.ok(view.alerts[0].message.endsWith('Podés recuperarlo después desde Movimientos deshechos, en Más.'), view.alerts[0].message);
+  assert.ok(view.alerts[0].message.endsWith('Podés recuperarlo después desde Movimientos deshechos, en Movimientos.'), view.alerts[0].message);
   view.alerts[0].buttons[0].onPress();
   assert.equal(view.updates.length, 0);
   find(view.render(), 'ActionButton', 'Deshacer movimiento').props.onPress();
@@ -468,7 +468,7 @@ test('transfer undo requires confirmation, affects both sides, and updates detai
   find(view.render(), 'ActionButton', 'Deshacer transferencia').props.onPress();
   // 25Q4: a plain transfer keeps its sentence, then the record-only note and where an undo is restored from.
   assert.equal(view.alerts[0].message, '10,00 ARS: se descontarán de Destino y se sumarán a Prueba ARS. Solo cambia el registro en esta app, no mueve dinero en el banco. '
-    + 'Podés recuperar la transferencia después desde Movimientos deshechos, en Más.');
+    + 'Podés recuperar la transferencia después desde Movimientos deshechos, en Movimientos.');
   view.alerts[0].buttons[0].onPress();
   assert.equal(view.transferChanges.length, 0);
   find(view.render(), 'ActionButton', 'Deshacer transferencia').props.onPress();
@@ -810,7 +810,7 @@ test('English movement detail and transfer form: titles, rows, confirmation and 
   assert.deepEqual(rows, ['Category=Salud', 'Account=Prueba ARS', 'Currency=Argentine pesos'], 'the stored name and the account name are not translated');
   find(root, 'ActionButton', 'Undo transaction').props.onPress();
   assert.equal(detail.alerts[0].title, 'Undo transaction?');
-  assert.equal(detail.alerts[0].message, '123,45 ARS will be added to Prueba ARS. This transaction will stop counting in your balances and reports. You can restore it later from Undone transactions, in More.');
+  assert.equal(detail.alerts[0].message, '123,45 ARS will be added to Prueba ARS. This transaction will stop counting in your balances and reports. You can restore it later from Undone transactions, in Activity.');
   assert.equal(detail.alerts[0].buttons.map((button: any) => button.text).join(','), 'Cancel,Undo');
   assert.equal(detail.updates.length, 0, 'asking never writes');
 
@@ -2264,7 +2264,7 @@ test('25Q4: undoing or restoring a card purchase says how the card will read, in
   };
   // Visa owes 173,45: 50,00 before the purchase.
   const view = undo({ ...liabilityData, records: [purchase] });
-  assert.equal(view.alerts[0].message, 'Visa quedará con un saldo pendiente de 50,00 ARS. Este movimiento dejará de contar en tus saldos y reportes. Podés recuperarlo después desde Movimientos deshechos, en Más.');
+  assert.equal(view.alerts[0].message, 'Visa quedará con un saldo pendiente de 50,00 ARS. Este movimiento dejará de contar en tus saldos y reportes. Podés recuperarlo después desde Movimientos deshechos, en Movimientos.');
   view.alerts[0].buttons[1].onPress(); await flush();
   view.setData({ ...liabilityData, records: [view.updates[0].after] });
   find(view.render(), 'ActionButton', 'Recuperar movimiento').props.onPress();
@@ -2276,7 +2276,7 @@ test('25Q4: undoing or restoring a card purchase says how the card will read, in
   const only = undo(fresh);
   assert.ok(only.alerts[0].message.startsWith('Visa quedará sin saldo pendiente. '), only.alerts[0].message);
   const english = undo({ ...liabilityData, records: [purchase] }, 'en-AR');
-  assert.equal(english.alerts[0].message, 'Visa will have an outstanding balance of 50,00 ARS. This transaction will stop counting in your balances and reports. You can restore it later from Undone transactions, in More.');
+  assert.equal(english.alerts[0].message, 'Visa will have an outstanding balance of 50,00 ARS. This transaction will stop counting in your balances and reports. You can restore it later from Undone transactions, in Activity.');
   english.alerts[0].buttons[1].onPress(); await flush();
   english.setData({ ...liabilityData, records: [english.updates[0].after] });
   find(english.render(), 'ActionButton', 'Restore transaction').props.onPress();
@@ -2294,15 +2294,15 @@ test('25Q4: undoing or restoring a card payment, a debt payment or a collection 
   };
   const payment = storedTransfer('pay', 'a', 'card-acc', 5000);
   assert.equal(ask(payment), 'Se sumarán 50,00 ARS a Prueba ARS. Visa quedará con un saldo pendiente de 50,00 ARS. Solo cambia el registro en esta app, no mueve dinero en el banco. '
-    + 'Podés recuperar la transferencia después desde Movimientos deshechos, en Más.');
+    + 'Podés recuperar la transferencia después desde Movimientos deshechos, en Movimientos.');
   assert.equal(ask(domain.makeTransferChange('undo', payment, 'void', createdAt).after),
     'Se descontarán 50,00 ARS de Prueba ARS. Visa quedará sin saldo pendiente. Solo cambia el registro en esta app, no mueve dinero en el banco.');
   assert.equal(ask(storedTransfer('pay', 'a', 'debt-acc', 3000)), 'Se sumarán 30,00 ARS a Prueba ARS. Le vas a deber 70,00 ARS a Juan. '
-    + 'Solo cambia el registro en esta app, no mueve dinero en el banco. Podés recuperar la transferencia después desde Movimientos deshechos, en Más.');
+    + 'Solo cambia el registro en esta app, no mueve dinero en el banco. Podés recuperar la transferencia después desde Movimientos deshechos, en Movimientos.');
   assert.equal(ask(storedTransfer('collect', 'rec-acc', 'a', 1000)), 'Se descontarán 10,00 ARS de Prueba ARS. Ana te va a deber 40,00 ARS. '
-    + 'Solo cambia el registro en esta app, no mueve dinero en el banco. Podés recuperar la transferencia después desde Movimientos deshechos, en Más.');
+    + 'Solo cambia el registro en esta app, no mueve dinero en el banco. Podés recuperar la transferencia después desde Movimientos deshechos, en Movimientos.');
   assert.equal(ask(payment, 'en-AR'), '50,00 ARS will be added to Prueba ARS. Visa will have an outstanding balance of 50,00 ARS. '
-    + 'This only changes the record in this app; it moves no money at the bank. You can restore the transfer later from Undone transactions, in More.');
+    + 'This only changes the record in this app; it moves no money at the bank. You can restore the transfer later from Undone transactions, in Activity.');
   // 25Q4 review: a restore that settles a debt says so by its direction; «la deuda con» is only money the person owes.
   const undone = (record: domain.TransferRecord) => domain.makeTransferChange('undo', record, 'void', createdAt).after;
   const collected = undone(storedTransfer('collect', 'rec-acc', 'a', 4000)), paid = undone(storedTransfer('pay', 'a', 'debt-acc', 7000));

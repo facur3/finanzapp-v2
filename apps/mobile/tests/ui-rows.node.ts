@@ -821,6 +821,29 @@ test('24UX6C: a transfer row shows the stored amount unsigned in the transfer to
     'in a card context the note is still read after the facts');
 });
 
+test('25N1: a row of Movimientos deshechos never looks live: the amount in the tertiary ink with no «+», and VoiceOver hears «deshecho»', () => {
+  const ui = load('components.tsx');
+  const bank = { id: 'a', name: 'Banco', currency: 'ARS', openingMinor: 0, createdAt: 't' };
+  const cash = { id: 'b', name: 'Efectivo', currency: 'ARS', openingMinor: 0, createdAt: 't' };
+  const income = { id: 'i', accountId: 'a', kind: 'income', merchant: 'Sueldo', category: 'Sueldo', amountMinor: 500000, dateISO: '2026-09-22', createdAt: 't' };
+  const row = ui.render('EntryRow', { entry: income, account: bank, voided: true });
+  const [money] = moneyOf(row);
+  assert.deepEqual([money.props.minor, money.props.signed, money.props.color], [500000, false, '#8E9098'], 'the stored amount, unsigned, in palette.tertiary');
+  assert.equal(drawn(row).some(text => text.startsWith('+')), false, 'no «+» on an undone income: ' + drawn(row).join(' | '));
+  assert.equal(pressOf(row).props.accessibilityLabel, 'Sueldo, ingreso, deshecho, 5000,00 ARS, x, Banco, Hoy');
+  const live = ui.render('EntryRow', { entry: income, account: bank });
+  assert.deepEqual([moneyOf(live)[0].props.signed, moneyOf(live)[0].props.color], [true, undefined], 'a live row is unchanged');
+  const expense = ui.render('EntryRow', { entry: { ...income, kind: 'expense', merchant: 'Café', category: 'Comida' }, account: bank, voided: true });
+  assert.equal(pressOf(expense).props.accessibilityLabel, 'Café, gasto, deshecho, 5000,00 ARS, x, Banco, Hoy');
+  const transfer = { id: 't', fromAccountId: 'a', toAccountId: 'b', amountMinor: 250000, dateISO: '2026-09-22', createdAt: 't', note: '' };
+  const undoneTransfer = ui.render('TransferRow', { transfer, accounts: [bank, cash], voided: true });
+  assert.equal(moneyOf(undoneTransfer)[0].props.color, '#8E9098');
+  assert.equal(pressOf(undoneTransfer).props.accessibilityLabel, 'Transferencia, deshecha, de Banco a Efectivo, 2500,00 ARS, Hoy');
+  // Through MovementRow, as EntryList draws them.
+  const viaList = ui.render('MovementRow', { item: { type: 'transfer', value: { ...transfer, note: 'Alquiler' }, key: 't' }, accounts: [bank, cash], voided: true });
+  assert.equal(pressOf(viaList).props.accessibilityLabel, 'Transferencia, Alquiler, deshecha, de Banco a Efectivo, 2500,00 ARS, Hoy');
+});
+
 test('24UX6C: a computed sign is kept: a negative account balance still renders with its minus', () => {
   const ui = load('components.tsx', { '@finanzapp/domain': { accountBalanceMinor: () => -45000, formatMinorUnits, labelFromISO: (d: string) => d, categoryKey: (s: string) => s.toLowerCase(), todayKey: (d: Date) => d.toISOString().slice(0, 10) } });
   const account = { id: 'a', name: 'Banco', currency: 'ARS', openingMinor: 0, createdAt: 't' };

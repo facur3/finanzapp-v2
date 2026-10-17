@@ -23,7 +23,7 @@ const snapshot: domain.LedgerSnapshot = {
   transfers: [],
 };
 
-function harness(data: domain.LedgerSnapshot = snapshot) {
+function harness(data: domain.LedgerSnapshot = snapshot, archive?: domain.LedgerArchive) {
   const source = readFileSync(new URL('../app/(tabs)/activity.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   // The automatic runtime passes an element's key as the third argument.
@@ -63,10 +63,10 @@ function harness(data: domain.LedgerSnapshot = snapshot) {
     },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': { View: 'View', AccessibilityInfo: { announceForAccessibility: (text: string) => announced.push(text) } },
-    'expo-router': { router: { push: (to: unknown) => { pushed.push(to); } }, useLocalSearchParams: () => params,
+    'expo-router': { Tabs: { Screen: 'Tabs.Screen' }, router: { push: (to: unknown) => { pushed.push(to); } }, useLocalSearchParams: () => params,
       useFocusEffect: (effect: () => void | (() => void)) => { if (!focusEffect) { focusEffect = effect; blur = effect(); } } },
-    '../../src/storage/LedgerProvider': { useLedger: () => ({ snapshot: data }) },
-    '../../src/ui/components': { ActionButton: 'ActionButton', AppText: 'AppText', Choices: 'Choices', EmptyState: 'EmptyState', SearchField: 'SearchField' },
+    '../../src/storage/LedgerProvider': { useLedger: () => ({ snapshot: data, archive }) },
+    '../../src/ui/components': { ActionButton: 'ActionButton', AppText: 'AppText', Choices: 'Choices', EmptyState: 'EmptyState', IconButton: 'IconButton', SearchField: 'SearchField' },
     '../../src/ui/entry-list': { EntryList: 'EntryList' },
     '../../src/ui/presentation': presentation,
     '../../src/ui/category-hues': { useCategoryLookOf: () => (stored: string) => ({ label: stored }) },
@@ -77,8 +77,15 @@ function harness(data: domain.LedgerSnapshot = snapshot) {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected activity dependency: ' + name);
     return modules[name];
   } });
-  const render = () => { cursor = 0; effectCursor = 0; return module.exports.default!(); };
-  return { render, announced, pushed, clock, params, blurNow: () => { if (typeof blur === 'function') blur(); }, focusAgain: () => { blur = focusEffect?.(); } };
+  // 25N1: the screen is its bar options (Tabs.Screen) beside the list; `render` hands back the list, `options` the bar's.
+  let screen: Node | null = null;
+  const render = () => {
+    cursor = 0; effectCursor = 0;
+    screen = module.exports.default!();
+    return screen?.type === 'Fragment' ? (screen.props.children as Node[]).find(child => child?.type === 'EntryList')! : screen;
+  };
+  const options = () => (screen!.props.children as Node[]).find(child => child?.type === 'Tabs.Screen')!.props.options;
+  return { render, options, announced, pushed, clock, params, blurNow: () => { if (typeof blur === 'function') blur(); }, focusAgain: () => { blur = focusEffect?.(); } };
 }
 const flat = (value: any): any[] => !value || typeof value !== 'object' ? [] : Array.isArray(value) ? value.flatMap(flat) : [value, ...flat(value.props?.children)];
 const header = (root: Node) => flat(root.props.header);
@@ -193,4 +200,23 @@ test('25O1: an empty Movimientos leaves the filled action to the dock\'s «+» o
   assert.deepEqual([add.props.label, add.props.secondary], ['Agregar cuenta', false], 'the only way forward stays filled');
   add.props.onPress();
   assert.deepEqual([...withAccount.view.pushed, ...none.view.pushed], ['/new-entry', '/new-account']);
+});
+
+test('25N1: Movimientos deshechos is a button of Movimientos\' bar while a movement, a transfer or an operation is undone; none otherwise', () => {
+  const records = snapshot.entries.map(domain.initialRecord);
+  const base: domain.LedgerArchive = { accounts: snapshot.accounts, records };
+  const buttonOf = (archive?: domain.LedgerArchive) => { const view = harness(snapshot, archive); view.render(); return { view, right: view.options().headerRight }; };
+  assert.equal(buttonOf().right, undefined, 'the ledger not read yet: no button');
+  assert.equal(buttonOf(base).right, undefined, 'nothing undone: nothing to open');
+  const withEntry = buttonOf({ ...base, records: [{ ...records[0], voided: true }, records[1]] });
+  const button = withEntry.right();
+  assert.deepEqual([button.type, button.props.name, button.props.label], ['IconButton', 'arrow-undo-outline', 'Movimientos deshechos']);
+  button.props.onPress();
+  assert.deepEqual(withEntry.view.pushed, ['/undone-entries']);
+  const transfer: domain.Transfer = { id: 't1', fromAccountId: 'a', toAccountId: 'a', amountMinor: 100, note: '', dateISO: '2026-09-11', createdAt };
+  assert.equal(typeof buttonOf({ ...base, transfers: [{ transfer, revision: 1, voided: true, updatedAt: createdAt }] }).right, 'function', 'an undone transfer');
+  const refund = domain.newEntryRefund(base, { id: 'r1', entryId: 'e1', amountMinor: 500, dateISO: '2026-09-11', todayISO: '2026-09-12', createdAt });
+  assert.equal(buttonOf({ ...base, purchaseOperations: [refund] }).right, undefined, 'a live devolución is not undone');
+  const undoneRefund = domain.makeOperationChange('undo', refund, 'void', createdAt).after;
+  assert.equal(typeof buttonOf({ ...base, purchaseOperations: [undoneRefund] }).right, 'function', 'an undone devolución is listed there too');
 });

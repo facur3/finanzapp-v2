@@ -7,7 +7,7 @@ import { activityDateLabel, dayNetMinor, groupActivity, mergeActivity, type Acti
 import { useCurrentDay, usePalette } from './theme';
 import { useDockInset } from './dock-clearance';
 
-export function EntryList({ entries, transfers, accounts, accountId, header, empty, footer, context, dayNet = true }: {
+export function EntryList({ entries, transfers, accounts, accountId, header, empty, footer, context, dayNet = true, voided = false }: {
   entries: Entry[]; transfers?: Transfer[]; accounts: Account[]; accountId?: string; header?: ReactNode; empty?: ReactNode;
   /** After the last movement: a detail screen's own actions (24UX4: close or delete a debt), where iOS places them. */
   footer?: ReactNode; context?: RowContext;
@@ -15,6 +15,8 @@ export function EntryList({ entries, transfers, accounts, accountId, header, emp
    * no signed net and no spoken «Neto del día» over records that are in no balance or report. 25Q1: false as well on a
    * list that is only part of a day (a category's or a day's expenses, Movimientos under a filter or a search). */
   dayNet?: boolean;
+  /** 25N1: every row is undone (Movimientos deshechos): each row says so (`EntryRow`'s and `TransferRow`'s `voided`). */
+  voided?: boolean;
 }) {
   const p = usePalette();
   const day = useCurrentDay();
@@ -49,6 +51,6 @@ export function EntryList({ entries, transfers, accounts, accountId, header, emp
     renderItem={({ item, index, section }) => <View style={{ backgroundColor: p.surface, overflow: 'hidden',
       borderTopLeftRadius: index === 0 ? 16 : 0, borderTopRightRadius: index === 0 ? 16 : 0,
       borderBottomLeftRadius: index === section.data.length - 1 ? 16 : 0, borderBottomRightRadius: index === section.data.length - 1 ? 16 : 0 }}>
-      <MovementRow item={item} accounts={accounts} accountId={accountId} showDate={false} last={index === section.data.length - 1} context={context} />
+      <MovementRow item={item} accounts={accounts} accountId={accountId} showDate={false} last={index === section.data.length - 1} context={context} voided={voided} />
     </View>} />;
 }

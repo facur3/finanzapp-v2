@@ -1,11 +1,13 @@
 import type { Messages } from '../../messages.ts';
 
-/** Más: the hub rows, the footer and its diagnostics. */
-export const settings: Pick<Messages, 'settings'> = {
+/** Finanzas and Ajustes: the rows, the footer and its diagnostics, and Licencias. */
+export const settings: Pick<Messages, 'settings' | 'licenses'> = {
   settings: {
+    open: 'Settings',
     sections: {
-      finance: 'Finances',
-      appData: 'App and data',
+      preferences: 'Preferences',
+      yourData: 'Your data',
+      about: 'About',
     },
     rows: {
       review: 'To review',
@@ -30,9 +32,8 @@ export const settings: Pick<Messages, 'settings'> = {
       categoriesCount: { one: '{count} customized', other: '{count} customized' },
       backup: 'Backup',
       backupSubtitle: 'Before deleting the app or changing phones',
-      undone: 'Undone transactions',
-      undoneNone: 'None',
-      undoneCount: { one: '{count} can be restored', other: '{count} can be restored' },
+      licenses: 'Licenses',
+      licensesSubtitle: 'Third-party software and data',
     },
     version: 'FinanzApp {version} ({release})',
     diagnostics: '{material} · {source}',
@@ -53,5 +54,14 @@ export const settings: Pick<Messages, 'settings'> = {
       intl: 'Language: Intl (no native module)',
       none: 'Language: default',
     },
+  },
+  licenses: {
+    intro: 'FinanzApp includes this third-party software and data. Each notice is shown as published.',
+    software: 'Software',
+    data: 'Data and artwork',
+    rates: 'Reference exchange rates come from Frankfurter (frankfurter.dev), which gathers them from central banks and official sources. Each rate is subject to its provider’s terms.',
+    covers: 'Includes: {packages}',
+    notFoundTitle: 'We could not find this notice',
+    notFoundDetail: 'Go back to Licenses to see the list.',
   },
 };

@@ -73,11 +73,11 @@ for (const [theme, background] of [['light', '#F5F6F8'], ['dark', '#080B10']]) {
   });
 }
 
-test('24UX6A: four sections, no Assistant tab, Tarjetas stays in Más, and Inicio has no header of its own', () => {
+test('24UX6A: four sections, no Assistant tab, Tarjetas stays in Finanzas (Más before 25N1), and Inicio has no header of its own', () => {
   const { props } = renderLayout('#F5F6F8');
   const screens = props.children;
   const byName = Object.fromEntries(screens.map((screen: any) => [screen.props.name, screen.props.options]));
-  assert.equal(screens.map((screen: any) => screen.props.options.title).join(','), 'Inicio,Movimientos,Reportes,Más');
+  assert.equal(screens.map((screen: any) => screen.props.options.title).join(','), 'Inicio,Movimientos,Reportes,Finanzas');
   assert.equal(byName.assistant, undefined, 'the Assistant is a root-stack screen opened from the capture hub, never a tab');
   assert.equal(screens.some((screen: any) => screen.props.name === 'assistant'), false);
   assert.equal(byName.cards, undefined, 'Tarjetas is no longer a tab');
@@ -87,7 +87,7 @@ test('24UX6A: four sections, no Assistant tab, Tarjetas stays in Más, and Inici
   // Each root has a filled glyph when focused and an outline otherwise (the dock is icon-only, so the glyph carries it).
   const glyphs: Record<string, [string, string]> = {
     index: ['home', 'home-outline'], activity: ['receipt', 'receipt-outline'], reports: ['pie-chart', 'pie-chart-outline'],
-    settings: ['ellipsis-horizontal-circle', 'ellipsis-horizontal-circle-outline'],
+    settings: ['wallet', 'wallet-outline'],
   };
   for (const [name, [filled, outline]] of Object.entries(glyphs)) {
     assert.equal(byName[name].tabBarIcon({ color: '#000', size: 24, focused: true }).props.name, filled, name);
@@ -99,7 +99,9 @@ test('24UX6A: four sections, no Assistant tab, Tarjetas stays in Más, and Inici
   assert.equal(byName.index.headerShown, false);
   assert.equal(byName.index.headerRight, undefined);
   for (const name of ['activity', 'reports', 'settings']) assert.notEqual(byName[name].headerShown, false, name + ' keeps its title');
-  for (const name of ['index', 'activity', 'reports', 'settings']) assert.equal(byName[name].headerRight, undefined, name + ' has no header action');
+  // 25N1: the layout gives no root a header action; Finanzas' gear and Movimientos' Movimientos deshechos are set by the
+  // screens themselves (tests/more-routes.node.ts, tests/activity-route.node.ts).
+  for (const name of ['index', 'activity', 'reports', 'settings']) assert.equal(byName[name].headerRight, undefined, name + ' has no header action from the layout');
   assert.equal(JSON.stringify(screens).includes('/new-entry'), false);
   assert.equal(pushed.length, 0, 'rendering the layout navigates nowhere');
 });
@@ -120,24 +122,24 @@ test('23.1B1: tab labels follow the language; routes and order never change', ()
     const { props } = renderLayout('#F5F6F8');
     return props.children.map((screen: any) => screen.props.name + '=' + screen.props.options.title).join(',');
   };
-  assert.equal(labels(), 'index=Inicio,activity=Movimientos,reports=Reportes,settings=Más');
+  assert.equal(labels(), 'index=Inicio,activity=Movimientos,reports=Reportes,settings=Finanzas');
   locale = 'en-AR';
   try {
-    assert.equal(labels(), 'index=Home,activity=Activity,reports=Reports,settings=More');
+    assert.equal(labels(), 'index=Home,activity=Activity,reports=Reports,settings=Finances');
     // 24UX6C: no header button left to translate (the dock «+» carries its own label, tests/floating-tab-bar.node.ts).
     const { props } = renderLayout('#F5F6F8');
     for (const screen of props.children) assert.equal(screen.props.options.headerRight, undefined, screen.props.name);
   } finally { locale = 'es-AR'; }
 });
 
-test('25A-03: Más carries the number of readable pending proposals as its badge, and no badge at zero or when the store is unavailable', () => {
+test('25A-03: Finanzas (Más before 25N1) carries the number of readable pending proposals as its badge, and no badge at zero or when the store is unavailable', () => {
   const badgeOf = () => renderLayout('#F5F6F8').props.children.find((screen: any) => screen.props.name === 'settings').props.options.tabBarBadge;
   const others = () => renderLayout('#F5F6F8').props.children.filter((screen: any) => screen.props.name !== 'settings').map((screen: any) => screen.props.options.tabBarBadge);
   try {
     assert.equal(badgeOf(), undefined, 'nothing pending: no badge');
     reviewTray = { writable: true, items: [{ id: 'a' }, { id: 'b' }], unreadable: ['c', 'd', 'e'], conflicts: [] };
     assert.equal(badgeOf(), 2, 'unreadable rows are never counted as proposals');
-    assert.equal(others().every((badge: unknown) => badge === undefined), true, 'only Más carries it');
+    assert.equal(others().every((badge: unknown) => badge === undefined), true, 'only Finanzas carries it');
     reviewTray = 'unavailable';
     assert.equal(badgeOf(), undefined);
     reviewTray = null;
