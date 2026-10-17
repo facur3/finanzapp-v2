@@ -613,15 +613,15 @@ test('25O1 review: Android\'s back belongs to the setup only while it is in fron
   assert.equal(progressOf(view.render()), 'Página 3 de 3');
 });
 
-test('25O1 review: the opening balance is one row, the currency chip and then the amount filling the rest; from the stacking threshold, a column', () => {
+test('25O1 review: the opening balance keeps the whole width under its currency chip at every text size (a seven-digit balance stays at 46 pt)', () => {
   for (const stacked of [false, true]) {
     const view = harness({ stacked });
     find(toStart(view), 'NavigationRow', 'Efectivo').props.onPress();
     const block = nodes(view.render()).find(n => n.type === 'View' && [n.props.children].flat().some((child: Node | false) => !!child && child.type === 'CurrencyChip'))!;
     const [chip, field] = [block.props.children].flat() as Node[];
     assert.deepEqual([chip.type, field.props.children.type], ['CurrencyChip', 'AmountField']);
-    assert.deepEqual([block.props.style.flexDirection, block.props.style.alignItems, field.props.style.flex], stacked ? ['column', 'flex-start', undefined] : ['row', 'center', 1],
-      stacked ? 'large text: the amount gets the whole width' : 'beside the chip');
+    assert.deepEqual([block.props.style.flexDirection ?? 'column', block.props.style.alignItems, field.props.style.alignSelf, field.props.style.flex],
+      ['column', 'flex-start', 'stretch', undefined], stacked ? 'large text' : 'the default size');
   }
 });
 

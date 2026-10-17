@@ -11,7 +11,7 @@ import { LEDGER_CURRENCIES, draftFitsCurrency, makeAccountAppearance, minorFromL
   type Account, type AccountAppearance, type Currency } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { DEFAULT_LOOK, accountGlyph } from '../src/ui/appearance';
-import { ActionButton, AmountField, AppText, ErrorMessage, Field, GlyphTile, IconButton, NavigationRow, PressFeedback, Surface, useStacked } from '../src/ui/components';
+import { ActionButton, AmountField, AppText, ErrorMessage, Field, GlyphTile, IconButton, NavigationRow, PressFeedback, Surface } from '../src/ui/components';
 import { idleBarColor } from '../src/ui/charts';
 import { CurrencyChip } from '../src/ui/currency-chip';
 import { InlineFlag } from '../src/ui/marks';
@@ -64,7 +64,6 @@ export default function OnboardingScreen() {
   const reduced = useReduceMotion();
   const { width, fontScale } = useWindowDimensions();
   const display = useDisplayCurrency([]);
-  const stacked = useStacked();
   const hasAccounts = (snapshot?.accounts.length ?? 0) > 0;
   // The guard: decided once, when this screen mounts, from the same rule as the layout.
   const [eligible] = useState(() => onboardingDecision(defaultPreferenceStore, hasAccounts) === 'new');
@@ -269,11 +268,11 @@ export default function OnboardingScreen() {
         <AppText secondary>{t('onboarding.account.zero')}</AppText>
       </View>
       <View style={{ gap: space.m, marginTop: space.xxl }}>
-        {/* 25O1 review: the chip, then the amount filling the rest, as one row; a column from the stacking threshold. */}
-        <View style={{ flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center', gap: stacked ? space.xs : space.m, padding: space.l,
-          borderRadius: radius.group, backgroundColor: p.surface }}>
+        {/* 25O1 review: the chip above the amount at every size: a seven-digit balance (1.500.000 pesos is ordinary) keeps the
+            whole width at 46 pt; beside the chip it fell to about 32 pt and scrolled inside the field at 1.2× text. */}
+        <View style={{ alignItems: 'flex-start', gap: space.xs, padding: space.l, borderRadius: radius.group, backgroundColor: p.surface }}>
           <CurrencyChip value={chosen} onChange={setCurrency} currencies={gate} disabled={locked} />
-          <View style={stacked ? { alignSelf: 'stretch' } : { flex: 1, minWidth: 0 }}>
+          <View style={{ alignSelf: 'stretch' }}>
             <AmountField bare label={t('accounts.form.openingBalance')} currency={chosen} value={opening} onChangeText={value => { setOpening(value); setError(null); }}
               keyboardType="numbers-and-punctuation" inputMode={undefined} editable={!locked} />
           </View>
