@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { Alert } from 'react-native';
 import { router } from 'expo-router';
-import { accountBalanceMinor, assertCardDeletable, assertOpenAccount, cardCreditMinor, cardDebtMinor, cardHasPendingInstallments, closePersonalDebt, debtDeletion, debtOutstandingMinor, deleteRecurringRule, liabilityActivity, pauseRecurringRule, recurringHistory,
+import { accountBalanceMinor, advanceRecurringDate, assertCardDeletable, assertOpenAccount, cardCreditMinor, cardDebtMinor, cardHasPendingInstallments, closePersonalDebt, debtDeletion, debtOutstandingMinor, deleteRecurringRule, liabilityActivity, pauseRecurringRule, recurringHistory,
   reopenPersonalDebt, resumeRecurringRule, todayKey, type Account, type CreditCardProfile, type PersonalDebtProfile, type RecurringRule } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { useI18n } from '../i18n/provider';
@@ -26,10 +26,17 @@ export function useRecurringManagement() {
 
   /** 25D2: the outcome VoiceOver hears, once per action (the row moves between groups or leaves, the detail's state word
    * changes): the rule's name and what became of it, a resumed one with its next date written out. A deletion is said
-   * once a detail it closes is gone. */
+   * once a detail it closes is gone. A resumed date due today is recorded by the save's catch-up (through today), so the
+   * date said is the one the rule shows afterwards: the first after today on its calendar (review). */
+  function shownNext(rule: RecurringRule): string {
+    const today = todayKey();
+    let date = rule.nextDateISO;
+    while (date <= today) date = advanceRecurringDate(date, rule.frequency, rule.anchorDateISO);
+    return date;
+  }
   function said(next: RecurringRule) {
     if (next.deleted) announce(t('recurring.manage.deletedSpoken', { merchant: next.merchant }), 'leave');
-    else announce(next.active ? t('recurring.manage.resumedSpoken', { merchant: next.merchant, date: formatDate(next.nextDateISO, 'long') })
+    else announce(next.active ? t('recurring.manage.resumedSpoken', { merchant: next.merchant, date: formatDate(shownNext(next), 'long') })
       : t('recurring.manage.pausedSpoken', { merchant: next.merchant }));
   }
   async function commit(next: RecurringRule, failure: MessageKey, feedback: 'selection' | 'success', done?: () => void) {

@@ -68,7 +68,7 @@ VoiceOver on, Spanish, then the key steps in English; Metro from this branch in 
 2. **Saves:** a Gasto — «Guardado, 1234,50 pesos.» once Inicio is up; a transfer and a devolución the same; an edit —
    «Cambios guardados.».
 3. **Undo and restore:** a movement, a transfer and a devolución — the status line the screen shows is spoken.
-4. **Plans and recurring:** Dejar de seguir — «Sin seguimiento»; Reactivar — «Activo»; an adelanto — «Adelanto
+4. **Plans and recurring:** Dejar de seguir — «Sin seguimiento»; Reactivar — the state the hero then shows («Activo», «Completo» when every statement closed while untracked); an adelanto — «Adelanto
    registrado»; rotor Acciones on a rule: Pausar, Reanudar (with the next date), Eliminar, each spoken; deleting a
    throwaway account — «Cuenta eliminada»; an import — «Copia incorporada».
 5. **Inicio:** the number reads «Gastado en <mes>, … pesos»; Disponible is spoken once when chosen; each «Ver todos»
@@ -80,6 +80,9 @@ VoiceOver on, Spanish, then the key steps in English; Metro from this branch in 
 7. **Lists and pickers:** Movimientos' fourth filter is «Transferencias»; rows say «pesos», never «ARS»; a plain detail
    row is one stop; the account and category pickers close with the two-finger scrub; in Cuentas and Deudas at rest the
    swipe actions are not separate stops and the Actions rotor still has them.
+
+Note, not a failure: with the iPhone in English and the app in Spanish, announcements are spoken by the device's voice
+(`announceForAccessibility` carries no language).
 
 ## Producto 25R1 — robustness (on its branch, stacked on 25N1; milestone M2)
 

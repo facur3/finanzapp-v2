@@ -797,7 +797,9 @@ test('24T3: a completed plan offers a devolución while something is returnable;
 
 test('24T3: «Dejar de seguir el plan» says what stops, what stays and what it is not; a failed stop is retried unchanged without asking twice and the plan stays on screen', async () => {
   let attempts = 0;
-  const view = harness('installment/[id].tsx', { params: { id: 'tv' }, data: withPlans, write: async () => { attempts++; if (attempts === 1) throw new Error('No pudimos guardar: disco lleno.'); } });
+  // A committed stop: the provider reads the stopped plan back before the write resolves.
+  const view = harness('installment/[id].tsx', { params: { id: 'tv' }, data: withPlans, write: async () => { attempts++; if (attempts === 1) throw new Error('No pudimos guardar: disco lleno.');
+    view.setData({ ...withPlans, installmentPlans: [domain.cancelInstallmentPlan(tv, '2026-10-01T12:00:00.000Z'), nb, phone] }); } });
   const button = find(view.render(), 'ActionButton', 'Dejar de seguir el plan');
   assert.equal(JSON.stringify([button.props.secondary, button.props.tone, button.props.icon]), JSON.stringify([true, 'expense', 'stop-circle-outline']));
   button.props.onPress();
@@ -821,7 +823,9 @@ test('24T3: «Dejar de seguir el plan» says what stops, what stays and what it 
   assert.deepEqual(view.writes.map(item => JSON.stringify(item.arg)), [JSON.stringify({ planId: 'tv', expectedRevision: 0 }), JSON.stringify({ planId: 'tv', expectedRevision: 0 })],
     'the same stop, with the revision the person saw');
   assert.equal(JSON.stringify([view.backs(), view.haptics()]), JSON.stringify([0, 1]), 'a stopped plan stays on screen');
-  // 25D2: the pressed button is gone and the state word changed: VoiceOver hears the new state once.
+  // 25D2: the pressed button is gone and the state word changed: VoiceOver hears the new state once, as the screen reads it.
+  view.render();
+  view.render();
   assert.deepEqual(view.announced, ['Sin seguimiento']);
   assert.equal(nodes(view.render()).some(node => node.type === 'ErrorMessage' && node.props.message), false);
 });
@@ -869,9 +873,29 @@ test('24T3: stopping after a closing the app has not recorded yet says the close
     'Antes se registra la cuota 3, que ya cerró ($' + NBSP + '100.000,00). Las cuotas que faltan ($' + NBSP + '900.000,00) dejan de registrarse');
 });
 
+/** The ledger as storage leaves it after «Reactivar plan» on `day` (the provider reads it back before the write resolves): the plan
+ * tracked again and the instalments whose statement closed while it was not, recorded now. */
+function reactivated(stopped: domain.LedgerArchive, day: string): domain.LedgerArchive {
+  const next = { ...stopped, installmentPlans: stopped.installmentPlans!.map(item => item.id === 'tv' ? domain.reactivateInstallmentPlan(item, day + 'T12:00:00.000Z') : item) };
+  return { ...next, records: [...next.records, ...domain.planCatchUpInserts(next, 'tv', day)] };
+}
+
+test('25D2 (review): «Reactivar plan» after every statement closed while untracked says the state the screen shows, «Completo», never «Activo»', async () => {
+  const stopped = { ...withPlans, installmentPlans: [domain.cancelInstallmentPlan(tv, '2026-09-30T12:00:00.000Z'), nb, phone] };
+  const day = '2027-08-01'; // the last of the twelve statements closed on 2027-07-28
+  const view = harness('installment/[id].tsx', { params: { id: 'tv' }, data: stopped, day, write: async () => { view.setData(reactivated(stopped, day)); } });
+  find(view.render(), 'ActionButton', 'Reactivar plan').props.onPress();
+  view.alerts[0].buttons[1].onPress();
+  await settle();
+  const root = view.render();
+  assert.ok(texts(root).includes('Completo'), 'the hero reads Completo');
+  view.render();
+  assert.deepEqual(view.announced, ['Completo'], 'once, the word the screen shows');
+});
+
 test('24T3: «Reactivar plan» names the closings recorded now, on their own dates, and sends the revision it showed', async () => {
   const stopped = { ...withPlans, installmentPlans: [domain.cancelInstallmentPlan(tv, '2026-09-30T12:00:00.000Z'), nb, phone] };
-  const view = harness('installment/[id].tsx', { params: { id: 'tv' }, data: stopped, day: '2026-12-01' });
+  const view = harness('installment/[id].tsx', { params: { id: 'tv' }, data: stopped, day: '2026-12-01', write: async () => { view.setData(reactivated(stopped, '2026-12-01')); } });
   const button = find(view.render(), 'ActionButton', 'Reactivar plan');
   assert.equal(JSON.stringify([button.props.secondary, button.props.tone, button.props.icon]), JSON.stringify([true, undefined, 'play-circle-outline']));
   button.props.onPress();
@@ -884,6 +908,7 @@ test('24T3: «Reactivar plan» names the closings recorded now, on their own dat
   await settle();
   assert.deepEqual(view.writes.map(item => [item.action, JSON.stringify(item.arg)]), [['reactivate', JSON.stringify({ planId: 'tv', expectedRevision: 1 })]]);
   assert.equal(view.haptics(), 1);
+  view.render();
   assert.deepEqual(view.announced, ['Activo'], '25D2: the new state, told to VoiceOver');
   // Nothing closed in between: the alert says only that it follows again.
   const calm = harness('installment/[id].tsx', { params: { id: 'tv' }, data: stopped });

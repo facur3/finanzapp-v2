@@ -431,3 +431,13 @@ test('25D2: pause, resume and delete of a recurring rule are told to VoiceOver o
   await english.render('useRecurringManagement').pause(rules[0]);
   assert.deepEqual(english.announced, ['Gimnasio: paused.']);
 });
+
+test('25D2 (review): «Reanudar» on the rule\'s due day names the date it shows afterwards, next month, not today (recorded by the catch-up)', async () => {
+  const today = domain.todayKey();
+  const due: domain.RecurringRule = { ...rules[1], anchorDateISO: today, nextDateISO: today };
+  const view = harness();
+  await view.render('useRecurringManagement').resume(due);
+  const next = domain.advanceRecurringDate(today, 'monthly', today);
+  assert.ok(next.slice(0, 7) > today.slice(0, 7), next);
+  assert.deepEqual(view.announced, ['Pausado: reanudado, próxima fecha ' + bindLocale('es-AR').formatDate(next, 'long') + '.']);
+});

@@ -1,11 +1,11 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, View } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { ActionButton, AppText, DetailRow, EmptyState, ErrorMessage, LifecycleNote, MerchantBadge, Money, Screen, SectionTitle, Surface, type IconName } from '../../src/ui/components';
 import { PlanProgressSummary, ScheduleRow } from '../../src/ui/card-rows';
 import { useCategoryLabel } from '../../src/ui/category-hues';
-import { isPlanWriteRefusal, planActions, planOperationRows, planScheduleRows, planStateWord, planSummary, scheduleRowOpens, type PlanClosings } from '../../src/ui/installment-presentation';
+import { isPlanWriteRefusal, planActions, planOperationRows, planScheduleRows, planStateWord, planSummary, scheduleRowOpens, type PlanClosings, type PlanStateWord } from '../../src/ui/installment-presentation';
 import { numberRanges } from '../../src/ui/operation-presentation';
 import { announce, errorHaptic, successHaptic, warningHaptic } from '../../src/ui/motion';
 import { withCurrencyCode } from '../../src/i18n/format';
@@ -55,6 +55,16 @@ export default function InstallmentPlanScreen() {
   // revision the person saw) without asking twice; storage makes it a no-op once committed.
   const [pending, setPending] = useState<{ action: 'delete' | 'stop' | 'reactivate'; revision: number } | null>(null);
   const writing = useRef(false);
+  // 25D2 (review): a stop or a reactivation is said once the screen reads the plan it wrote, as the state word it now shows: a
+  // reactivation whose catch-up recorded every instalment reads «Completo» (or «Adelantado», «Devuelto»), never «Activo».
+  const sayState = useRef(false);
+  const stateLabel = (word: Exclude<PlanStateWord, 'deleted'>) => t(word === 'stopped' ? 'installments.detail.cancelled' : `installments.detail.${word}`);
+  useEffect(() => {
+    if (!sayState.current || !plan || !archive) return;
+    sayState.current = false;
+    const word = planStateWord(planSummary(plan, archive.records, archive.purchaseOperations ?? []));
+    if (word !== 'deleted') announce(stateLabel(word));
+  });
   const back = () => { if (router.canGoBack()) router.back(); else router.replace('/cards'); };
 
   if (!archive || !snapshot || !plan || !card || !account || (plan.deleted && seenLiveId !== plan.id)) return <Screen>
@@ -89,9 +99,9 @@ export default function InstallmentPlanScreen() {
       setPending(null);
       successHaptic();
       // A deleted plan leaves; a stopped or reactivated one stays, its new state said under the hero. 25D2: and to VoiceOver
-      // (iOS has no live region): the state word that replaces the pressed button.
+      // (iOS has no live region): the state word that replaces the pressed button, said by the effect above.
       if (next.action === 'delete') back();
-      else announce(t(next.action === 'stop' ? 'installments.detail.cancelled' : 'installments.detail.active'));
+      else sayState.current = true;
     } catch (cause) {
       setError(failureMessage(cause, failure[next.action]));
       // Refused before anything was written (the plan changed, an instalment or an operation was recorded since the screen was
@@ -135,7 +145,7 @@ export default function InstallmentPlanScreen() {
 
   const word = planStateWord(summary);
   const stopped = status === 'cancelled';
-  const state = word === 'deleted' ? null : t(word === 'stopped' ? 'installments.detail.cancelled' : `installments.detail.${word}`);
+  const state = word === 'deleted' ? null : stateLabel(word);
   // Interest only, or a mix with fees or taxes (an older plan): how the financing rows and each instalment name it.
   const financing = plan.feeMinor + plan.taxMinor > 0 ? 'financing' : 'interest';
   // With financing, the plan's figures are its principal and say so; the financing still to come has its own row.
