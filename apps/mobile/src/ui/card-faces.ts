@@ -40,6 +40,10 @@ export const COLOR_FACES: Readonly<Record<string, FaceTone>> = {
   graphite: { base: '#232326', highlight: '#3A3A3F' },
 };
 
+/** The rim of every face (the deck's cards and a row's swatch): a white hairline, what separates two dark faces in dark
+ * mode, where the deck has no shadow. */
+export const FACE_RIM = 'rgba(255, 255, 255, 0.12)';
+
 /** 25D1: the black wash a pressed deck card gets under Reduce Motion, where it does not scale. Pinned by
  * tests/cards-deck.node.ts: white text keeps 6:1 and the issuer line 4.5:1 on every face while pressed. */
 export const DECK_PRESSED_WASH = 0.12;
