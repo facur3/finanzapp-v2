@@ -1,6 +1,8 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-17 (**25R1 — robustness**, on its branch stacked on #120: catch-ups that follow the day and the
+Updated: 2026-10-17 (**25D2 — VoiceOver and Voice Control**, on its branch stacked on #121: the Assistant and every
+ledger outcome spoken on iOS, in-place changes announced, names that match the visible words, one stop per row;
+«Producto 25D2»). Before (**25R1 — robustness**, PR #121, stacked on #120: catch-ups that follow the day and the
 foreground, rates that back off and recover, links that only open Inicio, committed changes reported as done; «Producto
 25R1»). Before (**25N1 — Finanzas, Ajustes and the shared controls**, on its branch stacked on #119: Más becomes
 the Finanzas tab with Ajustes behind a gear, Licencias, Movimientos deshechos in Movimientos, shared controls, forms
@@ -445,7 +447,9 @@ history file keeps the evidence of when and why.
 
 ## 1. Implemented (current state)
 
-- **25R1 — robustness (on its branch, stacked on #120).** «Producto 25R1». Catch-ups per day change and real return,
+- **25D2 — VoiceOver and Voice Control (on its branch, stacked on #121).** «Producto 25D2». The Assistant and the
+  outcomes of writes spoken on iOS, in-place changes announced, Voice Control names, one stop per row.
+- **25R1 — robustness (PR #121, stacked on #120).** «Producto 25R1». Catch-ups per day change and real return,
   rates with back-off and refresh, links that open Inicio only, committed changes reported as done, tests in three zones.
 - **25N1 — Finanzas, Ajustes and the shared controls (PR #120, stacked on #119).** «Producto 25N1». The fourth
   tab is Finanzas, Ajustes sits behind its gear with Licencias; Movimientos deshechos moved to Movimientos; shared
@@ -1023,7 +1027,8 @@ item unless a section says a new native build is needed. The checklist sections 
   symbol and cents on the sand, «Otras», the chosen colour's check, Enviar/Detener, the currency chips and the date
   sheet. Device QA no longer follows each change: the steps below accumulate for a milestone session over the critical
   journeys, then a final regression. A test that passes never counts as a device result.
-- **25R1 (on its branch, stacked on #120):** the checklist's «Producto 25R1», in M2.
+- **25D2 (on its branch, stacked on #121):** the checklist's «Producto 25D2», in M2 (VoiceOver and Voice Control).
+- **25R1 (PR #121, stacked on #120):** the checklist's «Producto 25R1», in M2.
 - **25N1 (PR #120, stacked on #119):** the checklist's «Producto 25N1», in milestone **M2** (with 25D2), in a QA
   profile; the owner approves the navigation there.
 - **Milestone M1 — the next QA session (recommended now):** #112, #117, #118 and 25O1 together on the same build, the
@@ -4677,7 +4682,30 @@ nothing of it is on a screen yet.
   passed, 0 failed; `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0 errors, 0 stale; `check` OK;
   `export:ios` OK. No account, handle, ad account or campaign created.
 
-### Producto 25R1 — robustness (this PR, stacked on #120)
+### Producto 25D2 — VoiceOver and Voice Control (this PR, stacked on #121)
+
+- **Why.** The register's VoiceOver group, the two P1s among it: the Assistant was silent for VoiceOver on iOS, and no
+  outcome of a write was ever spoken (iOS has no live regions).
+- **One helper.** `announce(text, after)` in `src/ui/motion.tsx`: iOS only, queued, called from the handler that caused
+  the change (never on mount), `'leave'` delays it until the closing screen is gone; Android keeps its live regions; a
+  test rejects any direct `announceForAccessibility`, and `voiceover.node.ts` checks its arguments like any label.
+- **The Assistant:** thinking, the finished reply (once, never each streamed part), system notes and the next question
+  are spoken while it is in front; «Reintentar» is its own stop; Confirmar says «Registrado.» after the sheet closes.
+- **Outcomes:** new movements, transfers and devoluciones («Guardado, <amount in words>.»), edits, undo and restore,
+  plan states, an adelanto, an import, recurring pause/resume/delete and account deletion are spoken.
+- **In place:** Inicio's number is named («Gastado en <mes>, …»), its Gastado | Disponible switch and Reportes' and
+  Presupuestos' month steps are spoken; an empty month says so instead of «0,00 pesos».
+- **Names and stops:** «Este mes» is labelled by its visible words (Voice Control); «Ver todos, <section>»;
+  «Transferencias»; rows speak the unit in words (docs/currency.md §6) instead of the ISO code; a plain detail row and a
+  «Dónde más gastaste» row are one stop; comparison rows say their category; page-sheet pickers answer the escape
+  gesture; closed swipe actions leave the reading order (the Actions rotor keeps them).
+- **Deliberate changes of displayed values.** A budget's percent rounds down (87.5 % shows «87 %»), so «85 %» always
+  matches amber and «100 %» always means the limit is reached; spoken row amounts say «pesos» instead of «ARS».
+- **Not in this delivery.** Announcing the account, card, budget, category, debt and recurring form saves; card, debt
+  and plan deletions; the remaining ISO codes in eyebrows, Stat labels and chart sentences; the search role on
+  Movimientos' field (it waits for the iPhone).
+
+### Producto 25R1 — robustness (PR #121, stacked on #120)
 
 - **Why.** The register's robustness group: catch-ups and rates that did not follow the day or the network, routes that
   accepted anything, views that reported a committed change as failed, and the tests that never ran the real code.

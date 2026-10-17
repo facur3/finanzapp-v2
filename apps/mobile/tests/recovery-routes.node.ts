@@ -858,7 +858,7 @@ test('entry detail shows budget context only for a matching active budget, and l
   const budget: domain.MonthlyBudget = { id: 'b', scope: 'category', category: 'salud', currency: 'ARS', monthISO: '2026-01', amountMinor: 20000, active: true, createdAt, revision: 0, updatedAt: createdAt };
   const view = harness('app/entry/[id].tsx', {}, { data: { ...archive, budgets: [budget] }, params: { id: entry.id } });
   const row = find(view.render(), 'DetailRow', 'Presupuesto');
-  assert.equal(row.props.value, '62 % usado · quedan 76,55');
+  assert.equal(row.props.value, '61 % usado · quedan 76,55'); // 25D2 review: floored as Presupuestos (61,7 %)
   assert.equal(row.props.tone, 'neutral');
   row.props.onPress();
   assert.equal(JSON.stringify(view.pushed[0]), JSON.stringify({ pathname: '/budgets', params: { currency: 'ARS', month: '2026-01' } }));
@@ -1180,9 +1180,9 @@ test('23.1C2: the entry form and the entry detail give VoiceOver the language’
       'DetailRow', locale.startsWith('en') ? 'Budget' : 'Presupuesto');
     return node.props.value + '|' + node.props.spokenValue;
   };
-  assert.equal(row('es-AR'), '62 % usado · quedan 76,55|62 % usado · quedan 76,55 pesos');
-  assert.equal(row('es-US'), '62 % usado · quedan 76.55|62 % usado · quedan 76,55 pesos');
-  assert.equal(row('en-AR'), '62% used · 76,55 left|62% used · 76.55 pesos left');
+  assert.equal(row('es-AR'), '61 % usado · quedan 76,55|61 % usado · quedan 76,55 pesos');
+  assert.equal(row('es-US'), '61 % usado · quedan 76.55|61 % usado · quedan 76,55 pesos');
+  assert.equal(row('en-AR'), '61% used · 76,55 left|61% used · 76.55 pesos left');
   assert.equal(row('en-US', 10000), 'Over by 23.45|Over by 23.45 pesos');
   assert.equal(row('es-US', 10000), 'Excedido por 23.45|Excedido por 23,45 pesos');
 });

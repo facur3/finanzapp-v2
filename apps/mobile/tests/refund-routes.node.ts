@@ -707,6 +707,18 @@ test('24T3 (review): the movement detail\'s budget line never leaves more than t
   assert.equal(en.props.spokenValue, bindLocale('en-US').spokenMoney(100000, 'ARS') + ' left · refunds exceed what was spent');
 });
 
+test('25D2 (review): the movement detail floors the budget percent as Presupuestos does, never «100 % usado» with money left', () => {
+  const budget: domain.MonthlyBudget = { id: 'ropa', scope: 'category', category: 'Ropa', currency: 'ARS', monthISO: TODAY.slice(0, 7), amountMinor: 1000000, active: true,
+    createdAt: T0, revision: 0, updatedAt: T0 };
+  const value = (amountMinor: number) => {
+    const shirt: domain.Entry = { id: 'shirt', accountId: bank.id, kind: 'expense', amountMinor, merchant: 'Zara', category: 'Ropa', dateISO: TODAY, createdAt: at(TODAY) };
+    const data = base({ records: [...base().records, domain.initialRecord(shirt)], budgets: [budget] });
+    return find(harness('app/entry/[id].tsx', { params: { id: shirt.id }, data }).render(), 'DetailRow', 'Presupuesto').props.value;
+  };
+  assert.equal(value(875000), '87 % usado · quedan 1.250,00', '87,5 % is «87 %», never «88 %»');
+  assert.equal(value(996000), '99 % usado · quedan 40,00', '99,6 % is «99 %», never «100 %» with $ 40 left');
+});
+
 test('24T3 (review): the expense form\'s category hint never formats a negative «gastado» when devoluciones net the month below zero', () => {
   const { data } = refundedBudget();
   const hint = (locale?: AppLocale) => {

@@ -4,7 +4,7 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import { categoryKey, entryRefundSummary, makeEntryChange, operationGuardMessage, recurringOccurrenceOf, snapshotFromArchive, summarizeMonthlyBudgets, todayKey, validateArchive, type EntryChange, type EntryRecord, type Account, type PurchaseOperation } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
-import { budgetTone } from '../../src/ui/budget-presentation';
+import { budgetTone, percentUsed } from '../../src/ui/budget-presentation';
 import { AccountBadge, ActionButton, AppText, DetailRow, EmptyState, ErrorMessage, MerchantBadge, Money, Screen, SectionTitle, Surface } from '../../src/ui/components';
 import { presentedAmount } from '../../src/ui/movement-amount';
 import { useI18n } from '../../src/i18n/provider';
@@ -149,12 +149,12 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
   const date = long.charAt(0).toLocaleUpperCase() + long.slice(1);
   // Budget context only when a matching active budget exists for this month, currency and category.
   // 24T3 (A24, as Presupuestos): devoluciones may net the category below zero; what is left never reads above the limit.
-  let budget: { ratio: number; remainingMinor: number; exceeded: boolean; refunded: boolean } | null = null;
+  let budget: { ratio: number; percent: number; remainingMinor: number; exceeded: boolean; refunded: boolean } | null = null;
   if (!income && !record.voided && snapshot) {
     try {
       const row = summarizeMonthlyBudgets(snapshot, archive?.budgets ?? [], account.currency, entry.dateISO.slice(0, 7)).rows
         .find(item => categoryKey(item.budget.category) === categoryKey(entry.category));
-      if (row) budget = { ratio: row.ratio, remainingMinor: Math.min(row.remainingMinor, row.budget.amountMinor), exceeded: row.exceeded, refunded: row.spentMinor < 0 };
+      if (row) budget = { ratio: row.ratio, percent: percentUsed(row), remainingMinor: Math.min(row.remainingMinor, row.budget.amountMinor), exceeded: row.exceeded, refunded: row.spentMinor < 0 };
     } catch { budget = null; }
   }
   // A movement a recurring rule recorded links back to its rule's detail (24UX2, 25B3); a rule deleted since (24UX4:
@@ -165,7 +165,7 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
   // The budget row on screen (the region's separators) and for VoiceOver (the amount in the language's words).
   const budgetLine = (row: NonNullable<typeof budget>, money: (minor: number) => string) => row.exceeded ? t('entryDetail.budgetExceeded', { amount: money(-row.remainingMinor) })
     : row.refunded ? t('entryDetail.budgetRefunds', { amount: money(row.remainingMinor) })
-    : t('entryDetail.budgetUsed', { percent: Math.round(row.ratio * 100), amount: money(row.remainingMinor) });
+    : t('entryDetail.budgetUsed', { percent: row.percent, amount: money(row.remainingMinor) });
 
   const shown = presentedAmount(entry.kind, entry.amountMinor);
   return <Screen gap={space.xl}>
