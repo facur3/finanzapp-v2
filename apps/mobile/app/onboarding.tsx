@@ -23,7 +23,7 @@ import { AccountCard, AvailableArt, CommitmentsArt, RecordArt } from '../src/ui/
 import { ACCOUNT_PRESETS, STORY_PAGES, markOnboardingDone, onboardingDecision, previousStep, suggestedCurrency, type AccountPreset,
   type OnboardingStep } from '../src/ui/onboarding-flow';
 import { radius, space, type, usePalette, useReduceMotion } from '../src/ui/theme';
-import { regionFlag } from '../src/i18n/flags';
+import { languageFlag, regionFlag } from '../src/i18n/flags';
 import { defaultPreferenceStore } from '../src/i18n/preference';
 import { useI18n, useLocalePreferences } from '../src/i18n/provider';
 
@@ -242,9 +242,9 @@ export default function OnboardingScreen() {
             <InlineFlag flag={regionFlag(preferences.state.region)} size={15} />
             <AppText variant="subhead" style={{ fontWeight: '500' }}>{regionName(preferences.state.region, preferences.state.language)}</AppText>
           </Pill>}
-          {/* A language never shows a flag: its own name says it. */}
           <Pill label={t('onboarding.start.languageLabel', { name: languageName(preferences.state.language) })} hint={t('onboarding.start.languageHint')}
             onPress={() => router.push('/language')}>
+            <InlineFlag flag={languageFlag(preferences.state.language)} size={15} />
             <AppText variant="subhead" style={{ fontWeight: '500' }}>{languageName(preferences.state.language)}</AppText>
           </Pill>
         </View>}

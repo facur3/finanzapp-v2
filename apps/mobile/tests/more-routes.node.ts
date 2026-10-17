@@ -65,6 +65,9 @@ class MemoryFile {
   write(text: string) { if (exportIo.failWrite) throw new Error('ENOSPC: no space left on device'); exportIo.files.set(this.uri, text); }
   delete() { exportIo.files.delete(this.uri); }
 }
+/** The QA profile a harness's bundle runs (`qa-profile.ts`); null: the person's own data. */
+let qaProfile: string | null = null;
+
 function harness(file: string, data: domain.LedgerArchive = archive, released?: ReleasedSets, locale: AppLocale | null = null, gate?: domain.CurrencyGate, dev = true) {
   currentLocaleStore = localeStore(released);
   forcedLocale = locale;
@@ -114,7 +117,8 @@ function harness(file: string, data: domain.LedgerArchive = archive, released?: 
     '../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) }, '../../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) },
     '../src/ui/theme': theme, '../../src/ui/theme': theme,
     '../src/ui/material': { useMaterialDecision: () => ({ material: 'opaque', reason: 'expo-go' }) }, '../../src/ui/material': { useMaterialDecision: () => ({ material: 'opaque', reason: 'expo-go' }) },
-    '../../src/ui/locale-options': localeOptions, '../../src/ui/marks': { RegionMark: 'RegionMark' },
+    '../../src/ui/locale-options': localeOptions, '../../src/ui/marks': { LanguageMark: 'LanguageMark', RegionMark: 'RegionMark' },
+    '../../src/dev/qa-profile': { get BUILD_QA_PROFILE() { return qaProfile; } },
     '../src/ui/material-policy': materialPolicy, '../../src/ui/material-policy': materialPolicy,
     '../src/ui/choice-screen': { ChoiceScreen: 'ChoiceScreen' },
     '../src/ui/entry-list': { EntryList: 'EntryList' },
@@ -177,14 +181,14 @@ test('Más groups permanent navigation into Finanzas and App y datos, with live 
   assert.equal(value('Categorías'), 'Gastos e ingresos');
   // Finanzas rows carry a soft identity tile from the shared palette. 24UX6C: App y datos rows lead with neutral 34 pt tiles
   // (no colour: the component's own neutral fill), so both groups align on one leading edge; no row keeps a bare icon prop.
-  // 25O1: Región's tile is its region's flag (Idioma keeps its glyph: a language has no flag).
+  // 25O1: Región's mark is its region's flag, Idioma's the flag of the variety its copy is written in.
   const leading = rows(root).map(row => row.props.leading?.type ?? null);
-  assert.equal(leading.join(','), [...Array(9).fill('GlyphTile'), 'RegionMark', 'GlyphTile'].join(','));
+  assert.equal(leading.join(','), [...Array(8).fill('GlyphTile'), 'LanguageMark', 'RegionMark', 'GlyphTile'].join(','));
   assert.equal(rows(root).every(row => row.props.leading.props.size === 34), true, 'one tile size in both groups');
   assert.equal(new Set(rows(root).slice(0, 6).map(row => row.props.leading.props.color)).size, 6, 'six distinct restrained colours, no row painted');
   assert.equal(rows(root).slice(0, 6).every(row => typeof row.props.leading.props.color === 'string'), true, 'Finanzas keeps its tinted identities');
-  assert.equal(rows(root).slice(6).map(row => row.props.leading.props.icon ?? row.props.leading.props.region).join(','), 'save-outline,arrow-undo-outline,language-outline,AR,contrast-outline',
-    'App y datos keeps its glyphs, now in tiles; Región shows Argentina, the region it names');
+  assert.equal(rows(root).slice(6).map(row => row.props.leading.props.icon ?? row.props.leading.props.region ?? row.props.leading.props.language).join(','), 'save-outline,arrow-undo-outline,es,AR,contrast-outline',
+    'App y datos keeps its glyphs, now in tiles; Idioma shows Spanish\'s mark, Región Argentina, the region it names');
   assert.equal(rows(root).slice(6).every(row => row.props.leading.props.color === undefined), true, 'App y datos tiles stay neutral');
   assert.equal(rows(root).some(row => 'icon' in row.props), false, 'no row keeps the old icon prop');
   assert.equal(rows(root).some(row => 'value' in row.props || 'label' in row.props), false, 'no leftover label/value props');
@@ -201,7 +205,8 @@ test('Más → App y datos (23.1C2): Idioma and Región say what is in use and w
   assert.equal(region.props.subtitle, 'Argentina · según el dispositivo');
   assert.deepEqual([region.props.leading.type, region.props.leading.props.region, region.props.leading.props.size], ['RegionMark', 'AR', 34],
     '25O1: the flag of the region the subtitle names, on the 34 pt tile of its neighbours');
-  assert.equal(rows(root).find(row => row.props.title === 'Idioma')!.props.leading.props.icon, 'language-outline', 'a language has no flag');
+  const languageMark = rows(root).find(row => row.props.title === 'Idioma')!.props.leading;
+  assert.deepEqual([languageMark.type, languageMark.props.language, languageMark.props.size], ['LanguageMark', 'es', 34], 'Idioma: the mark of the language in use');
   assert.equal(region.props.last, undefined, '24UX6A: Apariencia closes App y datos');
   region.props.onPress();
   assert.deepEqual(view.pushed, ['/region']);
@@ -444,6 +449,16 @@ test('24B5: a release names no test currency in Más; a development preview gate
   assert.match(texts(preview), /Monedas de prueba activas: BHD, IQD, JOD, KWD, LYD, OMR, TND\. Solo en esta compilación de desarrollo\./);
   const english = harness('(tabs)/settings.tsx', archive, undefined, 'en-AR', currencyGate.PREVIEW_CURRENCIES).render();
   assert.match(texts(english), /Test currencies enabled: BHD, IQD, JOD, KWD, LYD, OMR, TND\. Only in this development build\./);
+});
+
+test('M1: a development bundle running a QA profile says so under the footer; the person\'s own data shows nothing', () => {
+  const texts = (root: any) => nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
+  assert.doesNotMatch(texts(harness('(tabs)/settings.tsx').render()), /Perfil de prueba/);
+  qaProfile = 'm1';
+  try {
+    assert.match(texts(harness('(tabs)/settings.tsx').render()), /Perfil de prueba «m1»: tus datos no se abren\. Reiniciá Metro sin la variable para volver a ellos\./);
+    assert.match(texts(harness('(tabs)/settings.tsx', archive, undefined, 'en-AR').render()), /Test profile “m1”: your data is not opened\./);
+  } finally { qaProfile = null; }
 });
 
 test('24UX5: a preview or store build shows the version, never the diagnostics (25O1: nor the local-storage footnote, §13.1)', () => {

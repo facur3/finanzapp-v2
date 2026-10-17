@@ -16,6 +16,8 @@ export const preferences = {
     followingDevice: '{value} · según el dispositivo',
     /** 25O1: the one fact of each chooser, not a disclaimer. Región: what it changes and what it never touches. */
     regionNote: 'Cambia cómo se escriben fechas y números. Tus importes y monedas no cambian.',
+    /** Idioma: under each language, the variety its copy is written in (the flag beside it is that region's), in the row's own language. */
+    languageVariety: 'Variante: {region}',
     /** Idioma (iOS only): iOS draws its own text (Copiar, Pegar, compartir) in the language set for the app in Settings. */
     languageNote: 'Para que iOS también use este idioma en sus menús, elegilo en Configuración.',
     /** The text button under that note: opens FinanzApp's page in iOS Settings. 25O1 review: «Configuración», the name

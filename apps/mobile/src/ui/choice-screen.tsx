@@ -4,7 +4,7 @@ import { Stack } from 'expo-router';
 import { useI18n } from '../i18n/provider';
 import { AppText, CheckRow, Field, PressFeedback } from './components';
 import { SEARCHABLE_CHOICES, buildChoiceRows, type ChoiceOption, type ChoiceRow, type GroupPosition } from './choice-list';
-import { FlagTile, RegionMark } from './marks';
+import { FlagMark } from './marks';
 import { selectionHaptic } from './motion';
 import { radius, space, usePalette } from './theme';
 
@@ -23,8 +23,8 @@ import { radius, space, usePalette } from './theme';
  * with Dynamic Type; no row has a fixed height. Nothing here knows about
  * routes beyond the title, so the onboarding can show it as one of its steps.
  *
- * 25O1: a row leads with its mark when its option carries one (a region's flag, the device row's neutral glyph); a
- * language never has one. On the 234-region list nothing waits at the end: the note sits under the pinned card, read
+ * 25O1: a row leads with its mark when its option carries one (a round flag, the device row's neutral glyph on the same
+ * circle). On the 234-region list nothing waits at the end: the note sits under the pinned card, read
  * before the list (and steps aside while a search is typed). A short list keeps its note under its last card.
  * 25O1 review: a refused save is said in an alert, in front wherever the list is scrolled; a line under the tapped
  * group landed a screen below the finger in a long section. */
@@ -97,11 +97,11 @@ export function ChoiceScreen<T extends string>({ title, options, pinned, recent,
   </>;
 }
 
-/** 25O1: a row's mark, drawn from its data: a region's flag, or a neutral glyph on the same 40 pt tile; nothing for a
- * language. Hidden from VoiceOver by its own component: the title already names it. */
+/** 25O1: a row's mark, drawn from its data: a round flag, or a neutral glyph on the same circle. Hidden from VoiceOver by
+ * its own component: the title already names it. */
 function choiceMark(option: ChoiceOption) {
-  if (option.region) return <RegionMark region={option.region} />;
-  return option.glyph ? <FlagTile flag={null} fallback={option.glyph} /> : undefined;
+  if (option.flag) return <FlagMark flag={option.flag} fallback="globe-outline" />;
+  return option.glyph ? <FlagMark flag={null} fallback={option.glyph} /> : undefined;
 }
 
 /** The corners a row draws by its place in its group, so consecutive rows read as one grouped card. */

@@ -866,8 +866,10 @@ test('25O1: a Cuentas section header leads its name with the currency\'s mark (n
   const list = find(harness('accounts.tsx', {}, data).render(), 'SectionList');
   const headers = list.props.sections.map((section: { currency: string }) => list.props.renderSectionHeader({ section }) as Node);
   const flagOf = (header: Node) => find(header, 'InlineFlag').props;
-  assert.deepEqual(headers.map((header: Node) => [flagOf(header).flag, flagOf(header).size]), [['🇦🇷', 15], ['🇺🇸', 15], [null, 15]], 'the issuer\'s flag at the name\'s size; XOF none');
-  const line = nodes(headers[0]).find(node => node.type === 'View' && node.props.style?.flexDirection === 'row' && nodes(node).some(child => child.type === 'InlineFlag'))!;
+  assert.deepEqual(headers.map((header: Node) => [flagOf(header).flag, flagOf(header).size]), [['AR', 15], ['US', 15], [null, 15]], 'the issuer\'s flag at the name\'s size; XOF none');
+  const line = nodes(headers[0]).filter(node => node.type === 'View' && node.props.style?.flexDirection === 'row' && nodes(node).some(child => child.type === 'InlineFlag')).at(-1)!;
+  assert.equal(line.props.style.alignItems, 'center', 'a round flag sits centred on the name, not on its baseline');
+  assert.equal(headers[0].props.style.alignItems, 'center', 'the name and the total centred with the flag (review: a flag first leaves no text baseline to align on)');
   assert.deepEqual(nodes(line).filter(node => node.type === 'InlineFlag' || node.type === 'AppText').map(node => node.type), ['InlineFlag', 'AppText'], 'the flag before the name');
   assert.equal(headers[0].props.accessibilityLabel, 'Pesos argentinos, saldo registrado 1423,00 pesos', 'VoiceOver hears the name and the figure, never the flag');
   const items = list.props.sections.flatMap((section: { data: domain.Account[] }) => section.data.map((item, index) => list.props.renderItem({ item, index, section }) as Node));

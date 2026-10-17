@@ -17,6 +17,7 @@ import type { AppLocale } from '../src/i18n/locale.ts';
 import * as movementAmount from '../src/ui/movement-amount.ts';
 import * as presentation from '../src/ui/presentation.ts';
 import * as flags from '../src/i18n/flags.ts';
+import { FLAG_ART } from '../src/i18n/flag-art.ts';
 import { darkPalette, lightPalette } from '../src/ui/palette.ts';
 
 // Producto 22.1: the row and field components at source level (React Native
@@ -652,24 +653,33 @@ test('24B5: the currency field lists the gate\'s currencies with search over cod
   assert.deepEqual([dinar.props.value, dinar.props.detail], ['Dinares kuwaitíes', 'KWD · KWD']);
 });
 
-// 25O1: the real marks (src/ui/marks.tsx) under the currency rows: the issuer's flag, the euro's EU flag, a neutral glyph
-// for a supranational code, all on the inset tile and hidden from VoiceOver.
-const loadMarks = () => load('marks.tsx', { '@expo/vector-icons': { Ionicons: 'Ionicons' }, '../i18n/flags': flags });
-/** What a mark draws: its flag's text, or the fallback glyph's name. */
-const markDrawn = (root: Node) => { const all = nodes(root); return all.find(node => node.type === 'Text')?.props.children ?? 'glyph:' + all.find(node => node.type === 'Ionicons')?.props.name; };
+// 25O1: the real marks (src/ui/marks.tsx) under the currency rows: the issuer's round flag, the euro's EU flag, a neutral
+// glyph on the same circle for a supranational code, all hidden from VoiceOver.
+const loadMarks = (fontScale = 1) => load('marks.tsx', { '@expo/vector-icons': { Ionicons: 'Ionicons' }, '../i18n/flags': flags,
+  '../i18n/flag-art': { FLAG_ART }, 'react-native-svg': { __esModule: true, default: 'Svg', Path: 'Path' } }, fontScale);
+/** What a mark draws: the flags its paths are (art shared by several codes lists them all: UM|US), or the fallback glyph's name. */
+const flagOfPaths = (paths: Node[]) => Object.keys(FLAG_ART).filter(code => FLAG_ART[code]!.length === paths.length && FLAG_ART[code]!.every(([fill, d], index) => paths[index]!.props.fill === fill && paths[index]!.props.d === d)).join('|');
+const markDrawn = (root: Node) => { const all = nodes(root); const paths = all.filter(node => node.type === 'Path'); return paths.length ? flagOfPaths(paths) : 'glyph:' + all.find(node => node.type === 'Ionicons')?.props.name; };
 
-test('25O1: a currency\'s mark is its issuer\'s flag (the euro the EU\'s), XOF and the other supranational codes the neutral cash glyph; a region\'s its own; hidden from VoiceOver', () => {
+test('25O1: a currency\'s mark is its issuer\'s round flag (the euro the EU\'s), XOF and the other supranational codes the neutral cash glyph; a region\'s its own, Sark too; a language its variety\'s; hidden from VoiceOver', () => {
   const marks = loadMarks();
-  assert.deepEqual(['ARS', 'USD', 'EUR', 'JPY', 'XOF', 'XAF'].map(currency => markDrawn(marks.render('CurrencyMark', { currency }))), ['🇦🇷', '🇺🇸', '🇪🇺', '🇯🇵', 'glyph:cash-outline', 'glyph:cash-outline']);
-  assert.deepEqual(['AR', 'UY', 'CQ'].map(region => markDrawn(marks.render('RegionMark', { region }))), ['🇦🇷', '🇺🇾', 'glyph:globe-outline'], 'Sark: the neutral globe until iOS draws its flag');
-  for (const tile of [marks.render('FlagTile', { flag: '🇦🇷', fallback: 'globe-outline' }), marks.render('FlagTile', { flag: null, fallback: 'phone-portrait-outline', size: 34 })]) {
-    const view = nodes(tile).find(node => node.type === 'View')!;
+  assert.deepEqual(['ARS', 'USD', 'EUR', 'JPY', 'XOF', 'XAF'].map(currency => markDrawn(marks.render('CurrencyMark', { currency }))), ['AR', 'UM|US', 'EU', 'JP', 'glyph:cash-outline', 'glyph:cash-outline']);
+  assert.deepEqual(['AR', 'UY', 'CQ', 'ZZ'].map(region => markDrawn(marks.render('RegionMark', { region }))), ['AR', 'UY', 'CQ', 'glyph:globe-outline'], 'vector art: Sark too');
+  assert.deepEqual(['es', 'en'].map(language => markDrawn(marks.render('LanguageMark', { language }))), ['AR', 'UM|US']);
+  for (const [mark, side] of [[marks.render('FlagMark', { flag: 'AR', fallback: 'globe-outline' }), 36], [marks.render('FlagMark', { flag: null, fallback: 'phone-portrait-outline', size: 34 }), 34]] as const) {
+    const view = nodes(mark).find(node => node.type === 'View')!;
     assert.deepEqual([view.props.accessible, view.props.accessibilityElementsHidden, view.props.importantForAccessibility], [false, true, 'no-hide-descendants']);
-    assert.equal(view.props.style.backgroundColor, '#EEEEF3', 'the inset tile a row\'s glyph sits on');
+    assert.deepEqual([view.props.style.width, view.props.style.height, view.props.style.borderRadius], [side, side, side / 2], 'a circle, at every text size');
   }
-  const flagText = nodes(marks.render('FlagTile', { flag: '🇦🇷', fallback: 'globe-outline' })).find(node => node.type === 'Text')!;
-  assert.equal(flagText.props.allowFontScaling, false, 'the tile keeps its side at every text size, like GlyphTile');
+  const flag = nodes(marks.render('FlagMark', { flag: 'JP', fallback: 'globe-outline' }));
+  assert.equal(flag.find(node => node.type === 'View')!.props.style.overflow, 'hidden', 'the art is clipped to the circle');
+  assert.equal(flag.find(node => node.type === 'Svg')!.props.viewBox, '0 0 512 512');
+  const ring = flag.filter(node => node.type === 'View')[1]!;
+  assert.deepEqual([ring.props.style[1].borderWidth, ring.props.style[1].borderColor], [0.5, '#E6E6EC'], 'a hairline ring of the palette\'s line keeps a white field\'s edge');
+  assert.equal(nodes(marks.render('FlagMark', { flag: null, fallback: 'globe-outline' })).find(node => node.type === 'View')!.props.style.backgroundColor, '#EEEEF3', 'the neutral glyph on the inset circle');
   assert.equal(marks.render('InlineFlag', { flag: null }), null, 'no flag: nothing inline, not an empty box');
+  const inline = (scale: number, size?: number) => nodes(loadMarks(scale).render('InlineFlag', { flag: 'AR', size })).find(node => node.type === 'View')!.props.style.width;
+  assert.deepEqual([inline(1), inline(1, 15), inline(1.4, 15), inline(3, 15), inline(0.8, 15)], [19, 17, 23, 26, 17], 'inline: grows with the text beside it, up to 1.6×, never below its size');
 
   // The same marks inside the sheet: a supranational row shows the neutral glyph; the label stays name and code.
   const ui = load('form-controls.tsx', { './marks': marks.exports });
@@ -677,7 +687,7 @@ test('25O1: a currency\'s mark is its issuer\'s flag (the euro the EU\'s), XOF a
   const sheet = ui.render('CurrencySheet', { visible: true, title: 'Elegir moneda', options, value: 'ARS', onClose: () => {}, onChange: () => {} });
   const list = nodes(sheet).find(node => node.type === 'FlatList')!;
   const rows = list.props.data.map((item: unknown) => list.props.renderItem({ item }));
-  assert.deepEqual(rows.map((row: Node) => markDrawn(row)), ['🇦🇷', '🇪🇺', 'glyph:cash-outline']);
+  assert.deepEqual(rows.map((row: Node) => markDrawn(row)), ['AR', 'EU', 'glyph:cash-outline']);
   assert.deepEqual(rows.map((row: Node) => row.props.accessibilityLabel), ['Pesos argentinos, ARS', 'Euros, EUR', options[2].name + ', XOF']);
 });
 

@@ -178,7 +178,7 @@ test('a device the app does not support: Portuguese in Brazil reads Spanish with
   assert.equal(bind.bindLocale(state.locale, state.device.source, state.device.primaryLanguage).speechLanguage, 'es', 'so VoiceOver reads the Spanish labels with a Spanish voice');
   const t = bind.bindLocale(state.locale).t;
   assert.deepEqual(optionsOf('language', state, t).map(option => [option.value, option.title, option.subtitle ?? '']),
-    [['system', 'Según el dispositivo', 'Ahora: Español'], ['es', 'Español', ''], ['en', 'English', '']]);
+    [['system', 'Según el dispositivo', 'Ahora: Español'], ['es', 'Español', 'Variante: Argentina'], ['en', 'English', 'Variant: United States']]);
 });
 
 test('"follow the device" follows it live: a changed device reading re-resolves only the halves that follow it', () => {
@@ -210,7 +210,7 @@ test('the chooser lists only released values: a Spanish-only gate offers the dev
   // The default gate (23.1C2): each region shows its conventions in the current language.
   const open = createLocaleStore({ devices: () => device('en-US', 'US'), store: memory().store, released: HOME_GATE }).getState();
   assert.deepEqual(optionsOf('language', open, bind.bindLocale(open.locale).t).map(option => [option.value, option.title, option.subtitle ?? '']),
-    [['system', 'Same as device', 'Now: English'], ['es', 'Español', ''], ['en', 'English', '']], 'each language by its own name');
+    [['system', 'Same as device', 'Now: English'], ['es', 'Español', 'Variante: Argentina'], ['en', 'English', 'Variant: United States']], 'each language by its own name, with the variety its copy is written in');
   const tEn = bind.bindLocale(open.locale).t;
   assert.deepEqual(optionsOf('region', open, tEn).map(option => [option.title, option.subtitle]),
     [['Same as device', 'Now: United States'], ['Argentina', '22/9/2026 · 1.234,56'], ['United States', '9/22/2026 · 1,234.56']]);
@@ -500,7 +500,7 @@ function loadPreferenceScreen(provider: Record<string, any>, recentStore = memor
     react: React, 'react/jsx-runtime': require('react/jsx-runtime'), 'react-native': { FlatList, View: host('View'), StyleSheet: { create: (styles: unknown) => styles },
       Alert: { alert: (title: string) => { alerts.push(title); } } },
     'expo-router': { Stack: { Screen: host('Stack.Screen') } }, '../i18n/provider': provider, './components': components,
-    './choice-list': require('../src/ui/choice-list.ts'), './marks': { FlagTile: host('FlagTile'), RegionMark: host('RegionMark') }, './motion': { selectionHaptic: () => { haptics++; } },
+    './choice-list': require('../src/ui/choice-list.ts'), './marks': { FlagMark: host('FlagMark') }, './motion': { selectionHaptic: () => { haptics++; } },
     './theme': { radius: { group: 16 }, space: { s: 8, m: 12, l: 16, xl: 20 }, usePalette: () => ({ background: '#F2F2F6', surface: '#FFFFFF' }) },
   });
   const recentModule = require('../src/i18n/recent.ts');
@@ -526,7 +526,7 @@ test('Idioma: a tap saves and applies in place, the checkmark moves, the screen 
   const rows = () => root.root.findAllByType('CheckRow' as never).map(row => row.props);
   const title = () => root.root.findByType('Stack.Screen' as never).props.options.title;
   assert.equal(title(), 'Idioma');
-  assert.deepEqual(rows().map(row => [row.title, row.subtitle ?? '', row.selected]), [['Según el dispositivo', 'Ahora: Español', true], ['Español', '', false], ['English', '', false]]);
+  assert.deepEqual(rows().map(row => [row.title, row.subtitle ?? '', row.selected]), [['Según el dispositivo', 'Ahora: Español', true], ['Español', 'Variante: Argentina', false], ['English', 'Variant: United States', false]]);
   act(() => rows()[2].onPress());
   assert.equal(saved.rows.get(LANGUAGE_PREFERENCE_KEY), 'en', 'saved first');
   assert.equal(title(), 'Language', 'the header title re-renders in the new language without leaving the screen');
@@ -587,7 +587,7 @@ test('Idioma and Región on the default gate: Según el dispositivo, Español an
   const rows = () => root.root.findAllByType('CheckRow' as never).map(row => row.props);
   const note = () => root.root.findAllByType('AppText' as never).map(node => String(node.props.children)).join(' ');
   assert.equal(root.root.findByType('Stack.Screen' as never).props.options.title, 'Idioma');
-  assert.deepEqual(rows().map(row => [row.title, row.subtitle ?? '', row.selected]), [['Según el dispositivo', 'Ahora: Español', true], ['Español', '', false], ['English', '', false]]);
+  assert.deepEqual(rows().map(row => [row.title, row.subtitle ?? '', row.selected]), [['Según el dispositivo', 'Ahora: Español', true], ['Español', 'Variante: Argentina', false], ['English', 'Variant: United States', false]]);
   assert.deepEqual(rows().map(row => row.accessibilityLanguage ?? ''), ['', 'es', 'en'], 'each language is spoken in its own language, as in iOS Settings');
   assert.doesNotMatch(note(), /Por ahora/, 'English is released: the note no longer says the app is Spanish-only');
   assert.match(note(), /Para que iOS también use este idioma en sus menús, elegilo en Configuración\./, '25O1: the one fact, not a disclaimer');
@@ -608,7 +608,7 @@ test('Idioma with a narrower gate lists no unfinished language; Región lists on
   const { screen } = loadPreferenceScreen(provider);
   let root!: ReturnType<typeof renderer.create>;
   act(() => { root = renderer.create(h(provider.I18nProvider, { store }, h(screen.LocalePreferenceScreen, { kind: 'language' }))); });
-  assert.deepEqual(root.root.findAllByType('CheckRow' as never).map(row => [row.props.title, row.props.subtitle ?? '']), [['Según el dispositivo', 'Ahora: Español'], ['Español', '']]);
+  assert.deepEqual(root.root.findAllByType('CheckRow' as never).map(row => [row.props.title, row.props.subtitle ?? '']), [['Según el dispositivo', 'Ahora: Español'], ['Español', 'Variante: Argentina']]);
   assert.match(root.root.findAllByType('AppText' as never).map(node => String(node.props.children)).join(' '), /elegilo en Configuración/);
   act(() => root.update(h(provider.I18nProvider, { store }, h(screen.LocalePreferenceScreen, { kind: 'region' }))));
   // 24R1: the device's Region (US) is one the catalogue names but this gate does not honour: the subtitle says whose formats stand in.

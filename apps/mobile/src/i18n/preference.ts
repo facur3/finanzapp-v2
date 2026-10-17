@@ -5,6 +5,7 @@
  * changing either never rewrites a stored amount, name or date. Each is its
  * own key; "follow the device" is the absence of the key. An unreadable store
  * means "follow the device", never an error and never a reset of anything. */
+import { profiledStore } from '../dev/qa-profile.ts';
 import { languagePreferenceFrom, regionPreferenceFrom, type LanguagePreference, type LocalePreferences, type RegionPreference } from './locale.ts';
 
 export const LANGUAGE_PREFERENCE_KEY = 'finanzapp.language';
@@ -12,8 +13,9 @@ export const REGION_PREFERENCE_KEY = 'finanzapp.region';
 
 export interface PreferenceStore { getItemSync(key: string): string | null; setItemSync(key: string, value: string): void; removeItemSync(key: string): boolean }
 
+/** The app's store; a development QA profile reads and writes its own prefixed keys instead (`qa-profile.ts`). */
 export function defaultPreferenceStore(): PreferenceStore {
-  return (require('expo-sqlite/kv-store') as { Storage: PreferenceStore }).Storage;
+  return profiledStore((require('expo-sqlite/kv-store') as { Storage: PreferenceStore }).Storage);
 }
 
 function read<T>(key: string, parse: (stored: unknown) => T, fallback: T, store: () => PreferenceStore): T {

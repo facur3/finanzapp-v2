@@ -52,12 +52,12 @@ export default function AccountsScreen() {
         const flag = currencyFlag(section.currency);
         const total = totals[section.currency];
         // The visible amount only measures the line (the flag with the name); VoiceOver hears the spoken twin, never the flag.
-        const stacked = total !== undefined && labelAmountStacks(width, fontScale, (flag ? flag + ' ' : '') + name, moneyText(total, section.currency), SECTION_CHROME);
+        const stacked = total !== undefined && labelAmountStacks(width, fontScale, (flag ? 'MM ' : '') + name, moneyText(total, section.currency), SECTION_CHROME);
         return <View accessible accessibilityRole="header" accessibilityLanguage={speechLanguage}
           accessibilityLabel={total === undefined ? name : t('accounts.list.sectionLabel', { currency: name, amount: spokenMoney(total, section.currency) })}
-          style={{ flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'baseline', justifyContent: 'space-between', gap: stacked ? 2 : 12,
+          style={{ flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center', justifyContent: 'space-between', gap: stacked ? 2 : 12,
             paddingTop: 20, paddingBottom: 8, paddingHorizontal: 4 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, flexShrink: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 }}>
             <InlineFlag flag={flag} size={15} />
             <AppText variant="subhead" style={{ fontWeight: '600', flexShrink: 1 }}>{name}</AppText>
           </View>

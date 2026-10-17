@@ -369,7 +369,7 @@ test('25O1, a new installation: the story\'s three pages, stepped or swiped, the
   const region = pill(root, 'Region: United States')!, language = pill(root, 'Language: English')!;
   assert.deepEqual([region.props.hint, language.props.hint], ['Opens the list of regions', 'Opens the list of languages']);
   assert.equal(find(region, 'InlineFlag').props.flag, flags.regionFlag('US'), 'the region carries its flag');
-  assert.equal(nodes(language).some(n => n.type === 'InlineFlag'), false, 'a language never does');
+  assert.equal(find(language, 'InlineFlag').props.flag, flags.languageFlag('en'), 'a language the flag of the variety its copy is written in');
   const restoreLink = nodes(root).find(n => n.type === 'PressFeedback' && n.props.accessibilityLabel === 'Restore a backup');
   assert.deepEqual([find(root, 'NavigationRow', 'Digital wallet'), region, language, restoreLink].map(node => scrolls(root, node)), [true, true, true, true],
     '25O1 review: the rows, the pills and the way to restore a copy scroll into reach');

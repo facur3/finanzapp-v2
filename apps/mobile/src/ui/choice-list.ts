@@ -27,9 +27,9 @@ export interface ChoiceOption<T extends string = string> {
   language?: string;
   /** Folded text a search matches; the folded title when absent. */
   searchText?: string;
-  /** 25O1: the row's mark, as data the screen draws: a region's flag (its code), or a neutral glyph on the same tile
-   * (Región's «Según el dispositivo»). Neither: no mark, as for a language, which never shows a flag. */
-  region?: string;
+  /** 25O1: the row's mark, as data the screen draws: the region whose round flag leads it (a region's own, a language's
+   * variety, `flags.ts`), or a neutral glyph on the same circle («Según el dispositivo»). Neither: no mark. */
+  flag?: string;
   glyph?: IconName;
 }
 

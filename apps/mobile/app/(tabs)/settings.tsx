@@ -10,7 +10,8 @@ import { usePalette, useThemePreference } from '../../src/ui/theme';
 import { useI18n, useLocalePreferences } from '../../src/i18n/provider';
 import { previewOnlyCurrencies } from '../../src/storage/currency-gate';
 import { preferenceSummary, shownRegion, showsPreference } from '../../src/ui/locale-options';
-import { RegionMark } from '../../src/ui/marks';
+import { LanguageMark, RegionMark } from '../../src/ui/marks';
+import { BUILD_QA_PROFILE } from '../../src/dev/qa-profile';
 
 declare const __DEV__: boolean | undefined;
 // Diagnostic: where this launch read the device languages. "módulo nativo" proves the build links expo-localization.
@@ -37,7 +38,8 @@ const DIAGNOSTICS = typeof __DEV__ !== 'undefined' && __DEV__;
  * neutral tiles, so the two groups align on one edge), and the local-storage note and the version as a quiet footer.
  * No row was added, removed or renamed; there is no «Ajustes» destination.
  *
- * 25O1: Región leads with the flag of the region its subtitle names (Idioma keeps its glyph: a language has no flag), and
+ * 25O1: Región leads with the round flag of the region its subtitle names, Idioma with the flag of the variety its copy is
+ * written in (the chooser says so in words), and
  * the local-storage footnote is gone (owner decision, app-store-launch.md §13.1): the Backup row's subtitle says when a
  * copy matters, and the first opening says where the records live. */
 export default function MoreScreen() {
@@ -87,7 +89,7 @@ export default function MoreScreen() {
       <Surface grouped>
         <NavigationRow title={t('settings.rows.backup')} subtitle={t('settings.rows.backupSubtitle')} leading={neutral('save-outline')} onPress={() => router.push('/backup')} />
         <NavigationRow title={t('settings.rows.undone')} subtitle={undone ? t('settings.rows.undoneCount', { count: undone }) : t('settings.rows.undoneNone')} leading={neutral('arrow-undo-outline')} onPress={() => router.push('/undone-entries')} />
-        {locale && <NavigationRow title={t('preferences.language')} subtitle={preferenceSummary('language', locale.state, t)} leading={neutral('language-outline')} onPress={() => router.push('/language')} />}
+        {locale && <NavigationRow title={t('preferences.language')} subtitle={preferenceSummary('language', locale.state, t)} leading={<LanguageMark language={locale.state.language} size={34} />} onPress={() => router.push('/language')} />}
         {locale && showsRegion && <NavigationRow title={t('preferences.region')} subtitle={preferenceSummary('region', locale.state, t)} leading={<RegionMark region={shownRegion(locale.state)} size={34} />} onPress={() => router.push('/region')} />}
         {/* 24UX6A: Sistema, Claro or Oscuro; a device setting like the language and the region. */}
         <NavigationRow title={t('preferences.appearance')} subtitle={appearanceLabel} leading={neutral('contrast-outline')} last onPress={() => router.push('/appearance')} />
@@ -98,6 +100,7 @@ export default function MoreScreen() {
       {DIAGNOSTICS && <AppText tertiary style={{ textAlign: 'center', fontSize: 13 }}>{t('settings.diagnostics', { material: t(MATERIAL_LABELS[material.reason]), source: t(LOCALE_SOURCE_LABELS[localeSource]) })}</AppText>}
     </View>
     {previewCurrencies.length > 0 && <AppText secondary style={{ textAlign: 'center', fontSize: 13 }}>{t('settings.currencyPreview', { codes: previewCurrencies.join(', ') })}</AppText>}
+    {BUILD_QA_PROFILE && <AppText secondary style={{ textAlign: 'center', fontSize: 13 }}>{t('settings.qaProfile', { name: BUILD_QA_PROFILE })}</AppText>}
   </Screen>;
 }
 

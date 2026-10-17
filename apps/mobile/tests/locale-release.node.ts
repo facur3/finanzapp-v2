@@ -166,7 +166,7 @@ function preferenceScreen(provider: Record<string, any>) {
   const choiceScreen = run(compile('src/ui/choice-screen.tsx'), {
     react: React, 'react/jsx-runtime': require('react/jsx-runtime'), 'react-native': { FlatList, View: 'View', StyleSheet: { create: (styles: unknown) => styles } },
     'expo-router': { Stack: { Screen: 'Stack.Screen' } }, '../i18n/provider': provider, './components': components, './choice-list': require('../src/ui/choice-list.ts'),
-    './marks': { FlagTile: 'FlagTile', RegionMark: 'RegionMark' },
+    './marks': { FlagMark: 'FlagMark' },
     './motion': { selectionHaptic() {} }, './theme': { radius: { group: 16 }, space: { s: 8, m: 12, l: 16, xl: 20 }, usePalette: () => ({ background: '#F2F2F6', surface: '#FFFFFF' }) },
   });
   return run(compile('src/ui/locale-choosers.tsx'), {
@@ -204,7 +204,7 @@ test('a release bundle mounted without a store prop, on an iPhone in English (Un
   assert.deepEqual(events, ['add onLocaleSettingsChanged', 'remove onLocaleSettingsChanged']);
 });
 
-test('the release bundle\'s Idioma lists Español and English, each spoken in its own language, and Región lists both regions; no "Spanish for now" note; 25O1: flags on regions only', () => {
+test('the release bundle\'s Idioma lists Español and English, each spoken in its own language, and Región lists both regions; no "Spanish for now" note; 25O1: round flags on regions and on languages (their variety)', () => {
   const { provider } = releaseBundle('es-AR', 'AR');
   const LocalePreferenceScreen = preferenceScreen(provider);
   let mounted!: ReturnType<typeof renderer.create>;
@@ -213,11 +213,12 @@ test('the release bundle\'s Idioma lists Español and English, each spoken in it
   // The footnotes: the note and its button (section letters and the search sentence are other styles).
   const note = () => mounted.root.findAllByType('AppText' as never).filter(node => node.props.variant === 'footnote').map(node => String(node.props.children)).join(' ');
   assert.deepEqual(rows().map(row => [row.title, row.subtitle ?? '', row.accessibilityLanguage ?? '']),
-    [['Según el dispositivo', 'Ahora: Español', ''], ['Español', '', 'es'], ['English', '', 'en']],
-    '"English" is spoken by an English voice and "Español" by a Spanish one, as iOS Settings does; the device row keeps the interface voice');
+    [['Según el dispositivo', 'Ahora: Español', ''], ['Español', 'Variante: Argentina', 'es'], ['English', 'Variant: United States', 'en']],
+    '"English" is spoken by an English voice and "Español" by a Spanish one, as iOS Settings does, each with its variety in its own words; the device row keeps the interface voice');
   // 25O1: the one thing Idioma cannot change (iOS's own menus follow the app's language in Settings), and the way there.
   assert.equal(note(), 'Para que iOS también use este idioma en sus menús, elegilo en Configuración. Abrir Configuración');
-  assert.deepEqual(rows().map(row => row.leading), [undefined, undefined, undefined], 'a language never shows a flag');
+  assert.deepEqual(rows().map(row => [row.leading.type, row.leading.props.flag]), [['FlagMark', null], ['FlagMark', 'AR'], ['FlagMark', 'US']],
+    '25O1: a language shows the flag of the variety its copy is written in; the device row a neutral mark');
   React.act(() => rows()[2].onPress());
   assert.equal(mounted.root.findByType('Stack.Screen' as never).props.options.title, 'Language', 'English chosen in a release bundle applies in place');
   assert.equal(note(), 'To have iOS use this language in its menus too, choose it in Settings. Open Settings');
@@ -225,13 +226,13 @@ test('the release bundle\'s Idioma lists Español and English, each spoken in it
   // 24R2B: 234 regions, so the search field, the letter sections and the device row pinned above them.
   assert.equal(rows().length, 235);
   assert.deepEqual([rows()[0].title, rows()[0].subtitle], ['Same as device', 'Now: Argentina']);
-  // 25O1: the device row leads with a neutral tile, every region with its own flag; the note sits under the device row.
-  assert.deepEqual([rows()[0].leading.type, rows()[0].leading.props.fallback], ['FlagTile', 'phone-portrait-outline']);
-  assert.equal(rows().slice(1).every(row => row.leading.type === 'RegionMark'), true);
-  assert.equal(new Set(rows().slice(1).map(row => row.leading.props.region)).size, 234, 'each its own');
+  // 25O1: the device row leads with a neutral mark, every region with its own flag; the note sits under the device row.
+  assert.deepEqual([rows()[0].leading.type, rows()[0].leading.props.fallback], ['FlagMark', 'phone-portrait-outline']);
+  assert.equal(rows().slice(1).every(row => row.leading.type === 'FlagMark'), true);
+  assert.equal(new Set(rows().slice(1).map(row => row.leading.props.flag)).size, 234, 'each its own');
   assert.equal(note(), 'Changes how dates and numbers are written. Your amounts and currencies stay the same.');
   React.act(() => mounted.root.findByType('Field' as never).props.onChangeText('united states'));
-  assert.deepEqual(rows().slice(0, 2).map(row => [row.title, row.subtitle ?? '', row.accessibilityLanguage ?? '', row.leading.props.region ?? '']),
+  assert.deepEqual(rows().slice(0, 2).map(row => [row.title, row.subtitle ?? '', row.accessibilityLanguage ?? '', row.leading.props.flag ?? '']),
     [['Same as device', 'Now: Argentina', '', ''], ['United States', '9/22/2026 · 1,234.56', '', 'US']]);
   assert.equal(note(), '', 'a search shows only its matches');
   React.act(() => mounted.root.findByType('Field' as never).props.onChangeText('ARG'));

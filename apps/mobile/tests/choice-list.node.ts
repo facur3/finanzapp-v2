@@ -61,7 +61,7 @@ function screen(props: any, { reduced = true } = {}) {
     'expo-router': { Stack: { Screen: 'Stack.Screen' } },
     '../i18n/provider': { useI18n: () => bindLocale('es-AR') },
     './components': { AppText: 'AppText', CheckRow: 'CheckRow', ErrorMessage: 'ErrorMessage', Field: 'Field', PressFeedback: 'PressFeedback' },
-    './choice-list': choiceList, './marks': { FlagTile: 'FlagTile', RegionMark: 'RegionMark' },
+    './choice-list': choiceList, './marks': { FlagMark: 'FlagMark' },
     './motion': { selectionHaptic: () => haptics.push('selection') },
     './theme': { radius: { group: 16 }, space: { s: 8, m: 12, l: 16, xl: 20 }, usePalette: () => ({ background: '#F2F2F6', surface: '#FFFFFF' }), useReduceMotion: () => reduced },
   };
@@ -234,25 +234,29 @@ test('the pinned card is detached from an options card that follows it at once, 
 });
 
 // 25O1: marks, and nothing on the 234-region list waiting at its end.
-const regionOptions = () => regionChoices('es').map(choice => ({ value: choice.code, title: choice.name, searchText: choice.searchText, region: choice.code }));
+const regionOptions = () => regionChoices('es').map(choice => ({ value: choice.code, title: choice.name, searchText: choice.searchText, flag: choice.code }));
 const markedPinned = { ...pinned, glyph: 'phone-portrait-outline' as const };
 const checkRow = (row: Node) => nodes(row).find(node => node.type === 'CheckRow')!;
 const textsOf = (tree: Node[]) => tree.filter(node => node.type === 'AppText').map(node => String(node.props.children));
 
-test('25O1: a row leads with the mark its option carries: a region its own flag, the device row a neutral glyph, a language nothing', () => {
+test('25O1: a row leads with the mark its option carries: a region its own flag, the device row a neutral glyph, a language its variety\'s flag', () => {
   const regions = screen({ title: 'Región', options: regionOptions(), pinned: markedPinned, recent: ['UY'], selected: 'UY', onChoose: () => true });
   const rows = rendered(regions.render());
   const leading = (row: Node) => checkRow(row)?.props.leading;
-  assert.deepEqual([leading(rows[0]).type, leading(rows[0]).props.flag, leading(rows[0]).props.fallback], ['FlagTile', null, 'phone-portrait-outline'], 'the pinned row: a neutral tile');
+  assert.deepEqual([leading(rows[0]).type, leading(rows[0]).props.flag, leading(rows[0]).props.fallback], ['FlagMark', null, 'phone-portrait-outline'], 'the pinned row: a neutral circle');
   const data = list(regions.render()).props.data as any[];
   const marked: [any, any][] = rows.map((row: Node, index: number) => [data[index], leading(row)]).filter(([item]: [any, any]) => item.kind === 'choice' && !item.pinned);
   assert.equal(marked.length, 257 + 1, 'every region row of the catalogue, the recent one included');
-  assert.equal(marked.every(([item, mark]) => mark.type === 'RegionMark' && mark.props.region === item.option.value), true, 'each region shows its own code\'s mark');
+  assert.equal(marked.every(([item, mark]) => mark.type === 'FlagMark' && mark.props.flag === item.option.value), true, 'each region shows its own code\'s mark');
   assert.equal(marked.some(([item]) => item.key === 'recent:UY'), true);
   assert.equal(marked.every(([item]) => checkRow(rows[data.indexOf(item)]).props.accessibilityLanguage === undefined), true);
   // VoiceOver: the label is the title and the subtitle, as before; the mark hides itself (marks.tsx).
-  const languages = screen({ title: 'Idioma', options: [{ value: 'es', title: 'Español', language: 'es' }, { value: 'en', title: 'English', language: 'en' }], pinned, selected: 'es', onChoose: () => true });
-  assert.deepEqual(rendered(languages.render()).map((row: Node) => leading(row)), [undefined, undefined, undefined], 'a language never shows a flag');
+  const languages = screen({ title: 'Idioma', options: [{ value: 'es', title: 'Español', language: 'es', flag: 'AR' }, { value: 'en', title: 'English', language: 'en', flag: 'US' }],
+    pinned: markedPinned, selected: 'es', onChoose: () => true });
+  assert.deepEqual(rendered(languages.render()).map((row: Node) => [leading(row).props.flag, leading(row).props.fallback ?? null]),
+    [[null, 'phone-portrait-outline'], ['AR', 'globe-outline'], ['US', 'globe-outline']], 'a language shows the flag its option names');
+  const bare = screen({ title: 'Idioma', options: [{ value: 'es', title: 'Español' }], pinned, selected: 'es', onChoose: () => true });
+  assert.deepEqual(rendered(bare.render()).map((row: Node) => leading(row)), [undefined, undefined], 'an option without a mark leads with nothing');
 });
 
 test('25O1: the long list says its note under the pinned card (gone while a search is typed); a short list keeps it under its last card, with its text button', () => {

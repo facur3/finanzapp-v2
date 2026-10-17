@@ -37,6 +37,7 @@ export const settings: Pick<Messages, 'settings'> = {
     version: 'FinanzApp {version} ({release})',
     diagnostics: '{material} · {source}',
     currencyPreview: 'Test currencies enabled: {codes}. Only in this development build.',
+    qaProfile: 'Test profile “{name}”: your data is not opened. Restart Metro without the variable to return to it.',
     material: {
       disabled: 'Opaque material (turned off)',
       expoGo: 'Opaque material (Expo Go)',

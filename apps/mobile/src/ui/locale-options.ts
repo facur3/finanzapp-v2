@@ -10,8 +10,9 @@
 import { formatMoneyAmount, formatNumericDate } from '../i18n/format.ts';
 import { LANGUAGES, RELEASED_REGIONS, composeLocale, isLanguageCode, isRegionCode, type LanguageCode, type LanguagePreference, type RegionCode,
   type RegionPreference } from '../i18n/locale.ts';
-import type { Translate } from '../i18n/messages.ts';
+import { translate, type Translate } from '../i18n/messages.ts';
 import { foldText } from '../i18n/intl-support.ts';
+import { languageFlag } from '../i18n/flags.ts';
 import { activeLanguageChoice, activeRegionChoice, pendingRegionChoice, type LocaleState } from '../i18n/store.ts';
 import { regionChoices, regionDisplayName, regionStatus } from '../i18n/regions.ts';
 import { RECENT_LIMIT } from '../i18n/recent.ts';
@@ -53,9 +54,15 @@ export function deviceRegionSummary(state: LocaleState, t: Translate): string {
 
 export function languageChooser(state: LocaleState, t: Translate): LocaleChooser<LanguagePreference> {
   return {
-    pinned: { value: 'system', title: t('preferences.followDevice'), subtitle: t('preferences.followDeviceNow', { value: languageName(state.device.language) }) },
-    // Autonyms, each spoken in its own language; searched by name and by code ("en", "english").
-    options: state.released.languages.map(language => ({ value: language, title: languageName(language), language, searchText: foldText(languageName(language) + ' ' + language) })),
+    pinned: { value: 'system', title: t('preferences.followDevice'), subtitle: t('preferences.followDeviceNow', { value: languageName(state.device.language) }),
+      glyph: 'phone-portrait-outline' },
+    // Autonyms, each spoken in its own language; searched by name and by code ("en", "english"). 25O1: each leads with the
+    // flag of the variety its copy is written in, and its subtitle says so in words, in the row's own language like its
+    // name (VoiceOver reads the whole row in that voice): «Variante: Argentina», "Variant: United States". The
+    // flag never stands alone for a country the language merely comes from.
+    options: state.released.languages.map(language => ({ value: language, title: languageName(language), language,
+      subtitle: translate(language, 'preferences.languageVariety', { region: regionName(languageFlag(language), language) }),
+      flag: languageFlag(language), searchText: foldText(languageName(language) + ' ' + language) })),
     selected: activeLanguageChoice(state),
     acceptRecent: (value): value is LanguageCode => isLanguageCode(value) && state.released.languages.includes(value),
     // 25O1: the one thing a choice here cannot do (iOS draws its own menus in the app's language from Settings), not a
@@ -69,7 +76,7 @@ export function regionChooser(state: LocaleState, t: Translate): LocaleChooser<R
   const codes = pending ? [...state.released.regions, pending] : state.released.regions;
   // 25O1: every region row leads with its own flag (a kept preview region too); the device row with a neutral glyph.
   const options = regionChoices(state.language, codes).map(choice => ({
-    value: choice.code, title: choice.name, searchText: choice.searchText, region: choice.code,
+    value: choice.code, title: choice.name, searchText: choice.searchText, flag: choice.code,
     subtitle: choice.code === pending
       ? t('preferences.pendingRegion', { fallback: regionName(state.region, state.language) })
       : regionSample(choice.code, state, t),

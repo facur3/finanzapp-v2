@@ -43,6 +43,8 @@ export const settings = {
     diagnostics: '{material} · {source}',
     /** Under the footer of a development bundle started with EXPO_PUBLIC_CURRENCY_PREVIEW=1: the extra currencies its forms offer. Never in a release. */
     currencyPreview: 'Monedas de prueba activas: {codes}. Solo en esta compilación de desarrollo.',
+    /** Under the footer of a development bundle started with EXPO_PUBLIC_QA_PROFILE=<name>: the separate test profile in use. Never in a release. */
+    qaProfile: 'Perfil de prueba «{name}»: tus datos no se abren. Reiniciá Metro sin la variable para volver a ellos.',
     /** Which control material this session draws, for a tester. */
     material: {
       disabled: 'Material opaco (desactivado)',
