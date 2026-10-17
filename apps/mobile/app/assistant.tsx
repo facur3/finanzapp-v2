@@ -61,7 +61,8 @@ export default function AssistantScreen() {
   const dispatch = session.dispatch;
   const client = useMemo(() => assistantForBuild(undefined, undefined, randomUUID), []);
   const list = useRef<FlatList<Message>>(null);
-  // `pinned`: the reader is at the end of the thread. Only the reader's own scrolls (a drag and its momentum) change it, so
+  // `pinned`: the reader is at the end of the thread. Only the reader's own scrolls (a drag and its momentum, a tap on the
+  // status bar) change it, so
   // neither the list's own scrollToEnd nor the viewport shrinking under the keyboard can unpin it.
   const scroll = useRef({ content: 0, viewport: 0, pinned: true, reading: false });
   // Coming back to a conversation that is already there (from the hub's «Continuar»): open at its last exchange, once.
@@ -281,6 +282,9 @@ export default function AssistantScreen() {
   };
   const reading = (on: boolean) => (event: NativeSyntheticEvent<NativeScrollEvent>) => { scroll.current.reading = on; read(event); };
   const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => { if (scroll.current.reading) read(event); };
+  /** A tap on the status bar takes the reader to the top without a drag: they left the end, so a streamed word no longer
+   * pulls them back down (read against the sizes the list last reported; the content may still fit the viewport). */
+  const onScrollToTop = () => { scroll.current.pinned = shouldAutoscroll(0, scroll.current.content, scroll.current.viewport); };
   /** A reopened thread: until both sizes are known nothing scrolls; then one jump to its end, not animated. */
   const returnToEnd = () => {
     if (!returning.current) return false;
@@ -330,7 +334,7 @@ export default function AssistantScreen() {
     <FlatList ref={list} data={messages} keyExtractor={message => message.id} renderItem={renderItem}
       contentInsetAdjustmentBehavior="automatic" keyboardDismissMode="interactive" keyboardShouldPersistTaps="handled"
       onScroll={onScroll} scrollEventThrottle={32} onScrollBeginDrag={reading(true)} onScrollEndDrag={reading(false)}
-      onMomentumScrollBegin={reading(true)} onMomentumScrollEnd={reading(false)}
+      onMomentumScrollBegin={reading(true)} onMomentumScrollEnd={reading(false)} onScrollToTop={onScrollToTop}
       onLayout={event => onLayout(event.nativeEvent.layout.height)} onContentSizeChange={onContentSizeChange}
       contentContainerStyle={{ padding: space.xl, gap: space.l, flexGrow: 1, justifyContent: messages.length ? 'flex-start' : 'center' }}
       ListEmptyComponent={<Suggestions items={SUGGESTIONS.map(key => t(key))} onPick={text => void send(text)} disabled={busy} />} />

@@ -167,7 +167,9 @@ export function conversationReducer(state: ConversationState, action: Conversati
       if (state.phase === 'idle') return state;
       const last = state.messages.at(-1);
       if (last?.role === 'assistant' && last.status === 'streaming') {
-        return { ...state, phase: 'streaming', messages: [...state.messages.slice(0, -1), { ...last, text: last.text + action.text }] };
+        // The place `send` took carries no language: the first word gives it, so a reply stopped mid-stream is still read in its own.
+        return { ...state, phase: 'streaming', messages: [...state.messages.slice(0, -1),
+          { ...last, text: last.text + action.text, ...(action.language && !last.language ? { language: action.language } : {}) }] };
       }
       return { ...state, phase: 'streaming', nextId: state.nextId + 1,
         messages: [...state.messages, { id: id(state, 'a'), role: 'assistant', status: 'streaming', text: action.text, content: null, ...(action.language ? { language: action.language } : {}) }] };
@@ -240,15 +242,36 @@ export function conversationReducer(state: ConversationState, action: Conversati
 export const SUGGESTIONS = ['assistant.suggestions.whySpentMore', 'assistant.suggestions.foodSpending', 'assistant.suggestions.recordExpense',
   'assistant.suggestions.budgetProgress'] as const satisfies readonly MessageKey[];
 
+// The words that open a question. «qué» and «cómo» (and their unaccented forms) ask only opening the text or after a «¿»:
+// after a bare comma they are usually a relative («, que era lo del gas») or a comparison («, como siempre»). The English
+// auxiliaries ask only opening the text: after a comma they tag a statement ("Spent 3000 at Carrefour, is that right?").
+// A lookahead stands in for \b, which ends at an accented letter («qué»).
+const ASKS = String.raw`cu[aá]nt[oa]s?|por qu[eé]|cu[aá]l(?:es)?|en qu[eé]|me alcanza|how|why|what`;
+const END = String.raw`(?![\p{L}\p{N}])`;
+const OPENS = new RegExp(String.raw`^(?:¿|(?:${ASKS}|qu[eé]|c[oó]mo|did|do|does|is|are|can (?:i|we))${END})`, 'u');
+const ASKS_WITHIN = new RegExp(String.raw`¿\s*(?:${ASKS}|qu[eé]|c[oó]mo)${END}|[,;:.]\s*(?:${ASKS}|qué|cómo)${END}`, 'u');
+// Digits that state no amount: a day («el 15», "the 15th", «15/9»), a year («en 2026»), a count («3 cuotas», «2 tarjetas»)
+// and a bound («más de 50000», "more than $500"), which compares rather than records.
+const NOT_AN_AMOUNT = [
+  /\b\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?\b/g,
+  /\b(?:el|del|al|the)\s+\d{1,2}(?:st|nd|rd|th)?(?!\d|[.,]\d)/gu,
+  /\b\d{1,2}(?:st|nd|rd|th)\b/g,
+  /\b(?:en|in)\s+(?:19|20)\d{2}(?!\d|[.,]\d)/gu,
+  /\d+\s*(?:cuotas?|tarjetas?|mes(?:es)?|d[ií]as?|semanas?|a[ñn]os?|veces|cards?|instal+ments?|months?|days?|weeks?|years?|times)(?![\p{L}])/gu,
+  /(?:(?:m[aá]s|menos)\s+(?:de|que)|(?:more|less|fewer)\s+than|\b(?:over|under|above|below))\s+\D{0,4}\d[\d.,]*/gu,
+];
+const statesAmount = (t: string) => /\d/.test(NOT_AN_AMOUNT.reduce((rest, pattern) => rest.replace(pattern, ' '), t));
+
 /** A question about recorded money is explained against local evidence;
  * anything else is parsed as an action. It reads the user's own words, so it
- * knows the question openers of every interface language. */
+ * knows the question openers of every interface language: opening the text, after a «¿» or after a clause
+ * («Este mes, ¿cuánto gasté…?», "This month, how much…"). A question mark elsewhere asks only when the sentence states
+ * no amount: «Gasté 2000 en el súper?» and «Gasté 3.000 en Carrefour, ¿está bien?» are movements to record (and send no
+ * facts); «Gasté más de 50000 en comida?», «Me alcanza para las 3 cuotas?» and «En qué gasté el 15?» are questions. */
 export function classifyIntent(text: string): 'explain' | 'parse' {
   const t = text.trim().toLowerCase();
-  if (/^(?:¿|(?:cu[aá]nt[oa]s?|por qu[eé]|c[oó]mo voy|cu[aá]l|qu[eé] tal|how (?:much|many|am i|is|are)|why|what)\b)/.test(t)) return 'explain';
-  // A question mark elsewhere asks only when the sentence states no amount: «Gasté 3.000 en Carrefour, ¿está bien?» is a
-  // movement to record (and sends no facts), «En comida gasté más que en agosto?» a question.
-  return /[?¿]/.test(t) && !/\d/.test(t) ? 'explain' : 'parse';
+  if (OPENS.test(t) || ASKS_WITHIN.test(t)) return 'explain';
+  return /[?¿]/.test(t) && !statesAmount(t) ? 'explain' : 'parse';
 }
 
 /** Whether new content should pull the list to its end: only when the reader is already near it. */

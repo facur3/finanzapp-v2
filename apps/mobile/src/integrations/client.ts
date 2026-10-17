@@ -63,8 +63,9 @@ export function integrationClient(baseURL: string, getAccessToken: () => Promise
 /** The person's text as the request carries it: the invisible characters a paste brings along (web pages, PDFs and bank
  * apps add them) that the request admits but the reply refuses in a name are taken out, so a merchant the model copies
  * verbatim is never refused (and billed) for a character nobody can see: the zero-width space, the word joiner and the
- * invisible operators, the BOM and the interlinear annotations go; a line or paragraph separator becomes a line break.
+ * invisible operators, the BOM and the interlinear annotations go; a line or paragraph separator, a CR or a CRLF becomes a
+ * line break and a tab a space (a reply refuses both, even in prose, which keeps only the line break).
  * Visible words are unchanged; the joiners of emoji and scripts (U+200C, U+200D) stay. The thread shows what was typed. */
 export function withoutInvisibles(text: string): string {
-  return text.replace(/[\u200b\u2060-\u2064\ufeff\ufff9-\ufffb]/g, '').replace(/[\u2028\u2029]/g, '\n');
+  return text.replace(/[\u200b\u2060-\u2064\ufeff\ufff9-\ufffb]/g, '').replace(/\r\n?|[\u2028\u2029]/g, '\n').replace(/\t/g, ' ');
 }
