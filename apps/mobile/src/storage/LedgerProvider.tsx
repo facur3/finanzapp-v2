@@ -180,7 +180,11 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
       lastPass.current = { day: passFor.current ?? '', failed: true };
       catchUps.current = { ...catchUps.current, recurringError: true };
       if (mounted.current) setError(sessionWarning(catchUps.current));
-    }).finally(() => { pending.current = false; });
+    }).finally(() => {
+      pending.current = false;
+      // A midnight that passed while this pass ran was coalesced into it: run once more for the new day.
+      if (mounted.current && database.current && passFor.current !== todayKey()) runPass();
+    });
   };
 
   useEffect(() => {

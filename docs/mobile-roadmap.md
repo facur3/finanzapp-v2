@@ -1,6 +1,8 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-17 (**25N1 — Finanzas, Ajustes and the shared controls**, on its branch stacked on #119: Más becomes
+Updated: 2026-10-17 (**25R1 — robustness**, on its branch stacked on #120: catch-ups that follow the day and the
+foreground, rates that back off and recover, links that only open Inicio, committed changes reported as done; «Producto
+25R1»). Before (**25N1 — Finanzas, Ajustes and the shared controls**, on its branch stacked on #119: Más becomes
 the Finanzas tab with Ajustes behind a gear, Licencias, Movimientos deshechos in Movimientos, shared controls, forms
 and tokens; «Producto 25N1», §1, §2). Before (**25O1 — first impression**, on its branch stacked on #118: the first opening rebuilt as a short
 story drawn with the app's own figures, «¿Dónde tenés tu plata?» with three presets and «Restaurar una copia», the
@@ -443,7 +445,9 @@ history file keeps the evidence of when and why.
 
 ## 1. Implemented (current state)
 
-- **25N1 — Finanzas, Ajustes and the shared controls (on its branch, stacked on #119).** «Producto 25N1». The fourth
+- **25R1 — robustness (on its branch, stacked on #120).** «Producto 25R1». Catch-ups per day change and real return,
+  rates with back-off and refresh, links that open Inicio only, committed changes reported as done, tests in three zones.
+- **25N1 — Finanzas, Ajustes and the shared controls (PR #120, stacked on #119).** «Producto 25N1». The fourth
   tab is Finanzas, Ajustes sits behind its gear with Licencias; Movimientos deshechos moved to Movimientos; shared
   controls, forms and tokens cleaned up.
 - **25O1 — first impression (PR #119, stacked on 25Q4).** «Producto 25O1». The first opening is a three-page story
@@ -1019,7 +1023,8 @@ item unless a section says a new native build is needed. The checklist sections 
   symbol and cents on the sand, «Otras», the chosen colour's check, Enviar/Detener, the currency chips and the date
   sheet. Device QA no longer follows each change: the steps below accumulate for a milestone session over the critical
   journeys, then a final regression. A test that passes never counts as a device result.
-- **25N1 (on its branch, stacked on #119):** the checklist's «Producto 25N1», in milestone **M2** (with 25D2), in a QA
+- **25R1 (on its branch, stacked on #120):** the checklist's «Producto 25R1», in M2.
+- **25N1 (PR #120, stacked on #119):** the checklist's «Producto 25N1», in milestone **M2** (with 25D2), in a QA
   profile; the owner approves the navigation there.
 - **Milestone M1 — the next QA session (recommended now):** #112, #117, #118 and 25O1 together on the same build, the
   checklist's «Milestone M1»: every write in a development QA profile (`EXPO_PUBLIC_QA_PROFILE`, its own empty files, so
@@ -4672,7 +4677,34 @@ nothing of it is on a screen yet.
   passed, 0 failed; `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0 errors, 0 stale; `check` OK;
   `export:ios` OK. No account, handle, ad account or campaign created.
 
-### Producto 25N1 — Finanzas, Ajustes and the shared controls (this PR, stacked on #119)
+### Producto 25R1 — robustness (this PR, stacked on #120)
+
+- **Why.** The register's robustness group: catch-ups and rates that did not follow the day or the network, routes that
+  accepted anything, views that reported a committed change as failed, and the tests that never ran the real code.
+- **Catch-up.** One pass when the day changes with the app open, one on a real return from the background (a Control
+  Center pull on a day already caught up costs nothing; returns are coalesced; a midnight during a pass runs it again);
+  a rule resubmitted after the catch-up advanced it is a no-op; a plan with a due instalment is judged caught up before
+  «Eliminar plan».
+- **Rates.** Typed errors (408, 429, 5xx transient with Retry-After capped at 6 h; other 4xx a refusal); back-off 1, 2,
+  5, 15, then 30 min, per quote, with the month's timer at the earliest back-off; a refused request split once per quote;
+  refresh on foreground and focus, released when the screen is not in front; a past month final only when its rates
+  reach its end; «fetching» from the first frame; `credentials: 'omit'`; month and date parameters validated.
+- **Links.** `app/+native-intent.ts`: a link that launches the app opens Inicio; one that arrives while it is open is
+  ignored, so it never dismisses a form. Producers (notifications, Shortcuts) will allow their own validated path.
+- **Committed but not refreshed.** A write that committed but could not refresh the view is done (`committedBeforeRefresh`):
+  management actions close, an import says «Copia incorporada», and a detail's «Reintentar cambio» gives way once the
+  ledger shows the change.
+- **Reports.** The comparison is offered only when it can compare; drill-downs say why a rate is missing under ⓘ.
+- **Tests and CI.** The real RatesProvider, finance view and cache loaded by tests; date tests also in Buenos Aires, New
+  York and Auckland in CI; a privacy-surface test (dependencies, permission strings, outbound origins); the bundle scan
+  proves the patched decoder; the review files under the second-write-path guard.
+- **Not in this delivery.** Refusing an import whose catch-up backlog is too large (the owner's decision); deleting the
+  unused report components; a memoization the review asks to profile first; the encryption declaration (the owner's).
+- **Independent review.** Four confirmed (none on money or storage), all fixed with tests that fail on the code before:
+  a warm link dismissed a half-filled form, a short rate back-off stranded a longer one, a midnight during a pass was
+  dropped, and the checklist's link steps are marked as covering #118/#119 only.
+
+### Producto 25N1 — Finanzas, Ajustes and the shared controls (PR #120, stacked on #119)
 
 - **Why.** The owner (2026-10-17) found Más mixing financial tools and settings, asked to reconsider the navigation
   without adding tabs by inertia, and to accelerate with substantial deliveries closing groups of the private register's

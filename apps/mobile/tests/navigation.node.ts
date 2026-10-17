@@ -205,6 +205,7 @@ test('every link from outside the app lands on Inicio: no screen, form or prefil
   const { redirectSystemPath } = await import('../app/+native-intent.ts');
   for (const path of ['finanzapp://new-entry?amountMinor=100000&merchant=x', '/new-transfer?toAccountId=a&note=pagá', '/onboarding', '/backup-import',
     '/review-sheet/abc', '', 'finanzapp://', '/%E0%A4%A']) {
-    for (const initial of [true, false]) assert.equal(redirectSystemPath({ path, initial }), '/', path);
+    assert.equal(redirectSystemPath({ path, initial: true }), '/', path);
+    assert.equal(redirectSystemPath({ path, initial: false }), null, 'a link while the app is open never navigates: ' + path);
   }
 });
