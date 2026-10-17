@@ -5,7 +5,7 @@ import { ACCOUNT_ICONS, APPEARANCE_COLORS, CATEGORY_ICONS, CATEGORY_PRESETS } fr
 import { ACCOUNT_ICON_CHOICES, CATEGORY_ICON_CHOICES, COLOR_CHOICES, FINANCE_ROW_LOOKS, accountGlyph, appearanceHex, appearanceName, categoryGlyph } from '../src/ui/appearance.ts';
 import { lightPalette, darkPalette } from '../src/ui/palette.ts';
 import { tintOf } from '../src/ui/category-color.ts';
-import { contrast } from './contrast.ts';
+import { contrast, deltaE } from './contrast.ts';
 
 // The real glyph map of the installed Ionicons font: every curated id must draw.
 const glyphs = JSON.parse(readFileSync(new URL('../node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/glyphmaps/Ionicons.json', import.meta.url), 'utf8'));
@@ -51,4 +51,19 @@ test('the Más Finanzas tiles use palette colours and stay restrained: six rows,
   assert.equal(FINANCE_ROW_LOOKS.cards.glyph, 'card-outline', 'Tarjetas is a Finanzas row since the centre tab became the Assistant');
   assert.equal(new Set(colors).size, colors.length);
   for (const color of colors) assert.ok(APPEARANCE_COLORS.some(item => item.id === color), color);
+});
+
+test('no Más Finanzas tile reads as the brand or as a meaning: ΔE 12 or more from the sapphire and the four semantic tones, in light and dark', () => {
+  for (const p of [lightPalette, darkPalette]) {
+    const theme = { isDark: p === darkPalette };
+    const references = { primary: p.primary, primaryFill: p.primaryFill, accent: p.accent, hero: p.hero, expense: p.expense, income: p.income, warning: p.warning, transfer: p.transfer };
+    for (const [row, look] of Object.entries(FINANCE_ROW_LOOKS)) {
+      const hex = appearanceHex(look.color, theme);
+      for (const [token, reference] of Object.entries(references)) {
+        // Grafito is a neutral grey beside the grey-blue transfer (8.1 in dark): apart by hue, kept for Tarjetas' graphite faces.
+        const floor = look.color === 'graphite' && token === 'transfer' ? 8 : 12;
+        assert.ok(deltaE(hex, reference) >= floor, `${row} (${look.color} ${hex}) is ΔE ${deltaE(hex, reference).toFixed(1)} from ${token} ${reference}`);
+      }
+    }
+  }
 });

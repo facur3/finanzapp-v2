@@ -299,7 +299,8 @@ export function idleBarColor(p: Palette): string {
 export type MonthPoint = { monthISO: string; amountMinor: number; partial: boolean; count?: number };
 
 /** Six monthly bars on a common zero-to-max scale. The selected month is the
- * brand primary, the rest the idle ink (`idleBarColor`); a partial (current) month is outlined.
+ * brand primary, the rest the idle ink (`idleBarColor`). The month in progress is always the last bar and the shown one; the
+ * caption («Mes en curso hasta hoy») and VoiceOver say it is partial (25N1: its outline, secondary on the sapphire, was 1.1:1).
  * Tapping a bar selects that month. Bars animate between data sets, never from zero.
  * 24T3 (A24): the scale is zero to the largest positive net; a month whose net is zero or less is drawn at zero (never a
  * bar below the axis), VoiceOver says «sin gasto neto» when the month has records, and when the shown month nets below
@@ -360,9 +361,7 @@ function Bar({ point, fraction, selected, onPress, currency, height }: {
     accessibilityLabel={t(noNetSpending(point) ? point.partial ? 'reports.chart.barPartialNoNet' : 'reports.chart.barNoNet' : point.partial ? 'reports.chart.barPartial' : 'reports.chart.bar',
       { month: formatDate(point.monthISO.slice(0, 7) + '-01', 'month'), year: point.monthISO.slice(0, 4), amount: spokenMoney(point.amountMinor, currency) })}
     onPress={onPress} containerStyle={{ flex: 1 }} style={{ height, justifyContent: 'flex-end', minHeight: undefined }}>
-    <Animated.View style={[{ borderRadius: 6, backgroundColor: selected ? p.primary : idleBarColor(p), borderWidth: point.partial ? StyleSheet.hairlineWidth * 2 : 0,
-      // The month in progress stays outlined: ink on an idle bar (the idle fill is too close to the secondary ink), secondary on the shown one.
-      borderColor: selected ? p.secondary : p.text,
+    <Animated.View style={[{ borderRadius: 6, backgroundColor: selected ? p.primary : idleBarColor(p),
       transitionProperty: 'backgroundColor', transitionDuration: reduced ? 0 : duration.state, transitionTimingFunction: easeOutCss }, style]} />
   </PressFeedback>;
 }

@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { darkPalette, lightPalette } from '../src/ui/palette.ts';
 import { radius, space, type } from '../src/ui/tokens.ts';
-import { contrast, luminance } from './contrast.ts';
+import { contrast, deltaE, lab, luminance } from './contrast.ts';
 
 // WCAG 2 contrast over the actual palette. A pure check of the numbers: the
 // rendered look, blending on device and Dynamic Type still need the iPhone.
@@ -20,15 +20,7 @@ function saturationLightness(hex: string): { s: number; l: number } {
   const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2;
   return { s: max === min ? 0 : (max - min) / (1 - Math.abs(2 * l - 1)), l };
 }
-/** CIE L*a*b* (D65), to tell a grey-blue from a saturated blue where the hue alone cannot: chroma and colour distance. */
-function lab(hex: string): [number, number, number] {
-  const lin = [1, 3, 5].map(index => { const c = parseInt(hex.slice(index, index + 2), 16) / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; });
-  const xyz = [[0.4124, 0.3576, 0.1805], [0.2126, 0.7152, 0.0722], [0.0193, 0.1192, 0.9505]].map(row => row.reduce((sum, k, i) => sum + k * lin[i], 0));
-  const [x, y, z] = [xyz[0] / 0.95047, xyz[1], xyz[2] / 1.08883].map(t => t > 216 / 24389 ? Math.cbrt(t) : (24389 / 27 * t + 16) / 116);
-  return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
-}
 const chroma = (hex: string) => { const [, a, b] = lab(hex); return Math.hypot(a, b); };
-const deltaE = (one: string, two: string) => { const [p, q] = [lab(one), lab(two)]; return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]); };
 const ratio = (a: string, b: string) => contrast(a, b).toFixed(2);
 
 for (const [name, p] of [['light', lightPalette], ['dark', darkPalette]] as const) {
@@ -121,6 +113,10 @@ for (const [name, p] of [['light', lightPalette], ['dark', darkPalette]] as cons
     assert.ok(contrast(p.heroInk, p.hero) > contrast(p.heroMoneySymbol, p.hero) && contrast(p.heroMoneySymbol, p.hero) > contrast(p.heroMoneyCents, p.hero),
       'the symbol is quieter than the units, the cents quieter still');
     assert.ok(contrast(p.heroMoneySymbol, p.heroMoneyCents) >= 1.25, 'the two quiet steps are distinguishable');
+    // 25N1: the zero month's units (heroSecondary) sit under the symbol's grey (light 0.717 against 0.762, dark 0.661), so a
+    // quiet hero is drawn in heroSecondary throughout (Money onField), and that one tone still reads on the field.
+    assert.ok(luminance(p.heroSecondary) < luminance(p.heroMoneySymbol), 'why the quiet hero cannot keep the grey symbol');
+    assert.ok(contrast(p.heroSecondary, p.hero) >= 4.5, `the quiet hero on the field: ${ratio(p.heroSecondary, p.hero)}`);
   });
   test(`${name}: the dock and its «+» read in both themes; the selected capsule separates from the pill (24UX6A)`, () => {
     assert.ok(contrast(p.onAccent, p.accent) >= 4.5, `the «+» glyph on the accent: ${ratio(p.onAccent, p.accent)}`);

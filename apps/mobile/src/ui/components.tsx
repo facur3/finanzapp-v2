@@ -590,7 +590,8 @@ export function Money({ minor, currency, large = false, color, signed = false, s
   minor: number; currency: Currency; large?: boolean; color?: string; signed?: boolean; size?: number; tone?: Tone; weight?: '500' | '600' | '700';
   align?: 'left' | 'center';
   /** On Inicio's field (25A-03): a hero's symbol and cents take the field's solid quiet tones (`heroMoneySymbol`,
-   * `heroMoneyCents`) instead of the ink at an alpha. The whole units keep `color`. */
+   * `heroMoneyCents`) instead of the ink at an alpha. The whole units keep `color`. 25N1: a hero drawn quieter than the
+   * field's ink (the zero month's `heroSecondary`) is one tone throughout, never units dimmer than their own symbol. */
   onField?: boolean;
 }) {
   const p = usePalette();
@@ -615,7 +616,7 @@ export function Money({ minor, currency, large = false, color, signed = false, s
   // With iOS's Increase Contrast on, nothing steps back: the quiet parts are a
   // composition choice, never one a person who asked for contrast pays for.
   const parts = hero && safe ? splitAmount(text, amountFormat) : null;
-  const quiet = p.increaseContrast ? { symbol: ink, cents: ink } : onField ? { symbol: p.heroMoneySymbol, cents: p.heroMoneyCents }
+  const quiet = p.increaseContrast || (onField && ink !== p.heroInk) ? { symbol: ink, cents: ink } : onField ? { symbol: p.heroMoneySymbol, cents: p.heroMoneyCents }
     : ink === p.text ? { symbol: p.secondary, cents: p.tertiary }
     // 25O1 review: the light palette's ink only sits on a light ground (the close's sand-white card): its quiet pair in both themes.
     : ink === lightPalette.text ? { symbol: lightPalette.secondary, cents: lightPalette.tertiary }
