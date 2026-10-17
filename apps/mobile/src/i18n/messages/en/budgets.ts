@@ -72,6 +72,7 @@ export const budgets: Pick<Messages, 'budgets'> = {
       categoryNote: 'Compared with the expenses recorded in this category during that month. It is a sublimit: it isn’t added to the overall budget. Refunds are subtracted in their own month and category.',
       retryNote: 'The submission is locked so Retry doesn’t create another budget.',
       create: 'Create budget',
+      takenHint: 'To change it, tap it in Budgets.',
       delete: 'Delete budget',
       retryDelete: 'Retry deleting',
       deleteTitle: 'Delete this budget?',

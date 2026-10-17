@@ -290,6 +290,19 @@ test('card detail lists only that card account with card context and links purch
   assert.equal(find(harness('card/[id].tsx', { id: 'missing' }).render(), 'EmptyState').props.title, 'No encontramos esta tarjeta');
 });
 
+test('25N1: each open debt section lists overdue first, then due soon, then by due date, undated, then settled (storage keeps its own order)', () => {
+  // The harness day is 2026-09-20. Every debt owes 300,00 on its own account but the settled one.
+  const make = (id: string, dueDateISO: string | null, opening = -30000, at = createdAt) => ({
+    account: { ...debtAccount, id: id + '-acc', name: 'Debo · ' + id, openingMinor: opening },
+    debt: { ...debt, id, accountId: id + '-acc', counterparty: id, dueDateISO, createdAt: at } });
+  const items = [make('undated', null, -30000, '2026-08-01T12:00:00.000Z'), make('later', '2026-10-15'), make('settled', '2026-09-05', 0),
+    make('soon', '2026-09-22'), make('overdue', '2026-09-10'), make('dated', '2026-10-01')];
+  const data = { ...archive, accounts: [cash, ...items.map(item => item.account)], debts: items.map(item => item.debt) };
+  const order = nodes(harness('debts.tsx', {}, data).render()).filter(node => node.type === 'DebtRow').map(row => row.props.debt.id);
+  assert.deepEqual(order, ['overdue', 'soon', 'dated', 'later', 'undated', 'settled']);
+  assert.deepEqual(data.debts.map(item => item.id), ['undated', 'later', 'settled', 'soon', 'overdue', 'dated'], 'the ledger\'s list is not reordered');
+});
+
 test('debts screen separates what I owe from what they owe me and never mixes currencies', () => {
   const receivableAccount: domain.Account = { id: 'rec-acc', name: 'Me deben · Ana', currency: 'USD', openingMinor: 4000, createdAt };
   const receivable: domain.PersonalDebtProfile = { ...debt, id: 'receivable', accountId: receivableAccount.id, direction: 'owed_to_me', counterparty: 'Ana', dueDateISO: null };

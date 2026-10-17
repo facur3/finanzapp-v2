@@ -142,6 +142,18 @@ export function debtDueState(debt: Pick<PersonalDebtProfile, 'active' | 'directi
   return days <= 3 && debt.direction === 'owed_by_me' ? 'soon' : 'due';
 }
 
+/** 25N1: an open list of debts in the order that asks for action: overdue first, then due soon, then dated by due date,
+ * then undated, then settled; within a state by due date, then by creation. A view only: storage keeps its own order. */
+const DUE_RANK: Record<DebtDueState, number> = { overdue: 0, soon: 1, due: 2, none: 3, settled: 4, closed: 5 };
+export function debtsByUrgency<T extends PersonalDebtProfile>(debts: readonly T[], snapshot: LedgerSnapshot, todayISO: string): T[] {
+  const rank = new Map(debts.map(debt => {
+    let outstanding = 1;
+    try { outstanding = debtOutstandingMinor(debt, snapshot); } catch { /* an unreadable balance keeps its date's place */ }
+    return [debt.id, DUE_RANK[debtDueState(debt, outstanding, todayISO)]];
+  }));
+  return [...debts].sort((a, b) => rank.get(a.id)! - rank.get(b.id)! || (a.dueDateISO ?? '').localeCompare(b.dueDateISO ?? '') || a.createdAt.localeCompare(b.createdAt));
+}
+
 /** 24UX6E: a due day as VoiceOver reads it, the CardFacts pattern: a relative word stays as it is («hoy», «Ayer»); a
  * plain day is written out («1 de octubre de 2026», "October 1, 2026"), never the abbreviated «1 oct». `inline` as in
  * `relativeDate` (the day inside a sentence). */
