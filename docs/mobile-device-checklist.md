@@ -57,6 +57,30 @@ copies' locations (25Q4 step 9 needs Xcode's Devices window), the cold links of 
 merges `master` and keeps its CI green before its own merge; never a force-push). A failure fixes forward on the branch
 it belongs to and the stack above merges it in.
 
+## Producto 25D2 — VoiceOver and Voice Control (on its branch, stacked on 25R1; milestone M2)
+
+VoiceOver on, Spanish, then the key steps in English; Metro from this branch in a QA profile, with
+`EXPO_PUBLIC_ASSISTANT_FIXTURES=1` for step 1. The version line reads «FinanzApp 0.1.0 (25D2)».
+
+1. **Assistant:** ask a question — «Asistente: pensando», then the reply once; «offline» — the note, and the next swipe
+   lands on «Reintentar, botón»; an expense that asks for an account — the question, then after the chip the review
+   cue; Confirmar in the sheet — «Registrado.» after it closes; leave mid-answer — nothing spoken over the next screen.
+2. **Saves:** a Gasto — «Guardado, 1234,50 pesos.» once Inicio is up; a transfer and a devolución the same; an edit —
+   «Cambios guardados.».
+3. **Undo and restore:** a movement, a transfer and a devolución — the status line the screen shows is spoken.
+4. **Plans and recurring:** Dejar de seguir — «Sin seguimiento»; Reactivar — «Activo»; an adelanto — «Adelanto
+   registrado»; rotor Acciones on a rule: Pausar, Reanudar (with the next date), Eliminar, each spoken; deleting a
+   throwaway account — «Cuenta eliminada»; an import — «Copia incorporada».
+5. **Inicio:** the number reads «Gastado en <mes>, … pesos»; Disponible is spoken once when chosen; each «Ver todos»
+   names its section; Voice Control «Tocar Ver todos» asks which.
+6. **Reportes and Presupuestos:** a month step speaks the month and total once (focus stays on the arrow); an empty
+   month «Sin gastos en este período»; bars of months with nothing «sin gastos registrados»; Comparar rows «Este período,
+   Comida: …»; «Dónde más gastaste» one stop per row; Voice Control «Tocar Este mes»; Presupuestos' arrows tick and say
+   the month and its state; a budget at 85 % or more says «Cerca del límite» and its percent never rounds up into amber.
+7. **Lists and pickers:** Movimientos' fourth filter is «Transferencias»; rows say «pesos», never «ARS»; a plain detail
+   row is one stop; the account and category pickers close with the two-finger scrub; in Cuentas and Deudas at rest the
+   swipe actions are not separate stops and the Actions rotor still has them.
+
 ## Producto 25R1 — robustness (on its branch, stacked on 25N1; milestone M2)
 
 JavaScript only, the same development build; Metro from this branch in a QA profile (`EXPO_PUBLIC_QA_PROFILE=m2`).

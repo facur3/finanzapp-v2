@@ -880,6 +880,17 @@ barras de Día a día y una cabecera fija sólida. Siguen permitidos para una pa
 vinculante del roadmap no cambia: la próxima entrega de producto es 24T3; 24UX6C (Movimientos y Más) y 24UX6D
 (Tarjetas) siguen a 24UX6B en el carril UX, y su lugar frente a 24T3 lo decide el dueño (ver `docs/mobile-roadmap.md`).
 
+## Producto 25D2 — VoiceOver y Voice Control (en su rama, sobre 25R1)
+
+- **Lo que pasa se dice.** iOS no tiene regiones vivas: un solo ayudante (`announce`) dice el resultado de una acción
+  desde el gesto que la causó, en las palabras de la app y con los importes en palabras; nunca al montar una pantalla,
+  nunca dos veces, y lo que cierra una pantalla se dice cuando ya cerró.
+- **El Asistente se oye:** pensando, la respuesta entera una vez, las notas y la próxima pregunta, solo mientras está
+  al frente; «Reintentar» es su propia parada.
+- **Nombres que coinciden con lo visible** (Voice Control): «Este mes», «Ver todos, <sección>», «Transferencias»; una
+  fila es una parada; los importes de las filas en palabras («pesos», no «ARS»).
+- **Un porcentaje de presupuesto redondea hacia abajo**, así el ámbar y el 85 % siempre coinciden.
+
 ## Producto 25N1 — Finanzas, Ajustes y los controles compartidos (en su rama, sobre #119)
 
 - **Finanzas.** La cuarta pestaña deja de ser «Más»: se llama Finanzas (billetera) y es una sola lista de las
@@ -3411,6 +3422,8 @@ crédito, marca elegida) y los filetes de las píldoras, el chip y el compositor
 color propio.
 
 ## Pendiente de revisión en iPhone
+
+- Producto 25D2, en el hito M2: el guion de VoiceOver y Voice Control (docs/mobile-device-checklist.md, «Producto 25D2»).
 
 - Producto 25N1, en el hito M2: Finanzas y su engranaje, Ajustes, Licencias, Movimientos deshechos desde Movimientos, los
   controles y formularios nuevos y los tokens en claro y oscuro (docs/mobile-device-checklist.md, «Producto 25N1»).
