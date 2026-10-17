@@ -73,9 +73,8 @@ function routeHarness(file: string, params: Record<string, unknown>, initialData
   // 24C1: the finance view as the provider builds it, over a fixed rate book (no network); `ensured` records what the screen asked for.
   const ratesProvider = { useFinanceView: (months: readonly string[], currency?: domain.Currency) => {
     const held = presentation.historyCurrencies(data.accounts);
-    // 25B2: with one currency in the whole history the view is that currency's own ledger, whatever the preference says (rates-provider.tsx).
-    const mode = held.length <= 1 ? 'single' : display.getMode();
-    const target = currency ?? (held.length <= 1 ? held[0] ?? displayCurrency.resolveDisplayCurrency(display.getState(), held, mode) : displayCurrency.resolveDisplayCurrency(display.getState(), held, mode));
+    // 25B2: the provider's own rule (resolveFinanceTarget): with one currency in the whole history the view is that currency's own ledger.
+    const { mode, currency: target } = financeView.resolveFinanceTarget(held, { mode: display.getMode(), currency: displayCurrency.resolveDisplayCurrency(display.getState(), held, display.getMode()) }, currency);
     const built = financeView.financeView(data, mode, target, rates.book);
     if (built.quotes.length) rates.ensured?.push({ months, quotes: built.quotes });
     return { ...built, activity: rates.activity ?? 'idle', loaded: true, lastFetchedAt: null, book: rates.book, held };
