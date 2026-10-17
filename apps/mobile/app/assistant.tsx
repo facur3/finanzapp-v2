@@ -16,7 +16,7 @@ import { AssistantComposer } from '../src/ui/assistant-composer';
 import { AnswerEvidence, AssistantText, ClarificationChoices, ProposalCard, Suggestions, SystemNote, UserMessage, type ProposalState } from '../src/ui/assistant-messages';
 import { AppText, IconButton } from '../src/ui/components';
 import { Appear, Restored, announce, impactHaptic } from '../src/ui/motion';
-import { availableCurrencies } from '../src/ui/presentation';
+import { availableCurrencies, historyCurrencies } from '../src/ui/presentation';
 import { space, useCurrentDay, usePalette, useReduceMotion } from '../src/ui/theme';
 
 /** The tab roots: an evidence link to one of them goes back to the tabs already under the Assistant and selects that tab
@@ -176,7 +176,10 @@ export default function AssistantScreen() {
         if (event.type === 'delta') dispatch({ type: 'delta', text: event.text, language });
         else if (event.type === 'result') {
           const { content, ...rest } = contentFromResult(event.result, event.facts, accounts, entries, currency, day, incomeAccounts);
-          dispatch({ type: 'answer', ...rest, content: toContent(content), language });
+          // The facts count the accounts in `currency` only: with other currencies in the ledger the rows say so, so they are
+          // never read as Inicio's consolidated total.
+          const scoped = content?.kind === 'answer' && historyCurrencies(snapshot?.accounts ?? []).length > 1 ? { ...content, scoped: true } : content;
+          dispatch({ type: 'answer', ...rest, content: toContent(scoped), language });
           sayReply();
           // 25A-06 (decision A): a name the model copied past its bound was left null at the server, never cut: the thread
           // says which one right under the reply, and the review (the card's row, the sheet's gap, Editar) asks for it.

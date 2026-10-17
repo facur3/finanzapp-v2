@@ -171,6 +171,9 @@ export function AnswerEvidence({ content, onOpen }: { content: AnswerContent; on
   const stacked = useStacked();
   if (!content.rows.length && !content.links.length) return null;
   const currency = content.currency;
+  // What the rows cover, said under them when it is not the obvious whole: days 1 to N of a capped month, one currency's accounts.
+  const scope = [content.untilISO ? t('reports.period.untilDay', { day: Number(content.untilISO.slice(8)) }) : null,
+    content.scoped ? t('assistant.evidence.scope', { currency }) : null].filter(Boolean).join(' · ');
   // A difference that grew is said as such ("42500,00 pesos más"); a lower one already starts with "Menos".
   const spoken = (row: AnswerContent['rows'][number]) => row.signed && row.amountMinor > 0
     ? t('assistant.evidence.spokenIncrease', { amount: spokenMoney(row.amountMinor, currency) }) : spokenMoney(row.amountMinor, currency);
@@ -185,6 +188,7 @@ export function AnswerEvidence({ content, onOpen }: { content: AnswerContent; on
         </View>;
       })}
     </View>}
+    {scope !== '' && content.rows.length > 0 && <AppText secondary variant="footnote" accessibilityLanguage={speechLanguage}>{scope}</AppText>}
     {content.links.length > 0 && <View style={styles.links}>
       {content.links.map(link => <PressFeedback key={link.id} feedback="opacity" accessibilityRole="link" accessibilityLabel={t(`assistant.links.${link.id}`)} onPress={() => onOpen(link.href)} style={styles.link}>
         <AppText variant="subhead" style={{ color: p.primary, fontWeight: '600' }}>{t(`assistant.links.${link.id}`)}</AppText>

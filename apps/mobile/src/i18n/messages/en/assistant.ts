@@ -57,6 +57,7 @@ export const assistant: Pick<Messages, 'assistant'> = {
       refunds: 'Refunds',
       previousMonth: '{label} (previous month)',
       spokenIncrease: '{amount} more',
+      scope: 'Only accounts in {currency}, nothing converted.',
     },
     links: {
       movements: 'View transactions',

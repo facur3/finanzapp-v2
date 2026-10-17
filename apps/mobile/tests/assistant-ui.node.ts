@@ -379,6 +379,20 @@ test('answer evidence renders rows with the shared Money component and links as 
   assert.equal(rowOf(large).props.accessibilityLabel, 'Supermercado, 31200,00 pesos más', 'one VoiceOver element, the same sentence');
 });
 
+test('the evidence says what its rows cover when it is not the obvious whole: days 1 to N of a capped month, one currency\'s accounts', () => {
+  const ui = load('assistant-messages.tsx');
+  const facts = [{ id: 'current.expenses', label: 'Gastos registrados', amountMinor: 120000, count: 3, startISO: '2026-10-01', endISO: '2026-10-30' }];
+  const words = (content: conversation.AnswerContent) => nodes(ui.render('AnswerEvidence', { content, onOpen: () => {} })).filter(node => node.type === 'AppText').map(textOf);
+  const capped = conversation.answerContent({ evidenceIds: ['current.expenses'] }, facts, 'ARS', '2026-10-31');
+  assert.ok(words({ ...capped, scoped: true }).includes('Del 1 al 30 · Solo cuentas en ARS, sin conversiones.'));
+  assert.ok(words(capped).includes('Del 1 al 30'));
+  const whole = conversation.answerContent({ evidenceIds: ['current.expenses'] }, facts, 'ARS', '2026-10-30');
+  assert.ok(!words(whole).some(text => /Del 1|Solo cuentas/.test(text)), 'a single-currency ledger mid-month: no caption');
+  const english = load('assistant-messages.tsx', { locale: 'en-US' });
+  assert.ok(nodes(english.render('AnswerEvidence', { content: { ...capped, scoped: true }, onOpen: () => {} })).filter(node => node.type === 'AppText').map(textOf)
+    .includes('Days 1–30 · Only accounts in ARS, nothing converted.'));
+});
+
 test('English: every word the Assistant UI says is English; account names, merchants, custom categories and the model\'s text are untouched', () => {
   const ui = load('assistant-messages.tsx', { locale: 'en-AR' });
   const handlers = { archive: proposalArchive, onReview: () => {}, onRetry: () => {}, onOpenRecord: () => {} };

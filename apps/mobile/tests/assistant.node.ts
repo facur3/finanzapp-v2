@@ -729,3 +729,20 @@ test('25A-06: facts travel as exact major-unit decimals in the request currency 
   await assert.rejects(client.assistant({ action: 'explain', text: '¿Cuánto gasté?', todayISO: today, currency: 'KWD' as any, region: 'KW', language: 'es', facts: yen }));
   assert.equal(bodies.length, 2);
 });
+
+test('on the last days of a month after a shorter one, «this month» ends where the comparison does, and the answer says until when', () => {
+  const opened = '2026-01-01T12:00:00.000Z';
+  const account: Account = { id: 'cash', name: 'Efectivo', currency: 'ARS', openingMinor: 0, createdAt: opened };
+  const spent = (id: string, dateISO: string): Entry => ({ id, accountId: 'cash', kind: 'expense', amountMinor: 1000, merchant: 'Kiosco', category: 'Comida', dateISO, createdAt: opened });
+  const snapshot = { accounts: [account], entries: [spent('a', '2026-09-10'), spent('b', '2026-10-05'), spent('c', '2026-10-31'), spent('d', '2026-02-10'), spent('e', '2026-03-05'), spent('f', '2026-03-31')], transfers: [] };
+  for (const [today, end] of [['2026-10-31', '2026-10-30'], ['2026-03-31', '2026-03-28']] as const) {
+    const facts = monthlyEvidence(snapshot, 'ARS', today);
+    const current = facts.find(fact => fact.id === 'current.expenses')!;
+    assert.equal(current.endISO, end, 'the like-for-like window of the comparison');
+    const content = answerContent({ evidenceIds: ['current.expenses'] }, facts, 'ARS', today);
+    assert.equal(content.untilISO, end, 'the rows say they stop before today');
+  }
+  const midMonth = monthlyEvidence(snapshot, 'ARS', '2026-10-12');
+  assert.equal(answerContent({ evidenceIds: ['current.expenses'] }, midMonth, 'ARS', '2026-10-12').untilISO, undefined, 'a window that reaches today needs no caption');
+  assert.equal(answerContent({ evidenceIds: [] }, midMonth, 'ARS', '2026-10-31').untilISO, undefined, 'no rows, no caption');
+});

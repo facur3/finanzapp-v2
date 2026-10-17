@@ -86,8 +86,11 @@ export function optionText(option: ClarificationOption, t: Translate = translato
   return option.labelKey ? t(option.labelKey) : option.label ?? '';
 }
 
-/** `currency` is the one the facts were computed in: the rows keep it even if the screen later shows another. */
-export type AnswerContent = { kind: 'answer'; rows: EvidenceRow[]; links: EvidenceLink[]; currency: Currency };
+/** `currency` is the one the facts were computed in: the rows keep it even if the screen later shows another.
+ * `untilISO`: the cited facts of this month end before the day asked (the comparison's like-for-like window after a shorter
+ * month), so the rows say «Del 1 al {day}». `scoped`: the ledger holds other currencies too, and these facts count only the
+ * accounts in `currency` (never a consolidated total), so the rows say so. */
+export type AnswerContent = { kind: 'answer'; rows: EvidenceRow[]; links: EvidenceLink[]; currency: Currency; untilISO?: string; scoped?: boolean };
 /** A resolved draft before the screen turns it into a proposal (it never reaches the reducer). */
 export type ResolvedContent = { kind: 'draft'; draft: ResolvedDraft };
 /** 25A-04: the frozen capture of one Assistant proposal into the review store: its item id, its write id and its capture
@@ -445,7 +448,7 @@ export function evidenceLabel(row: EvidenceRow, t: Translate = translator('es'),
  * the amount. Links open the FinanzApp screens that hold those records. The
  * model's navigation intent only moves the link it names first when that link
  * was derived here from the same cited fact: it never adds a link or a route. */
-export function answerContent(result: { evidenceIds: string[]; navigation?: NavigationIntent | null }, facts: AssistantFact[], currency: Currency): AnswerContent {
+export function answerContent(result: { evidenceIds: string[]; navigation?: NavigationIntent | null }, facts: AssistantFact[], currency: Currency, todayISO?: string): AnswerContent {
   const cited = result.evidenceIds.map(id => facts.find(fact => fact.id === id)).filter((fact): fact is AssistantFact => !!fact);
   const current = cited.filter(fact => fact.id.startsWith('current.'));
   const previous = cited.filter(fact => fact.id.startsWith('previous.'));
@@ -470,7 +473,8 @@ export function answerContent(result: { evidenceIds: string[]; navigation?: Navi
     budget: id => budget?.id === id, movements: id => cited.some(fact => fact.id === id) };
   const first = intent ? links.findIndex(link => link.id === intent.target && source[link.id](intent.factId)) : -1;
   if (first > 0) links.unshift(...links.splice(first, 1));
-  return { kind: 'answer', rows: rows.slice(0, 5), links, currency };
+  const end = current.map(fact => fact.endISO).sort().at(-1);
+  return { kind: 'answer', rows: rows.slice(0, 5), links, currency, ...(todayISO && end && end < todayISO && rows.length ? { untilISO: end } : {}) };
 }
 
 /** The protocol's clarification fields the conversation has a field for; the others (currency, date, merchant, period)
@@ -501,7 +505,7 @@ export function contentFromResult(result: AssistantResultV2, facts: AssistantFac
     const options = result.clarification.candidateIds.map(id => facts.find(fact => fact.id === id)).filter((fact): fact is AssistantFact => !!fact).map(factOption);
     return { text: result.message, content: { kind: 'clarification', field: CLARIFIED[result.clarification.field] ?? null, options, chosen: null }, pending: null };
   }
-  if (result.type === 'answer') return { text: result.message, content: answerContent(result, facts, currency), pending: null };
+  if (result.type === 'answer') return { text: result.message, content: answerContent(result, facts, currency, todayISO), pending: null };
   return { text: result.message, content: null, pending: null };
 }
 

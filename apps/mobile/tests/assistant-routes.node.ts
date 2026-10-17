@@ -401,6 +401,20 @@ test('an answer renders its text and evidence rows/links from the cited facts, a
   assert.equal(view2.navigated.length, 0);
 });
 
+test('with accounts in several currencies an answer says its facts count one currency\'s accounts; with one currency it says nothing', async () => {
+  for (const [accounts, scoped] of [[[visa, cash, usd], true], [[visa, cash], false]] as const) {
+    const scripted = scriptedClient();
+    const view = harness({ client: scripted.client, accounts: [...accounts] });
+    view.render().empty.props.onPick('¿Por qué gasté más este mes?');
+    await tick();
+    scripted.reply([{ type: 'result', result: FIXTURE_ANSWER, facts: FIXTURE_FACTS }]);
+    await settle();
+    const evidence = find([view.render().items[1]], 'AnswerEvidence')[0];
+    assert.equal(evidence.props.content.scoped ?? false, scoped);
+    assert.equal(evidence.props.content.currency, 'ARS');
+  }
+});
+
 test('25A-04: a resolved draft becomes a proposal captured into «Para revisar» on real SQLite: one item, the source assistant, nothing in the ledger, and the card leads to the review', async () => {
   const files = await reviewFiles([visa, cash, usd]);
   try {

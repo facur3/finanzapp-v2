@@ -80,6 +80,8 @@ export const assistant = {
       previousMonth: '{label} (mes anterior)',
       /** VoiceOver for a difference that grew against the previous month (the screen shows "+$ 42.500,00"): "42500,00 pesos más". */
       spokenIncrease: '{amount} más',
+      /** Under the rows when the ledger holds other currencies: these facts count only the accounts in {currency} (its code). */
+      scope: 'Solo cuentas en {currency}, sin conversiones.',
     },
     /** Text buttons under an answer that open the screens holding the records. */
     links: {
