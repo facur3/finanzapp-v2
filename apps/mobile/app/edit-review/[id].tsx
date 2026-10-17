@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { Keyboard, View } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { accountKind, editedDraftFits, minorFromEditedDraft, todayKey, type ReviewArchive, type ReviewKind, type ReviewPurchase, type StatementPlacement } from '@finanzapp/domain';
+import { accountKind, editedDraftFits, hasHiddenCharacters, minorFromEditedDraft, resolveCategory, todayKey, type ReviewArchive, type ReviewKind, type ReviewPurchase, type StatementPlacement } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import type { ReviewItem } from '../../src/storage/review-database';
 import { ActionButton, AmountField, AppText, Choices, EmptyState, ErrorMessage, Field, IconButton, Screen, Surface } from '../../src/ui/components';
@@ -10,9 +10,10 @@ import { QUICK_COUNTS, type CountChoice } from '../../src/ui/purchase-plan';
 import { parseInstallmentCount, placementOptions } from '../../src/ui/installment-presentation';
 import { accountKindLabel } from '../../src/ui/liability-presentation';
 import { draftFromMinor } from '../../src/ui/money-input';
+import { errorHaptic, successHaptic } from '../../src/ui/motion';
 import { editedReviewDraft, editorDestinations } from '../../src/ui/review-presentation';
 import { useReviewItem } from '../../src/ui/use-review-item';
-import { space } from '../../src/ui/theme';
+import { space, usePalette } from '../../src/ui/theme';
 import { useI18n } from '../../src/i18n/provider';
 
 /** Producto 25A-03, Editar: the proposal's fields in the app's own controls (the account, category and date selectors and
@@ -26,9 +27,17 @@ export default function EditReviewScreen() {
   const { t } = useI18n();
   const { item: found, tray, resolving } = useReviewItem(id);
   const item = tray?.writable ? found : undefined;
-  if (!item && resolving) return <Screen>{null}</Screen>;
-  if (!item) return <Screen><EmptyState icon="file-tray-outline" title={t('review.detail.notFoundTitle')} detail={t('review.detail.notFoundDetail')} /></Screen>;
+  // 25Q4: the modal keeps a close button while the proposal resolves and when it is no longer pending (the editor's close).
+  const closeButton = closeOnly(t('common.close'));
+  if (!item && resolving) return <Screen>{closeButton}</Screen>;
+  if (!item) return <Screen>{closeButton}<EmptyState icon="file-tray-outline" title={t('review.detail.notFoundTitle')} detail={t('review.detail.notFoundDetail')} /></Screen>;
   return <ReviewEditor key={item.id} item={item} />;
+}
+
+/** 25Q4: the editor's close where there is nothing to edit (nothing is saving there): back, or Para revisar with nothing behind. */
+function closeOnly(label: string) {
+  return <Stack.Screen options={{ headerLeft: () => <IconButton name="close" label={label}
+    onPress={() => { if (router.canGoBack()) router.back(); else router.replace('/review'); }} /> }} />;
 }
 
 /** The count segment a stored count shows: one of the quick counts, «Otra» with the number typed, or nothing chosen. */
@@ -39,7 +48,8 @@ function countChoiceOf(count: number | null): { choice: CountChoice | null; type
 
 function ReviewEditor({ item }: { item: ReviewItem }) {
   const { archive, snapshot, updateReview } = useLedger();
-  const { t, formatDate } = useI18n();
+  const { t, formatDate, failureMessage } = useI18n();
+  const p = usePalette();
   // The revision this editor opened: a proposal changed since (another edit, a reconciliation) is refused, never overwritten.
   const [opened] = useState(item);
   const draft = opened.draft;
@@ -60,7 +70,8 @@ function ReviewEditor({ item }: { item: ReviewItem }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const saving = useRef(false);
-  if (!archive) return <Screen>{null}</Screen>;
+  // 25Q4 review: before the ledger opens, the same close as every other branch.
+  if (!archive) return <Screen>{closeOnly(t('common.close'))}</Screen>;
   const reviewArchive = archive as ReviewArchive;
   const cards = archive.cards ?? [], debts = archive.debts ?? [];
 
@@ -72,6 +83,13 @@ function ReviewEditor({ item }: { item: ReviewItem }) {
   const fit = currency && amount.trim() ? editedDraftFits(amount, currency, stored) : { ok: true as const };
   const showsPurchase = !!card && kind !== 'income';
   const typedOrQuick = countChoice === 'other' ? parseInstallmentCount(typedCount) : countChoice === null ? null : Number(countChoice);
+  // Checked where they are typed, as the forms do, never only at save: a typed count outside 2-120 (it would be saved as
+  // «sin cantidad» without a word) and a merchant pasted with hidden characters (refused at save with no field named).
+  const countInvalid = showsPurchase && mode === 'installments' && countChoice === 'other' && typedCount !== '' && typedOrQuick === null;
+  const hiddenMerchant = hasHiddenCharacters(merchant);
+  // A category archived since the proposal (or copied from an archived one) is not a choice: the field reads «Elegir
+  // categoría» and the picker lists live categories only. Saving without choosing keeps the gap, as before.
+  const archivedCategory = category.trim() !== '' && resolveCategory(kind ?? 'expense', category, archive.categories ?? []).archived;
   const dateISO = date ? todayKey(date) : null;
   const statements = card && dateISO ? placementOptions(card, archive.cardCycleDates ?? [], dateISO) : null;
   const close = () => { if (!saving.current) { if (router.canGoBack()) router.back(); else router.replace('/review'); } };
@@ -90,10 +108,14 @@ function ReviewEditor({ item }: { item: ReviewItem }) {
         kind, amountMinor, currency: amountMinor === null ? draft.currency : currency, merchant, category, dateISO, destinationId, purchase,
       }, reviewArchive);
       await updateReview(opened.id, opened.revision, next);
+      // 25Q4 review: a saved edit taps Success, as every other «Guardar cambios» does.
+      successHaptic();
       saving.current = false;
       close();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'review.unavailable');
+      setError(failureMessage(cause, 'review.edit.saveFailed'));
+      // 25Q4: nothing stays frozen here; Guardar cambios is offered again.
+      errorHaptic();
     } finally {
       saving.current = false;
       setBusy(false);
@@ -113,7 +135,7 @@ function ReviewEditor({ item }: { item: ReviewItem }) {
     {!fit.ok && <AppText variant="footnote" secondary>{t('review.gaps.amount')}</AppText>}
     <View style={{ gap: space.m }}>
       <View style={{ gap: space.s }}>
-        <CategoryField entries={snapshot?.entries ?? []} kind={kind ?? 'expense'} value={category} onChange={setCategory} disabled={busy} prominent allowCreate={false} />
+        <CategoryField entries={snapshot?.entries ?? []} kind={kind ?? 'expense'} value={archivedCategory ? '' : category} onChange={setCategory} disabled={busy} prominent allowCreate={false} />
         <AppText secondary variant="footnote">{t('review.edit.categoryNote')}</AppText>
       </View>
       {destinations.length ? <AccountField label={t('review.fields.destination')} accounts={destinations} value={destinationId ?? ''} disabled={busy} prominent
@@ -130,6 +152,7 @@ function ReviewEditor({ item }: { item: ReviewItem }) {
     <Field label={t(kind === 'income' ? 'entryForm.merchantIncome' : 'entryForm.merchantExpense')} value={merchant}
       placeholder={t(kind === 'income' ? 'entryForm.merchantIncomePlaceholder' : 'entryForm.merchantExpensePlaceholder')}
       onChangeText={setMerchant} maxLength={120} autoCapitalize="sentences" editable={!busy} />
+    {hiddenMerchant && <AppText variant="footnote" style={{ color: p.warning }}>{t('review.edit.hiddenCharacters')}</AppText>}
     <Surface grouped><DateField value={date} onChange={setDate} disabled={busy} /></Surface>
     {/* «Pago», on an expense paid with an active card only. Nothing is preselected: «Una vez» or «En cuotas» is the
         person's choice, and so is the count (never 12 or any other default). No financing from here. */}
@@ -145,6 +168,7 @@ function ReviewEditor({ item }: { item: ReviewItem }) {
           <Choices<CountChoice> compact value={countChoice} onChange={setCountChoice} disabled={busy} options={counts} />
           {countChoice === 'other' && <Field label={t('entryForm.plan.countField')} value={typedCount} placeholder={t('entryForm.plan.countPlaceholder')}
             onChangeText={value => setTypedCount(value.replace(/\D/g, '').slice(0, 3))} keyboardType="number-pad" maxLength={3} editable={!busy} />}
+          {countInvalid && <AppText variant="footnote" style={{ color: p.warning }}>{t('entryForm.plan.countInvalid')}</AppText>}
         </View>
         <View style={{ gap: space.s }}>
           <AppText secondary variant="footnote" style={{ fontWeight: '500' }}>{t('review.edit.placement')}</AppText>
@@ -157,6 +181,6 @@ function ReviewEditor({ item }: { item: ReviewItem }) {
       </>}
     </View>}
     <ErrorMessage message={error} />
-    <ActionButton label={t('common.saveChanges')} onPress={save} busy={busy} disabled={!fit.ok} />
+    <ActionButton label={t('common.saveChanges')} onPress={save} busy={busy} disabled={!fit.ok || countInvalid || hiddenMerchant} />
   </Screen>;
 }

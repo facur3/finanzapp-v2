@@ -5,11 +5,20 @@ import type { Messages } from '../../messages.ts';
  * opens (Producto 24UX6A, decision 005). */
 export const home: Pick<Messages, 'home' | 'quickActions'> = {
   home: {
-    emptyTitle: 'Understand your spending.',
-    emptyDetail: 'Choose an account to group your transactions. You can start without entering your bank balance.',
-    start: 'Get started',
+    firstSteps: {
+      title: 'First steps',
+      account: 'Create your first account',
+      accountDetail: 'Cash, bank or wallet',
+      expense: 'Log your first purchase',
+      expenseDetail: 'A coffee, groceries, anything',
+      card: 'Add your credit card',
+      cardDetail: 'Optional · to follow its installments',
+      doneLabel: '{title}, {detail}, done',
+    },
     spending: 'Spent',
     available: 'Available',
+    heroSpending: 'Spent in {month}, {amount}',
+    heroAvailable: 'Available, {amount}',
     availableHelp: 'The money recorded in your accounts in this currency: opening balance plus income, minus expenses and transfers. '
       + 'It excludes cards and debts, and it is not a bank balance or your net worth.',
     spendingOutOfRange: 'The total is beyond the range we can show precisely. Your transactions are still saved.',
@@ -48,14 +57,14 @@ export const home: Pick<Messages, 'home' | 'quickActions'> = {
       title: 'Record',
       close: 'Close',
       assistant: 'Assistant',
-      assistantDetail: 'Say it in your own words or ask anything',
+      assistantDetail: 'Record a purchase or ask about your spending',
       continue: 'Continue: “{text}”',
       expense: 'Expense',
-      expenseDetail: 'A purchase or a payment',
+      expenseDetail: 'A purchase or a bill',
       income: 'Income',
-      incomeDetail: 'Salary, a payment received or other income',
+      incomeDetail: 'Salary or other income',
       transfer: 'Transfer',
-      transferDetail: 'Between accounts or a card payment',
+      transferDetail: 'Between your accounts',
     },
   },
   quickActions: {

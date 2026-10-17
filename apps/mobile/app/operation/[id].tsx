@@ -49,8 +49,7 @@ function OperationDetail({ operation }: { operation: PurchaseOperation }) {
   const month = formatMonth(operation.dateISO.slice(0, 7), 'monthYear');
   const long = formatDate(operation.dateISO, 'weekdayLong');
   const date = long.charAt(0).toLocaleUpperCase() + long.slice(1);
-  const status = t(voided ? (refund ? 'operations.detail.statusVoidedRefund' : 'operations.detail.statusVoidedPayoff')
-    : refund ? 'operations.detail.statusRefund' : 'operations.detail.statusPayoff');
+  const status = changes.statusOf(operation);
   const name = account ? accountName(account) : '';
 
   // What it records, with the region's separators on screen and in the spoken form for VoiceOver.
@@ -109,7 +108,7 @@ function OperationDetail({ operation }: { operation: PurchaseOperation }) {
     </View>
     <ErrorMessage message={error} />
     {check.ok || frozen
-      ? <ActionButton label={actionLabel} icon={voided ? 'arrow-redo-outline' : 'arrow-undo-outline'} onPress={() => changes.ask(operation)} busy={busy} secondary={!voided} />
+      ? <ActionButton label={actionLabel} onPress={() => changes.ask(operation)} busy={busy} secondary={!voided} />
       : <LifecycleNote icon="information-circle-outline" title={t(voided ? 'operations.detail.blockedRestoreTitle' : 'operations.detail.blockedTitle')} detail={errorText(check.reason)} />}
   </Screen>;
 }

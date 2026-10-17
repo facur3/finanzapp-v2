@@ -10,12 +10,12 @@ import { budgetCategoriesCaption, budgetCurrencies, budgetTone, percentUsed } fr
 import { useCategoryLabel } from '../src/ui/category-hues';
 import { ActionButton, AppText, CategoryBadge, EmptyState, IconButton, Money, PressFeedback, Screen, SectionTitle, Stat, StatRow, Surface } from '../src/ui/components';
 import { CurrencySwitch } from '../src/ui/currency-switch';
-import { labelAmountStacks } from '../src/ui/geometry';
+import { TEXT_STYLE_MAX_SCALE, WEIGHT_WIDTH, labelAmountStacks, titleFit, widestWordEm } from '../src/ui/geometry';
 import { useDefaultCurrency } from '../src/ui/use-default-currency';
 import { useI18n } from '../src/i18n/provider';
 import { availableCurrencies, historyCurrencies } from '../src/ui/presentation';
 import { heldCurrency } from '../src/ui/report-presentation';
-import { timing } from '../src/ui/motion';
+import { announce, selectionHaptic, timing } from '../src/ui/motion';
 import { space, useCurrentDay, usePalette, useReduceMotion } from '../src/ui/theme';
 
 /** Hierarchy: the general budget (the month's ceiling over every recorded
@@ -30,6 +30,7 @@ export default function BudgetsScreen() {
   const day = useCurrentDay();
   const p = usePalette();
   const { t, formatMonthTitle, moneyText, spokenMoney, currencyUnit } = useI18n();
+  const { width, fontScale } = useWindowDimensions();
   const currencies = budgetCurrencies(availableCurrencies(snapshot?.accounts ?? []), archive?.budgets ?? []);
   // The route's currency is honoured when an account holds it; otherwise the one default rule (25B2): the currency held,
   // the display currency among several, the region's tender, ARS last. An unknown code is never coerced.
@@ -58,6 +59,20 @@ export default function BudgetsScreen() {
   const exceeded = summary ? summary.rows.filter(row => budgetTone(row) === 'expense').length : 0;
   const near = summary ? summary.rows.filter(row => budgetTone(row) === 'warning').length : 0;
   const isCurrent = monthISO === currentMonthISO(day);
+  const monthState = (month: string) => t(month === currentMonthISO(day) ? 'budgets.screen.currentMonth' : month > currentMonthISO(day) ? 'budgets.screen.futureMonth' : 'budgets.screen.closedMonth');
+  // 25D2: a step ticks like Reportes' arrows, and VoiceOver hears the month it landed on and its state (focus stays on the
+  // arrow, so stepping on keeps working); the title and the budgets change away from the control.
+  const goToMonth = (month: string) => {
+    selectionHaptic();
+    setMonthISO(month);
+    announce(formatMonthTitle(month) + '. ' + monthState(month));
+  };
+  // 25D1: the month title of Reportes, with the same rule: Title 3's iOS size, beside the arrows while its longest word
+  // fits there, otherwise on its own line with the arrows under it (the year's longest title decides).
+  const monthTitle = titleFit(fontScale, TEXT_STYLE_MAX_SCALE.title3!, widestWordEm(Array.from({ length: 12 }, (_, i) => formatMonthTitle(monthISO.slice(0, 4) + '-' + String(i + 1).padStart(2, '0')))),
+    20 * WEIGHT_WIDTH.semibold, width - 2 * space.xl - 2 * 44 - 2 * 8, width - 2 * space.xl);
+  const monthArrow = (step: -1 | 1) => <IconButton name={step < 0 ? 'chevron-back' : 'chevron-forward'} label={t(step < 0 ? 'budgets.screen.previousMonth' : 'budgets.screen.nextMonth')}
+    onPress={() => goToMonth(shiftMonthISO(monthISO, step))} />;
   const total = summary?.total ?? null;
   const newBudget = (scope: 'total' | 'category') => router.push({ pathname: '/new-budget', params: { currency, month: monthISO, scope } });
 
@@ -68,21 +83,24 @@ export default function BudgetsScreen() {
 
     <View style={{ gap: space.m }}>
       {currencies.length > 1 && <CurrencySwitch value={currency} currencies={currencies} onChange={setSelectedCurrency} />}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <IconButton name="chevron-back" label={t('budgets.screen.previousMonth')} onPress={() => setMonthISO(value => shiftMonthISO(value, -1))} />
-        <View style={{ flex: 1, alignItems: 'center', gap: 2 }}>
-          <AppText accessibilityRole="header" variant="title3" style={{ textAlign: 'center' }}>{formatMonthTitle(monthISO)}</AppText>
+      <View style={monthTitle.stacked ? { gap: 8 } : { flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        {!monthTitle.stacked && monthArrow(-1)}
+        <View style={[!monthTitle.stacked && { flex: 1 }, { alignItems: 'center', gap: 2 }]}>
+          <AppText accessibilityRole="header" variant="title3" maxFontSizeMultiplier={monthTitle.maxScale} numberOfLines={2}
+            style={{ textAlign: 'center' }}>{formatMonthTitle(monthISO)}</AppText>
           {/* 24UX6E: the state and «Este mes» wrap onto two centred lines at large text instead of overflowing the
               column; the link keeps its 28 pt line and reaches 44 pt with its slop. */}
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', columnGap: 10, rowGap: 2 }}>
-            <AppText secondary variant="caption" style={{ textAlign: 'center' }}>{t(isCurrent ? 'budgets.screen.currentMonth' : monthISO > currentMonthISO(day) ? 'budgets.screen.futureMonth' : 'budgets.screen.closedMonth')}</AppText>
-            {!isCurrent && <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('budgets.screen.backToCurrent')} onPress={() => setMonthISO(currentMonthISO(day))}
+            <AppText secondary variant="caption" style={{ textAlign: 'center' }}>{monthState(monthISO)}</AppText>
+            {/* 25D2: named by its visible words (Voice Control: «Tocar Este mes»); the longer sentence is the hint. */}
+            {!isCurrent && <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('budgets.screen.thisMonth')} accessibilityHint={t('budgets.screen.backToCurrent')}
+              onPress={() => goToMonth(currentMonthISO(day))}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ minHeight: 28, justifyContent: 'center' }}>
               <AppText variant="caption" style={{ fontWeight: '600', color: p.link }}>{t('budgets.screen.thisMonth')}</AppText>
             </PressFeedback>}
           </View>
         </View>
-        <IconButton name="chevron-forward" label={t('budgets.screen.nextMonth')} onPress={() => setMonthISO(value => shiftMonthISO(value, 1))} />
+        {monthTitle.stacked ? <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>{monthArrow(-1)}{monthArrow(1)}</View> : monthArrow(1)}
       </View>
       {/* 25Q1: no account ever held this currency, so the spent figure is no data, never a verified zero. */}
       {(total || activeCount > 0) && !historyCurrencies(snapshot.accounts).includes(currency) && <AppText secondary variant="footnote" style={{ textAlign: 'center' }}>
@@ -144,7 +162,9 @@ function TotalPanel({ total, currency, spoken }: { total: BudgetProgress<TotalMo
   const remaining = Math.min(total.remainingMinor, total.budget.amountMinor);
   return <View accessible accessibilityLabel={t('budgets.total.label', { spent: spoken(total.spentMinor), limit: spoken(total.budget.amountMinor), percent,
     status: remaining < 0 ? t('budgets.total.exceededBy', { amount: spoken(-remaining) }) : refunded ? t('budgets.total.refundsAvailable', { amount: spoken(remaining) })
-      : remaining === 0 ? t('budgets.total.reached') : t('budgets.total.availableAmount', { amount: spoken(remaining) }) })}
+      : remaining === 0 ? t('budgets.total.reached')
+      // 25D2: the amber state is a word on screen («cerca del límite»), so VoiceOver hears it too.
+      : tone === 'warning' ? t('budgets.total.nearAvailable', { amount: spoken(remaining) }) : t('budgets.total.availableAmount', { amount: spoken(remaining) }) })}
     accessibilityLanguage={speechLanguage} style={{ gap: 20 }}>
     <View style={{ gap: 6 }}>
       <AppText secondary variant="footnote" style={{ fontWeight: '500' }}>{t(remaining < 0 ? 'budgets.total.exceeded' : 'budgets.total.available')}</AppText>
@@ -186,7 +206,9 @@ function BudgetRow({ row, money, spoken, last }: { row: BudgetProgress<CategoryM
   const refunded = row.spentMinor < 0;
   const statusOf = (amount: (minor: number) => string) => row.exceeded ? t('budgets.row.exceededBy', { amount: amount(-row.remainingMinor) })
     : refunded ? t('budgets.row.refundsLeft', { amount: amount(row.budget.amountMinor) })
-    : row.remainingMinor === 0 ? t('budgets.row.reached') : t('budgets.row.left', { amount: amount(row.remainingMinor) });
+    : row.remainingMinor === 0 ? t('budgets.row.reached')
+    // 25D2: a sublimit carries the amber state by colour alone on screen; VoiceOver hears it in words.
+    : state === 'warning' ? t('budgets.row.nearLeft', { amount: amount(row.remainingMinor) }) : t('budgets.row.left', { amount: amount(row.remainingMinor) });
   const limit = money(row.budget.amountMinor);
   const detail = row.exceeded ? t('budgets.row.overOf', { amount: money(-row.remainingMinor), limit })
     : refunded ? t('budgets.row.refundsOf', { limit })

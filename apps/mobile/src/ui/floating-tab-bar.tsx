@@ -32,8 +32,8 @@ export { DOCK, tabBarBottomGap } from './dock-geometry';
 
 /** The pill's solid material: the graphite fill, a hairline edge, and a soft lift on the light ground (none on black). */
 export function dockMaterial(p: Palette): ViewStyle {
-  return { backgroundColor: p.dock, borderWidth: StyleSheet.hairlineWidth, borderColor: p.isDark ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.10)',
-    ...(p.isDark ? {} : { shadowColor: p.text, shadowOpacity: 0.14, shadowRadius: 16, shadowOffset: { width: 0, height: 6 } }) };
+  return { backgroundColor: p.dock, borderWidth: StyleSheet.hairlineWidth, borderColor: p.dockEdge,
+    ...(p.isDark ? {} : { shadowColor: p.shadow, shadowOpacity: 0.14, shadowRadius: 16, shadowOffset: { width: 0, height: 6 } }) };
 }
 
 export function FloatingTabBar({ state, descriptors, navigation, insets }: BottomTabBarProps) {
@@ -81,7 +81,7 @@ function TabItem({ label, index, count, focused, icon, onPress, badge = null }: 
     onPress={onPress} containerStyle={styles.itemContainer} style={styles.item}>
     <View accessible={false} importantForAccessibility="no-hide-descendants" style={[styles.capsule, focused ? { backgroundColor: p.dockActive } : null]}>
       {icon}
-      {/* Neutral, not lime (lime is the «+» beside it) and not red (nothing failed): the dock's white with its graphite. */}
+      {/* Neutral, not the brand (the brand is the «+» beside it) and not red (nothing failed): the dock's white with its graphite. */}
       {badge !== null && <View style={[styles.badge, { backgroundColor: p.dockActiveInk, borderColor: p.dock }]}>
         <Text accessibilityLanguage={speechLanguage} maxFontSizeMultiplier={1.2} style={[styles.badgeText, { color: p.dock }]}>{badge > 99 ? '99+' : badge}</Text>
       </View>}

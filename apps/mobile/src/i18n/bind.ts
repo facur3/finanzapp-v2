@@ -10,9 +10,9 @@ import type { LocaleSource } from './device.ts';
 import { amountFormat, codedAmount, currencyName, currencySymbol, currencyUnit, formatCount, formatMoneyAmount, formatDate, formatDateTime, formatDayMonth, formatMonth, formatMonthTitle,
   formatNumericDate, formatPercent, formatWholeUnits, moneyText, pickerLocale, relativeDate, spokenAmount, spokenMinor, spokenMoney, spokenPercent, type DateStyle,
   type HeldCurrencies, type RegionAmountFormat } from './format.ts';
-import { localizeError } from './errors.ts';
+import { failureMessage, localizeError } from './errors.ts';
 import { completeConventions, conventionsOf, languageOf, regionOf, type AppLocale, type LanguageCode, type RegionCode, type RegionConventions } from './locale.ts';
-import { translator, type Translate } from './messages.ts';
+import { translator, type MessageKey, type Translate } from './messages.ts';
 
 export interface I18n {
   locale: AppLocale;
@@ -71,6 +71,9 @@ export interface I18n {
   relativeDate: (dateISO: string, todayISO: string, inline?: boolean) => string;
   /** A caught or stored error message in the interface language (see errors.ts). */
   errorText: (message: string) => string;
+  /** 25Q4: what a failed action stores (errors.ts): a catalogued message, else `fallback`. Language-free; it sits on the
+   * binding because every catching screen already reads `useI18n()` and every route harness binds the real locale. */
+  failureMessage: (cause: unknown, fallback: MessageKey) => string;
 }
 
 /** `deviceLanguage` is the primary language subtag of the device's first
@@ -112,6 +115,7 @@ export function bindLocale(locale: AppLocale, localeSource: LocaleSource = 'none
     currencyName: currency => currencyName(currency, locale),
     relativeDate: (dateISO, todayISO, inline) => relativeDate(dateISO, todayISO, locale, inline),
     errorText: message => localizeError(language, message),
+    failureMessage,
   };
 }
 

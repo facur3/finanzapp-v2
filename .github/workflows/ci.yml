@@ -28,6 +28,11 @@ jobs:
       - name: Domain and mobile backend tests (packages/domain, server/mobile)
         run: npm test
 
+      # The runner is in UTC, where local time equals UTC: the same tests again in an offset zone (the primary market), one
+      # with daylight saving and one ahead of UTC, so a date computed from UTC instead of the device's calendar day fails here.
+      - name: The same tests in Buenos Aires, New York and Auckland (the local calendar day, never UTC's)
+        run: for zone in America/Argentina/Buenos_Aires America/New_York Pacific/Auckland; do TZ=$zone npm test || exit 1; done
+
       - name: Repository hygiene (no generated files, no legacy web tree, no imports from retired paths, no secrets)
         run: npm run check:repo
 
@@ -83,6 +88,9 @@ jobs:
 
       - name: SQLite persistence and dependency compatibility tests
         run: npm run test:storage
+
+      - name: The same tests in Buenos Aires, New York and Auckland (the local calendar day, never UTC's)
+        run: for zone in America/Argentina/Buenos_Aires America/New_York Pacific/Auckland; do TZ=$zone npm run test:storage || exit 1; done
 
       - name: Export iOS JavaScript and assets (not a signed native build)
         run: npm run export:ios

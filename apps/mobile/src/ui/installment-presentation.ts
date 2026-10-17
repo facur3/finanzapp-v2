@@ -1,7 +1,7 @@
 import { CARD_DELETED_MESSAGE, INSTALLMENT_DRIFT_MESSAGE, MAX_INSTALLMENTS, OPERATION_ACCOUNT_DELETED_MESSAGE, OPERATION_CHANGED_MESSAGE, OPERATION_HISTORY_DELETED_MESSAGE,
   OPERATION_ID_MESSAGE, OPERATION_INVALID_MESSAGE, OPERATION_PLAN_STOPPED_MESSAGE, OPERATION_STATE_MESSAGE, OPERATION_TARGET_MESSAGE, PAYOFF_DATE_MESSAGE,
-  PAYOFF_FINANCING_MESSAGE, PAYOFF_NOTHING_MESSAGE, PAYOFF_PRINCIPAL_MESSAGE, PLAN_CANCELLED_MESSAGE, PLAN_CARD_MESSAGE, PLAN_DELETED_MESSAGE, PLAN_MISSING_MESSAGE,
-  PLAN_NOT_CANCELLED_MESSAGE, PLAN_NOTHING_TO_STOP_MESSAGE, PLAN_OPERATION_DATE_MESSAGE, assertInstallmentPlanCancellable, assertInstallmentPlanDeletable, cardStatementsFrom,
+  PAYOFF_FINANCING_MESSAGE, PAYOFF_NOTHING_MESSAGE, PAYOFF_PRINCIPAL_MESSAGE, PLAN_CANCELLED_MESSAGE, PLAN_CARD_MESSAGE, PLAN_DELETED_MESSAGE, PLAN_HISTORY_MESSAGE, PLAN_MISSING_MESSAGE,
+  PLAN_NOT_CANCELLED_MESSAGE, PLAN_NOTHING_TO_STOP_MESSAGE, PLAN_OPERATION_DATE_MESSAGE, PLAN_OPERATION_HISTORY_MESSAGE, assertInstallmentPlanCancellable, assertInstallmentPlanDeletable, cardStatementsFrom,
   effectiveShares, installmentAmounts, installmentOccurrenceOf, installmentPlanFigures, installmentSchedule, isPlanRefund, newPlanPayoff, newPlanRefund,
   operationGuardMessages, planCatchUpInserts, planOperationFloorISO, planRefundAvailability, reactivateInstallmentPlan, validateArchive, type CardCycleDates,
   type CardStatement, type CreditCardProfile, type EffectiveShare, type EntryRecord, type Installment, type InstallmentComponent, type InstallmentPlan,
@@ -236,7 +236,8 @@ export function planActions(archive: LedgerArchive, planId: string, todayISO: st
   if (!plan || plan.deleted) return none;
   const operations = archive.purchaseOperations ?? [];
   const caught = planCaughtUp(archive, planId, todayISO);
-  const remove = planSummary(plan, archive.records, operations).deletable;
+  // Judged after the catch-up, like storage: a plan whose first statement closed since the last pass has history.
+  const remove = planSummary(plan, caught.records, operations).deletable;
   const draft = { id: 'dry-run', dateISO: todayISO, todayISO, createdAt: nowISO };
   let refund = false;
   try {
@@ -314,15 +315,18 @@ export function payoffPreview(archive: LedgerArchive, planId: string, input: { i
     floorISO: planOperationFloorISO(plan, caught.records, operations), choiceNeeded: parts.financingMinor > 0 && input.financing === null } };
 }
 
-/** 24T3 (A13): the refusals a plan write (an adelanto, a stop, a reactivation) gets from the plan and the ledger as they are,
- * before anything is written: the form or the detail releases its frozen submission on one of these and reads the plan
- * again. Anything else (a failed disk write, a refresh that failed after the commit) leaves the outcome unknown: the
+/** 24T3 (A13): the refusals a plan write (an adelanto, a stop, a reactivation, a deletion) gets from the plan and the ledger as
+ * they are, before anything is written: the form or the detail releases its frozen submission on one of these and reads the
+ * plan again. Anything else (a failed disk write, a refresh that failed after the commit) leaves the outcome unknown: the
  * submission stays frozen and Reintentar sends it unchanged. */
 const PLAN_WRITE_REFUSALS = new Set<string>([
   OPERATION_CHANGED_MESSAGE, OPERATION_STATE_MESSAGE, OPERATION_INVALID_MESSAGE, OPERATION_TARGET_MESSAGE, OPERATION_ID_MESSAGE, OPERATION_ACCOUNT_DELETED_MESSAGE,
   OPERATION_HISTORY_DELETED_MESSAGE, OPERATION_PLAN_STOPPED_MESSAGE, PAYOFF_NOTHING_MESSAGE, PAYOFF_PRINCIPAL_MESSAGE, PAYOFF_FINANCING_MESSAGE, PAYOFF_DATE_MESSAGE,
   PLAN_OPERATION_DATE_MESSAGE, PLAN_NOTHING_TO_STOP_MESSAGE, PLAN_NOT_CANCELLED_MESSAGE, PLAN_CANCELLED_MESSAGE, PLAN_DELETED_MESSAGE, PLAN_MISSING_MESSAGE,
   PLAN_CARD_MESSAGE, CARD_DELETED_MESSAGE, INSTALLMENT_DRIFT_MESSAGE, ...operationGuardMessages(),
+  // 25Q4: a deletion refused because the plan recorded an instalment or an operation since the screen was drawn (only
+  // assertInstallmentPlanDeletable throws these).
+  PLAN_HISTORY_MESSAGE, PLAN_OPERATION_HISTORY_MESSAGE,
   // Storage's stale-revision refusal of a stop or a reactivation (`planLifecycleRetry`): the catalogue holds its exact text.
   errors.errors.installments.changed,
 ]);

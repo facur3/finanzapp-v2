@@ -3,11 +3,24 @@
  * opens (Producto 24UX6A, decision 005). */
 export const home = {
   home: {
-    emptyTitle: 'Entendé tus gastos.',
-    emptyDetail: 'Elegí una cuenta para agrupar tus movimientos. Podés empezar sin cargar tu saldo bancario.',
-    start: 'Empezar',
+    /** 25O1: Inicio while nothing is recorded yet, in place of the empty states: three steps, never a filled button. A done
+     * step shows what was created (the account's or the card's name) and VoiceOver hears «hecho». */
+    firstSteps: {
+      title: 'Primeros pasos',
+      account: 'Creá tu primera cuenta',
+      accountDetail: 'Efectivo, banco o billetera',
+      expense: 'Anotá tu primer gasto',
+      expenseDetail: 'Un café, el súper, lo que sea',
+      card: 'Sumá tu tarjeta',
+      cardDetail: 'Opcional · para seguir sus cuotas',
+      doneLabel: '{title}, {detail}, hecho',
+    },
     spending: 'Gastado',
     available: 'Disponible',
+    /** 25D2: VoiceOver's name for Inicio's number, the metric before the amount. {month}: the current month in lowercase
+     * («octubre»); {amount}: the amount in words. */
+    heroSpending: 'Gastado en {month}, {amount}',
+    heroAvailable: 'Disponible, {amount}',
     availableHelp: 'Es el dinero registrado en tus cuentas de esta moneda: saldo inicial más ingresos, menos gastos y transferencias. '
       + 'No incluye tarjetas ni deudas, y no es un saldo bancario ni tu patrimonio.',
     spendingOutOfRange: 'El total supera el rango que podemos mostrar con precisión. Tus movimientos siguen guardados.',
@@ -17,7 +30,8 @@ export const home = {
     refundsExceed: 'Las devoluciones superan lo gastado',
     /** The month's latest expenses and incomes. */
     recent: 'Actividad reciente',
-    /** With accounts but nothing due and nothing recorded this month: the actions are the dock's «+» and the Assistant. */
+    /** Something recorded before (25O1: a ledger with nothing recorded shows Primeros pasos instead), but nothing due and nothing
+     * this month: the actions are the dock's «+» and the Assistant. */
     quietTitle: 'Todavía no hay movimientos este mes',
     /** The same, when one currency of several is shown alone («Solo USD»): the month may have movements in another. */
     quietTitleIn: 'Todavía no hay movimientos en {currency} este mes',
@@ -68,15 +82,18 @@ export const home = {
       title: 'Registrar',
       close: 'Cerrar',
       assistant: 'Asistente',
-      assistantDetail: 'Decilo con tus palabras o preguntá lo que quieras',
+      /** 25O1: the Assistant's narrow scope (one movement to propose, questions about the ledger), as its composer says it. */
+      assistantDetail: 'Registrá un gasto o preguntá por tus gastos',
       /** Only when this app session already has a conversation: the person's last words, as they wrote them. */
       continue: 'Continuar: «{text}»',
       expense: 'Gasto',
-      expenseDetail: 'Una compra o un pago',
+      /** 25O1: never «un pago»: a payment settles a card or a debt (a transfer). */
+      expenseDetail: 'Una compra o un servicio',
       income: 'Ingreso',
-      incomeDetail: 'Sueldo, cobro u otro ingreso',
+      incomeDetail: 'Sueldo u otro ingreso',
       transfer: 'Transferencia',
-      transferDetail: 'Entre cuentas o pago de tarjeta',
+      /** 25O1: the plain transfer lists cash accounts only; a card is paid from Tarjetas (Pagar tarjeta). */
+      transferDetail: 'Entre tus cuentas',
     },
   },
   quickActions: {

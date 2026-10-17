@@ -53,9 +53,17 @@ export const review: Pick<Messages, 'review'> = {
       merchant: 'The merchant or description is missing.',
       category: 'Choose a category you already use.',
       date: 'Choose today or an earlier date.',
+      destinationUnavailable: 'That account or card is no longer available. Choose another.',
+      categoryArchived: 'That category is archived. Choose another.',
+      installmentCountTooMany: 'That number of installments doesn’t fit this amount.',
+    },
+    value: {
+      unavailable: '{value} (no longer available)',
+      archived: '{value} (archived)',
     },
     detail: {
       notFoundTitle: 'This proposal is no longer pending',
+      confirmedSpoken: 'Recorded.',
       notFoundDetail: 'It was confirmed, discarded or can’t be read.',
       willExpense: 'Confirming records an expense.',
       willCardOnce: 'Confirming records an expense on the card.',
@@ -71,6 +79,8 @@ export const review: Pick<Messages, 'review'> = {
       dismiss: 'Discard',
       dismissQuestion: 'Discard this proposal?',
       dismissDetail: 'Nothing is recorded and it won’t appear again. Your transactions don’t change.',
+      confirmFailed: 'We couldn’t confirm the proposal. You can retry: it’s recorded only once.',
+      dismissFailed: 'We couldn’t discard the proposal. It’s still pending.',
       recordedLater: 'Recorded. The proposal will be marked as confirmed the next time the app opens.',
     },
     sheet: {
@@ -90,6 +100,8 @@ export const review: Pick<Messages, 'review'> = {
       placementNext: 'The next one',
       noInterest: 'No interest. A financed purchase is recorded from the purchase form.',
       categoryNote: 'Only a category you already use: a new one is created from the expense or income form.',
+      hiddenCharacters: 'This name has invisible characters from copied text. Type it again.',
+      saveFailed: 'We couldn’t save your changes. The proposal is unchanged.',
     },
   },
 };

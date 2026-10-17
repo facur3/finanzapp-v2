@@ -12,7 +12,10 @@ export const common = {
     retrySave: 'Reintentar guardado',
     retryChange: 'Reintentar cambio',
     saveChanges: 'Guardar cambios',
-    closeAmountKeyboard: 'Cerrar teclado del monto',
+    /** 25D2: VoiceOver, once a form that saved has closed. {amount}: the amount saved, in words («1234,50 pesos»). */
+    saved: 'Guardado, {amount}.',
+    /** 25D2: VoiceOver, once an edit form that saved has closed. */
+    changesSaved: 'Cambios guardados.',
     moreInfoAbout: 'Más información sobre {title}',
     /** VoiceOver name of a metric's help glyph: "Qué significa Disponible". */
     whatIs: 'Qué significa {title}',

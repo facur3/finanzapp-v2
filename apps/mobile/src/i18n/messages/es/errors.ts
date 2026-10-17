@@ -231,6 +231,7 @@ export const errors = {
       newDebt: 'Una deuda nueva no puede tener cambios previos.',
       debtExists: 'Esta deuda ya existe con otros datos. Volvé a abrir el formulario.',
       debtMissing: 'No encontramos esta deuda.',
+      accountMissing: 'No encontramos esta cuenta.',
       debtChanged: 'La deuda cambió desde que la abriste. Volvé a revisarla.',
       /** 24UX4: a change to a rule or debt tracker that was deleted (on another screen, or by a restored copy). */
       recurringDeleted: 'Este recurrente fue eliminado.',
@@ -293,6 +294,12 @@ export const errors = {
       writeConflict: 'El registro de esta propuesta ya existe con otros datos. No se registró nada.',
       readOnly: 'Estas propuestas requieren una versión más nueva de FinanzApp. No se modificaron.',
       input: 'Datos de propuesta inválidos. No se registró nada.',
+      /** 25Q4: the domain's own review refusals (packages/domain/review-drafts.ts), thrown by Confirmar and by Editar's Guardar cambios. */
+      draftInvalid: 'La propuesta tiene datos inválidos. No se registró nada.',
+      incomplete: 'Completá la propuesta antes de confirmarla. No se registró nada.',
+      stale: 'La cuenta, la tarjeta o la categoría cambió desde la propuesta. Revisala de nuevo.',
+      destination: 'Elegí una cuenta o tarjeta disponible para este movimiento.',
+      writeId: 'Identificador de propuesta inválido.',
     },
     /** Producto 25A-02: one id is one kind of financial write (`packages/domain/write-ids.ts`). */
     writes: {

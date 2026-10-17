@@ -7,8 +7,8 @@ import type { ReviewItem } from '../../src/storage/review-database';
 import { ActionButton, AppText, DetailRow, EmptyState, ErrorMessage, IconButton, LifecycleNote, Money, PressFeedback, Surface } from '../../src/ui/components';
 import { reviewSheetScrolls } from '../../src/ui/geometry';
 import { useAccountNameOf, useCategoryLabel } from '../../src/ui/category-hues';
-import { reviewFacts } from '../../src/ui/review-presentation';
-import { useReviewActions } from '../../src/ui/review-actions';
+import { gapText, reviewFacts, staleValueKey } from '../../src/ui/review-presentation';
+import { usePushOnce, useReviewActions } from '../../src/ui/review-actions';
 import { useReviewItem } from '../../src/ui/use-review-item';
 import { space, usePalette } from '../../src/ui/theme';
 import { useI18n } from '../../src/i18n/provider';
@@ -23,7 +23,7 @@ import { useI18n } from '../../src/i18n/provider';
  * tray is stale) and shows what Confirmar records, compactly: kind and amount, merchant, category, account or card, the
  * card's purchase mode, the date, and every missing fact by name.
  *
- * - Confirmar (the one lime action) is enabled only when the domain finds no gap and a current basis, and calls the same
+ * - Confirmar (the one brand-filled action) is enabled only when the domain finds no gap and a current basis, and calls the same
  *   dispatcher as «Para revisar» (`useReviewActions` → `confirmReview` → the store's frozen write): one write at most.
  * - Editar opens the «Para revisar» editor over the sheet; saving returns here, to the edited item.
  * - Descartar asks first, then pending → dismissed; the ledger is never touched.
@@ -102,7 +102,8 @@ function ReviewSheet({ item, leaving, reload, leave, refreshing, onHeld }: {
   const { t, formatDate, moneyText, spokenMoney } = useI18n();
   const nameOf = useAccountNameOf();
   const categoryLabel = useCategoryLabel(item.draft.category ?? '', item.draft.kind ?? 'expense');
-  const { busy, error, confirm, dismiss } = useReviewActions(item, { leaving, reload, leave });
+  const { busy, error, confirm, dismiss, clearError } = useReviewActions(item, { leaving, reload, leave });
+  const push = usePushOnce();
   useEffect(() => { onHeld(busy); }, [busy]);
   useEffect(() => () => onHeld(false), []);
   const idle = busy || refreshing;
@@ -111,6 +112,8 @@ function ReviewSheet({ item, leaving, reload, leave, refreshing, onHeld }: {
   const facts = reviewFacts(item, archive as ReviewArchive, { todayISO: todayKey(), writable: tray.writable, conflicts: tray.conflicts });
   const missing = t('review.missing');
   const conflict = facts.state === 'conflict';
+  // A name that is no longer valid is drawn with why, never as the current value.
+  const named = (name: string, key: ReturnType<typeof staleValueKey>) => key ? t(key, { value: name }) : name;
   const title = t(facts.kind === 'income' ? 'review.sheet.titleIncome' : facts.kind === 'expense' ? 'review.sheet.titleExpense' : 'review.sheet.titleUnknown');
   const purchase = !facts.card || facts.kind === 'income' ? null : facts.purchase === null ? missing : facts.purchase.mode === 'once' ? t('review.purchase.once')
     : facts.purchase.count === null ? t('review.purchase.installmentsOpen') : t('review.purchase.installments', { count: facts.purchase.count });
@@ -127,16 +130,16 @@ function ReviewSheet({ item, leaving, reload, leave, refreshing, onHeld }: {
       <AppText variant="headline" style={{ color: facts.merchant ? p.text : p.secondary }}>{facts.merchant ?? t('review.noMerchant')}</AppText>
     </View>
     <Surface grouped>
-      <DetailRow label={t('review.fields.category')} value={facts.category ? categoryLabel : missing} icon="pricetag-outline" layout="inline" />
+      <DetailRow label={t('review.fields.category')} value={facts.category ? named(categoryLabel, staleValueKey(facts.categoryState)) : missing} icon="pricetag-outline" layout="inline" />
       <DetailRow label={t(facts.card ? 'review.fields.card' : facts.destination ? 'review.fields.account' : 'review.fields.destination')}
-        value={facts.destination ? nameOf(facts.destination) : missing} icon={facts.card ? 'card-outline' : 'wallet-outline'} layout="inline" />
+        value={facts.destination ? named(nameOf(facts.destination), staleValueKey(facts.destinationState)) : missing} icon={facts.card ? 'card-outline' : 'wallet-outline'} layout="inline" />
       {purchase !== null && <DetailRow label={t('review.fields.purchase')} value={purchase} icon="layers-outline" layout="inline" />}
       <DetailRow label={t('review.fields.date')} icon="calendar-outline" value={facts.dateISO ? formatDate(facts.dateISO, 'dayYear') : missing}
         spokenValue={facts.dateISO ? formatDate(facts.dateISO, 'long') : undefined} layout="inline" last />
     </Surface>
     {/* What still blocks Confirmar, named; neutral, never an error. Editar completes it. */}
     {facts.gaps.length > 0 && <View style={{ gap: 8 }}>
-      {facts.gaps.map(gap => <LifecycleNote key={gap} icon="ellipse-outline" detail={t(`review.gaps.${gap}`)} />)}
+      {facts.gaps.map(gap => <LifecycleNote key={gap} icon="ellipse-outline" detail={t(gapText(gap, facts))} />)}
     </View>}
     {conflict && <LifecycleNote icon="alert-circle-outline" tone="warning" detail={t('review.detail.conflictNote')} />}
     {facts.state === 'interrupted' && <LifecycleNote icon="time-outline" tone="warning" detail={t('review.detail.interruptedNote')} />}
@@ -146,11 +149,11 @@ function ReviewSheet({ item, leaving, reload, leave, refreshing, onHeld }: {
     {tray.writable && <View style={{ gap: space.s }}>
       {!conflict && <ActionButton label={confirmText.text} spokenLabel={confirmText.spoken} icon="checkmark" onPress={confirm} busy={busy} disabled={!facts.canConfirm || refreshing} />}
       {!conflict && <ActionButton label={t('review.detail.edit')} icon="create-outline" secondary disabled={idle}
-        onPress={() => router.push({ pathname: '/edit-review/[id]', params: { id: item.id } })} />}
+        onPress={() => { clearError(); push({ pathname: '/edit-review/[id]', params: { id: item.id } }); }} />}
       {/* Descartar is explicit and asks first; closing the sheet is not discarding. A conflict with a frozen write cannot be
           dismissed (the store refuses it). */}
       {(!conflict || item.attempt === null) && <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('review.sheet.discard')}
-        accessibilityState={{ disabled: idle }} disabled={idle} onPress={dismiss} style={{ alignSelf: 'center', minHeight: 44, justifyContent: 'center', paddingHorizontal: space.m }}>
+        accessibilityState={{ disabled: idle }} disabled={idle} onPress={dismiss} style={{ alignSelf: 'center', minHeight: 44, justifyContent: 'center', paddingHorizontal: space.m, opacity: idle ? 0.5 : 1 }}>
         <AppText variant="subhead" style={{ color: p.expense, fontWeight: '500' }}>{t('review.sheet.discard')}</AppText>
       </PressFeedback>}
     </View>}

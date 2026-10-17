@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { CARD_DELETED_MESSAGE, CARD_PLAN_MESSAGE, INSTALLMENT_DRIFT_MESSAGE, INSTALLMENT_ENTRY_MESSAGE, INSTALLMENT_ID_MESSAGE, PLAN_CHANGE_MESSAGE, PLAN_DELETE_PATH_MESSAGE,
@@ -12,6 +12,8 @@ import { DATABASE_VERSION, SCHEMA_SCRIPTS, cancelInstallmentPlan, catchUpInstall
   createTransfer, deleteCreditCard, deleteInstallmentPlan, importArchive, initializeDatabase, processRecurring, readArchive, readSnapshot, saveCreditCard, saveInstallmentPlan, saveMonthlyBudget,
   saveRecurringRule, type LedgerDatabase } from '../src/storage/database.ts';
 import { openLedger, refreshLedger } from '../src/storage/ledger-session.ts';
+import { restoreCatchUp } from '../src/ui/backup-file.ts';
+import { planActions } from '../src/ui/installment-presentation.ts';
 import { runExclusiveTransaction, runSchemaMigration, type TransactionConnection } from '../src/storage/transaction.ts';
 
 // Producto 24T1 on real SQLite: schema 12, a purchase in instalments recognised statement by statement, exactly once,
@@ -210,7 +212,7 @@ test('a card payment lowers the balance due and assigns no instalment; the movem
   const undone = installmentPlanFigures(archive.installmentPlans![0], archive.records, archive.purchaseOperations ?? []);
   assert.deepEqual([undone.recognisedMinor, undone.undoneMinor, undone.remainingMinor, undone.status], [10000, 10000, 110000, 'active']);
   assert.equal(cardDebtMinor(card, await readSnapshot(db)), 23100 + 10000 - 30000);
-  await assert.rejects(deleteInstallmentPlan(db, 'tv', now), new RegExp(PLAN_HISTORY_MESSAGE), 'an undone instalment is history too');
+  await assert.rejects(deleteInstallmentPlan(db, 'tv', now, '2026-10-25'), new RegExp(PLAN_HISTORY_MESSAGE), 'an undone instalment is history too');
   // Restore brings it back; a plain new movement can never take an instalment id.
   const voided = archive.records.find(item => item.entry.id === 'inst_tv_002')!;
   await changeEntry(db, makeEntryChange('op5', voided, 'restore', now));
@@ -235,16 +237,16 @@ test('the plan lifecycle: cancelled keeps the recognised instalments and stops t
   // 24T3 (A15): a retry names the revision the screen showed: one revision on and already stopped is a no-op.
   await cancelInstallmentPlan(db, 'tv', 0, '2026-10-25', '2026-09-29T10:00:00.000Z');
   assert.deepEqual(await planOf(db, 'tv'), cancelled, 'a retry changes nothing');
-  await assert.rejects(deleteInstallmentPlan(db, 'tv', now), new RegExp(PLAN_HISTORY_MESSAGE));
-  await assert.rejects(deleteInstallmentPlan(db, 'fin', now), new RegExp(PLAN_HISTORY_MESSAGE));
+  await assert.rejects(deleteInstallmentPlan(db, 'tv', now, '2026-10-25'), new RegExp(PLAN_HISTORY_MESSAGE));
+  await assert.rejects(deleteInstallmentPlan(db, 'fin', now, '2026-10-25'), new RegExp(PLAN_HISTORY_MESSAGE));
   await assert.rejects(cancelInstallmentPlan(db, 'nope', 0, '2026-10-25', now), new RegExp(PLAN_MISSING_MESSAGE));
   // A plan created by mistake, nothing recorded yet: deleted (a tombstone; the row and its schedule stay); twice is a no-op.
   const mistake = newInstallmentPlan({ id: 'oops', card, cardAccount, merchant: 'Error', category: 'Otros', purchaseDateISO: '2026-11-01', principalMinor: 900, count: 3, placement: 'next', createdAt: now });
   await createInstallmentPlan(db, mistake);
-  await deleteInstallmentPlan(db, 'oops', now);
+  await deleteInstallmentPlan(db, 'oops', now, '2026-10-25');
   const gone = await planOf(db, 'oops');
   assert.deepEqual([gone.deleted, gone.cancelledAt, gone.revision, gone.schedule.length], [true, null, 1, 3]);
-  await deleteInstallmentPlan(db, 'oops', '2026-09-30T10:00:00.000Z');
+  await deleteInstallmentPlan(db, 'oops', '2026-09-30T10:00:00.000Z', '2026-10-25');
   assert.deepEqual(await planOf(db, 'oops'), gone);
   assert.equal(await catchUpInstallments(db, '2030-01-01'), 0);
   assert.equal((await db.getFirstAsync<{ n: number }>('SELECT count(*) AS n FROM installments'))?.n, 12 + 3 + 3, 'no row is ever DELETEd');
@@ -455,6 +457,67 @@ test('a real lock held by another connection fails both passes (each reported), 
   assert.deepEqual(await instalmentIds(db), ['inst_tv_001', 'inst_tv_002']);
 });
 
+test('25Q4: a restore records what fell due since the copy; a failing recurring catch-up keeps the import and returns its flag; the retry records each date once', async () => {
+  const { restoreFromBackup } = await import('../src/storage/ledger-session.ts');
+  const { db } = await seeded();
+  await saveRecurringRule(db, { id: 'gym', accountId: 'bank', kind: 'expense', amountMinor: 700, merchant: 'Gimnasio', category: 'Salud', frequency: 'monthly',
+    anchorDateISO: '2026-09-15', nextDateISO: '2026-09-15', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt });
+  const copy = parsePilotBackup(JSON.stringify(createRecoveryBackup(await readArchive(db), new Date(now)))).archive;
+  const fresh = setup().db;
+  await initializeDatabase(fresh);
+  const broken = failingOn(fresh, insertOf('rec_'), 'disk I/O error');
+  const preview = previewBackupImport(await readArchive(fresh), copy);
+  assert.deepEqual(await restoreFromBackup(broken.db, copy, preview.baseline, '2026-10-25'), { recurringError: true, installmentError: false },
+    'the import committed: a failing catch-up after it is its banner, never a failed import');
+  const restored = await readArchive(fresh);
+  assert.deepEqual(restored.accounts.map(account => account.id).sort(), ['bank', 'card-account']);
+  assert.deepEqual(restored.installmentPlans!.map(plan => plan.id), ['tv']);
+  assert.equal(restored.recurring!.find(rule => rule.id === 'gym')!.nextDateISO, '2026-09-15', 'the failed pass rolled back whole');
+  const due = async (target: LedgerDatabase) => (await readArchive(target)).records.map(record => record.entry.id).filter(id => /^(rec|inst)_/.test(id)).sort();
+  assert.deepEqual(await due(fresh), ['inst_tv_001', 'inst_tv_002']);
+  // The banner's retry (or the next foreground) records each date once.
+  broken.heal();
+  await refreshLedger(broken.db, '2026-10-25');
+  assert.deepEqual(await due(fresh), ['inst_tv_001', 'inst_tv_002', 'rec_gym_20260915', 'rec_gym_20261015']);
+  await refreshLedger(broken.db, '2026-10-25');
+  assert.deepEqual(await due(fresh), ['inst_tv_001', 'inst_tv_002', 'rec_gym_20260915', 'rec_gym_20261015'], 'nothing twice');
+  // A healthy restore on another device records the same four movements and leaves no banner.
+  const other = setup().db;
+  await initializeDatabase(other);
+  assert.deepEqual(await restoreFromBackup(other, copy, previewBackupImport(await readArchive(other), copy).baseline, '2026-10-25'),
+    { recurringError: false, installmentError: false });
+  assert.deepEqual(await due(other), ['inst_tv_001', 'inst_tv_002', 'rec_gym_20260915', 'rec_gym_20261015']);
+});
+
+test('25Q4: the review counts what a real restore\'s catch-ups record: the copy\'s rule and plan on a new device, only its rule where the plan was already caught up', async () => {
+  const { restoreFromBackup } = await import('../src/storage/ledger-session.ts');
+  const { db } = await seeded();
+  await saveRecurringRule(db, { id: 'gym', accountId: 'bank', kind: 'expense', amountMinor: 700, merchant: 'Gimnasio', category: 'Salud', frequency: 'monthly',
+    anchorDateISO: '2026-09-15', nextDateISO: '2026-09-15', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt });
+  const copy = parsePilotBackup(JSON.stringify(createRecoveryBackup(await readArchive(db), new Date(now)))).archive;
+  const fresh = setup().db;
+  await initializeDatabase(fresh);
+  // The same card and plan, its instalments recorded by its own foreground pass, and no gym yet.
+  const caughtUp = (await seeded()).db;
+  await catchUpInstallments(caughtUp, '2026-10-25');
+  const due = async (target: LedgerDatabase) => (await readArchive(target)).records.filter(record => /^(rec|inst)_/.test(record.entry.id)).length;
+  for (const [target, expected] of [[fresh, 4], [caughtUp, 2]] as const) {
+    const current = await readArchive(target);
+    const preview = previewBackupImport(current, copy);
+    const counted = restoreCatchUp(current, preview, '2026-10-25');
+    assert.equal(counted, expected);
+    const before = await due(target);
+    assert.deepEqual(await restoreFromBackup(target, copy, preview.baseline, '2026-10-25'), { recurringError: false, installmentError: false });
+    assert.equal(await due(target) - before, counted, 'what the review said is what the restore recorded');
+  }
+});
+
+test('25Q4: the provider restores through restoreFromBackup inside rereadOnRefusal', () => {
+  const provider = readFileSync(new URL('../src/storage/LedgerProvider.tsx', import.meta.url), 'utf8');
+  assert.match(provider, /restoreBackup: \(incoming, baseline\) => rereadOnRefusal\(async db => \{\s*catchUps\.current = await restoreFromBackup\(db, incoming, baseline, todayKey\(\)\);/);
+  assert.ok(!provider.includes('await importArchive(db, incoming, baseline);'), 'the import is restoreFromBackup\'s, never the provider\'s own');
+});
+
 // ---- 24T1 review: interest, fee and financing tax as independent components on real SQLite ---------------------------
 
 test('a plan with interest, fee and financing tax stores each component with its category, recognises each share as its own movement, undoes and restores each on its own, and round-trips through backup v12 with its identity', async () => {
@@ -542,4 +605,17 @@ test('an archived card refuses a new purchase, a new plan, a new recurring rule 
   await saveCreditCard(db, { ...card, active: true, revision: 2, updatedAt: now });
   await createEntry(db, expense('after', 'card-account', 100, '2026-10-27'));
   await createInstallmentPlan(db, { ...financed, id: 'after-plan' });
+});
+
+test('25R1: a plan whose first statement closed since the last catch-up has history: its deletion is refused on the caught-up plan, and the instalment is then recorded, never lost', async () => {
+  const { db } = await seeded();
+  // tv's first instalment closes on 2026-09-20; no pass ran since. On the 21st the stored ledger shows nothing recorded.
+  assert.deepEqual(await instalmentIds(db), []);
+  const before = await readArchive(db);
+  assert.equal(planActions(before, 'tv', '2026-09-21', now).remove, false, 'the screen offers no deletion on the caught-up plan');
+  assert.equal(planActions(before, 'tv', '2026-09-19', now).remove, true, 'the day before the closing it still does');
+  await assert.rejects(deleteInstallmentPlan(db, 'tv', now, '2026-09-21'), new RegExp(PLAN_HISTORY_MESSAGE));
+  assert.equal((await planOf(db, 'tv')).deleted, false, 'nothing written');
+  await catchUpInstallments(db, '2026-09-21');
+  assert.deepEqual(await instalmentIds(db), ['inst_tv_001'], 'the instalment owed is recorded, the plan stays');
 });

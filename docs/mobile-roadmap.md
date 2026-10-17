@@ -1,6 +1,46 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-15, latest (**25Q3 — calm failures and a dock that never ignores a tap**, on its branch, stacked on
+Updated: 2026-10-17 (**25A-UI — the Assistant's interface**, on its branch stacked on #122: a visible and safe wait,
+a thread that follows the keyboard, a disconnected build that says what is true, answers that say what they cover;
+«Producto 25A-UI»). Before (**25D2 — VoiceOver and Voice Control**, PR #122, stacked on #121: the Assistant and every
+ledger outcome spoken on iOS, in-place changes announced, names that match the visible words, one stop per row;
+«Producto 25D2»). Before (**25R1 — robustness**, PR #121, stacked on #120: catch-ups that follow the day and the
+foreground, rates that back off and recover, links that only open Inicio, committed changes reported as done; «Producto
+25R1»). Before (**25N1 — Finanzas, Ajustes and the shared controls**, on its branch stacked on #119: Más becomes
+the Finanzas tab with Ajustes behind a gear, Licencias, Movimientos deshechos in Movimientos, shared controls, forms
+and tokens; «Producto 25N1», §1, §2). Before (**25O1 — first impression**, on its branch stacked on #118: the first opening rebuilt as a short
+story drawn with the app's own figures, «¿Dónde tenés tu plata?» with three presets and «Restaurar una copia», the
+opening balance with the currency's flag, and a sapphire close that continues into Inicio; «Primeros pasos» on a new
+Inicio; round graphic flags for regions, currencies and languages (their variety) with written semantics; a development QA
+profile so M1 never touches the owner's data; three product proposals recorded (§3: Finanzas and Ajustes, shared
+expenses, Theme Packs); empty states in one line; account forms money first;
+the «+» captions corrected (decision 005, text only); two dark brand fills; JavaScript only; the owner widened the
+design delegation and the deferred findings were re-triaged; the next QA milestone M1 covers the four stacked drafts;
+«Producto 25O1», §1, §2, §3). Before (2026-10-16, later, **25Q4 — edits, failures and recovery that keep the money right**, on its branch stacked on
+#117: an edited card or debt payment keeps its card or debt and offers only sides storage accepts; a debt payment or
+collection never settles more than is pending, new, edited or restored; undo and restore say how a card or a debt will
+read; a failed action says its own sentence, never an engine's text, with one Error or Warning tap; a failed catch-up
+stays in the banner until its pass succeeds; the import review says what a restore also records; temporary plaintext
+copies are deleted; «Ver todos» opens the whole list; JavaScript only, no domain, schema 14, backup v14 or navigation
+change; the owner paused the 2026-10-16 iPhone session, and device QA now accumulates per milestone; «Producto 25Q4»,
+§1, §2). Before (2026-10-16, **one iPhone session prepared for #112 and #117 with the merged 25Q1–25Q3**: `master` 42f6e9a
+(after PRs #114–#116) merged into #112 and #117, the only code conflicts the release marker and Presupuestos' window
+and route parameters, both sides kept; every check green on both branches and in CI; the iOS native fingerprint of
+`master`, #112 and #117 is one (`7672beac…`), so one EAS development build from `master` serves the session (the owner's
+authorisation pending; the 2026-10-14 build predates PR #113's native change); the checklist's «QA session» holds the
+order, the acceptance rules and a walk over every screen; staging untouched: its Production deployment serves 42f6e9a,
+`COMPATIBLE`, server code identical to B8's `S`, no variable edited since B8, the database switch last read off at B8's
+close; §2). Before (2026-10-15, **25D1 legibility and touch**, on its branch stacked on draft PR #112, unmerged until #112 is
+approved and merged: contrast floors for a coloured hero's symbol and cents, «Otras» and the colour check; 44 pt
+Enviar/Detener and currency chips; no grabber on the date sheet; pressed states for Tarjetas' deck under Reduce Motion
+and for every segment; large text under one rule: no style past the size iOS gives it at AX5, layouts that adapt
+instead of caps (month titles, the month axis, row amounts), Increase Contrast honoured by the quiet parts of a hero,
+the Large Content Viewer where a control cannot grow; JavaScript only; «Producto 25D1», §2). Before
+(2026-10-15, **25VIS2 finish line**, same draft PR #112: the rest of the approved composer scope, the failed-save
+haptics (V4), the Save-gating table (V8) and the keyboard lowered by «Pagar total» (V15); the recurring form keeps one
+category per kind; `ErrorMessage` announces only on iOS (Codex); the binding interface and motion rules no longer name a
+palette; checklist steps that described UI that does not exist corrected; the owner's five-choice sheet and the
+merge-time flip list; «Producto 25VIS2», §2). Before (2026-10-15, latest, **25Q3 — calm failures and a dock that never ignores a tap**, on its branch, stacked on
 25Q2: a screen that fails to draw shows a card in the app's words instead of ending the app; an unknown link opens a
 localised screen instead of Expo's English developer one; a dock tab held past half a second selects on release; no
 domain, storage, schema, navigation model or motion change; «Producto 25Q3», §1, §2). Before (2026-10-15, latest, **25Q2 — a backup that completes or says why**, on its branch, stacked on 25Q1: the export
@@ -14,7 +54,14 @@ record names the evidence that was not kept, accounts for the fourth settled res
 25A-06», runbook §0.2, §6.4, §6.5, §12. **CI:** the Expo SDK 57 patches aligned again, with a native change, so a new
 development build comes before iPhone QA; a pull request now checks against the Expo table its lockfile pins, so a
 patch Expo publishes later stops failing unrelated PRs; §1 «Builds and tooling». No remote write, no paid call).
-Before (2026-10-14, later, 25A-06 **B8 preflight**, docs only: PRs #107 to #110 merged by the owner's instruction;
+Before (2026-10-14, latest, **25VIS2 + movement composer and accessibility polish**, same draft PR #112, owner-approved
+items of the private UX review: the kind switch locked during a save, one category per kind, the amount on transfer
+Saves, the fixed card or debt, 44 pt targets without larger drawings, VoiceOver and Reduce Motion pressed states; the
+dark dock reviewed and unchanged (no photos); `master` merged in; no financial, schema, backup, navigation or recovery
+change; «Producto 25VIS2», §2). Before (2026-10-14, **Producto 25VIS2, Sapphire + Sand trial**, on its branch, **unmerged until physical
+iPhone QA and the owner's approval**: brand-brief.md §4.9's sheet B token for token in `palette.ts`, the Lime identity
+tests rewritten, every accessibility assertion at WCAG AA or above (three Lime-only 7:1 bars lowered, named in the section); no layout, navigation or financial change; JavaScript only, but
+the iPhone check needs a new development build from `master`; «Producto 25VIS2», §2). Before (2026-10-14, later, 25A-06 **B8 preflight**, docs only: PRs #107 to #110 merged by the owner's instruction;
 the Production deployment of `master` 6611376 is Ready, created by the push and `COMPATIBLE`; the variables' names and
 scopes verified read-only; the B8 execution sheet with each step's kind (runbook §12.0); the organization billing,
 the database reads, the baseline, the probe and the owner's go still open; `master` frozen during B8; product
@@ -389,9 +436,9 @@ history file keeps the evidence of when and why.
   an Xcode build; no frame-rate or App Store claim before verification.
 - **Interface rules.** Native navigation gestures, safe areas, Dynamic Type, Reduce Motion and
   Reduce Transparency honoured everywhere; Liquid Glass only on the control surfaces with
-  the opaque fallback (the dock's pill falls back to solid pine); the Forest identity of decision 005 (pine
-  primary, hue window 158–168°, never teal, cyan, emerald or blue; it supersedes the earlier cobalt/sapphire
-  primary) marks interaction and the brand only and keeps 4.5:1; `expense` is the negative colour
+  the opaque fallback (the dock's pill falls back to its solid fill); the brand colour (the palette in
+  `src/ui/palette.ts`, whose identity is decision 005's latest palette amendment; another palette is its own
+  owner-approved amendment) marks interaction and the brand only and keeps 4.5:1 as text; `expense` is the negative colour
   (destructive, overdue, over a limit), never ordinary spending; category colours unchanged; semantic colours
   carry meaning; 44 pt targets; no decorative glassmorphism, no large currency selector beside the main amount,
   no new navigation without a decision (the current navigation is decision 005's).
@@ -402,20 +449,50 @@ history file keeps the evidence of when and why.
 
 ## 1. Implemented (current state)
 
-- **25Q3 — calm failures and a dock that never ignores a tap (on its branch, after 25Q2).** «Producto 25Q3». The root
+- **25A-UI — the Assistant's interface (on its branch, stacked on #122).** «Producto 25A-UI». The wait, Stop, the
+  keyboard follow, the disconnected build, coverage captions and the review editor's states.
+- **25D2 — VoiceOver and Voice Control (PR #122, stacked on #121).** «Producto 25D2». The Assistant and the
+  outcomes of writes spoken on iOS, in-place changes announced, Voice Control names, one stop per row.
+- **25R1 — robustness (PR #121, stacked on #120).** «Producto 25R1». Catch-ups per day change and real return,
+  rates with back-off and refresh, links that open Inicio only, committed changes reported as done, tests in three zones.
+- **25N1 — Finanzas, Ajustes and the shared controls (PR #120, stacked on #119).** «Producto 25N1». The fourth
+  tab is Finanzas, Ajustes sits behind its gear with Licencias; Movimientos deshechos moved to Movimientos; shared
+  controls, forms and tokens cleaned up.
+- **25O1 — first impression (PR #119, stacked on 25Q4).** «Producto 25O1». The first opening is a three-page story
+  (scenes drawn with the app's components from fixed sample figures, played once, still under Reduce Motion), «¿Dónde
+  tenés tu plata?» (cash, bank or digital wallet as presets; the region pill with its flag, the language pill with its variety's;
+  «Restaurar una copia», which ends the setup when the copy brings accounts), the opening balance (the currency chip with
+  the issuer's flag) and «Todo listo.» on the sapphire field Inicio opens with; VoiceOver moves to each new title. A new
+  Inicio shows «Primeros pasos» without a filled button. Round vector flags: region rows lead with their own, currencies
+  with their issuer's, languages with their variety's (said in words), never an account; the chooser notes say one
+  useful fact. A development-only QA profile (`EXPO_PUBLIC_QA_PROFILE`) lets the first opening be checked on the owner's
+  iPhone without opening their data. Empty states in one line; account forms
+  name, currency and balance first; the «+» captions say what each form records; two dark brand fills.
+- **25Q4 — edits, failures and recovery that keep the money right (PR #118, stacked on #117).** «Producto 25Q4».
+  Editing a card payment, a debt payment or a collection keeps its card or debt and offers only the sides storage
+  accepts (no choice ends frozen); a debt payment or collection settles at most what is pending, new, edited or
+  restored, said in red while it is typed; undo and restore confirmations say how a card or a debt will read and where
+  an undone movement is recovered; a failed save, deletion, import or review action shows a catalogued refusal or the
+  action's own sentence, never an engine's text, with one Error tap (Warning while a frozen retry waits on an outcome
+  the app cannot verify), every haptic through `motion.tsx`; a failed catch-up stays in the banner until its pass
+  succeeds; a file from a newer build is said as itself at launch with no retry; the first opening's redirect fires
+  once; every edit modal keeps «Cerrar»; the import review names the copy and says what the restore also records;
+  plaintext temporary copies of the ledger are deleted; «Ver todos» and the Assistant's link open the whole list.
+
+- **25Q3 — calm failures and a dock that never ignores a tap (PR #116, merged).** «Producto 25Q3». The root
   stack gives every route `ScreenFailure` (expo-router's `unstable_screenErrorBoundary`, pinned by a test on the
   installed package): a drawing error shows «No pudimos mostrar esta pantalla» with «Volver a intentar», never the error
   text, while the header, the back gesture and the dock stay; `app/+not-found.tsx` answers an unknown link in the app's
   language with «Ir a Inicio»; the dock's tabs have no long press, so a slow tap selects.
 
-- **25Q2 — a backup that completes or says why (on its branch, after 25Q1).** «Producto 25Q2». The export is
+- **25Q2 — a backup that completes or says why (PR #115, merged).** «Producto 25Q2». The export is
   `FinanzApp-backup-<date>-<HHmm>.json`, one compact line measured in bytes before anything is written (a copy over 5 MB
   says so in its own words instead of the import's), shared as JSON and always deleted; native failures read «No se pudo
   preparar la copia…» or «No pudimos leer la copia…»; a bad pick after an import returns to the choice with its
   sentence; the Backup screen and its Más row say that deleting the app deletes the records; `check:repo` and
   `.gitignore` recognise a real backup by its old, new or dated name and by its header.
 
-- **25Q1 — money that reads right (on its branch; Metro on the new development build).** «Producto 25Q1». The
+- **25Q1 — money that reads right (PR #114, merged; Metro on the new development build).** «Producto 25Q1». The
   Assistant's category link opens the figure it cites; Reportes keeps budgets while a consolidated total waits for a
   rate; «Neto del día» heads only a whole day's movements; an archived card in credit says so; a budget in a currency no
   account holds stays reachable; a card with only instalments to come says when they are recorded; deleting an account
@@ -949,13 +1026,46 @@ it was checked in). Metro from `master` (or a delivery's branch) on the installe
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
-- **25Q3 — calm failures and a dock that never ignores a tap (on its branch; the development build after PR #113):**
+- **Device QA by milestone (owner, 2026-10-16).** The owner paused the joint session below after the setup and six 25D1
+  checks passed on the development build 5d1453b2 (`master` 42f6e9a, fingerprint `7672beac…`): a coloured hero's
+  symbol and cents on the sand, «Otras», the chosen colour's check, Enviar/Detener, the currency chips and the date
+  sheet. Device QA no longer follows each change: the steps below accumulate for a milestone session over the critical
+  journeys, then a final regression. A test that passes never counts as a device result.
+- **25A-UI (on its branch, stacked on #122):** the checklist's «Producto 25A-UI», in M2.
+- **25D2 (PR #122, stacked on #121):** the checklist's «Producto 25D2», in M2 (VoiceOver and Voice Control).
+- **25R1 (PR #121, stacked on #120):** the checklist's «Producto 25R1», in M2.
+- **25N1 (PR #120, stacked on #119):** the checklist's «Producto 25N1», in milestone **M2** (with 25D2), in a QA
+  profile; the owner approves the navigation there.
+- **Milestone M1 — the next QA session (recommended now):** #112, #117, #118 and 25O1 together on the same build, the
+  checklist's «Milestone M1»: every write in a development QA profile (`EXPO_PUBLIC_QA_PROFILE`, its own empty files, so
+  the owner's data is never opened): the first opening, the critical journeys, a restore and the legibility pass; then
+  the owner's data for reading only; about 40 minutes. Its results decide the four drafts, merged in order (#112 → #117
+  → #118 → #119).
+  VoiceOver announcements beyond the first opening wait for M2, after 25D2 reworks them.
+- **25O1 — first impression (on its branch, stacked on #118; JavaScript only, the same build):** the checklist's
+  «Producto 25O1», in M1.
+- **25Q4 — edits, failures and recovery (PR #118, stacked on #117; JavaScript only, the same build):** the
+  checklist's «Producto 25Q4», in M1.
+- **QA session — 25VIS2, 25D1 and the merged 25Q1–25Q3 together (paused; the owner's development build from `master`
+  42f6e9a):** the checklist's «QA session»: the order, the acceptance rules and the walk over every
+  screen; the sections below hold the steps. Its results decide #112 (the Sapphire verdict and its five choices) and #117.
+- **25VIS2 — Sapphire + Sand trial (on its branch, unmerged; one new development build first, cut from `master` after
+  PR #113's Expo alignment):** the checklist's «Producto 25VIS2» in light and dark, then the owner's score against
+  Electric Lime and the five choices of its sheet (the transfer tone, two or three dark brand fills, the cobalt account
+  preset, one bright object per screen, card faces). Not merged until then.
+  Same PR (JavaScript only): the checklist's «Same PR — movement composer and accessibility polish» and the dark dock's
+  photos on every ground («The dark dock»).
+- **25D1 — legibility and touch (on its branch, stacked on #112; JavaScript only, Metro on the same new development
+  build):** the checklist's «Producto 25D1» in light and dark, at the default size, AX3 and AX5, in Spanish and English;
+  merged only after #112.
+- **Fix — «Pagar tarjeta» in dark (PR #107, merged; no EAS build):** the checklist's section; nothing device-verified.
+- **25Q3 — calm failures and a dock that never ignores a tap (PR #116, merged; the development build after PR #113):**
   the checklist's «Producto 25Q3»: an unknown link, a probe failure in a tab and in a pushed screen (local, never
   committed), a held dock tab.
-- **25Q2 — a backup that completes or says why (on its branch; the development build after PR #113):** the
+- **25Q2 — a backup that completes or says why (PR #115, merged; the development build after PR #113):** the
   checklist's «Producto 25Q2»: the file's name and one-line content through AirDrop, Mail and Files, the cancelled and
   failed sheet, a bad pick after an import, the new sentences.
-- **25Q1 — money that reads right (on its branch; the development build after PR #113):** the checklist's «Producto
+- **25Q1 — money that reads right (PR #114, merged; the development build after PR #113):** the checklist's «Producto
   25Q1»: the Assistant's category link (fixtures), Reportes without a rate, the day headings under a filter, an archived
   card in credit, a budget in euros with no euro account, a card with only cuotas to come, the account deletion text.
 
@@ -1208,6 +1318,97 @@ item unless a section says a new native build is needed. The checklist sections 
   TestFlight.
 
 ## 3. Next deliveries
+
+*(2026-10-17, the owner's direction to accelerate: substantial deliveries that each close a group of related findings
+of the private register, with tests, an independent review and the register updated; device validation only at
+milestones; Idioma and Región stay separate choosers. The block after M1, ordered to keep conflicts low (each a PR from
+`master` once the four drafts merge; prepared on top of #119 until then):*
+*1. **25N1 — Finanzas, Ajustes and the shared controls:** the navigation proposal below, Licencias, the dock's long
+press, the switch's double haptic, disabled controls that look live, clear buttons and keyboard accessories, undo and
+alert conventions, the last account used, the card and budget forms, token drift. 2. **25D2 — VoiceOver and Voice
+Control:** outcomes spoken on iOS, the Assistant's thread, names that match the visible text, one stop per row. 3.
+**25R1 — robustness** (in parallel with 25D2: storage, rates, routes and tests, few shared files): catch-up and rate
+refresh on foreground, route parameter validation, a committed change whose view could not refresh, the backup's
+untested paths. 4. **25A-UI — the Assistant's interface:** the waiting state, the keyboard follow, disconnected builds,
+the composer's limits, «this month» on long months. 5. **25T — copy and the remaining polish:** one meaning per term,
+impersonal system messages, less permanent text, Increase Contrast, amounts at the largest sizes. **M2** (iPhone) after
+25D2 and 25N1.)*
+
+*(2026-10-17, later the same day: the owner clarified the flags (round graphic flags, and a representative one for
+Idioma), done in 25O1 before M1, and asked for three product proposals. They are recorded below as **proposals**:
+nothing in them is programmed, tested or validated on an iPhone, and the private register lists them as such. No new PR
+opens before M1; after it: the navigation delivery (25N1), then 25D2 and the register's deliveries. Shared expenses wait
+for the owner's decision on the ledger; Theme Packs belong to 25F.)*
+
+#### Proposal — Más becomes «Finanzas», with Ajustes as its own screen (25N1, the first delivery after M1)
+
+- **Problem.** Más mixes seven financial destinations (Para revisar, Cuentas, Tarjetas, Presupuestos, Recurrentes,
+  Deudas y cobros, Categorías) with five device and data utilities (Copia de seguridad, Movimientos deshechos, Idioma,
+  Región, Apariencia) under a tab whose name says nothing; every visit scans twelve rows (Hick), and the coming Theme
+  Packs, privacy controls, Licencias and «Compartidos» would make it longer.
+- **Proposal (design delegation; the owner approves navigation on the device before merge).** The fourth tab keeps its
+  place and becomes **Finanzas** (a wallet glyph): Para revisar while something waits (its badge stays on the tab), then
+  Cuentas, Tarjetas, Presupuestos, Recurrentes, Deudas y cobros, Categorías, and later Compartidos. **Ajustes** is a
+  pushed screen behind a gear button in Finanzas' navigation bar (labelled «Ajustes» for VoiceOver, 44 pt): Preferencias
+  (Idioma, Región, Apariencia; later Temas), Tus datos (Copia de seguridad; later the pre-launch privacy controls),
+  Acerca de (the version, Licencias, Ayuda; a development build's diagnostics). **Movimientos deshechos** moves to
+  Movimientos' own menu: it is records, not a preference.
+- **Not chosen.** A fifth tab (decision 005 keeps four; settings are rare, and tabs are for top-level content); a gear on
+  Inicio (it would compete with the sapphire hero and the snapshot's one job); a modal Ajustes (its rows push further
+  screens, so a push keeps the back gesture).
+- **Cost and evidence.** Routes stay (`/language`, `/region`, `/appearance`, `/backup`), so links and the first
+  opening's pills keep working; `more-routes` and the navigation tests change; decision 005 gets an amendment. Licencias
+  must exist before a release anyway: the round flags carry an MIT notice (`src/i18n/flag-art.ts`).
+
+#### Proposal — Shared expenses (owner decision first)
+
+Design, accounting and minimum scope: [shared-expenses.md](shared-expenses.md). In short: a group is one internal
+account holding the person's net position with it; a group expense posts the person's **share** as the expense (funded
+by the group account) and what they **put in** as a transfer into it; repayments are transfers; who owes whom among the
+others is metadata with suggested settlements; a purchase paid by card is one card purchase split between the share and
+the group account (a card is never a transfer's source), and instalment purchases stay out of v1. It changes several
+of decision 003's invariants (a fourth account kind netting several people, an expense funded by it, the split card
+purchase), the schema and the backup version, so it waits for the owner's decision. Entry: «Dividir» in the
+expense form, groups under Finanzas › Compartidos, their balances also in «Deudas y cobros»; no new tab.
+
+#### Proposal — Theme Packs (25F, Pro)
+
+The owner's sketch (2026-10-17): a theme screen with a scrollable preview of real FinanzApp screens over the chosen
+palette and a row of colour swatches below. Recorded under 25F; not built.
+
+- **Experience.** Ajustes › Preferencias › Temas. On top, a paged preview (Inicio, Movimientos, Reportes, a card) drawn by
+  the app's own components under the candidate palette, scaled into a phone frame, never screenshots; page dots under it.
+  Below, the swatches as one row of round buttons (the selected one ringed, a lock glyph on a Pro theme). Tapping a
+  swatch previews it at once (selection haptic); «Usar este tema» applies it; a Pro theme can be previewed freely and
+  offers «Desbloquear con Pro» instead (the 25F paywall, contextual, never on first launch). Sapphire + Sand stays the
+  default identity and is always free; a theme changes the accent, the paper and the hero field, never the layout.
+- **Semantics and accessibility (the gates of every pack).** Each pack defines light, dark and Increase Contrast and
+  passes the palette's contrast tests (`theme.node.ts`); the semantic colours keep their meaning in every theme (expense,
+  income, transfer, warning), so an accent may not sit near them in hue: a green or coral accent, as in the sketch, would
+  read as income or as an expense and is either re-tuned or refused; the brand brief's guardrails apply (no acid green,
+  never navy as the field). Swatches are labelled («Zafiro y arena, en uso»; «Coral, Pro»), colour is never the only cue,
+  the preview is one VoiceOver element described in words, and with Reduce Motion the pages cross-fade.
+- **Engineering readiness.** The palette is already one token object per scheme read through `usePalette`; packs become
+  more token sets plus a stored choice (a device preference, like Apariencia, outside backups). Alternative app icons
+  would need a native build and are not part of v1.
+- **StoreKit.** Gated by the same Pro entitlement as the rest of 25F (app-store-launch.md §1–§5): StoreKit 2 needs a
+  native module, so a new EAS build, App Store Connect products and the paid applications agreement, all with the
+  owner's authorization; restore purchases; the entitlement cached for offline use; losing Pro returns to Sapphire +
+  Sand without touching any record. No purchase code until 25F.
+
+*(2026-10-17: the owner widened the design delegation (consult only for financial rules, data semantics, important
+functionality, the business model or launch decisions) and put the first opening first. 25O1 (first impression) is on
+its branch; the deferred findings were re-triaged, and the design-only ones moved into deliveries. Next: milestone M1
+(the four stacked drafts on the iPhone, then their merge), 25D2 VoiceOver and Voice Control, the forms and commitments
+delivery (the last account used, the card faces, the recurring date wheel), Reportes and the Assistant's interface, Más
+(Licencias) and robustness, a copy pass (one meaning per term, impersonal system messages).)*
+
+*(2026-10-16, the owner's working mode: deliveries are drawn from the iOS review's private register in the owner's
+order of priorities, each with tests and an independent review, and the iPhone checks accumulate for milestone sessions.
+After 25Q4 (edits, failures and recovery, on its branch): 25D2 VoiceOver and Voice Control, a robustness delivery (the
+details that keep a retry after the ledger already shows the change, a committed change whose view could not refresh),
+the Assistant's interface, then polish and copy. The App Store shell still waits for its inputs. Nothing here reorders a
+feature.)*
 
 *(2026-10-15: after B8 the post-audit quality deliveries run one at a time, each a focused PR with its tests and its
 iPhone steps: #113 (B8 closed, Expo CI), #112's finish line, 25Q1 (money that reads right); next, in the owner's order
@@ -2968,6 +3169,7 @@ nothing of it is on a screen yet.
   Assistant comes first and largest (a pine tile with the accent sparkle, «Asistente» · «Decilo con tus palabras o
   preguntá lo que quieras»; «Continuar: «…»» only when the session holds the person's real last words), then Gasto
   «Una compra o un pago», Ingreso «Sueldo, cobro u otro ingreso» and Transferencia «Entre cuentas o pago de tarjeta»
+  *(captions replaced by 25O1: decision 005's amendment of 2026-10-17)*
   on neutral inset tiles. `captureDestination` is the one table: expense and income → /new-entry with the kind (and
   the display currency only while a live account holds it), transfer → /new-transfer, assistant → /assistant with the
   display currency; each is pushed once the hub has left. The first choice holds while it leaves (a second row, the
@@ -3162,7 +3364,8 @@ nothing of it is on a screen yet.
   `transferSoft` with the transfer glyph (24UX6A had three neutral tiles). No behaviour or write change.
 - **What changed: the Assistant.** The permanent caption «No conectado en esta versión…» is removed (key
   `assistant.disconnectedNote` deleted); in the disconnected build a sent message still gets the in-thread
-  `unavailable` note «El Asistente todavía no está conectado en esta versión. Tu mensaje quedó escrito para cuando lo
+  `unavailable` note *(25A-UI: now «El Asistente todavía no está disponible en esta versión. Tu mensaje sigue en el
+  cuadro.» with «Registrar a mano»)* «El Asistente todavía no está conectado en esta versión. Tu mensaje quedó escrito para cuando lo
   esté.» («The Assistant isn’t connected in this version yet. Your message stays in the text field until it is.»): the
   limitation at the point of use. The composer microphone and its note are removed (keys `composer.dictate`,
   `dictateHint`, `dictationNote` deleted) until dictation exists in 25A. The empty conversation's glyph is the accent
@@ -4485,7 +4688,400 @@ nothing of it is on a screen yet.
   passed, 0 failed; `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0 errors, 0 stale; `check` OK;
   `export:ios` OK. No account, handle, ad account or campaign created.
 
-### Producto 25Q3 — calm failures and a dock that never ignores a tap (this PR, stacked on 25Q2)
+### Producto 25A-UI — the Assistant's interface (this PR, stacked on #122)
+
+- **Why.** The register's Assistant-interface group: a wait that was invisible and a Stop that shared Send's place, a
+  thread that lost its end under the keyboard, a disconnected build that promised more than it kept, answers that did
+  not say what they covered, and the review editor's stale or hidden states.
+- **The wait.** The reply's place is reserved on send; «Pensando…» and Stop appear after `WAIT_REVEAL_MS` (400 ms); a
+  Stop before the first word gives the question back; the composer takes the protocol's 2 000 characters; a '?' beside
+  an amount stays a movement (a question starts with «¿» or a question word).
+- **The thread.** Following the end is decided by the reader's own drags; the keyboard keeps a reader at the end there
+  without animation; history does not replay its entrances (`Restored`); typing re-renders only the composer; chips only
+  where a choice completes something.
+- **Disconnected.** No send haptic; the note says the Assistant is not available in this version and the message stays
+  in the field, with «Registrar a mano» (the empty expense form); a limit is never «de hoy».
+- **Coverage.** «Del 1 al N» when this month's facts end before today; «Solo cuentas en ARS, sin conversiones.» when
+  other currencies exist. The request and the reply agree on invisible characters (`withoutInvisibles`; the domain
+  exports `hasHiddenCharacters`).
+- **Review.** Editar clears the refusal line; one sheet or editor per double tap (`usePushOnce`); live validation of
+  hidden characters and the instalment count; an archived category is never shown as chosen; a destination or category
+  that stopped being valid is drawn with its reason on every surface.
+- **Owner decisions left (none blocks the merge).** Whether the Assistant's facts come from the consolidated view the
+  screens use (today: the display currency's accounts, said in words); whether «este mes» runs through today; what a
+  chip does for a question the model asked (today: none; typing answers it); refusing invisible characters at the
+  server's input (a protocol change).
+
+### Producto 25D2 — VoiceOver and Voice Control (PR #122, stacked on #121)
+
+- **Why.** The register's VoiceOver group, the two P1s among it: the Assistant was silent for VoiceOver on iOS, and no
+  outcome of a write was ever spoken (iOS has no live regions).
+- **One helper.** `announce(text, after)` in `src/ui/motion.tsx`: iOS only, queued, called from the handler that caused
+  the change (never on mount), `'leave'` delays it until the closing screen is gone; Android keeps its live regions; a
+  test rejects any direct `announceForAccessibility`, and `voiceover.node.ts` checks its arguments like any label.
+- **The Assistant:** thinking, the finished reply (once, never each streamed part), system notes and the next question
+  are spoken while it is in front; «Reintentar» is its own stop; Confirmar says «Registrado.» after the sheet closes.
+- **Outcomes:** new movements, transfers and devoluciones («Guardado, <amount in words>.»), edits, undo and restore,
+  plan states, an adelanto, an import, recurring pause/resume/delete and account deletion are spoken.
+- **In place:** Inicio's number is named («Gastado en <mes>, …»), its Gastado | Disponible switch and Reportes' and
+  Presupuestos' month steps are spoken; an empty month says so instead of «0,00 pesos».
+- **Names and stops:** «Este mes» is labelled by its visible words (Voice Control); «Ver todos, <section>»;
+  «Transferencias»; rows speak the unit in words (docs/currency.md §6) instead of the ISO code; a plain detail row and a
+  «Dónde más gastaste» row are one stop; comparison rows say their category; page-sheet pickers answer the escape
+  gesture; closed swipe actions leave the reading order (the Actions rotor keeps them).
+- **Deliberate changes of displayed values.** A budget's percent rounds down (87.5 % shows «87 %»), so «85 %» always
+  matches amber and «100 %» always means the limit is reached; spoken row amounts say «pesos» instead of «ARS».
+- **Not in this delivery.** Announcing the account, card, budget, category, debt and recurring form saves; card, debt
+  and plan deletions; the remaining ISO codes in eyebrows, Stat labels and chart sentences; the search role on
+  Movimientos' field (it waits for the iPhone).
+
+### Producto 25R1 — robustness (PR #121, stacked on #120)
+
+- **Why.** The register's robustness group: catch-ups and rates that did not follow the day or the network, routes that
+  accepted anything, views that reported a committed change as failed, and the tests that never ran the real code.
+- **Catch-up.** One pass when the day changes with the app open, one on a real return from the background (a Control
+  Center pull on a day already caught up costs nothing; returns are coalesced; a midnight during a pass runs it again);
+  a rule resubmitted after the catch-up advanced it is a no-op; a plan with a due instalment is judged caught up before
+  «Eliminar plan».
+- **Rates.** Typed errors (408, 429, 5xx transient with Retry-After capped at 6 h; other 4xx a refusal); back-off 1, 2,
+  5, 15, then 30 min, per quote, with the month's timer at the earliest back-off; a refused request split once per quote;
+  refresh on foreground and focus, released when the screen is not in front; a past month final only when its rates
+  reach its end; «fetching» from the first frame; `credentials: 'omit'`; month and date parameters validated.
+- **Links.** `app/+native-intent.ts`: a link that launches the app opens Inicio; one that arrives while it is open is
+  ignored, so it never dismisses a form. Producers (notifications, Shortcuts) will allow their own validated path.
+- **Committed but not refreshed.** A write that committed but could not refresh the view is done (`committedBeforeRefresh`):
+  management actions close, an import says «Copia incorporada», and a detail's «Reintentar cambio» gives way once the
+  ledger shows the change.
+- **Reports.** The comparison is offered only when it can compare; drill-downs say why a rate is missing under ⓘ.
+- **Tests and CI.** The real RatesProvider, finance view and cache loaded by tests; date tests also in Buenos Aires, New
+  York and Auckland in CI; a privacy-surface test (dependencies, permission strings, outbound origins); the bundle scan
+  proves the patched decoder; the review files under the second-write-path guard.
+- **Not in this delivery.** Refusing an import whose catch-up backlog is too large (the owner's decision); deleting the
+  unused report components; a memoization the review asks to profile first; the encryption declaration (the owner's).
+- **Independent review.** Four confirmed (none on money or storage), all fixed with tests that fail on the code before:
+  a warm link dismissed a half-filled form, a short rate back-off stranded a longer one, a midnight during a pass was
+  dropped, and the checklist's link steps are marked as covering #118/#119 only.
+
+### Producto 25N1 — Finanzas, Ajustes and the shared controls (PR #120, stacked on #119)
+
+- **Why.** The owner (2026-10-17) found Más mixing financial tools and settings, asked to reconsider the navigation
+  without adding tabs by inertia, and to accelerate with substantial deliveries closing groups of the private register's
+  findings. This one closes the navigation proposal of §3 and the shared controls, forms and token findings around it.
+- **Navigation.** The fourth tab is **Finanzas** (`app/(tabs)/settings.tsx` keeps its route): one list of the ledger's
+  tools, the review badge on the tab, a gear pushing **Ajustes** (`app/preferences.tsx`: Preferencias, Tus datos, Acerca
+  de, the version footer and the development diagnostics). **Licencias** (`app/licenses.tsx`, `app/license/[id].tsx`,
+  `src/ui/licenses.ts`): every production dependency's notice and the data licences (circle-flags, Unicode CLDR), full
+  texts in English. **Movimientos deshechos** is a button in Movimientos' bar while something is undone; undone rows are
+  dimmed and spoken as such. Decision 005 amended (25N1); routes kept.
+- **Controls.** No app haptic over the native switch; a held dock tab switches; React Native's press retention; one
+  disabled look; Clear on text fields and «Listo» on number pads; distinct devolución and undo glyphs; informational
+  alerts with «OK», recoverable actions not destructive-red.
+- **Forms.** The last account per kind (`src/ui/last-account.ts`, a device preference outside the ledger and backups);
+  «Hacia» preselected after adding its account; a pointer to Pagar tarjeta on plain transfers; the card form's live
+  date check and «Más datos (opcional)»; a plan's actions above its calendar; budgets never offer a taken scope; debts by
+  urgency (`debtsByUrgency`).
+- **Tokens.** `edge`, `dockEdge`, `pressWash`, `switchTrack` and a pure `src/ui/tokens.ts`; colour transitions on
+  ease-out, `pulseTiming`, Reflow on `duration.state`; `scheduleOnRN` replaces the deprecated `runOnJS`; distinct card
+  faces (smallest ΔE 12.7), Finanzas tiles off the brand and semantic hues (ΔE ≥ 12), no 1.1:1 partial outline; a source
+  scan rejects new edge, shadow or rgba literals outside the palette.
+- **Not in this delivery.** Moving blocked choices into action sheets; a row action «Recuperar» in Movimientos
+  deshechos (it would duplicate the detail's guarded restore); the default account colour (a stored-look change, the
+  owner's); generating the licence list from the dependency tree.
+- **Gates.** After #112 → #117 → #118 → #119 merge; the owner approves the navigation on the iPhone (M2).
+
+### Producto 25O1 — first impression (PR #119, stacked on #118)
+
+- **Why.** The owner (2026-10-17) found the first opening too basic, with little visual personality and too much text,
+  asked for a premium, clear and memorable one coherent with Sapphire + Sand, for country marks in the Region chooser and
+  near accounts where they mean something, and widened the design delegation to the whole app. References (Revolut,
+  Wise, Slack) were read for principles, not looks: the brand brief keeps caps-lock headlines, 3D renders, mascots and
+  confetti out; numerals are the hero and the commitments calendar the motif.
+- **The first opening.** `app/onboarding.tsx` and `src/ui/onboarding-flow.ts`: four steps on one route (story, start,
+  account, done). The story's scenes (`src/ui/onboarding-art.tsx`) are built from the app's own components with fixed
+  sample figures in the suggested currency and the person's formats (`sampleFigures`, never stored), each played once on
+  its page's first arrival and drawn still under Reduce Motion or on a return; they scale down to their room and are not
+  drawn under 160 pt. A display style (40 pt, capped at the Large Title's 60 pt or where the longest word fits). The
+  start step offers three presets (name and icon of the first account), the region and language pills (the Más
+  choosers), and «Restaurar una copia» (back with an account in the ledger, the setup ends). The account step asks the
+  preset's question, with the currency chip (`src/ui/currency-chip.tsx`) and the opening balance; saving keeps 25Q4's
+  rules. The close is the sapphire field with the account's card and a drawn check. The splash waits for a new
+  installation's first frame (a 1.5 s ceiling) and the tabs fade in; VoiceOver moves to each new title. A started mark
+  (`ONBOARDING_STARTED`, written by the layout for a new installation) lets a first opening interrupted by a relaunch
+  (an app-language change in iOS Settings) resume while the ledger has no account. AGENTS.md rule 15 is amended to
+  this flow, with every guarantee kept.
+- **Marks.** `src/i18n/flags.ts` and `src/ui/marks.tsx`: round vector flags (the owner, later on 2026-10-17: graphic
+  flags, cropped and rounded, not emoji), generated from circle-flags 2.8.3 (MIT; `npm run flags:generate`,
+  `src/i18n/flag-art.ts`, 258 flags drawn with react-native-svg paths, no runtime parsing, no new dependency), clipped to
+  a circle with a hairline of the palette's line so a white field keeps its edge on sand. A region shows its own flag; a
+  currency its issuer's beside its code (the euro's is the EU's, supranational codes a neutral glyph on the same
+  circle); a language the flag of the variety its catalogue is written in (rioplatense Spanish, American English:
+  `SPEECH_REGIONS`), with the variety said in words in its own language («Variante: Argentina», «Variant: United
+  States»), so the flag never stands alone for a country the language merely comes from; never an account (it has no
+  country; adding one is an open owner decision). Region and language rows, recents, Más (Idioma and Región) and the
+  onboarding pills show them; the device rows a phone glyph; the currency sheets, the Moneda rows and Cuentas' headers
+  the currency mark. Sark draws like every region (vector art does not wait for iOS 18.4's emoji). docs/i18n.md §11a.2
+  and docs/currency.md §1 record the semantics.
+- **QA profile (milestone M1).** `src/dev/qa-profile.ts`: a development bundle started with
+  `EXPO_PUBLIC_QA_PROFILE=<name>` opens its own ledger, rate and review files and prefixed preference keys, so it is a
+  new installation (the first opening included) while the person's ledger files are never opened and their preference
+  keys never read or written (the profile's prefixed keys share the key-value store); Más names it under
+  the footer; a release compiles it away. It replaces «reinstall the app» in M1.
+- **Choosers and Más.** Región's note says what it changes, under the pinned card on the long list; a refused save is
+  said in an alert, always in view; the current choice leads Recientes; from the stacking text size a region row gives
+  its flag's room back to the name. Idioma's note says how iOS uses the language in its own menus, with «Abrir
+  Configuración» (iOS's name for Settings on Latin American iPhones); Apariencia has no note; Más drops its
+  local-storage footnote.
+- **A new Inicio.** «Primeros pasos» (create the first account, log the first expense, add a card, optional) while the
+  ledger has no movement, transfer or instalment plan; a done step is a grey check, not a button; no filled button below
+  the field. Movimientos' empty state turns secondary when an account exists.
+- **Empty states, forms and the «+».** Tarjetas, Deudas y cobros and Recurrentes empty in one title and one line;
+  Nueva and Editar cuenta put name, currency and balance first and «Apariencia» last; adding the first account from a
+  movement returns to it; the hub's captions say what each form records (decision 005 amended, text only).
+- **Dark.** `primaryFill` and `swipeAccent` take the switch's #4568DA (white 4.8:1): two dark brand fills (the
+  25VIS2 owner sheet's choice, decided under the delegation).
+- **Not in this delivery.** The native splash colour (#F5F6F8 / #080B10) still predates Sapphire + Sand and changes with
+  the next native build; the illustration figures of small-unit two-decimal currencies (NGN, INR…) read dollar-like.
+- **Tests.** New `tests/flags.node.ts` (every region's art, issuers, varieties) and `tests/qa-profile.node.ts`; extended `onboarding` (the four steps, the story's pages and focus, Omitir, back,
+  the restore path, the save's retry and haptics, Reduce Motion, `sampleFigures`, the splash and the handoff),
+  `typography` (the display cap), `choice-list`, `locale-switch`, `locale-release`, `regions-integration`, `more-routes`,
+  `ui-rows` (the marks), `spending-home` (Primeros pasos), `capture-hub` (captions), `liabilities-routes`,
+  `recovery-routes`, `personalization-routes`, `polish-routes` (empty states, forms, the first-account return).
+- **Independent review.** Five lenses (design, accessibility, correctness, copy, tests), each finding put to a skeptic:
+  17 confirmed, none high, all fixed in this branch (a refused preference is an alert, a row's flag yields to large text,
+  the close's quiet tones, the progress's idle ink at 3:1, a scene per currency when the iPhone's Region changes, the
+  Android back scoped to focus, restored accounts ending the setup in front, the next 12th, a resumable first opening,
+  Cuentas' empty copy, «Configuración», and the missing pins); a verifier re-applied each mutation and each now fails a
+  test. The chip-beside-amount row the review asked for was measured against seven-digit balances and returned to a
+  column, so the figure keeps 46 pt.
+- **Second round (2026-10-17, later, after the owner's clarification).** Round graphic flags (emoji retired), a
+  language's variety flag and words, the QA profile for M1, and three proposals in §3. An independent review found six
+  points, none in the code's data safety, all fixed: the shared-expenses proposal now covers a purchase paid by card (a
+  split card purchase; instalments out of v1) and names every decision 003 invariant it touches; Cuentas' header centres
+  name, flag and total; the claims about the QA profile say the prefixed keys share the key-value store; the language's
+  words are claimed for the chooser only; no local path in the checklist; a catalogue comment back on its key. Local
+  checks: typecheck clean; `test:storage` 1485 tests, 1484 pass, 0 fail, 1 skipped; `currency:verify`,
+  `regions:verify`, `i18n:check -- --strict` (0 errors, 0 stale), `check`, `npm ls`, `export:ios` and the bundle
+  secret scan OK; root `npm test` 704 passed, 1 todo; `check:repo` OK.
+- **Gates.** #112, #117 and #118 merge first, after milestone M1; this branch then merges `master` (no force-push).
+- **Checks of the first round (local, Linux, worktree, 2026-10-17; the second round's are above):** typecheck clean; `test:storage` 1481 tests, 1480 pass, 0 fail, 1
+  skipped (the currency catalogue's existing «no cached sources» skip); `currency:verify` and `regions:verify` OK;
+  `i18n:check -- --strict` 0 errors, 0 stale (21 notes); `check` OK offline and live; `npm ls --all` OK; `export:ios` OK
+  and the bundle names no server secret; root `npm test` 704 passed + 1 todo; `check:repo` OK (466 files). None of this
+  is iPhone QA.
+
+### Producto 25Q4 — edits, failures and recovery that keep the money right (PR #118, stacked on #117; unmerged)
+
+- **Why.** The first delivery under the owner's working mode of 2026-10-16: the iOS quality review's findings (record
+  private) are the source of work, implemented in coherent deliveries with tests and independent review, and validated on
+  the iPhone by milestone. Money integrity and failure handling first. Editing a card or debt payment offered the card in
+  «Desde», a choice storage refuses, and the form froze; an edited or restored debt payment had no ceiling, so an
+  overpayment was accepted and read «Pendiente»; undoing a card purchase said «Se sumarán … a Visa»; a failed save could
+  show SQLite's own text; any later write cleared a failed catch-up's banner; failure haptics existed only in two forms.
+- **Money.** `transfer-form.tsx`: an edit keeps the stored card or debt fixed (the fixed fact a new payment shows) and
+  offers only the side pairs `assertTransferSides` accepts, as a dry run, so no choice ends in a frozen refusal. A debt
+  payment or collection is capped by what is pending without the transfer being edited, read from the records for new
+  and edited ones (a link's cap stays a further limit; an older overpayment keeps its amount and is never raised). The
+  cap is said in red while the amount is typed, not spoken; Save refuses it with the sentence spoken and one Error tap.
+  A debt at or past zero reads «Saldada». An edit's shortcut figure leaves the edited payment out («Saldo pendiente sin
+  este pago», «Pendiente sin este cobro»), so the screen never shows two «Pendiente». A transfer settles an obligation
+  only in its own direction (cash → card, cash → a debt I owe, a receivable → cash): a link the other way round opens a
+  plain transfer, as a link out of a card already did, and a payment an older build stored the other way round is edited
+  in the plain form, capped like a new payment once turned back there. A new card payment's cap is the larger of the
+  link's and what the records say the card owes now, so a charge a catch-up records while the form is open can be paid
+  in full. `transfer/[id].tsx`: restoring a debt payment or collection over what is
+  pending is refused before any confirmation, with «Ver deuda». Undo and restore say how a card or a debt will read
+  afterwards (`balanceAfterSentence`: «Visa quedará con un saldo pendiente de …», «… a favor», «Le vas a deber …»,
+  «… quedará saldada») and where an undone movement is recovered (Movimientos deshechos, en Más). Card payments keep
+  only their caller's cap (decision 003: a card's credit is modelled). A plan deletion that storage refuses before
+  writing releases the screen, which reads the plan again and offers a live «Dejar de seguir el plan».
+- **Failures.** `failureMessage` (on the i18n binding): a failed action keeps a catalogued refusal, translated, or its
+  own calm sentence, never an engine's or a native module's text; the release rules still read the raw message. The
+  domain's five review refusals and «No encontramos esta cuenta.» are catalogued; a test fails when the domain or storage
+  throws a sentence the catalogue lacks. Every failed write taps once (`errorHaptic` / `warningHaptic` in `motion.tsx`,
+  now the only module that imports expo-haptics, pinned by a scan): Warning only while a frozen «Reintentar» waits on an
+  outcome the app cannot verify, Error otherwise; never with Success, from a disabled button or from a line shown while
+  typing. This also closes #112's same-PR items: the failure haptic, Save waiting for every input (the gating table now
+  has a row for every term) and the fill lowering the keyboard, all verified by tests, none yet on the device.
+- **Storage and launch.** `LedgerProvider` keeps which catch-up last failed apart from a write's outcome: the banner and
+  its retry stay until that pass succeeds; a recurring rule or a restored copy whose catch-up fails after the commit
+  resolves as saved, with the banner. A restore runs `restoreFromBackup` (the same catch-ups as a launch) inside
+  `rereadOnRefusal`. A file from a newer build is said as itself at launch, with no «Volver a intentar». The first
+  opening's redirect fires once, after the fonts load. The movement, transfer, card and proposal editors keep «Cerrar»
+  when there is nothing to edit, like the other five.
+- **Backup and lists.** The import review says «Copia del …», «Último movimiento: …» (its date spoken whole) and how
+  many movements the restore also records for rules and plans that fell due after the copy (a dry run of storage's catch-up rules, cross-checked against a real SQLite restore); the confirmation
+  names the copy's date and that an import is undone one item at a time. An export that a process iOS ended under the
+  share sheet left in the cache is deleted at the next launch, and the picker's own copy right after its text is read
+  (only the app's names, only inside its cache and tmp; an original is never touched). «Ver todos» and the Assistant's
+  «Ver movimientos» open Movimientos whole and from the top; the dock keeps the search, the filter and the scroll.
+- **Not in this delivery.** Storage and the domain still accept a debt payment or collection that crosses zero (a backup
+  import, an older build or a stale screen can still record one, and every read clamps it to «Saldada»): refusing it is
+  a domain change after checkpoint B11, with the owner's call on how older backups that hold one import. The conflict card
+  naming the blocking records lands with the backup comparator after B11.
+- **Tests.** New `tests/ledger-provider.node.ts` (the provider in a hook harness: the catch-up banner, open failures) and
+  a root-layout harness in `onboarding.node.ts` (the redirect once, the boot retry, the cache sweep); extended
+  `recovery-routes` (edits, caps, the restore refusal, confirmations, the Save-gating table, the import review, the
+  picker's copy), `installment-routes`, `installments` (a real SQLite restore and its catch-ups), `backup-file`,
+  `translation`, `motion` (the haptics scan), `review-routes`, `refund-routes`, `activity-route`, `spending-home`,
+  `assistant-routes`, `personalization-routes`, `liabilities-routes` and `onboarding` (the failure tap of every save by
+  behaviour: Error, then Warning while the same submission waits frozen, then Success); pins of engine text moved
+  deliberately to each action's own key. Each central test was checked to fail with its change reverted.
+- **Independent review.** Five lenses (money, copy and VoiceOver, failures, tests, regressions), each finding put to a
+  skeptic: 17 confirmed, none high, all fixed in this branch (the settle direction, the edit captions, the card cap, the
+  movement count, the long date, the proposal editor's Success and close, the undo and restore wording, and the missing
+  test pins); a verifier re-applied the reviewers' mutations and each now fails a test. The one gap that round opened
+  (a turned-back payment without a cap) is closed and pinned too.
+- **Gates.** #112 and #117 merge first; this branch then merges `master` (no force-push). Device steps wait for the next
+  milestone session (the checklist's «Producto 25Q4»).
+- **Checks (local, Linux, worktree, 2026-10-16):** typecheck clean; `test:storage` 1439 tests, 1438 pass,
+  0 fail, 1 skipped (the currency catalogue's existing «no cached sources» skip); `currency:verify` and `regions:verify`
+  OK; `i18n:check -- --strict` 0 errors, 0 stale (21 notes); `check` OK offline and live; `npm ls --all` OK; `export:ios`
+  OK and the bundle names no server secret; root `npm test` 704 passed + 1 todo; `check:repo` OK (461 files). None of
+  this is iPhone QA.
+
+### Producto 25D1 — Legibility and touch (PR #117, stacked on #112; unmerged)
+
+- **Scope.** Branch `feat/25d1-legibility-touch` from #112's head (Sapphire + Sand), so it merges after #112. The
+  contrast, touch, pressed-state and large-text items of the owner's iOS quality review of 2026-10-15 (its record stays
+  private), JavaScript only: no navigation, domain, storage, schema (14), backup (v14), copy or catalogue change.
+  Each value is judgment backed by a figure (WCAG on the real tokens; widths from React Native's multipliers and
+  `labelWidthEm`); the iPhone decides.
+- **Contrast** (`palette.ts` `QUIET_ALPHA`, `quietTones`; `category-color.ts`; `appearance-picker.tsx`). A coloured
+  hero's symbol and cents keep their tone at alphas set by the 3:1 floor (light E6 / CC, dark B3 / 99; light cents were
+  2.16–2.43:1, now ≥ 3.29; dark ≥ 3.35); «Otras» a warm neutral ≥ 3.44:1 on the canvas, the surface and the ring track
+  (was 1.54); the chosen colour's check `onSemantic` (dark: ink ≥ 5.31:1, white was 1.97–3.30). With iOS's Increase
+  Contrast on (`subscribeIncreaseContrast`, the palette's `increaseContrast`), every hero's symbol and cents take the
+  units' full strength: the step back is composition, never paid by someone who asked for contrast.
+- **Touch.** The composer's Enviar/Detener a 44 pt target in the same 40 pt of layout (−2 pt margin inside the bar's
+  padding); plain currency chips 4 pt vertical slop; the date sheet loses the grabber it could not honour (HIG: only a
+  resizable sheet shows one).
+- **Pressed states.** Under Reduce Motion a Tarjetas deck card shows a 12 % black wash while pressed (no scale; white
+  text ≥ 6:1, the issuer AA, pinned on every face); every segmented-control segment dims to 0.6 under the finger, the
+  chosen one never.
+- **Large text: one rule (revised 2026-10-15 after the owner asked that no cap trade legibility for composition).** No
+  text grows past the size iOS gives its style at AX5 (the HIG table: Large Title 60, Title 1 58, Title 2 56, Title 3
+  55, Body 53, Subhead 49, Footnote 44, Caption 43; `TEXT_STYLE_MAX_SCALE`, applied by `AppText`), which also restores
+  iOS's order at every setting (React Native scales every style by one factor: 3.571 at AX5). Below that, where a layout
+  cannot hold a size, the layout adapts instead of the text shrinking: Inicio's month (Title 2) and the Reportes and
+  Presupuestos month titles (Title 3) stay beside their controls while the year's longest month word fits there, then
+  take their own line (the accounts button moves under it, right-aligned; the arrows move under the title), growing to
+  iOS's own 56 / 55 pt (`titleFit`; the only floor is a whole word). The first pass's fixed caps are gone: 1.4× on the
+  month titles (30.8 / 28 pt, under even iOS's AX1 34 / 31), 2× on the captions under them (24 pt), 1.4× on the month
+  axis, which now shows the short month while it fits its column at the person's size and the month's initial past
+  that, as Apple's charts do (`axisLabels`, hidden from VoiceOver: each bar speaks month, year and amount). Amounts are
+  never smaller than body text can be (`amountMaxScale`): a row amount grows to 53 pt (Body's AX5 size) whatever its own
+  size (it stopped at 1.8×: 30.6 pt under 53 pt names, a 24 pt total at 43), a hero to 1.4× or 53 pt, whichever is
+  larger (a 28 pt total reached 39); both still shrink to fit their line, so from AX3 a long amount on Inicio can draw
+  about as large as the month above it. «Para revisar» rows and the Assistant's evidence rows now stack above 1.2× like
+  every other row (beside a growing amount their label had no room). Kept from the first pass: `NavigationRow` and
+  `CheckRow` lift their two-line limit above the 1.2× stacking threshold; the sheet bars stop at 1.2× like a system bar,
+  through one `SheetBarButton` with the Large Content Viewer and an 8 pt slop; every Día a día row is stacked;
+  `IconButton`, `InfoButton` and `MetricHelp` offer the Large Content Viewer. `mobile-design.md`'s typography paragraph
+  no longer promises a half / three-quarters shrink floor for rows: iOS reads `minimumFontSize` (default 4 pt), never
+  `minimumFontScale` (`RCTTextLayoutManager.mm:246-249`, React Native 0.86.3).
+- **Tests.** New `tests/contrast-floors.node.ts`; `typography` (every style's AX5 ceiling and iOS's order at all ten
+  settings; the row-amount cap; Increase Contrast on the canvas, in colour and on the field; the first opening's words
+  at AX5), `spending-home` (Inicio's month at 1×, AX1–AX5 and 320–430 pt, whole words, under the hero, never under iOS's
+  AX1 size; rendered at AX5), `report-routes` and `budgets-routes` (the month title beside or above the arrows, rendered
+  from 1× to AX5 and 320–393 pt; the captions on their own ceiling), `spending-chart` (the axis at every width and
+  setting drawn at the person's size inside its column; the donut readout under the new row cap), `material` (the
+  Increase Contrast subscription and its wiring in the theme), `review-routes` and `assistant-ui` (the two rows that
+  now stack), `cards-deck`, `ui-rows`, `date-field`, `home-ranking`, `assistant-ui`,
+  `currency-copy` and the colour picker rendered for its check. Reverting a change fails a test (checked on the picker's
+  check and the grabber). `tests/contrast.ts` holds the WCAG helper so no test file imports another: `appearance` and
+  `contrast-floors` were re-registering the theme's 25 tests (the suite's count drops by 50, nothing was lost). The
+  typography goldens moved deliberately (`'#008800E6'`; `['#131411E6','#131411CC']`; the row amount 53/17). The version
+  line reads «FinanzApp 0.1.0 (25D1)».
+- **Not done:** a `minimumFontSize` floor for row amounts (device call); the Assistant's draft card at large text; segments at 320 pt and Deudas' totals; Increase Contrast for the rest of the palette
+  (separators, tertiary text); the Large Content Viewer on the «+», its «×» and Inicio's accounts button (each a later
+  pass).
+- **Gates.** #112 approved and merged first; this branch then merges `master` (no force-push) and is checked on the
+  iPhone from the same development build; the owner approves.
+- **Checks (local, Linux, worktree, 2026-10-15, after merging #112 with `master`):** `typecheck` OK; `test:storage` 1382 passed, 0 failed, 1 skipped
+  (the suite no longer counts the theme's 25 tests three times); `i18n:extract` no copy outside the catalogue; `currency:verify`, `regions:verify` OK; `i18n:check --
+  --strict` 0 errors, 0 stale (no copy change); `expo install --check` up to date, with `EXPO_OFFLINE=1` and live;
+  `npm ls --all` OK; `export:ios` OK; bundle secret scan OK; root `npm test` 703 passed; `check:repo` OK. None of this
+  is iPhone QA.
+
+### Producto 25VIS2 — Sapphire + Sand trial (on its branch; unmerged until iPhone QA and the owner's approval)
+
+- **Scope.** brand-brief.md §4.9's sheet B in `apps/mobile/src/ui/palette.ts`, token for token under the same names
+  (PR #107's `onSemantic` included: white in light, #19191C in dark). Typography stays the system's (SF Pro); the
+  four-tab dock and the separate «+» are unchanged; the palette itself changes no layout, navigation, domain, storage,
+  schema (14), backup (v14), API or server (the composer polish below changes the transfer Save label and removes one
+  catalogue key). The splash colour (`app.config.ts`, native) is left out so the trial stays JavaScript; it flips with
+  the release-candidate build (flip list below).
+- **Tests.** `tests/theme.node.ts`: every accessibility assertion kept at WCAG AA or above, plus primary text on the
+  inset and the field's ink on its control fill. Three bars that were Lime's own 7:1 are lowered: text on the call to
+  action and the «+» ≥ 4.5 (dark 5.49 and 6.61), ink AAA on every brand field → only the hero's units (7.63 / 8.2), and
+  the «+» against the dock → against the canvas ≥ 3 (6.65 / 7.42; against the pill 2.21 in light); the Lime identity rewritten for sapphire (hue 218–232°, saturated, HSL lightness ≥ 0.40 so never navy; the amount's order by
+  contrast against the field; warm neutrals; the slate transfer apart by Lab chroma ≤ 15 and ΔE ≥ 40 from every brand
+  token; the «+» at least 3:1 against the canvas). `spending-home.node.ts` reads `heroStatusBar` (light over the
+  field), `ui-rows.node.ts` the light ink on the thumb. The version line reads «FinanzApp 0.1.0 (25VIS2)».
+- **Tight margins for the iPhone:** the cents 4.62:1 on the light field; dark primary on `elevated` 4.83:1; the dark
+  switch track 3.18:1 on the inset; the field's control fill 1.28:1 against the field (a shape, with its text 7:1+).
+- **Owner decisions before approval** (answered with the date in the checklist's sheet): the transfer tone (slate
+  kept?); two or three dark brand fills (buttons and swipes join the switch's #4568DA?); the cobalt account preset
+  (#2557D6, close to the light brand; kept?); one bright object per screen (Movimientos' empty-state button secondary
+  when an account exists?); card faces (not changed by the palette).
+- **Gates.** PR #113 merged first (Expo alignment), then one new development build, the checklist's «Producto 25VIS2»
+  on the iPhone and the owner's explicit approval; only then a merge, whose last commit applies the flip list below.
+  Lime's values stay in git history.
+- **Movement composer and accessibility polish (same PR, 2026-10-14).** The owner approved the direction of the
+  private UX review (single-screen composer kept, its Gasto / Ingreso / Transferencia control kept) and these items:
+  - **V1.** `MovementForm` disables its switch while `EntryForm` or `TransferForm` reports a save in flight or a frozen
+    submission (`onLockedChange`, sent from the save handlers as `busy || pending !== null`). Recovery is unchanged:
+    both `save()` handlers only add the report (a local `frozen` mirror set with `setPending`, cleared with a
+    `releasesDraft` release in `EntryForm`; `TransferForm` has no release, so a refusal storage decides after the freeze
+    keeps its switch locked until the screen closes, as it already kept its fields); the frozen submission, the
+    operation id and what `releasesDraft` releases behave as before. After a successful save the switch stays locked
+    while the modal closes.
+  - **V2.** `EntryForm` and `RecurringForm` keep one category per kind (the recurring form had the same defect: a Gasto
+    category saved on an income rule and copied to every movement it records; extended 2026-10-15); **V3** the transfer, payment and collection Save echoes the amount
+    (on screen and spoken), read with the same `minorFromEditedDraft` as the save; **V7** the settled card or debt is a
+    `SelectorCard fixed` (full strength, no chevron, read as text).
+  - **Targets.** Default segments 32 pt + 6 pt vertical slop (44 pt; React Native 0.86's new architecture folds a
+    child's slop into its parent's overflow inset, so it hits outside the track); `MovementForm` keeps 4 pt under its
+    track; the plain `SectionTitle` action 36 + 4 + 4.
+  - **VoiceOver and Reduce Motion.** Field captions are not a separate stop; «Listo» is named «Listo»
+    (`common.closeAmountKeyboard` removed, English lock rewritten by `i18n:check -- --accept en`); the date sheet answers
+    the escape gesture; `ErrorMessage` announces on iOS (what Save refused: the refund form's live line passes
+    `announce={false}` until then); `PressFeedback` dims a `scale` control to 0.7 under Reduce Motion (an account
+    detail's quick-action pills opt out while they are glass); a disabled `Choices` is drawn at half opacity.
+  - **Not done, by decision:** autofocus, a discard confirmation, any other field, the dock's appearance (no photos;
+    #4F4D47 would be 1.52:1 on elevated rows and 1.03:1 on the dark sapphire field), Hacia preselection, merchant-first.
+  - **Completed 2026-10-15 (same PR), the rest of the approved scope:** **V4** a failed save taps once: Error for a
+    refusal (before the submission froze, or one storage decided before writing), Warning when it may have been written
+    and stays frozen for the exact retry; **V8** a table test: Save waits for each required input of a movement and a
+    transfer, and a complete draft saves once; **V15** «Usar todo», «Pagar total» and the refund's «Total disponible»
+    lower the keyboard as they fill, so Save and its echo are in view. Codex's review: `ErrorMessage` announces only on
+    iOS; Android keeps the alert role and the live region, which TalkBack speaks itself (Node-tested; Android is not
+    shipped). Coverage: the yen echo (a currency without decimals is never read as cents) and the switch locked after a
+    successful save. The 44 pt switch is reached by slop, not by the taller `prominent` track the review proposed,
+    because the owner asked not to enlarge the drawing.
+  - **Merge-time flip list** (only on the owner's approval, as the last commit before the merge; find each with
+    `grep -n -i -E 'electric lime|trial|unmerged|sin mergear|not selected|default identity'` over the files named):
+    decision 005 gets an «Enmienda <fecha> — Producto 25VIS2 (paleta Sapphire + Sand)» like 25VIS1's (accepted on the
+    owner's iPhone; Lime replaced token for token under the same names; the semantic rule, the graphite dock and the
+    navigation unchanged; the owner's answers above; not a public name or logo), and its header and 25VIS1 pointer say
+    so; this roadmap's header, §1 (a 25VIS2 bullet beside Lime's, Lime replaced), this section's title, decisions and
+    gates, «Product continuity» and the theme-pack lines naming Lime as the default identity; `apps/mobile/README.md`'s
+    «Implemented» line (no «colour tokens only» or trial wording; the polish named); brand-brief.md §4.8 and §4.9 (no
+    «Not selected; implemented only as an unmerged trial»); mobile-design.md's 25VIS2 header and its notice at the top;
+    the checklist's 25VIS2 heading (approved on <date>, results and answers recorded); README.md (desde 25VIS1 …),
+    go-to-market.md and app-store-launch.md (the default identity, the landing ornament); `palette.ts`'s header comment
+    (no «a palette trial»). Only if the answer is «two dark fills»: `palette.ts` dark `primaryFill` and `swipeAccent`
+    #3D60D4 → #4568DA, brand-brief.md's sheet rows and the Marca bullet, then `tests/theme.node.ts` again. **Not in the
+    merge (native):** the splash in `app.config.ts` (#F5F6F8 / #080B10 today, close to neither palette) flips to the
+    approved canvases (#F3EFE6 / #0C0B0A for Sapphire, Lime's if Lime is kept) with the release-candidate build, with
+    an `app-config.node.ts` assertion that they equal the palette's `background`.
+  - **Checks (local, Linux, worktree, 2026-10-15):** `typecheck` OK; `test:storage` 1389 passed, 0 failed, 1 skipped
+    (19 new tests over the two days, each failing on the source before its change); `currency:verify`,
+    `regions:verify` OK; `i18n:check -- --strict` 0 errors, 0 stale; `expo install --check` with `EXPO_OFFLINE=1` up to
+    date (the live check waits for PR #113 on `master`); `export:ios` OK; bundle secret scan OK; root `npm test` 703
+    passed; `check:repo` OK. CI runs the rest once `master` (with #113) is merged in. None of this is iPhone QA.
+
+### Producto 25Q3 — calm failures and a dock that never ignores a tap (PR #116, merged)
 
 - **Why.** A drawing error in any screen reached React Native unhandled and ended the app in a release build; an unknown
   link (`finanzapp-dev://nope`) opened Expo Router's black English «Unmatched Route» screen with a Sitemap link; and the
@@ -4518,7 +5114,7 @@ nothing of it is on a screen yet.
   `i18n:extract` clean; `expo install --check` live and offline up to date; `export:ios` (with the new route) and the
   bundle secret scan OK; root `npm test` 704 passed; `check:repo` OK. None of this is iPhone QA.
 
-### Producto 25Q2 — a backup that completes or says why (this PR, stacked on 25Q1)
+### Producto 25Q2 — a backup that completes or says why (PR #115, merged)
 
 - **Why.** The backup is the only recovery of a ledger that lives on the phone (production-plan.md §1.3). The audit found
   the export failing with the import's sentence from about 12 700 movements (the pretty file passed the import's 5 MB
@@ -4564,7 +5160,7 @@ nothing of it is on a screen yet.
   `i18n:extract` no copy outside the catalogue; `expo install --check` live and offline up to date; `export:ios` and the
   bundle secret scan OK; root `npm test` 704 passed (the guard's new test); `check:repo` OK. None of this is iPhone QA.
 
-### Producto 25Q1 — money that reads right (this PR)
+### Producto 25Q1 — money that reads right (PR #114, merged)
 
 - **Why.** The whole-app audit of 2026-10-15 (private record) found screens that print a wrong, zero or missing figure.
   These seven are read-side only and independent of PR #112; the write-side guards for editing or restoring a payment
@@ -6665,8 +7261,9 @@ unlimited (production-plan.md §6.6).
 - **Depends on.** 25A in production use with measured costs.
 - **Owner decisions recorded 2026-10-04 (not implemented; no pricing or entitlement decided here):**
   - **Theme packs: a pre-launch 25F Pro launch candidate** (promoted from a post-launch idea; confirmed 2026-10-04).
-    Electric Lime stays the default and current identity; additional packs such as Forest and Sapphire are gated behind
-    the same entitlement once StoreKit and the paywall exist. Each theme passes light, dark, accessibility and
+    *(2026-10-17: Sapphire + Sand is the default identity (#112, kept by the owner); the experience, accessibility gates and StoreKit
+    relation are in §3 «Proposal — Theme Packs».)* Electric Lime stayed the default when this was recorded; additional
+    packs are gated behind the same entitlement once StoreKit and the paywall exist. Each theme passes light, dark, accessibility and
     semantic-colour QA before launch. Not built now and not blocking 25A: placed after the core AI and Apple
     architecture (25A, 25A2, 25D) and before launch if the schedule allows, and before the optional Mercado Pago
     consumer-sync research.
@@ -6950,9 +7547,9 @@ amount field does not animate layout at all: its symbol is anchored and its digi
 grow from a fixed origin. One
 haptic per user action, always paired with a visual. Category hues come from
 `src/ui/category-color.ts` and never replace a name. Colour tokens live in
-`src/ui/palette.ts`: the Forest pine primary (decision 005, 2026-09-30; it supersedes
-the cobalt primary that this rule named until then) marks interaction, selection and the
-brand only, inside the 158–168° hue window (never teal, cyan, emerald or blue); the hero,
+`src/ui/palette.ts`: the brand primary (decision 005's latest palette amendment; another
+palette is its own owner-approved amendment) marks interaction, selection and the brand
+only; the hero,
 accent and dock tokens belong to Inicio's field, the «+» and the dock; `expense` is the
 negative colour (destructive, overdue, over a limit), not ordinary spending; the
 semantic colours carry meaning, normal text stays neutral, category colours are

@@ -21,6 +21,21 @@ test('states map to neutral, warning and expense at 85 % and past 100 %', () => 
   assert.equal(percentUsed(progress(total, 1250)), 125);
 });
 
+test('25D2: the shown percent is the whole percent not above what was spent, so «85 %» is amber and «100 %» is the limit, every time (a recorded golden change: it rounded)', () => {
+  const limit = { ...total, amountMinor: 10_000_000 };
+  const shown = (spent: number) => [percentUsed(progress(limit, spent)), budgetTone(progress(limit, spent))];
+  assert.deepEqual(shown(8_460_000), [84, 'neutral'], 'rounding showed a calm «85 %»');
+  assert.deepEqual(shown(8_500_000), [85, 'warning']);
+  assert.deepEqual(shown(9_960_000), [99, 'warning'], 'rounding showed «100 %» with money left');
+  assert.deepEqual(shown(10_000_000), [100, 'warning']);
+  assert.deepEqual(shown(10_000_001), [100, 'expense']);
+  assert.deepEqual(shown(-5_000), [0, 'neutral'], 'devoluciones above the purchases: none of the limit used');
+  // Exact integers: a binary tail never moves it (0.29 * 100 is 28.999… in floating point).
+  assert.equal(percentUsed(progress({ ...total, amountMinor: 100 }, 29)), 29);
+  assert.equal(percentUsed(progress({ ...total, amountMinor: 3 }, 1)), 33);
+  assert.equal(percentUsed({ spentMinor: Number.MAX_SAFE_INTEGER, budget: { amountMinor: Number.MAX_SAFE_INTEGER - 1 } }), 100);
+});
+
 test('the Por categoría caption counts sublimits, exceeded and near ones, in Spanish and English', () => {
   const en = translator('en');
   assert.equal(budgetCategoriesCaption(0, 0, 0), undefined);

@@ -6,14 +6,17 @@ import ts from 'typescript';
 import * as currencies from '../src/ui/currencies.ts';
 import * as domain from '@finanzapp/domain';
 import * as presentation from '../src/ui/presentation.ts';
+import { VIEW_REFRESH_MESSAGE } from '../src/storage/ledger-session.ts';
 import * as budgetPresentation from '../src/ui/budget-presentation.ts';
 import * as liabilityPresentation from '../src/ui/liability-presentation.ts';
 import * as installmentPresentation from '../src/ui/installment-presentation.ts';
 import * as moneyInput from '../src/ui/money-input.ts';
 import * as entryPrefill from '../src/ui/entry-prefill.ts';
+import { memoryOf } from './preference-memory.ts';
 import * as appearance from '../src/ui/appearance.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
+import { en } from '../src/i18n/messages/en/index.ts';
 import type { AppLocale } from '../src/i18n/locale.ts';
 import { realModule } from './real-module.ts';
 // 24T2 (stream B): the entry form's «Pago» section derivation (pure, real in the harness).
@@ -21,6 +24,8 @@ import * as purchasePlan from '../src/ui/purchase-plan.ts';
 import * as movementAmount from '../src/ui/movement-amount.ts';
 // 24T3: the movement detail asks whether a devolución can be recorded (a dry run of the domain's creation).
 import * as operationPresentation from '../src/ui/operation-presentation.ts';
+// 25Q4: the backup review counts what the restore's catch-ups record (pure, real in the harness).
+import * as backupFile from '../src/ui/backup-file.ts';
 
 // Actual screen/form handlers with native hosts replaced by descriptors.
 // This does not render UIKit, the Files picker, animation frames or gestures.
@@ -35,14 +40,21 @@ const removed: domain.Account[] = [];
 function harness(file: string, props: any = {}, options: { data?: domain.LedgerArchive | null; params?: any;
   add?: (value: domain.Entry) => Promise<void>; update?: (value: domain.EntryChange) => Promise<void>;
   addTransfer?: (value: domain.Transfer) => Promise<void>; updateTransfer?: (value: domain.TransferChange) => Promise<void>;
-  updateAccount?: (value: domain.AccountChange) => Promise<void>; addAccount?: (value: domain.Account) => Promise<void>;
-  restore?: (value: domain.LedgerArchive, baseline: string) => Promise<void>; picker?: () => Promise<any>; locale?: AppLocale } = {}) {
+  updateAccount?: (value: domain.AccountChange) => Promise<void>; addAccount?: (value: domain.Account) => Promise<void>; saveRecurring?: (value: domain.RecurringRule) => Promise<void>;
+  restore?: (value: domain.LedgerArchive, baseline: string) => Promise<void>; picker?: () => Promise<any>; locale?: AppLocale;
+  /** The day the archive's catch-ups last ran through (the provider's `asOfISO`); absent: as the screen's own day. */
+  asOfISO?: string;
+  /** 25N1: the device's key-value store as the last-account preference sees it (read and written in place). */
+  memory?: Record<string, string> } = {}) {
   const source = readFileSync(new URL('../' + file, import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const state: any[] = [];
   const refs: any[] = [];
   let cursor = 0, refCursor = 0, uuid = 0, backs = 0;
-  const pushed: any[] = [], alerts: any[] = [], updates: domain.EntryChange[] = [], additions: domain.Entry[] = [], restores: any[] = [];
+  // 25O1: a replace is recorded in `pushed` too (as before) and apart in `replaced`, so a test can tell the two.
+  // 25D2: what VoiceOver was told through motion.tsx's `announce`, in order (its iOS-only queue is tested in motion.node.ts).
+  const announced: string[] = [];
+  const pushed: any[] = [], replaced: any[] = [], alerts: any[] = [], updates: domain.EntryChange[] = [], additions: domain.Entry[] = [], restores: any[] = [], haptics: string[] = [];
   const transfers: domain.Transfer[] = [], transferChanges: domain.TransferChange[] = [], accountChanges: domain.AccountChange[] = [], newAccounts: domain.Account[] = [], rules: domain.RecurringRule[] = [];
   // null: the ledger has not hydrated yet; setData moves it on.
   let data = (options.data === undefined ? archive : options.data) as domain.LedgerArchive;
@@ -50,9 +62,9 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   let locale: AppLocale = options.locale ?? 'es-AR';
   const i18nProvider = { useI18n: () => bindLocale(locale) };
   const jsx = (type: Node['type'], props: Node['props']) => ({ type, props });
-  const ledger = { useLedger: () => ({ archive: data, snapshot: data ? domain.snapshotFromArchive(data) : null,
+  const ledger = { useLedger: () => ({ archive: data, snapshot: data ? domain.snapshotFromArchive(data) : null, asOfISO: options.asOfISO ?? null,
     addEntry: async (value: domain.Entry) => { additions.push(value); await options.add?.(value); },
-    saveRecurring: async (value: domain.RecurringRule) => { rules.push(value); },
+    saveRecurring: async (value: domain.RecurringRule) => { rules.push(value); await options.saveRecurring?.(value); },
     updateEntry: async (value: domain.EntryChange) => { updates.push(value); await options.update?.(value); },
     addTransfer: async (value: domain.Transfer) => { transfers.push(value); await options.addTransfer?.(value); },
     updateTransfer: async (value: domain.TransferChange) => { transferChanges.push(value); await options.updateTransfer?.(value); },
@@ -60,7 +72,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     addAccount: async (value: domain.Account) => { newAccounts.push(value); await options.addAccount?.(value); },
     restoreBackup: async (value: domain.LedgerArchive, baseline: string) => { restores.push({ value, baseline }); await options.restore?.(value, baseline); },
   }) };
-  const components = Object.fromEntries(['Screen', 'EmptyState', 'ActionButton', 'AppText', 'AmountField', 'AmountShortcut', 'Choices', 'ErrorMessage', 'Field', 'FieldNote', 'IconButton', 'Surface',
+  const components = Object.fromEntries(['Screen', 'EmptyState', 'ActionButton', 'AppText', 'AmountField', 'AmountShortcut', 'Choices', 'ErrorMessage', 'Field', 'FieldNote', 'IconButton', 'PressFeedback', 'Surface',
     'CategoryBadge', 'DetailRow', 'Money', 'SectionTitle', 'GlyphTile', 'AccountBadge', 'EntryRow', 'MerchantBadge', 'LifecycleNote'].map(name => [name, name]));
   const defaults = { useDefaultCurrency: ({ accountCurrency, requested }: { accountCurrency?: string | null; requested?: unknown } = {}) => accountCurrency ?? (domain.isLedgerCurrency(requested) ? requested : 'ARS') };
   const accountManagement = { useAccountManagement: () => ({ busyId: null, error: null,
@@ -69,6 +81,9 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     consequences: () => ({ movements: 0, transfers: 0, recurring: 0 }) }) };
   const swipe = { SwipeRow: 'SwipeRow', swipeAccessibility: (actions: { key: string; label: string; onPress: () => void }[]) => ({ accessibilityActions: actions.map(action => ({ name: action.key, label: action.label })),
     onAccessibilityAction: (event: { nativeEvent: { actionName: string } }) => actions.find(action => action.key === event.nativeEvent.actionName)?.onPress() }) };
+  // 25Q4: every haptic comes from motion.tsx; the recorder keeps each notification's type.
+  const motion = { ValueTransition: 'ValueTransition', announce: (text: string, after = 'now') => { announced.push(after === 'leave' ? 'after leaving: ' + text : text); }, successHaptic: () => { haptics.push('Success'); }, errorHaptic: () => { haptics.push('Error'); },
+    warningHaptic: () => { haptics.push('Warning'); }, selectionHaptic: () => {} };
   const modules: Record<string, unknown> = {
     // 24UX6C: the transaction presentation rule, a pure module.
     '../src/ui/movement-amount': movementAmount, '../../src/ui/movement-amount': movementAmount,
@@ -81,10 +96,11 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': { View: 'View', Keyboard: { dismiss() {} }, Alert: { alert: (title: string, message: string, buttons: any[]) => alerts.push({ title, message, buttons }) } },
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, useLocalSearchParams: () => options.params ?? {},
-      router: { canGoBack: () => true, back: () => { backs++; }, push: (value: any) => pushed.push(value), replace: (value: any) => pushed.push(value) } },
+      router: { canGoBack: () => true, back: () => { backs++; }, push: (value: any) => pushed.push(value), replace: (value: any) => { pushed.push(value); replaced.push(value); } } },
     'expo-crypto': { randomUUID: () => 'operation-' + (++uuid) },
-    'expo-haptics': { NotificationFeedbackType: { Success: 'Success' }, notificationAsync: async () => {}, selectionAsync: async () => {} },
-    'expo-file-system': { File: { pickFileAsync: options.picker ?? (async () => ({ canceled: true })) } },
+    // 25Q4: the app's container (the parent of Documents), under which iOS places the picker's copy.
+    'expo-file-system': { File: { pickFileAsync: options.picker ?? (async () => ({ canceled: true })) },
+      Paths: { document: { parentDirectory: { uri: 'file:///var/mobile/Containers/Data/Application/APP/' } } } },
     '@finanzapp/domain': domain,
     '@expo/vector-icons/Ionicons': 'Ionicons',
     '../storage/LedgerProvider': ledger, '../src/storage/LedgerProvider': ledger, '../../src/storage/LedgerProvider': ledger,
@@ -92,16 +108,17 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     './form-controls': { AccountField: 'AccountField', CategoryField: 'CategoryField', CurrencyField: 'CurrencyField', DateField: 'DateField', SelectorCard: 'SelectorCard' },
     '../src/ui/form-controls': { CurrencyField: 'CurrencyField' }, '../../src/ui/form-controls': { CurrencyField: 'CurrencyField' },
     '../src/ui/currencies': currencies, '../../src/ui/currencies': currencies,
-    './presentation': presentation, '../../src/ui/presentation': presentation, './entry-prefill': entryPrefill,
+    './presentation': presentation, '../src/ui/presentation': presentation, '../../src/ui/presentation': presentation, './entry-prefill': entryPrefill, './last-account': memoryOf(options.memory ?? {}),
     './budget-presentation': budgetPresentation, '../../src/ui/budget-presentation': budgetPresentation,
     './money-input': moneyInput, '../../src/ui/money-input': moneyInput, '../src/ui/money-input': moneyInput,
-    './liability-presentation': liabilityPresentation,
+    // 25Q4: the movement and transfer details word a card's or a debt's state after an undo or a restore.
+    './liability-presentation': liabilityPresentation, '../../src/ui/liability-presentation': liabilityPresentation,
     '../../src/ui/theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, useCurrentDay: () => '2026-09-20',
       usePalette: () => ({ text: '#000', positive: '#070', income: '#070', expense: '#700', primary: '#2557D6', warning: '#a60', secondary: '#666', tertiary: '#999' }) },
     './theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, usePalette: () => ({ background: '#fff' }) },
     './entry-form': { EntryForm: 'EntryForm' }, './transfer-form': { TransferForm: 'TransferForm' },
     '../../src/ui/recurring-form': { RecurringForm: 'RecurringForm' },
-    './motion': { ValueTransition: 'ValueTransition' },
+    './motion': motion, '../src/ui/motion': motion, '../../src/ui/motion': motion,
     './category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) }, '../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) }, '../../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) },
     '../src/ui/appearance': appearance, '../../src/ui/appearance': appearance,
     '../src/ui/appearance-picker': { IconColorPicker: 'IconColorPicker' }, '../../src/ui/appearance-picker': { IconColorPicker: 'IconColorPicker' },
@@ -109,6 +126,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     './purchase-plan': purchasePlan, './installment-purchase': { InstallmentPurchase: 'InstallmentPurchase' },
     './installment-presentation': installmentPresentation,
     '../../src/ui/operation-presentation': operationPresentation,
+    '../src/ui/backup-file': backupFile,
   };
   const require = (name: string) => {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected recovery dependency: ' + name);
@@ -121,6 +139,8 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   modules['../../src/ui/recurring-history'] = realModule('src/ui/recurring-history.tsx', require);
   // 24T2 (stream A): the movement detail reads which instalment of which plan recorded a movement.
   modules['../../src/ui/installment-presentation'] = installmentPresentation;
+  // 25Q4: the backup import reads the device's day (2026-09-20) for its catch-up count.
+  modules['../src/ui/theme'] = modules['../../src/ui/theme'];
   const module = { exports: {} as Record<string, (props: any) => Node> };
   runInNewContext(code, { module, exports: module.exports, Date, Error, require });
   return {
@@ -129,7 +149,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
       return node; },
     setData: (next: domain.LedgerArchive | null) => { data = next as domain.LedgerArchive; },
     setLocale: (next: AppLocale) => { locale = next; },
-    pushed, alerts, updates, additions, restores, transfers, transferChanges, accountChanges, newAccounts, rules, backs: () => backs,
+    pushed, replaced, alerts, updates, additions, restores, transfers, transferChanges, accountChanges, newAccounts, rules, haptics, announced, backs: () => backs,
   };
 }
 function nodes(value: any): Node[] {
@@ -155,6 +175,9 @@ test('edit form prefills every field, keeps currency and submits the same identi
   assert.equal(domain.todayKey(find(root, 'DateField').props.value), entry.dateISO);
   find(root, 'AmountField').props.onChangeText('98,76');
   find(root, 'Choices').props.onChange('income');
+  // 25VIS2: each kind keeps its own category, so the income's is picked on the form the switch produced.
+  root = view.render();
+  assert.equal(find(root, 'CategoryField').props.value, '', 'the expense category does not ride along into Ingreso');
   find(root, 'CategoryField').props.onChange('Regalo');
   root = view.render();
   await find(root, 'ActionButton', 'Guardar cambios').props.onPress();
@@ -198,6 +221,10 @@ test('refresh failure keeps a frozen exact submission for retry, even after the 
   find(view.render(), 'AmountField').props.onChangeText('1');
   await find(view.render(), 'ActionButton').props.onPress();
   assert.equal(view.backs(), 0);
+  // 25Q4: the form's own sentence, in the reader's language; never the engine's text.
+  const message = find(view.render(), 'ErrorMessage').props.message;
+  assert.equal(message, 'entryForm.saveUnverified');
+  assert.equal(bindLocale('en-AR').errorText(message), en.entryForm.saveUnverified);
   assert.equal(find(view.render(), 'AmountField').props.editable, false);
   view.setData({ ...archive, records: [view.updates[0].after] });
   await find(view.render(), 'ActionButton', 'Reintentar guardado').props.onPress();
@@ -217,7 +244,42 @@ test('new-entry mode keeps income/account selection and creates no edit command'
   assert.equal(view.additions[0].amountMinor, 1);
   assert.equal(view.additions[0].accountId, 'u');
   assert.equal(view.updates.length, 0);
+  // 25D2: the form closes with the save; VoiceOver hears what was saved, in words, once the screen under it is up.
+  assert.deepEqual(view.announced, ['after leaving: Guardado, 0,01 dólares.']);
 });
+test('25N1: a new Gasto or Ingreso opens on the account last saved with that kind; a requested account wins, and the rule is today\'s without one', async () => {
+  const memory: Record<string, string> = {};
+  const save = async (props: any) => {
+    const view = harness('src/ui/entry-form.tsx', props, { memory });
+    let root = view.render();
+    find(root, 'AmountField').props.onChangeText('1');
+    find(root, 'Field').props.onChangeText('Prueba');
+    find(root, 'CategoryField').props.onChange('Otros');
+    root = view.render();
+    await find(root, 'ActionButton').props.onPress();
+    return view.additions[0];
+  };
+  const opens = (props: any, data?: domain.LedgerArchive) => find(harness('src/ui/entry-form.tsx', props, { memory, data }).render(), 'AccountField').props.value;
+  assert.equal(opens({ kind: 'expense', currency: 'ARS' }), 'a', 'nothing remembered: the first account in the screen\'s currency');
+  assert.equal((await save({ kind: 'expense', currency: 'USD' })).accountId, 'u');
+  assert.equal(memory['finanzapp.lastAccount.expense'], 'u', 'saved, then remembered on the device');
+  assert.equal(opens({ kind: 'expense', currency: 'ARS' }), 'u', 'the last Gasto\'s account, whatever the screen\'s currency');
+  assert.equal(opens({ kind: 'income', currency: 'ARS' }), 'a', 'an Ingreso keeps its own memory');
+  assert.equal(opens({ kind: 'expense', currency: 'ARS', accountId: 'a' }), 'a', 'an account the screen asks for wins');
+  assert.equal(opens({ kind: 'expense', currency: 'ARS', prefill: { amountMinor: '100', currency: 'ARS' } }), 'a', 'a prefilled amount keeps its currency\'s account');
+  const gone = { ...archive, accounts: [archive.accounts[0], { ...archive.accounts[1], deletedAt: createdAt }] } as domain.LedgerArchive;
+  assert.equal(opens({ kind: 'expense', currency: 'ARS' }, gone), 'a', 'a remembered account deleted since: today\'s rule');
+  memory['finanzapp.lastAccount.income'] = 'nowhere';
+  assert.equal(opens({ kind: 'income', currency: 'USD' }), 'u', 'an unknown id is ignored');
+  // An edit never changes what is remembered.
+  const edit = harness('src/ui/entry-form.tsx', { original: archive.records[0] }, { memory });
+  let root = edit.render();
+  find(root, 'Field').props.onChangeText('Otra');
+  await find(edit.render(), 'ActionButton').props.onPress();
+  assert.equal(edit.updates.length, 1);
+  assert.equal(memory['finanzapp.lastAccount.expense'], 'u');
+});
+const statusLine = (root: Node) => nodes(root).find(node => node.props.accessibilityLiveRegion === 'polite')!.props.children;
 test('detail opens the native edit route; undo requires confirmation and canceled undo does nothing', async () => {
   const view = harness('app/entry/[id].tsx', {}, { params: { id: entry.id } });
   find(view.render(), 'ActionButton', 'Editar movimiento').props.onPress();
@@ -226,6 +288,8 @@ test('detail opens the native edit route; undo requires confirmation and cancele
   find(view.render(), 'ActionButton', 'Deshacer movimiento').props.onPress();
   assert.equal(view.updates.length, 0);
   assert.match(view.alerts[0].message, /Se sumarán 123,45 ARS a Prueba ARS/);
+  // 25Q4: an undo names where it can be restored from.
+  assert.ok(view.alerts[0].message.endsWith('Podés recuperarlo después desde Movimientos deshechos, en Movimientos.'), view.alerts[0].message);
   view.alerts[0].buttons[0].onPress();
   assert.equal(view.updates.length, 0);
   find(view.render(), 'ActionButton', 'Deshacer movimiento').props.onPress();
@@ -234,12 +298,20 @@ test('detail opens the native edit route; undo requires confirmation and cancele
   assert.equal(view.updates[0].action, 'void');
   assert.equal(view.backs(), 0); // Status updates in place; no redirect through a tab.
   view.setData({ ...archive, records: [view.updates[0].after] });
+  // 25D2: iOS has no live region: VoiceOver is told the status line the screen now shows, once.
+  assert.deepEqual(view.announced, ['Deshecho · no cuenta en saldos ni reportes']);
+  assert.equal(statusLine(view.render()), view.announced[0]);
   assert.equal(nodes(view.render()).some(node => node.props.label === 'Editar movimiento'), false);
   find(view.render(), 'ActionButton', 'Recuperar movimiento').props.onPress();
   assert.match(view.alerts[2].message, /Se descontarán/);
+  assert.equal(view.alerts[2].message.includes('Movimientos deshechos'), false, 'a restore has nothing to point back to');
   view.alerts[2].buttons[1].onPress();
   await flush();
   assert.equal(view.updates[1].action, 'restore');
+  view.setData({ ...archive, records: [view.updates[1].after] });
+  assert.equal(view.announced.length, 2);
+  assert.equal(view.announced[1], statusLine(view.render()), 'the restored status, as the line reads it');
+  assert.match(view.announced[1], /^Registrado/);
 });
 
 test('choosing/canceling the file picker and invalid backups never mutate the ledger', async () => {
@@ -275,6 +347,62 @@ test('25Q2: after an import, a file that fails leaves «Copia incorporada» for 
   assert.equal(message, 'backup.import.readFailed', 'never the platform\'s text');
   assert.equal(bindLocale('es-AR').errorText(message), 'No pudimos leer la copia. Tus datos y el archivo siguen intactos.');
 });
+test('25Q4: an import that fails with an engine\'s error says the import\'s own sentence; a storage refusal keeps its reason', async () => {
+  const json = JSON.stringify(domain.createRecoveryBackup(archive));
+  const failures = [new Error('disk I/O error'), new Error('La copia contradice cambios locales. No se importó nada. Conservá ambas versiones.')];
+  const view = harness('app/backup-import.tsx', {}, { data: { accounts: [], records: [] },
+    picker: async () => ({ canceled: false, result: { size: json.length, name: 'copia.json', text: async () => json } }),
+    restore: async () => { throw failures.shift(); } });
+  await find(view.render(), 'ActionButton', 'Elegir copia').props.onPress();
+  find(view.render(), 'ActionButton', 'Confirmar importación').props.onPress();
+  view.alerts[0].buttons[1].onPress();
+  await flush();
+  let message = find(view.render(), 'ErrorMessage').props.message;
+  assert.equal(message, 'backup.import.verifyFailed', 'never the engine\'s text');
+  assert.equal(bindLocale('es-AR').errorText(message), 'No pudimos verificar la importación. Reintentá con la misma copia para comprobarla sin duplicar datos.');
+  find(view.render(), 'ActionButton', 'Confirmar importación').props.onPress();
+  view.alerts[1].buttons[1].onPress();
+  await flush();
+  message = find(view.render(), 'ErrorMessage').props.message;
+  assert.equal(message, 'La copia contradice cambios locales. No se importó nada. Conservá ambas versiones.', 'a storage refusal keeps its own reason');
+  assert.notEqual(bindLocale('en-US').errorText(message), message);
+  assert.equal(view.restores.length, 2);
+  assert.equal(nodes(view.render()).some(node => node.props.title === 'Copia incorporada'), false);
+});
+test('25R1: an import that committed but whose view could not be read again is done: «Copia incorporada», never «Confirmar importación» again under the save-finished sentence', async () => {
+  const json = JSON.stringify(domain.createRecoveryBackup(archive));
+  const view = harness('app/backup-import.tsx', {}, { data: { accounts: [], records: [] },
+    picker: async () => ({ canceled: false, result: { size: json.length, name: 'copia.json', text: async () => json } }),
+    restore: async () => { throw new Error(VIEW_REFRESH_MESSAGE); } });
+  await find(view.render(), 'ActionButton', 'Elegir copia').props.onPress();
+  find(view.render(), 'ActionButton', 'Confirmar importación').props.onPress();
+  view.alerts[0].buttons[1].onPress();
+  await flush();
+  const root = view.render();
+  assert.equal(find(root, 'EmptyState').props.title, 'Copia incorporada');
+  assert.equal(nodes(root).some(node => node.props.label === 'Confirmar importación'), false);
+  assert.equal(view.restores.length, 1);
+  assert.deepEqual(view.announced, ['Copia incorporada'], '25D2: the copy is in, so VoiceOver hears so');
+});
+test('25R1: a refused import keeps the review: «Volver a revisar» previews the copy again against the stored ledger, and «Elegir otra copia» picks again', async () => {
+  const json = JSON.stringify(domain.createRecoveryBackup(archive));
+  let picks = 0;
+  const view = harness('app/backup-import.tsx', {}, { data: { accounts: [], records: [] },
+    picker: async () => { picks++; return { canceled: false, result: { size: json.length, name: 'copia.json', text: async () => json } }; },
+    restore: async () => { throw new Error('La copia contradice cambios locales. No se importó nada. Conservá ambas versiones.'); } });
+  await find(view.render(), 'ActionButton', 'Elegir copia').props.onPress();
+  find(view.render(), 'ActionButton', 'Confirmar importación').props.onPress();
+  view.alerts[0].buttons[1].onPress();
+  await flush();
+  // The provider re-read the archive before the refusal arrived: the copy is now all there.
+  view.setData(archive);
+  find(view.render(), 'ActionButton', 'Volver a revisar').props.onPress();
+  const root = view.render();
+  assert.equal(nodes(root).some(node => node.type === 'ErrorMessage' && node.props.message), false, 'the refusal is cleared');
+  assert.equal(nodes(root).some(node => node.props.label === 'Confirmar importación'), false, 'nothing left to import');
+  await find(root, 'ActionButton', 'Elegir otra copia').props.onPress();
+  assert.deepEqual([picks, view.restores.length], [2, 1]);
+});
 test('oversized files are rejected before reading their content', async () => {
   let reads = 0;
   const view = harness('app/backup-import.tsx', {}, { picker: async () => ({ canceled: false,
@@ -301,6 +429,19 @@ test('backup preview shows exact totals, cancel stays read-only, confirm waits f
   assert.equal(view.restores.length, 1);
   assert.equal(view.restores[0].baseline, domain.archiveKey({ accounts: [], records: [] }));
   assert.equal(find(view.render(), 'EmptyState').props.title, 'Copia incorporada');
+  assert.equal(view.haptics.join(','), 'Success');
+  // 25D2: the review gives way to the done view in place; VoiceOver hears its title once.
+  assert.deepEqual(view.announced, ['Copia incorporada']);
+  // 25Q4: a failed import keeps nothing frozen and offers the import again, so it taps Error.
+  const failing = harness('app/backup-import.tsx', {}, { data: { accounts: [], records: [] }, restore: async () => { throw new Error('database is locked'); },
+    picker: async () => ({ canceled: false, result: { size: json.length, name: 'test.json', text: async () => json } }) });
+  await find(failing.render(), 'ActionButton', 'Elegir copia').props.onPress();
+  find(failing.render(), 'ActionButton', 'Confirmar importación').props.onPress();
+  failing.alerts[0].buttons[1].onPress();
+  await flush();
+  assert.deepEqual([failing.restores.length, failing.haptics.join(',')], [1, 'Error']);
+  assert.equal(nodes(failing.render()).some(node => node.type === 'EmptyState' && node.props.title === 'Copia incorporada'), false);
+  assert.deepEqual(failing.announced, [], 'a failure is said by ErrorMessage, never as done');
 });
 test('identical or conflicting backups cannot show an enabled import action', async () => {
   const json = JSON.stringify(domain.createRecoveryBackup(archive));
@@ -354,7 +495,7 @@ test('transfer form previews exact two-account balances and only offers same-cur
   const root = view.render();
   assert.equal(find(root, 'DetailRow', 'Prueba ARS después').props.value, 'ARS\u00A0866,55');
   assert.equal(find(root, 'DetailRow', 'Destino después').props.value, 'ARS\u00A010,00');
-  await find(root, 'ActionButton', 'Registrar transferencia').props.onPress();
+  await find(root, 'ActionButton', 'Registrar transferencia\u00A0·\u00A0$\u00A010,00').props.onPress();
   assert.equal(view.transfers.length, 1);
   assert.equal(view.transfers[0].amountMinor, 1000);
   assert.equal(view.transfers[0].fromAccountId, 'a');
@@ -391,10 +532,13 @@ test('a transfer submission freezes across failed refresh and ignores duplicate 
   assert.equal(view.backs(), 0);
   finish(); await saving;
   assert.equal(find(view.render(), 'AmountField').props.editable, false);
+  assert.deepEqual(view.announced, [], '25D2: a failed save is said by its error, never as saved');
   view.setData({ ...transferData, transfers: [domain.initialTransferRecord(view.transfers[0])] });
   await find(view.render(), 'ActionButton', 'Reintentar guardado').props.onPress();
   assert.deepEqual(view.transfers[0], view.transfers[1]);
   assert.equal(view.backs(), 1);
+  // 25D2: saved by the retry: VoiceOver hears it once, in words, after the form has gone.
+  assert.deepEqual(view.announced, ['after leaving: Guardado, ' + bindLocale('es-AR').spokenMoney(view.transfers[1].amountMinor, 'ARS') + '.']);
 });
 test('editing a transfer removes its previous effect in preview and retains its identity', async () => {
   const original = domain.initialTransferRecord(transfer);
@@ -412,14 +556,19 @@ test('transfer undo requires confirmation, affects both sides, and updates detai
   const original = domain.initialTransferRecord(transfer);
   const view = harness('app/transfer/[id].tsx', {}, { data: { ...transferData, transfers: [original] }, params: { id: transfer.id } });
   find(view.render(), 'ActionButton', 'Deshacer transferencia').props.onPress();
-  assert.match(view.alerts[0].message, /Destino/);
-  assert.match(view.alerts[0].message, /Prueba ARS/);
+  // 25Q4: a plain transfer keeps its sentence, then the record-only note and where an undo is restored from.
+  assert.equal(view.alerts[0].message, '10,00 ARS: se descontarán de Destino y se sumarán a Prueba ARS. Solo cambia el registro en esta app, no mueve dinero en el banco. '
+    + 'Podés recuperar la transferencia después desde Movimientos deshechos, en Movimientos.');
+  assert.equal(view.alerts[0].buttons.map((button: { style?: string }) => button.style ?? '').join(','), 'cancel,default', 'recoverable from Movimientos deshechos: not the destructive style');
   view.alerts[0].buttons[0].onPress();
   assert.equal(view.transferChanges.length, 0);
   find(view.render(), 'ActionButton', 'Deshacer transferencia').props.onPress();
   view.alerts[1].buttons[1].onPress(); await flush();
   view.setData({ ...transferData, transfers: [view.transferChanges[0].after] });
   assert.equal(find(view.render(), 'ActionButton', 'Recuperar transferencia').props.disabled, undefined);
+  // 25D2: the new status line, told to VoiceOver once.
+  assert.deepEqual(view.announced, ['Deshecha · no afecta los saldos']);
+  assert.equal(statusLine(view.render()), view.announced[0]);
   assert.equal(view.backs(), 0);
   assert.equal(view.pushed.length, 0);
 });
@@ -449,17 +598,39 @@ test('account rename does not change its balance; unchanged save and close never
   assert.equal(view.accountChanges[0].expectedBalanceMinor, null);
   assert.equal(view.accountChanges[0].after.openingMinor, account.openingMinor);
 });
+test('25Q4 review: Editar cuenta taps Error for a balance refused before anything is sent, Warning while the same change stays frozen for «Reintentar guardado», then Success', async () => {
+  let attempts = 0;
+  const view = harness('app/edit-account/[id].tsx', {}, { params: { id: 'a' }, updateAccount: async () => { if (++attempts === 1) throw new Error('Refresh failed'); } });
+  // A balance Guardar lets through but cannot read: refused before anything is sent, still editable.
+  find(view.render(), 'AmountField').props.onChangeText('12abc');
+  find(view.render(), 'ActionButton').props.onPress();
+  assert.deepEqual([view.haptics.splice(0).join(','), view.accountChanges.length, find(view.render(), 'Field').props.editable], ['Error', 0, true]);
+  // The balance as it was and a new name: sent at once (no correction to confirm), and the write fails after it.
+  find(view.render(), 'AmountField').props.onChangeText('876,55');
+  find(view.render(), 'Field').props.onChangeText('Renombrada');
+  find(view.render(), 'ActionButton').props.onPress(); await flush();
+  assert.deepEqual([view.alerts.length, view.haptics.splice(0).join(','), find(view.render(), 'Field').props.editable], [0, 'Warning', false], 'sent with an unknown outcome: frozen for the exact retry');
+  find(view.render(), 'ActionButton', 'Reintentar guardado').props.onPress(); await flush();
+  assert.equal(JSON.stringify(view.accountChanges[1]), JSON.stringify(view.accountChanges[0]), 'the retry resends the same change');
+  assert.deepEqual([view.haptics.join(','), view.backs()], ['Success', 1]);
+});
 test('new account retry is frozen and honors requested USD currency', async () => {
   let attempts = 0;
   const view = harness('app/new-account.tsx', {}, { params: { currency: 'USD' }, addAccount: async () => { if (++attempts === 1) throw new Error('Refresh failed'); } });
   assert.equal(find(view.render(), 'CurrencyField').props.value, 'USD', 'the requested currency is preselected in the currency row');
   find(view.render(), 'Field').props.onChangeText('Nueva');
+  // 25Q4 review: an amount Save lets through but cannot read is refused before anything is sent: Error, still editable.
+  find(view.render(), 'AmountField').props.onChangeText('12abc');
+  await find(view.render(), 'ActionButton').props.onPress();
+  assert.deepEqual([view.haptics.splice(0).join(','), view.newAccounts.length, find(view.render(), 'Field').props.editable], ['Error', 0, true]);
   find(view.render(), 'AmountField').props.onChangeText('100');
   await find(view.render(), 'ActionButton').props.onPress();
   assert.equal(find(view.render(), 'Field').props.editable, false);
+  assert.equal(view.haptics.splice(0).join(','), 'Warning', 'sent with an unknown outcome: frozen for the exact retry');
   await find(view.render(), 'ActionButton', 'Reintentar guardado').props.onPress();
   assert.deepEqual(view.newAccounts[0], view.newAccounts[1]);
   assert.equal(view.backs(), 1);
+  assert.equal(view.haptics.join(','), 'Success');
 });
 test('a backup containing only a new transfer still offers import with correct counts', async () => {
   const json = JSON.stringify(domain.createRecoveryBackup({ ...transferData, transfers: [domain.initialTransferRecord(transfer)] }));
@@ -498,7 +669,7 @@ test('card payment locks the card as destination, caps at the recorded debt and 
   assert.equal(find(root, 'Field').props.value, 'Pago Visa');
   find(root, 'AmountField').props.onChangeText('60');
   root = view.render();
-  await find(root, 'ActionButton', 'Registrar pago').props.onPress();
+  await find(root, 'ActionButton', 'Registrar pago\u00A0·\u00A0$\u00A060,00').props.onPress();
   // The form stores the catalogue key; ErrorMessage shows it in the interface language.
   assert.equal(find(view.render(), 'ErrorMessage').props.message, 'transferForm.overCardDebt');
   assert.match(bindLocale('es-AR').errorText('transferForm.overCardDebt'), /supera el saldo pendiente/);
@@ -506,7 +677,7 @@ test('card payment locks the card as destination, caps at the recorded debt and 
   find(view.render(), 'AmountField').props.onChangeText('50');
   root = view.render();
   assert.equal(find(root, 'DetailRow', 'Visa después').props.value, 'Sin saldo pendiente', 'a card paid to zero owes nothing; it is not "in credit"');
-  await find(root, 'ActionButton', 'Registrar pago').props.onPress();
+  await find(root, 'ActionButton', 'Registrar pago\u00A0·\u00A0$\u00A050,00').props.onPress();
   assert.equal(view.transfers.length, 1);
   assert.deepEqual([view.transfers[0].fromAccountId, view.transfers[0].toAccountId, view.transfers[0].amountMinor, view.transfers[0].note], ['a', 'card-acc', 5000, 'Pago Visa']);
   assert.equal(view.additions.length, 0);
@@ -542,18 +713,70 @@ test('a card payment, debt payment and collection name themselves and write the 
   // Saving writes the same record shape in English: amounts, accounts and the note as shown.
   const view = harness('src/ui/transfer-form.tsx', { toAccountId: 'card-acc', maxAmountMinor: '5000' }, { data, locale: 'en-AR' });
   find(view.render(), 'AmountField').props.onChangeText('50');
-  await find(view.render(), 'ActionButton', 'Record payment').props.onPress();
+  await find(view.render(), 'ActionButton', 'Record payment\u00A0·\u00A0$\u00A050,00').props.onPress();
   assert.deepEqual([view.transfers[0].fromAccountId, view.transfers[0].toAccountId, view.transfers[0].amountMinor, view.transfers[0].note], ['a', 'card-acc', 5000, 'Visa payment']);
   assert.equal(view.additions.length, 0);
 });
 
-test('a plain transfer between accounts never lists cards or debts, while editing one keeps its original accounts', async () => {
+test('a plain transfer between accounts never lists cards or debts; editing a card payment keeps the card fixed and «Desde» lists only cash', async () => {
   const view = harness('src/ui/transfer-form.tsx', { accountId: 'a' }, { data: liabilityData });
   assert.deepEqual(find(view.render(), 'AccountField', 'Desde').props.accounts.map((item: domain.Account) => item.id), ['a', 'u']);
   assert.deepEqual(find(view.render(), 'AccountField', 'Hacia').props.accounts.map((item: domain.Account) => item.id), []);
   const original = domain.initialTransferRecord({ id: 'pay', fromAccountId: 'a', toAccountId: 'card-acc', amountMinor: 100, note: 'Pago', dateISO: entry.dateISO, createdAt });
   const editing = harness('src/ui/transfer-form.tsx', { original }, { data: { ...liabilityData, transfers: [original] } });
-  assert.deepEqual(find(editing.render(), 'AccountField', 'Hacia').props.accounts.map((item: domain.Account) => item.id), ['card-acc']);
+  const root = editing.render();
+  // 25Q4: the card is the fixed fact a new payment shows; before, it was a «Hacia» choice and was offered in «Desde» too.
+  assert.equal(nodes(root).some(node => node.type === 'AccountField' && node.props.label === 'Hacia'), false);
+  assert.deepEqual(nodes(root).filter(node => node.type === 'SelectorCard').map(node => [node.props.label, node.props.value, node.props.fixed]), [['Tarjeta', 'Visa', true]]);
+  assert.deepEqual(find(root, 'AccountField', 'Desde').props.accounts.map((item: domain.Account) => item.id), ['a']);
+});
+
+test('25N1: back from «Agregar cuenta» under a plain transfer, «Hacia» comes back with the one account added in «Desde»\'s currency', () => {
+  const view = harness('src/ui/transfer-form.tsx', { accountId: 'a' }, { data: archive });
+  let root = view.render();
+  assert.deepEqual(find(root, 'AccountField', 'Hacia').props.accounts, []);
+  const added: domain.Account = { ...account, id: 'n', name: 'Nueva', openingMinor: 0 };
+  // An account that appears without the person asking from here (another screen) is not preselected.
+  view.setData({ ...archive, accounts: [...archive.accounts, added] });
+  assert.equal(find(view.render(), 'AccountField', 'Hacia').props.value, '');
+  view.setData(archive);
+  root = view.render();
+  const add = nodes(root).find(node => node.type === 'EmptyState')!.props.action;
+  add.props.onPress();
+  assert.equal(JSON.stringify(view.pushed.pop()), JSON.stringify({ pathname: '/new-account', params: { currency: 'ARS' } }));
+  view.setData({ ...archive, accounts: [...archive.accounts, added, { ...added, id: 'd', name: 'Dólares', currency: 'USD' }] });
+  root = view.render();
+  assert.equal(find(root, 'AccountField', 'Hacia').props.value, 'n', 'the new ARS account, not the USD one');
+  find(root, 'AmountField').props.onChangeText('10');
+  assert.equal(nodes(view.render()).find(node => node.type === 'ActionButton' && /Registrar/.test(node.props.label))?.props.disabled, false, 'ready to save');
+  // Two added in that currency: nothing is obvious, «Hacia» stays to choose.
+  const twice = harness('src/ui/transfer-form.tsx', { accountId: 'a' }, { data: archive });
+  nodes(twice.render()).find(node => node.type === 'EmptyState')!.props.action.props.onPress();
+  twice.setData({ ...archive, accounts: [...archive.accounts, added, { ...added, id: 'm' }] });
+  assert.equal(find(twice.render(), 'AccountField', 'Hacia').props.value, '');
+});
+
+test('25N1: a plain transfer while a card owes points quietly to «Pagar tarjeta»; a payment, an edit or a card owing nothing shows nothing', () => {
+  const pointer = (root: Node) => nodes(root).find(node => node.type === 'PressFeedback');
+  const view = harness('src/ui/transfer-form.tsx', { accountId: 'a' }, { data: liabilityData });
+  const link = pointer(view.render())!;
+  assert.equal(link.props.accessibilityLabel, '¿Pagás Visa? Usá «Pagar tarjeta».');
+  link.props.onPress();
+  assert.equal(JSON.stringify(view.pushed.pop()), JSON.stringify({ pathname: '/new-transfer', params: { toAccountId: 'card-acc', maxAmountMinor: '5000' } }));
+  assert.equal(view.replaced.length, 1, 'the payment replaces this form: saving it never returns to an abandoned transfer');
+  const english = harness('src/ui/transfer-form.tsx', { accountId: 'a' }, { data: liabilityData, locale: 'en-AR' });
+  assert.equal(pointer(english.render())!.props.accessibilityLabel, 'Paying Visa? Use “Pay card”.');
+  const second: domain.Account = { ...cardAccount, id: 'card-2', name: 'Master' };
+  const two = harness('src/ui/transfer-form.tsx', { accountId: 'a' }, { data: { ...liabilityData, accounts: [...liabilityData.accounts, second], cards: [card, { ...card, id: 'card2', accountId: 'card-2' }] } }).render();
+  assert.equal(pointer(two), undefined);
+  assert.ok(nodes(two).some(node => node.type === 'AppText' && node.props.children === 'Para pagar una tarjeta, usá «Pagar tarjeta» en Tarjetas.'));
+  const clear = { ...liabilityData, accounts: [...archive.accounts, { ...cardAccount, openingMinor: 0 }, debtAccount] };
+  const archived = { ...liabilityData, cards: [{ ...card, active: false }] };
+  for (const [props, data] of [[{ accountId: 'a' }, clear], [{ accountId: 'a' }, archived], [{ toAccountId: 'card-acc', maxAmountMinor: '5000' }, liabilityData]] as const) {
+    const root = harness('src/ui/transfer-form.tsx', props, { data }).render();
+    assert.equal(pointer(root), undefined);
+    assert.equal(nodes(root).some(node => node.type === 'AppText' && /Pagar tarjeta/.test(String(node.props.children))), false);
+  }
 });
 
 test('expense form offers cash accounts and cards but never a personal debt account', () => {
@@ -581,6 +804,9 @@ test('the movement modal switches Gasto / Ingreso / Transferencia as state, neve
   assert.equal(choices.props.options.map((option: { value: string }) => option.value).join(','), 'expense,income,transfer');
   assert.equal(choices.props.value, 'expense');
   assert.equal(find(root, 'EntryForm').props.kind, 'expense');
+  // The 4 pt under the track keep the segments' slop clear of the scroller that follows (a render, not a pattern over source).
+  const track = root.props.children[0];
+  assert.deepEqual([track.type, track.props.style.paddingBottom, track.props.children.type], ['View', 4, 'Choices']);
   assert.equal(find(root, 'EntryForm').props.accountId, 'a');
   find(root, 'EntryForm').props.onAccountChange('b');
   choices.props.onChange('transfer');
@@ -632,7 +858,7 @@ test('entry detail shows budget context only for a matching active budget, and l
   const budget: domain.MonthlyBudget = { id: 'b', scope: 'category', category: 'salud', currency: 'ARS', monthISO: '2026-01', amountMinor: 20000, active: true, createdAt, revision: 0, updatedAt: createdAt };
   const view = harness('app/entry/[id].tsx', {}, { data: { ...archive, budgets: [budget] }, params: { id: entry.id } });
   const row = find(view.render(), 'DetailRow', 'Presupuesto');
-  assert.equal(row.props.value, '62 % usado · quedan 76,55');
+  assert.equal(row.props.value, '61 % usado · quedan 76,55'); // 25D2 review: floored as Presupuestos (61,7 %)
   assert.equal(row.props.tone, 'neutral');
   row.props.onPress();
   assert.equal(JSON.stringify(view.pushed[0]), JSON.stringify({ pathname: '/budgets', params: { currency: 'ARS', month: '2026-01' } }));
@@ -729,7 +955,7 @@ test('English movement detail and transfer form: titles, rows, confirmation and 
   assert.deepEqual(rows, ['Category=Salud', 'Account=Prueba ARS', 'Currency=Argentine pesos'], 'the stored name and the account name are not translated');
   find(root, 'ActionButton', 'Undo transaction').props.onPress();
   assert.equal(detail.alerts[0].title, 'Undo transaction?');
-  assert.equal(detail.alerts[0].message, '123,45 ARS will be added to Prueba ARS. It will stop counting in your balances and reports. You can restore it later.');
+  assert.equal(detail.alerts[0].message, '123,45 ARS will be added to Prueba ARS. This transaction will stop counting in your balances and reports. You can restore it later from Undone transactions, in Activity.');
   assert.equal(detail.alerts[0].buttons.map((button: any) => button.text).join(','), 'Cancel,Undo');
   assert.equal(detail.updates.length, 0, 'asking never writes');
 
@@ -778,7 +1004,8 @@ test('in English the account forms and the balance correction read in English an
 // labels, the confirmation and the conflict message change; the file that is
 // read, the preview and what is restored are exactly the Spanish ones.
 test('23.1B2 English backup import: review, confirmation and result are translated; the restored archive is identical to the Spanish import', async () => {
-  const json = JSON.stringify(domain.createRecoveryBackup(archive));
+  const exportedAt = '2026-10-14T17:32:00.000Z';
+  const json = JSON.stringify(domain.createRecoveryBackup(archive, new Date(exportedAt)));
   const picker = async () => ({ canceled: false, result: { size: json.length, name: 'test.json', text: async () => json } });
   const empty = { accounts: [], records: [] };
   const run = async (locale: AppLocale) => {
@@ -795,7 +1022,7 @@ test('23.1B2 English backup import: review, confirmation and result are translat
   assert.ok(nodes(root).some(node => node.type === 'AppText' && node.props.children === 'test.json'), 'the file name is shown as it is');
   assert.ok(nodes(root).some(node => node.type === 'SectionTitle' && node.props.children === 'Available after import'));
   find(root, 'ActionButton', 'Confirm import').props.onPress();
-  assert.equal(english.alerts[0].title, 'Import this backup?');
+  assert.equal(english.alerts[0].title, 'Import the backup from ' + bindLocale('en-AR').formatDateTime(exportedAt) + '?');
   assert.equal(english.alerts[0].buttons.map((button: any) => button.text).join(','), 'Cancel,Import');
   english.alerts[0].buttons[1].onPress(); await flush();
   assert.equal(find(english.render(), 'EmptyState').props.title, 'Backup imported');
@@ -953,9 +1180,9 @@ test('23.1C2: the entry form and the entry detail give VoiceOver the language’
       'DetailRow', locale.startsWith('en') ? 'Budget' : 'Presupuesto');
     return node.props.value + '|' + node.props.spokenValue;
   };
-  assert.equal(row('es-AR'), '62 % usado · quedan 76,55|62 % usado · quedan 76,55 pesos');
-  assert.equal(row('es-US'), '62 % usado · quedan 76.55|62 % usado · quedan 76,55 pesos');
-  assert.equal(row('en-AR'), '62% used · 76,55 left|62% used · 76.55 pesos left');
+  assert.equal(row('es-AR'), '61 % usado · quedan 76,55|61 % usado · quedan 76,55 pesos');
+  assert.equal(row('es-US'), '61 % usado · quedan 76.55|61 % usado · quedan 76,55 pesos');
+  assert.equal(row('en-AR'), '61% used · 76,55 left|61% used · 76.55 pesos left');
   assert.equal(row('en-US', 10000), 'Over by 23.45|Over by 23.45 pesos');
   assert.equal(row('es-US', 10000), 'Excedido por 23.45|Excedido por 23,45 pesos');
 });
@@ -1101,6 +1328,62 @@ test('24B6: a recurring income offers cash accounts only, a card chosen for a re
   assert.deepEqual([field.props.value, field.props.accounts.map((item: domain.Account) => item.id)], ['card-acc', ['a', 'card-acc']], 'its own card stays offered beside cash in that currency');
 });
 
+test('25VIS2 (V2, recurring form): a rule keeps one category per kind; Gasto\'s never rides into Ingreso, and switching back finds it', async () => {
+  const view = harness('src/ui/recurring-form.tsx', { accountId: 'a' }, { data: liabilityData });
+  find(view.render(), 'AmountField').props.onChangeText('100');
+  find(view.render(), 'Field').props.onChangeText('Alquiler');
+  find(view.render(), 'CategoryField').props.onChange('Comida');
+  let root = view.render();
+  assert.deepEqual([find(root, 'CategoryField').props.value, find(root, 'ActionButton').props.disabled], ['Comida', false]);
+  find(root, 'Choices').props.onChange('income');
+  root = view.render();
+  assert.deepEqual([find(root, 'CategoryField').props.kind, find(root, 'CategoryField').props.value, find(root, 'ActionButton').props.disabled], ['income', '', true],
+    'Comida does not ride into Ingreso, and Save waits for an income category');
+  assert.deepEqual([find(root, 'AmountField').props.value, find(root, 'Field').props.value], ['100', 'Alquiler'], 'the rest of the draft is kept');
+  find(root, 'CategoryField').props.onChange('Sueldo');
+  find(view.render(), 'Choices').props.onChange('expense');
+  assert.equal(find(view.render(), 'CategoryField').props.value, 'Comida', 'back on Gasto, its category is there again');
+  find(view.render(), 'Choices').props.onChange('income');
+  root = view.render();
+  assert.deepEqual([find(root, 'CategoryField').props.value, find(root, 'ActionButton').props.disabled], ['Sueldo', false]);
+  await find(root, 'ActionButton').props.onPress();
+  assert.deepEqual([view.rules[0].kind, view.rules[0].category, view.rules[0].amountMinor], ['income', 'Sueldo', 10000]);
+});
+
+test('25VIS2 (V2, recurring form): editing a rule, flipping its kind asks for that kind\'s category, and flipping back restores the stored one', async () => {
+  const rule: domain.RecurringRule = { id: 'salary', accountId: 'a', kind: 'income', amountMinor: 500000, merchant: 'Empresa', category: 'Sueldo', frequency: 'monthly',
+    anchorDateISO: '2026-01-05', nextDateISO: '2099-10-05', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
+  const view = harness('src/ui/recurring-form.tsx', { original: rule }, { data: { ...liabilityData, recurring: [rule] } });
+  assert.equal(find(view.render(), 'CategoryField').props.value, 'Sueldo');
+  find(view.render(), 'Choices').props.onChange('expense');
+  let root = view.render();
+  assert.deepEqual([find(root, 'CategoryField').props.value, find(root, 'ActionButton').props.disabled], ['', true], 'an expense rule needs an expense category');
+  find(root, 'Choices').props.onChange('income');
+  root = view.render();
+  assert.equal(find(root, 'CategoryField').props.value, 'Sueldo', 'flipping back restores the stored category');
+  find(root, 'AmountField').props.onChangeText('6000');
+  await find(view.render(), 'ActionButton').props.onPress();
+  assert.deepEqual([view.rules[0].kind, view.rules[0].category, view.rules[0].amountMinor], ['income', 'Sueldo', 600000]);
+});
+
+test('25Q4 review: the recurring form taps Error for a next date refused before anything is sent, Warning while the same rule stays frozen for «Reintentar guardado», then Success', async () => {
+  let attempts = 0;
+  const view = harness('src/ui/recurring-form.tsx', { accountId: 'a' }, { saveRecurring: async () => { if (++attempts === 1) throw new Error('Refresh failed'); } });
+  find(view.render(), 'AmountField').props.onChangeText('100');
+  find(view.render(), 'Field').props.onChangeText('Alquiler');
+  find(view.render(), 'CategoryField').props.onChange('Comida');
+  find(view.render(), 'DateField').props.onChange(new Date('2020-01-05T12:00:00'));
+  await find(view.render(), 'ActionButton').props.onPress();
+  assert.deepEqual([find(view.render(), 'ErrorMessage').props.message, view.haptics.splice(0).join(','), view.rules.length, find(view.render(), 'Field').props.editable],
+    ['recurring.form.pastDate', 'Error', 0, true], 'refused before anything is sent, still editable');
+  find(view.render(), 'DateField').props.onChange(new Date(domain.todayKey() + 'T12:00:00'));
+  await find(view.render(), 'ActionButton').props.onPress();
+  assert.deepEqual([view.haptics.splice(0).join(','), find(view.render(), 'Field').props.editable], ['Warning', false], 'sent with an unknown outcome: frozen for the exact retry');
+  await find(view.render(), 'ActionButton', 'Reintentar guardado').props.onPress();
+  assert.equal(JSON.stringify(view.rules[1]), JSON.stringify(view.rules[0]), 'the retry resends the same rule');
+  assert.deepEqual([view.haptics.join(','), view.backs()], ['Success', 1]);
+});
+
 // ---- 24B6 review: a ledger holding only cards ---------------------------------------------------------------
 
 const cardOnly: domain.LedgerArchive = { accounts: [cardAccount, { ...cardAccount, id: 'usd-card', name: 'Visa USD', currency: 'USD' }], records: [],
@@ -1140,13 +1423,13 @@ test('24B6 review: with only cards, Gasto still records a card purchase; Ingreso
   root = own.render();
   assert.equal(nodes(root).some(node => node.type === 'EmptyState'), false);
   assert.equal(find(root, 'AccountField').props.value, 'card-acc');
-  // An empty ledger keeps the original no-account state (replace, no currency).
+  // An empty ledger keeps the original no-account state (no currency); 25O1: pushed over the form too, never replacing it.
   const none = harness('src/ui/entry-form.tsx', { kind: 'income' }, { data: { accounts: [], records: [] } });
   root = none.render();
   assert.equal(find(root, 'EmptyState').props.detail, 'Cada movimiento necesita una cuenta para actualizar su saldo.');
   assert.equal(nodes(root).some(node => node.type === 'Choices'), false, 'nothing to switch between without an account');
   find(root, 'EmptyState').props.action.props.onPress();
-  assert.equal(none.pushed[0], '/new-account');
+  assert.deepEqual([none.pushed[0], none.replaced.length], ['/new-account', 0]);
   // A mixed ledger: an income lands on cash, never on the empty state.
   const mixed = harness('src/ui/entry-form.tsx', { kind: 'income', accountId: 'card-acc' }, { data: liabilityData });
   root = mixed.render();
@@ -1526,4 +1809,816 @@ test('24T3: a backup whose only new rows are purchase operations offers the impo
   root = same.render();
   assert.equal(nodes(root).some(node => node.props.label === 'Confirmar importación'), false);
   assert.equal(nodes(root).some(node => node.type === 'DetailRow' && node.props.label === 'Devoluciones y adelantos nuevos'), false);
+});
+
+/** 25Q4: the backup review of `copy` on an empty device, its file picked and read. */
+async function reviewCopy(copy: domain.LedgerArchive, exportedAt = new Date()) {
+  const json = JSON.stringify(domain.createRecoveryBackup(copy, exportedAt));
+  const view = harness('app/backup-import.tsx', {}, { data: { accounts: [], records: [] },
+    picker: async () => ({ canceled: false, result: { size: json.length, name: 'copia.json', text: async () => json } }) });
+  await find(view.render(), 'ActionButton', 'Elegir copia').props.onPress();
+  return view;
+}
+const appTexts = (root: Node) => nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children));
+
+// The restore's catch-ups record what fell due since the copy was made (installments.node.ts checks the count against a
+// real restore); the review says how many, under «Disponible después», which stays the copy's own total.
+test('25Q4: a copy whose rules fell due since it was made says how many movements the import also records; «Disponible después» is unchanged; a paused or not-yet-due rule says nothing', async () => {
+  const rent: domain.RecurringRule = { id: 'rent', accountId: 'a', kind: 'expense', amountMinor: 50000, merchant: 'Alquiler', category: 'Hogar', frequency: 'monthly',
+    anchorDateISO: '2026-07-01', nextDateISO: '2026-07-01', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
+  // The harness's day is 2026-09-20: 1 jul, 1 ago and 1 sep fell due. 25Q4 review: the count is movements (a financed
+  // instalment records one per part), so the sentence names movements, never «vencimientos».
+  let root = (await reviewCopy({ ...archive, recurring: [rent] })).render();
+  assert.ok(appTexts(root).includes('Al importar también se registran 3 movimientos de recurrentes o cuotas que vencieron después de la copia, así que tus saldos pueden diferir de esta revisión.'),
+    JSON.stringify(appTexts(root)));
+  assert.equal(find(root, 'Money').props.minor, 87655, 'the total stays what the copy holds');
+  root = (await reviewCopy({ ...archive, recurring: [{ ...rent, nextDateISO: '2026-09-01' }] })).render();
+  assert.ok(appTexts(root).includes('Al importar también se registra 1 movimiento de un recurrente o una cuota que venció después de la copia, así que tus saldos pueden diferir de esta revisión.'));
+  const english = bindLocale('en-US');
+  assert.deepEqual([english.t('backup.import.catchUp', { count: 1 }), english.t('backup.import.catchUp', { count: 3 })], [
+    'Importing also records 1 transaction from a recurring item or installment that fell due after the backup, so your balances may differ from this review.',
+    'Importing also records 3 transactions from recurring items or installments that fell due after the backup, so your balances may differ from this review.']);
+  for (const quiet of [{ ...rent, active: false }, { ...rent, nextDateISO: '2026-10-01' }]) {
+    root = (await reviewCopy({ ...archive, recurring: [quiet] })).render();
+    assert.equal(appTexts(root).some(text => text.startsWith('Al importar también')), false, JSON.stringify(quiet));
+    assert.ok(find(root, 'ActionButton', 'Confirmar importación'));
+  }
+});
+
+test('25Q4: the review names the copy by its date and its newest live movement, and the confirmation restates that date and that an import is removed one item at a time', async () => {
+  const exportedAt = '2026-10-14T17:32:00.000Z';
+  const when = bindLocale('es-AR').formatDateTime(exportedAt);
+  const record = (id: string, dateISO: string) => domain.initialRecord({ ...entry, id, dateISO });
+  const undone = (value: domain.EntryRecord) => domain.makeEntryChange('undo', value, 'void', createdAt).after;
+  // The newest live record is the transfer of 5 mar: the movement undone on 1 abr and the transfer undone on 1 may are not.
+  const view = await reviewCopy({ ...transferData, records: [record('e', '2026-01-01'), record('e2', '2026-02-10'), undone(record('e3', '2026-04-01'))],
+    transfers: [domain.initialTransferRecord({ ...transfer, dateISO: '2026-03-05' }),
+      domain.makeTransferChange('undo', domain.initialTransferRecord({ ...transfer, id: 't2', dateISO: '2026-05-01' }), 'void', createdAt).after] }, new Date(exportedAt));
+  const root = view.render();
+  assert.ok(appTexts(root).includes('Copia del ' + when), JSON.stringify(appTexts(root)));
+  const latest = nodes(root).find(node => node.type === 'AppText' && node.props.children === 'Último movimiento: 5 mar 2026');
+  assert.ok(latest);
+  assert.equal(latest.props.accessibilityLabel, 'Último movimiento: 5 de marzo de 2026', '25Q4 review: VoiceOver hears the date written out, never «5 mar»');
+  find(root, 'ActionButton', 'Confirmar importación').props.onPress();
+  assert.equal(view.alerts[0].title, '¿Importar la copia del ' + when + '?');
+  assert.equal(view.alerts[0].message, 'Se agregan solo los registros que faltan; no se reemplaza nada. Lo importado no se puede quitar de una sola vez: se deshace o se elimina de a uno.');
+  // A copy whose only movement was undone has none to name.
+  const quiet = (await reviewCopy({ ...archive, records: [undone(record('e', '2026-01-01'))] })).render();
+  assert.equal(appTexts(quiet).some(text => text.startsWith('Último movimiento')), false);
+});
+
+test('25Q4: the picker\'s copy inside the app is deleted once its text is read, also when the file is refused or too large; a file outside the app\'s tmp is never touched', async () => {
+  const json = JSON.stringify(domain.createRecoveryBackup(archive));
+  const inbox = 'file:///private/var/mobile/Containers/Data/Application/APP/tmp/com.facur3.finanzapp.dev-Inbox/copia.json';
+  const pick = async (uri: string, text: string, size = text.length) => {
+    const deleted: string[] = [];
+    const view = harness('app/backup-import.tsx', {}, { data: { accounts: [], records: [] },
+      picker: async () => ({ canceled: false, result: { uri, size, name: 'copia.json', text: async () => text, delete: () => { deleted.push(uri); } } }) });
+    await find(view.render(), 'ActionButton', 'Elegir copia').props.onPress();
+    return { view, deleted };
+  };
+  const valid = await pick(inbox, json);
+  assert.deepEqual(valid.deleted, [inbox]);
+  // The review and the import stand on the text read before: nothing opens the file again.
+  find(valid.view.render(), 'ActionButton', 'Confirmar importación').props.onPress();
+  valid.view.alerts[0].buttons[1].onPress();
+  await flush();
+  assert.equal(valid.view.restores.length, 1);
+  assert.deepEqual((await pick(inbox, 'hola')).deleted, [inbox], 'refused');
+  assert.deepEqual((await pick(inbox, json, domain.BACKUP_MAX_BYTES + 1)).deleted, [inbox], 'too large, never read');
+  for (const uri of ['file:///private/var/mobile/Library/Mobile%20Documents/com~apple~CloudDocs/copia.json', 'content://com.android.providers.downloads.documents/document/42',
+    'file:///var/mobile/Containers/Data/Application/APP/Documents/copia.json']) assert.deepEqual((await pick(uri, json)).deleted, [], uri);
+});
+
+test('25VIS2 (V1): the Gasto / Ingreso / Transferencia switch locks while either form reports a save in flight or frozen, and only then', () => {
+  const view = harness('src/ui/movement-form.tsx', { kind: 'expense', accountId: 'a' }, { data: liabilityData });
+  let root = view.render();
+  assert.equal(find(root, 'Choices').props.disabled, false);
+  find(root, 'EntryForm').props.onLockedChange(true);
+  root = view.render();
+  assert.equal(find(root, 'Choices').props.disabled, true, 'a frozen expense can become neither an income nor a transfer');
+  find(root, 'EntryForm').props.onLockedChange(false);
+  root = view.render();
+  assert.equal(find(root, 'Choices').props.disabled, false);
+  find(root, 'Choices').props.onChange('transfer');
+  root = view.render();
+  find(root, 'TransferForm').props.onLockedChange(true);
+  assert.equal(find(view.render(), 'Choices').props.disabled, true, 'the transfer form locks it the same way');
+  assert.equal(view.pushed.length, 0);
+});
+
+test('25VIS2 (V1): the entry form reports the lock exactly while busy or frozen; recovery is unchanged (same operation, same retry, released refusals unlock)', async () => {
+  const reports: boolean[] = [];
+  let outcome: 'unknown' | 'released' | 'ok' = 'unknown';
+  const view = harness('src/ui/entry-form.tsx', { kind: 'expense', accountId: 'a', onKindChange: () => {}, onLockedChange: (locked: boolean) => reports.push(locked) },
+    { data: liabilityData, add: async () => {
+      if (outcome === 'unknown') throw new Error('Refresh failed after commit');
+      if (outcome === 'released') throw new Error(domain.CARD_DELETED_MESSAGE);
+    } });
+  // Nothing typed: refused before anything is written, so the switch is free again.
+  await find(view.render(), 'ActionButton').props.onPress();
+  assert.equal(reports.splice(0).join(','), 'true,false');
+  assert.equal(view.additions.length, 0);
+  assert.equal(view.haptics.splice(0).join(','), 'Error', '25VIS2 (V4): a refusal taps Error');
+  find(view.render(), 'AmountField').props.onChangeText('10');
+  find(view.render(), 'Field').props.onChangeText('Kiosco');
+  find(view.render(), 'CategoryField').props.onChange('Comida');
+  await find(view.render(), 'ActionButton').props.onPress();
+  assert.equal(reports.splice(0).join(','), 'true,true', 'an unknown outcome stays frozen, and so does the switch');
+  assert.equal(view.haptics.splice(0).join(','), 'Warning', '25VIS2 (V4): it may have been written, so Warning, not Error');
+  assert.equal(find(view.render(), 'AmountField').props.editable, false);
+  assert.ok(presentation.releasesDraft(domain.CARD_DELETED_MESSAGE));
+  outcome = 'released';
+  await find(view.render(), 'ActionButton', 'Reintentar guardado').props.onPress();
+  assert.equal(reports.splice(0).join(','), 'true,false', 'a refusal storage decided before writing releases the draft and the switch');
+  assert.equal(view.haptics.splice(0).join(','), 'Error', '25VIS2 (V4): nothing was written, so Error');
+  assert.equal(find(view.render(), 'AmountField').props.editable, true);
+  outcome = 'ok';
+  await find(view.render(), 'ActionButton').props.onPress();
+  assert.equal(view.backs(), 1);
+  assert.equal(reports.splice(0).at(-1), true, 'a saved form leaves the switch locked while its modal closes: nothing switches under a closing screen');
+  assert.equal(view.haptics.splice(0).join(','), 'Success');
+  assert.equal(view.additions.length, 3);
+  assert.equal(new Set(view.additions.map(item => item.id)).size, 1, 'every attempt carried the one operation id');
+  assert.deepEqual([view.additions[2].kind, view.additions[2].category, view.additions[2].amountMinor], ['expense', 'Comida', 1000]);
+});
+
+test('25VIS2 (V1): the transfer form reports the same lock; a failed write stays frozen for the exact retry', async () => {
+  const reports: boolean[] = [];
+  const view = harness('src/ui/transfer-form.tsx', { accountId: 'a', onLockedChange: (locked: boolean) => reports.push(locked) },
+    { data: transferData, addTransfer: async () => { throw new Error('Refresh failed'); } });
+  find(view.render(), 'AmountField').props.onChangeText('12abc');
+  await find(view.render(), 'ActionButton').props.onPress();
+  assert.equal(reports.splice(0).join(','), 'true,false', 'an unreadable amount is refused before anything is written');
+  assert.equal(view.haptics.splice(0).join(','), 'Error', '25VIS2 (V4): a refusal taps Error');
+  fillTransfer(view);
+  await find(view.render(), 'ActionButton').props.onPress();
+  assert.equal(reports.splice(0).join(','), 'true,true');
+  assert.equal(find(view.render(), 'ErrorMessage').props.message, 'transferForm.saveUnverified', '25Q4: the form\'s own sentence, never the engine\'s text');
+  await find(view.render(), 'ActionButton', 'Reintentar guardado').props.onPress();
+  assert.equal(reports.splice(0).join(','), 'true,true');
+  assert.equal(view.haptics.splice(0).join(','), 'Warning,Warning', '25VIS2 (V4): an outcome that may have been written taps Warning, each time');
+  assert.equal(view.transfers.length, 2);
+  assert.equal(view.transfers[0].id, view.transfers[1].id, 'the retry resends the same transfer');
+});
+
+test('25Q4: the transfer detail taps Warning while «Reintentar cambio» keeps an unverified change, Error for a refusal storage decided before writing, Success once it goes through', async () => {
+  let failure: Error | null = new Error('Refresh failed');
+  const view = harness('app/transfer/[id].tsx', {}, { data: { ...transferData, transfers: [domain.initialTransferRecord(transfer)] }, params: { id: transfer.id },
+    updateTransfer: async () => { if (failure) throw failure; } });
+  find(view.render(), 'ActionButton', 'Deshacer transferencia').props.onPress();
+  view.alerts[0].buttons[1].onPress(); await flush();
+  assert.equal(view.haptics.splice(0).join(','), 'Warning', 'it may have been written');
+  assert.ok(find(view.render(), 'ActionButton', 'Reintentar cambio'), 'the change stays for the exact retry');
+  failure = new Error(domain.CARD_DELETED_MESSAGE);
+  find(view.render(), 'ActionButton', 'Reintentar cambio').props.onPress(); await flush();
+  assert.equal(view.haptics.splice(0).join(','), 'Error', 'nothing was written');
+  failure = null;
+  find(view.render(), 'ActionButton', 'Reintentar cambio').props.onPress(); await flush();
+  assert.equal(view.haptics.splice(0).join(','), 'Success');
+  assert.equal(view.transferChanges.length, 3);
+  assert.equal(new Set(view.transferChanges.map(change => change.id)).size, 1, 'every attempt carried the one change, as the screen keeps it frozen');
+});
+
+test('25VIS2 (V2): Gasto and Ingreso keep separate categories; an expense category never rides into an income, and a prefill keeps its own', async () => {
+  const props: Record<string, unknown> = { kind: 'expense', accountId: 'a', onKindChange: () => {} };
+  const view = harness('src/ui/entry-form.tsx', props, { data: liabilityData });
+  find(view.render(), 'AmountField').props.onChangeText('10');
+  find(view.render(), 'Field').props.onChangeText('Ana');
+  find(view.render(), 'CategoryField').props.onChange('Comida');
+  props.kind = 'income';
+  let root = view.render();
+  assert.deepEqual([find(root, 'CategoryField').props.kind, find(root, 'CategoryField').props.value], ['income', '']);
+  assert.equal(find(root, 'ActionButton').props.disabled, true, 'Save waits for an income category');
+  assert.equal(find(root, 'AmountField').props.value, '10', 'the rest of the draft is kept');
+  find(root, 'CategoryField').props.onChange('Sueldo');
+  props.kind = 'expense';
+  assert.equal(find(view.render(), 'CategoryField').props.value, 'Comida', 'back on Gasto, its own category is still there');
+  props.kind = 'income';
+  root = view.render();
+  assert.equal(find(root, 'CategoryField').props.value, 'Sueldo');
+  assert.equal(find(root, 'ActionButton').props.disabled, false);
+  await find(root, 'ActionButton').props.onPress();
+  assert.deepEqual([view.additions[0].kind, view.additions[0].category, view.additions[0].amountMinor], ['income', 'Sueldo', 1000]);
+  const prefilled = harness('src/ui/entry-form.tsx', { kind: 'income', accountId: 'a', onKindChange: () => {}, prefill: { category: 'Sueldo', merchant: 'Empresa', amountMinor: '150000', currency: 'ARS' } }, { data: liabilityData });
+  root = prefilled.render();
+  assert.deepEqual([find(root, 'CategoryField').props.value, find(root, 'Field').props.value, find(root, 'AmountField').props.value], ['Sueldo', 'Empresa', '1.500,00']);
+  assert.equal(prefilled.additions.length, 0, 'a prefill only seeds the fields');
+});
+
+test('25VIS2 (V8): Save waits for every required input of a movement and of a transfer; a complete draft saves once', async () => {
+  // Each row leaves one required input out of a complete draft; «none» leaves nothing out.
+  const entryRows = ['amount', 'merchant', 'category', 'category of the new kind', 'none'] as const;
+  for (const missing of entryRows) {
+    const props: Record<string, unknown> = { kind: 'expense', accountId: 'a', onKindChange: () => {} };
+    const view = harness('src/ui/entry-form.tsx', props, { data: liabilityData });
+    if (missing !== 'amount') find(view.render(), 'AmountField').props.onChangeText('10');
+    if (missing !== 'merchant') find(view.render(), 'Field').props.onChangeText('Kiosco');
+    if (missing !== 'category') find(view.render(), 'CategoryField').props.onChange('Comida');
+    if (missing === 'category of the new kind') props.kind = 'income';
+    const save = find(view.render(), 'ActionButton');
+    assert.equal(save.props.disabled, missing !== 'none', 'movement without its ' + missing);
+    if (missing === 'none') await save.props.onPress();
+    assert.equal(view.additions.length, missing === 'none' ? 1 : 0, 'movement without its ' + missing);
+  }
+  for (const missing of ['amount', 'destination', 'none'] as const) {
+    const view = harness('src/ui/transfer-form.tsx', { accountId: 'a' }, { data: transferData });
+    if (missing !== 'amount') find(view.render(), 'AmountField').props.onChangeText('12');
+    if (missing !== 'destination') find(view.render(), 'AccountField', 'Hacia').props.onChange('b');
+    const save = find(view.render(), 'ActionButton');
+    assert.equal(save.props.disabled, missing !== 'none', 'transfer without its ' + missing);
+    if (missing === 'none') await save.props.onPress();
+    assert.equal(view.transfers.length, missing === 'none' ? 1 : 0, 'transfer without its ' + missing);
+  }
+  // 25Q4: one row per remaining term of the two gating expressions. The rows other suites own are not copied here:
+  // refund-routes.node.ts (nothing typed, over what is left, before the purchase), installment-purchase.node.ts (counts
+  // 1 and 121, an empty «Total financiado», a price too small for the count), and the longer 24B2 and 24B6 tests above,
+  // which the first row and the no-account row summarize.
+  const filled = (view: ReturnType<typeof harness>, amount = '10') => {
+    find(view.render(), 'AmountField').props.onChangeText(amount);
+    find(view.render(), 'Field').props.onChangeText('Kiosco');
+    find(view.render(), 'CategoryField').props.onChange('Comida');
+  };
+  const yen: domain.Account = { ...account, id: 'jpy', name: 'Yen', currency: 'JPY' };
+  const rows: [string, () => ReturnType<typeof harness>][] = [
+    ['a draft yen cannot hold', () => {
+      const view = harness('src/ui/entry-form.tsx', { kind: 'expense', accountId: 'a', onKindChange: () => {} }, { data: { ...archive, accounts: [...archive.accounts, yen] } });
+      filled(view, '12,50');
+      find(view.render(), 'AccountField').props.onChange('jpy');
+      return view;
+    }],
+    ['«En cuotas» with a count outside 2 to 120', () => {
+      const view = harness('src/ui/entry-form.tsx', { kind: 'expense', accountId: 'card-acc', onKindChange: () => {} }, { data: liabilityData });
+      filled(view);
+      find(view.render(), 'InstallmentPurchase').props.onChange({ mode: 'installments', count: 'other', typedCount: '1' });
+      return view;
+    }],
+    ['the same account on both sides', () => {
+      const view = harness('src/ui/transfer-form.tsx', { fromAccountId: 'a', toAccountId: 'a' }, { data: transferData });
+      find(view.render(), 'AmountField').props.onChangeText('12');
+      return view;
+    }],
+    ['two currencies', () => {
+      const view = harness('src/ui/transfer-form.tsx', { fromAccountId: 'a', toAccountId: 'u' }, { data: transferData });
+      find(view.render(), 'AmountField').props.onChangeText('12');
+      return view;
+    }],
+    ['a transfer draft yen cannot hold', () => {
+      const view = harness('src/ui/transfer-form.tsx', { accountId: 'a' }, { data: { ...transferData, accounts: [...transferData.accounts, yen, { ...yen, id: 'jpy2', name: 'Yen 2' }] } });
+      find(view.render(), 'AmountField').props.onChangeText('12,50');
+      find(view.render(), 'AccountField', 'Desde').props.onChange('jpy');
+      find(view.render(), 'AccountField', 'Hacia').props.onChange('jpy2');
+      return view;
+    }],
+  ];
+  for (const [label, open] of rows) {
+    const view = open();
+    assert.equal(find(view.render(), 'ActionButton').props.disabled, true, label);
+    assert.equal(view.additions.length + view.transfers.length, 0, label);
+  }
+  // No account this kind may post to: the empty state's «Agregar cuenta» is the only button, never a disabled Save.
+  const none = harness('src/ui/entry-form.tsx', { kind: 'income', accountId: 'card-acc', onKindChange: () => {} }, { data: cardOnly });
+  assert.deepEqual(nodes(none.render()).filter(node => node.type === 'ActionButton').map(node => node.props.label), ['Agregar cuenta']);
+  // A characterization, not an endorsement: a zero amount keeps Save enabled, and the press writes nothing, shows the
+  // domain's sentence and taps Error. Gating a zero draft needs new copy, which was not approved.
+  const zero = harness('src/ui/entry-form.tsx', { kind: 'expense', accountId: 'a', onKindChange: () => {} }, { data: liabilityData });
+  filled(zero, '0');
+  assert.equal(find(zero.render(), 'ActionButton').props.disabled, false);
+  await find(zero.render(), 'ActionButton').props.onPress();
+  assert.equal(zero.additions.length, 0);
+  assert.ok(find(zero.render(), 'ErrorMessage').props.message);
+  assert.equal(zero.haptics.join(','), 'Error');
+  // A complete income saves once, as an income.
+  const income = harness('src/ui/entry-form.tsx', { kind: 'income', accountId: 'a', onKindChange: () => {} }, { data: liabilityData });
+  find(income.render(), 'AmountField').props.onChangeText('10');
+  find(income.render(), 'Field').props.onChangeText('Empresa');
+  find(income.render(), 'CategoryField').props.onChange('Sueldo');
+  assert.equal(find(income.render(), 'ActionButton').props.disabled, false);
+  await find(income.render(), 'ActionButton').props.onPress();
+  assert.deepEqual(income.additions.map(item => item.kind), ['income']);
+});
+
+test('25VIS2 (V3): a new transfer, card payment and collection echo the amount they record, on screen and for VoiceOver; editing, retrying, zero and unreadable text do not', async () => {
+  const cases = [
+    ['es-AR', 'Registrar transferencia\u00A0·\u00A0$\u00A01.234,50', 'Registrar transferencia, 1234,50 pesos'],
+    ['en-US', 'Record transfer\u00A0·\u00A0AR$\u00A01,234.50', 'Record transfer, 1234.50 pesos'],
+  ] as const;
+  for (const [locale, shown, spoken] of cases) {
+    const view = harness('src/ui/transfer-form.tsx', { accountId: 'a' }, { data: transferData, locale });
+    assert.equal(find(view.render(), 'ActionButton').props.spokenLabel, undefined, locale + ': nothing typed, nothing to echo');
+    find(view.render(), 'AmountField').props.onChangeText('1234,5');
+    const save = find(view.render(), 'ActionButton');
+    assert.equal(save.props.label + '|' + save.props.spokenLabel, shown + '|' + spoken, locale);
+  }
+  const plain = harness('src/ui/transfer-form.tsx', { accountId: 'a' }, { data: transferData });
+  for (const text of ['0', '12abc']) {
+    find(plain.render(), 'AmountField').props.onChangeText(text);
+    assert.deepEqual([find(plain.render(), 'ActionButton').props.label, find(plain.render(), 'ActionButton').props.spokenLabel], ['Registrar transferencia', undefined], text);
+  }
+  // In the source's own currency: a dollar account echoes dollars.
+  find(plain.render(), 'AccountField', 'Desde').props.onChange('u');
+  find(plain.render(), 'AmountField').props.onChangeText('25');
+  // (With no dollar destination yet, the empty state's «Agregar cuenta» is the first button; Save is found by its echo.)
+  assert.equal(find(plain.render(), 'ActionButton', 'Registrar transferencia\u00A0·\u00A0US$\u00A025,00').props.spokenLabel, 'Registrar transferencia, 25,00 dólares');
+  const payment = harness('src/ui/transfer-form.tsx', { toAccountId: 'card-acc', maxAmountMinor: '5000' }, { data: liabilityData });
+  find(payment.render(), 'AmountField').props.onChangeText('50');
+  assert.equal(find(payment.render(), 'ActionButton').props.spokenLabel, 'Registrar pago, 50,00 pesos');
+  const original = domain.initialTransferRecord({ id: 't', fromAccountId: 'a', toAccountId: 'b', amountMinor: 1000, note: '', dateISO: '2026-01-03', createdAt });
+  const editing = harness('src/ui/transfer-form.tsx', { original }, { data: { ...transferData, transfers: [original] }, updateTransfer: async () => { throw new Error('Refresh failed'); } });
+  find(editing.render(), 'AmountField').props.onChangeText('20');
+  assert.deepEqual([find(editing.render(), 'ActionButton').props.label, find(editing.render(), 'ActionButton').props.spokenLabel], ['Guardar cambios', undefined]);
+  await find(editing.render(), 'ActionButton').props.onPress();
+  assert.deepEqual([find(editing.render(), 'ActionButton').props.label, find(editing.render(), 'ActionButton').props.spokenLabel], ['Reintentar guardado', undefined]);
+});
+
+test('25VIS2 (V3): a currency without decimals echoes whole: 1234 yen read as 1234 yen, never as cents, on screen, aloud and when saved', async () => {
+  const yen = (id: string): domain.Account => ({ ...account, id, name: 'Yenes ' + id, currency: 'JPY', openingMinor: 100000 });
+  const data: domain.LedgerArchive = { ...archive, accounts: [yen('ya'), yen('yb')] };
+  for (const locale of ['es-AR', 'en-US'] as const) {
+    const bound = bindLocale(locale);
+    const view = harness('src/ui/transfer-form.tsx', { accountId: 'ya' }, { data, locale });
+    find(view.render(), 'AmountField').props.onChangeText('1234');
+    const save = find(view.render(), 'ActionButton');
+    const word = locale === 'es-AR' ? 'Registrar transferencia' : 'Record transfer';
+    assert.equal(save.props.label, word + '\u00A0·\u00A0' + bound.moneyText(1234, 'JPY'), locale + ': 123400 would mean the yen were read as cents');
+    assert.equal(save.props.spokenLabel, word + ', ' + bound.spokenMoney(1234, 'JPY'), locale);
+    assert.doesNotMatch(save.props.label, /[.,]00$/, locale + ': no decimals for a currency that has none');
+    if (locale !== 'es-AR') continue;
+    find(view.render(), 'AccountField', 'Hacia').props.onChange('yb');
+    await find(view.render(), 'ActionButton').props.onPress();
+    assert.equal(view.transfers[0].amountMinor, 1234, 'the saved amount is the echoed one');
+  }
+});
+
+test('25VIS2 (V7): the card or debt a payment settles is a fixed fact, not a disabled button', () => {
+  const root = harness('src/ui/transfer-form.tsx', { toAccountId: 'card-acc', maxAmountMinor: '5000' }, { data: liabilityData }).render();
+  const card = find(root, 'SelectorCard', 'Tarjeta');
+  assert.deepEqual([card.props.fixed, card.props.disabled, card.props.onPress], [true, undefined, undefined]);
+  assert.equal(card.props.detail, 'Saldo pendiente ARS 50,00');
+  const settle = harness('src/ui/transfer-form.tsx', { toAccountId: 'debt-acc', maxAmountMinor: '7000' }, { data: liabilityData }).render();
+  assert.equal(nodes(settle).find(node => node.type === 'SelectorCard')!.props.fixed, true);
+});
+
+// Producto 25Q4: edits and confirmations that keep the money right. An edited payment or collection keeps its card or
+// debt fixed and offers only sides storage accepts; a debt payment or collection settles at most what is pending, read
+// from the records for new and edited ones alike; an amount over the cap is said while it is typed.
+const anaAccount: domain.Account = { ...account, id: 'rec-acc', name: 'Me deben · Ana', openingMinor: 4000 };
+const ana: domain.PersonalDebtProfile = { ...debt, id: 'rec', accountId: anaAccount.id, direction: 'owed_to_me', counterparty: 'Ana' };
+const withAna: domain.LedgerArchive = { ...liabilityData, accounts: [...liabilityData.accounts, anaAccount, destination], debts: [debt, ana] };
+const storedTransfer = (id: string, fromAccountId: string, toAccountId: string, amountMinor: number) =>
+  domain.initialTransferRecord({ id, fromAccountId, toAccountId, amountMinor, note: '', dateISO: entry.dateISO, createdAt });
+/** The form's error line as ErrorMessage gets it: the message, and whether VoiceOver is told. */
+const lineOf = (root: Node) => { const { message, announce } = find(root, 'ErrorMessage').props; return { message, announce }; };
+
+test('25Q4: editing a card payment, a debt payment or a collection keeps its card or debt fixed and names itself; every side it offers is one storage accepts, and a deleted card, receivable or cash account keeps its stored side', async () => {
+  const es = bindLocale('es-AR');
+  // 25Q4 review: the shortcut's figure leaves the edited transfer out while the card or debt below counts it, and says so.
+  const cases = [
+    ['a', 'card-acc', 'Tarjeta', 'Visa', 'Desde', 'Pago', 'Pagar total', 'transferForm.explainCard',
+      'Saldo pendiente sin este pago: ARS 50,00', 'Outstanding balance without this payment: ARS 50.00'],
+    ['a', 'debt-acc', 'Deuda', 'Debo · Juan', 'Desde', 'Pago', 'Saldar total', 'transferForm.explainDebt',
+      'Pendiente sin este pago: ARS 70,00', 'Pending without this payment: ARS 70.00'],
+    ['rec-acc', 'a', 'Deuda', 'Me deben · Ana', 'Hacia', 'Cobro', 'Cobrar total', 'transferForm.explainDebt',
+      'Pendiente sin este cobro: ARS 40,00', 'Pending without this collection: ARS 40.00'],
+  ] as const;
+  for (const [fromAccountId, toAccountId, kind, name, free, label, shortcut, explain, caption, english] of cases) {
+    const original = storedTransfer('edited', fromAccountId, toAccountId, 1000);
+    const root = harness('src/ui/transfer-form.tsx', { original }, { data: { ...withAna, transfers: [original] } }).render();
+    assert.deepEqual(nodes(root).filter(node => node.type === 'SelectorCard').map(node => [node.props.label, node.props.value, node.props.fixed]), [[kind, name, true]], name);
+    const field = find(root, 'AccountField', free);
+    const offered: string[] = field.props.accounts.map((item: domain.Account) => item.id);
+    assert.deepEqual(offered, ['a', 'b'], name);
+    assert.equal(find(root, 'AmountField').props.label, label, name);
+    assert.equal(find(root, 'AmountShortcut').props.label, shortcut, name);
+    assert.equal(find(root, 'AmountShortcut').props.caption, caption, name);
+    assert.equal(find(harness('src/ui/transfer-form.tsx', { original }, { data: { ...withAna, transfers: [original] }, locale: 'en-US' }).render(), 'AmountShortcut').props.caption, english);
+    assert.ok(nodes(root).some(node => node.type === 'AppText' && node.props.children === es.t(explain)), name);
+    // What storage runs on changed sides (changeTransfer): every pair the list offers passes it.
+    for (const id of offered) {
+      const pair = free === 'Desde' ? { fromAccountId: id, toAccountId } : { fromAccountId, toAccountId: id };
+      if (pair.fromAccountId === fromAccountId && pair.toAccountId === toAccountId) continue;
+      assert.doesNotThrow(() => domain.assertTransferSides(pair, withAna.cards, withAna.debts, withAna.accounts), JSON.stringify(pair));
+    }
+  }
+  // A card already in credit without this payment says so, in the same words.
+  const credited = storedTransfer('edited', 'a', 'card-acc', 1000);
+  const inCredit = harness('src/ui/transfer-form.tsx', { original: credited }, { data: { ...withAna, transfers: [credited],
+    accounts: withAna.accounts.map(item => item.id === 'card-acc' ? { ...item, openingMinor: 2500 } : item) } });
+  assert.equal(find(inCredit.render(), 'AmountShortcut').props.caption, 'A favor sin este pago: ARS 25,00');
+  // A payment to a card deleted since still opens, on its stored source (the only side storage accepts), and saves there.
+  const original = storedTransfer('edited', 'a', 'card-acc', 1000);
+  const deleted = harness('src/ui/transfer-form.tsx', { original }, { data: { ...withAna, cards: [{ ...card, deleted: true }], transfers: [original] } });
+  assert.deepEqual(find(deleted.render(), 'AccountField', 'Desde').props.accounts.map((item: domain.Account) => item.id), ['a']);
+  find(deleted.render(), 'AmountField').props.onChangeText('20');
+  await find(deleted.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+  assert.deepEqual(deleted.transferChanges.map(change => [change.after.transfer.fromAccountId, change.after.transfer.toAccountId, change.after.transfer.amountMinor]), [['a', 'card-acc', 2000]]);
+  // 25Q4 review: a collection from a receivable deleted since offers only its stored destination («Destino» would be refused
+  // by storage and freeze the form), and saves there.
+  const collection = storedTransfer('c', 'rec-acc', 'a', 1000);
+  const gone = harness('src/ui/transfer-form.tsx', { original: collection }, { data: { ...withAna, debts: [debt, { ...ana, active: false, deleted: true }], transfers: [collection] } });
+  assert.deepEqual(find(gone.render(), 'AccountField', 'Hacia').props.accounts.map((item: domain.Account) => item.id), ['a']);
+  find(gone.render(), 'Field').props.onChangeText('Cobro viejo');
+  await find(gone.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+  assert.deepEqual(gone.transferChanges.map(change => [change.after.transfer.fromAccountId, change.after.transfer.toAccountId]), [['rec-acc', 'a']]);
+  // A card payment whose cash account was deleted since, with no other cash in its currency: the form still opens on the
+  // stored source (only a new payment needs a live one), and a note-only change saves.
+  const payment = storedTransfer('p', 'a', 'card-acc', 1000);
+  const closed = harness('src/ui/transfer-form.tsx', { original: payment }, { data: { ...liabilityData,
+    accounts: liabilityData.accounts.map(item => item.id === 'a' ? { ...item, deletedAt: '2026-09-20T10:00:00.000Z' } : item), transfers: [payment] } });
+  assert.equal(nodes(closed.render()).some(node => node.type === 'EmptyState'), false, 'never «Agregar cuenta» instead of the form');
+  assert.ok(find(closed.render(), 'AmountField'));
+  assert.deepEqual(find(closed.render(), 'AccountField', 'Desde').props.accounts.map((item: domain.Account) => item.id), ['a']);
+  find(closed.render(), 'Field').props.onChangeText('nota');
+  await find(closed.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+  assert.deepEqual(closed.transferChanges.map(change => [change.after.transfer.fromAccountId, change.after.transfer.note]), [['a', 'nota']]);
+  // 25O1 review: a collection whose cash destination was deleted since, with another live account in its currency: the edit
+  // keeps its stored destination, never moves the collected money into one the person did not choose.
+  const collected = storedTransfer('c', 'rec-acc', 'a', 1000);
+  const moved = harness('src/ui/transfer-form.tsx', { original: collected }, { data: { ...withAna,
+    accounts: withAna.accounts.map(item => item.id === 'a' ? { ...item, revision: 1, deletedAt: '2026-09-20T10:00:00.000Z' } : item), transfers: [collected] } });
+  assert.equal(find(moved.render(), 'AccountField', 'Hacia').props.value, 'a', 'the stored destination, never the live «Destino»');
+  find(moved.render(), 'Field').props.onChangeText('nota');
+  await find(moved.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+  assert.deepEqual(moved.transferChanges.map(change => [change.after.transfer.fromAccountId, change.after.transfer.toAccountId, change.after.transfer.note]), [['rec-acc', 'a', 'nota']]);
+});
+
+test('25Q4 review: a payment or a collection stored the other way round (a debt I owe → cash, cash → a receivable) is edited in the generic form, where it is turned back and saved', async () => {
+  const edit = (original: domain.TransferRecord) => harness('src/ui/transfer-form.tsx', { original }, { data: { ...withAna, transfers: [original] } });
+  const sides = (view: ReturnType<typeof harness>) => view.transferChanges.map(change => [change.after.transfer.fromAccountId, change.after.transfer.toAccountId, change.after.transfer.amountMinor]);
+  for (const original of [storedTransfer('inverted', 'debt-acc', 'a', 1000), storedTransfer('inverted', 'a', 'rec-acc', 1000)]) {
+    const root = edit(original).render();
+    const label = JSON.stringify([original.transfer.fromAccountId, original.transfer.toAccountId]);
+    assert.equal(nodes(root).some(node => node.type === 'SelectorCard'), false, label + ': nothing fixed as if it settled the debt');
+    assert.equal(find(root, 'AmountField').props.label, 'Transferencia', label + ': never «Cobro» or «Pago»');
+    assert.doesNotMatch(find(root, 'AmountShortcut').props.caption, /Pendiente/, label);
+  }
+  // Juan's debt grew by this 10,00 (the shape a pre-25Q4 edit could write): «Desde» → a, «Hacia» → the debt makes it a payment.
+  const owed = edit(storedTransfer('inverted', 'debt-acc', 'a', 1000));
+  find(owed.render(), 'AccountField', 'Desde').props.onChange('a');
+  assert.deepEqual(find(owed.render(), 'AccountField', 'Hacia').props.accounts.map((item: domain.Account) => item.id), ['debt-acc', 'b']);
+  find(owed.render(), 'AccountField', 'Hacia').props.onChange('debt-acc');
+  await find(owed.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+  assert.deepEqual(sides(owed), [['a', 'debt-acc', 1000]]);
+  // Ana's receivable grew by this 10,00: another destination first frees the receivable as the source, then cash receives it.
+  const receivable = edit(storedTransfer('inverted', 'a', 'rec-acc', 1000));
+  find(receivable.render(), 'AccountField', 'Hacia').props.onChange('b');
+  find(receivable.render(), 'AccountField', 'Desde').props.onChange('rec-acc');
+  find(receivable.render(), 'AccountField', 'Hacia').props.onChange('a');
+  await find(receivable.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+  assert.deepEqual(sides(receivable), [['rec-acc', 'a', 1000]]);
+  // Turned back, the pair settles the debt, so it has a new payment's ceiling: what is pending without it (70,00 to Juan,
+  // 40,00 from Ana). The stored 90,00 grew the debt, so it allows nothing more.
+  for (const [original, turn, pending] of [
+    [storedTransfer('inverted', 'debt-acc', 'a', 9000), [['Desde', 'a'], ['Hacia', 'debt-acc']], 7000],
+    [storedTransfer('inverted', 'a', 'rec-acc', 9000), [['Hacia', 'b'], ['Desde', 'rec-acc'], ['Hacia', 'a']], 4000],
+  ] as const) {
+    const view = edit(original);
+    for (const [field, id] of turn) find(view.render(), 'AccountField', field).props.onChange(id);
+    await find(view.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+    assert.deepEqual([lineOf(view.render()).message, view.haptics.join(','), view.transferChanges.length], ['transferForm.overObligation', 'Error', 0], original.transfer.toAccountId);
+    find(view.render(), 'AmountField').props.onChangeText(String(pending / 100));
+    await find(view.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+    assert.deepEqual(view.transferChanges.map(change => change.after.transfer.amountMinor), [pending], original.transfer.toAccountId);
+  }
+});
+
+test('25Q4 review: a link asking to pay out of a debt I owe, or to pay into a receivable, opens a plain transfer, as a link out of a card does', () => {
+  for (const props of [{ fromAccountId: 'debt-acc' }, { toAccountId: 'rec-acc' }, { fromAccountId: 'debt-acc', maxAmountMinor: '7000', amountMinor: '7000' }]) {
+    const root = harness('src/ui/transfer-form.tsx', props, { data: withAna }).render();
+    const label = JSON.stringify(props);
+    assert.equal(nodes(root).some(node => node.type === 'SelectorCard'), false, label + ': the debt is not fixed as a side');
+    assert.equal(find(root, 'Stack.Screen').props.options.title, 'Entre mis cuentas', label + ': a plain transfer, never «Registrar cobro» or «Registrar pago»');
+    assert.deepEqual([find(root, 'AmountField').props.value, find(root, 'Field').props.value], ['', ''], label + ': no settlement prefill, no default note');
+    assert.deepEqual(find(root, 'AccountField', 'Desde').props.accounts.map((item: domain.Account) => item.id), ['a', 'u', 'b'], label);
+    assert.deepEqual(find(root, 'AccountField', 'Hacia').props.accounts.map((item: domain.Account) => item.id), ['b'], label + ': cash only');
+  }
+});
+
+test('25Q4: an edited debt payment or collection keeps the ceiling a new one has: over it the sentence shows while typing, Save refuses it with one Error tap and writes nothing; within it saves; an older overpayment keeps its stored amount, never more', async () => {
+  const edit = (data: domain.LedgerArchive, original: domain.TransferRecord) =>
+    harness('src/ui/transfer-form.tsx', { original }, { data: { ...data, transfers: [...data.transfers ?? [], original] } });
+  // Juan is owed 70,00 without this 30,00 payment: the most the edit may settle.
+  const view = edit(liabilityData, storedTransfer('p', 'a', 'debt-acc', 3000));
+  find(view.render(), 'AmountField').props.onChangeText('70,01');
+  assert.deepEqual(lineOf(view.render()), { message: 'transferForm.overObligation', announce: false }, 'shown while typed, not spoken');
+  assert.equal(nodes(view.render()).some(node => node.type === 'DetailRow' && node.props.label === 'Debo · Juan después'), false);
+  const save = find(view.render(), 'ActionButton', 'Guardar cambios');
+  assert.equal(save.props.disabled, false);
+  await save.props.onPress();
+  assert.deepEqual(lineOf(view.render()), { message: 'transferForm.overObligation', announce: true }, 'what Save refused is spoken');
+  assert.deepEqual([view.haptics.join(','), view.transferChanges.length], ['Error', 0]);
+  const shortcut = find(view.render(), 'AmountShortcut');
+  assert.equal(shortcut.props.label, 'Saldar total');
+  shortcut.props.onPress();
+  assert.equal(find(view.render(), 'AmountField').props.value, '70', 'what is pending, never the cash balance');
+  find(view.render(), 'AmountField').props.onChangeText('70');
+  assert.equal(find(view.render(), 'DetailRow', 'Debo · Juan después').props.value, 'Saldada');
+  await find(view.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+  assert.deepEqual(view.transferChanges.map(change => [change.after.transfer.toAccountId, change.after.transfer.amountMinor]), [['debt-acc', 7000]]);
+  // Ana owes 40,00 without this 10,00 collection.
+  const collect = edit(withAna, storedTransfer('c', 'rec-acc', 'a', 1000));
+  find(collect.render(), 'AmountField').props.onChangeText('40,01');
+  await find(collect.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+  assert.deepEqual([lineOf(collect.render()).message, collect.haptics.join(','), collect.transferChanges.length], ['transferForm.overObligation', 'Error', 0]);
+  find(collect.render(), 'AmountField').props.onChangeText('40');
+  await find(collect.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+  assert.deepEqual(collect.transferChanges.map(change => change.after.transfer.amountMinor), [4000]);
+  // An older overpayment (30,00 and 90,00 on 70,00): the debt reads «Saldada», and the edit keeps 90,00 but never raises it.
+  const older = { ...liabilityData, transfers: [storedTransfer('q1', 'a', 'debt-acc', 3000)] }, q2 = storedTransfer('q2', 'a', 'debt-acc', 9000);
+  const noteOnly = edit(older, q2);
+  assert.equal(find(noteOnly.render(), 'SelectorCard', 'Deuda').props.detail, 'Saldada', 'never «Pendiente ARS 50,00»');
+  find(noteOnly.render(), 'Field').props.onChangeText('Pago viejo');
+  await find(noteOnly.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+  assert.deepEqual(noteOnly.transferChanges.map(change => [change.after.transfer.amountMinor, change.after.transfer.note]), [[9000, 'Pago viejo']]);
+  const raised = edit(older, q2);
+  find(raised.render(), 'AmountField').props.onChangeText('90,01');
+  await find(raised.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+  assert.deepEqual([lineOf(raised.render()).message, raised.transferChanges.length], ['transferForm.overObligation', 0]);
+});
+
+test('25Q4: a new debt payment or collection is capped by what is pending now: a link without a cap or with a stale one cannot overpay; a card keeps its link\'s cap', async () => {
+  for (const props of [{ toAccountId: 'debt-acc' }, { toAccountId: 'debt-acc', maxAmountMinor: '9000' }]) {
+    const view = harness('src/ui/transfer-form.tsx', props, { data: liabilityData });
+    find(view.render(), 'AmountField').props.onChangeText('70,01');
+    assert.deepEqual(lineOf(view.render()), { message: 'transferForm.overObligation', announce: false }, JSON.stringify(props));
+    await find(view.render(), 'ActionButton', 'Registrar pago\u00A0·\u00A0$\u00A070,01').props.onPress();
+    assert.equal(view.transfers.length, 0, JSON.stringify(props));
+    find(view.render(), 'AmountField').props.onChangeText('70');
+    await find(view.render(), 'ActionButton', 'Registrar pago\u00A0·\u00A0$\u00A070,00').props.onPress();
+    assert.deepEqual(view.transfers.map(item => item.amountMinor), [7000], JSON.stringify(props));
+  }
+  const collect = harness('src/ui/transfer-form.tsx', { fromAccountId: 'rec-acc' }, { data: withAna });
+  // 25Q4 review: a receivable reads what is still owed to the person, never «Saldada» while it is owed.
+  assert.equal(find(collect.render(), 'SelectorCard', 'Deuda').props.detail, 'Pendiente ARS 40,00');
+  assert.equal(find(harness('src/ui/transfer-form.tsx', { fromAccountId: 'rec-acc' }, { data: withAna, locale: 'en-US' }).render(), 'SelectorCard', 'Debt').props.detail, 'Pending ARS 40.00');
+  find(collect.render(), 'AmountField').props.onChangeText('40,01');
+  await find(collect.render(), 'ActionButton', 'Registrar cobro\u00A0·\u00A0$\u00A040,01').props.onPress();
+  assert.deepEqual([lineOf(collect.render()).message, collect.transfers.length], ['transferForm.overObligation', 0]);
+  find(collect.render(), 'AmountField').props.onChangeText('40');
+  assert.equal(find(collect.render(), 'DetailRow', 'Me deben · Ana después').props.value, 'Saldada');
+  // A card's credit is modelled: only its caller's cap bounds a new payment.
+  const payment = harness('src/ui/transfer-form.tsx', { toAccountId: 'card-acc', maxAmountMinor: '9000' }, { data: liabilityData });
+  find(payment.render(), 'AmountField').props.onChangeText('60');
+  await find(payment.render(), 'ActionButton', 'Registrar pago\u00A0·\u00A0$\u00A060,00').props.onPress();
+  assert.deepEqual(payment.transfers.map(item => item.amountMinor), [6000]);
+});
+
+test('25Q4: Pagar tarjeta says an over-balance amount while it is typed, in words naming what the app can do; Save stays enabled and refuses it once, spoken; the cap stays', async () => {
+  const view = harness('src/ui/transfer-form.tsx', { toAccountId: 'card-acc', maxAmountMinor: '5000' }, { data: liabilityData });
+  find(view.render(), 'AmountField').props.onChangeText('60');
+  assert.deepEqual(lineOf(view.render()), { message: 'transferForm.overCardDebt', announce: false }, 'shown while typed, not spoken');
+  const save = find(view.render(), 'ActionButton', 'Registrar pago\u00A0·\u00A0$\u00A060,00');
+  assert.deepEqual([save.props.disabled, view.transfers.length], [false, 0]);
+  await save.props.onPress();
+  assert.deepEqual(lineOf(view.render()), { message: 'transferForm.overCardDebt', announce: true });
+  assert.deepEqual([view.haptics.join(','), view.transfers.length], ['Error', 0]);
+  find(view.render(), 'AmountField').props.onChangeText('50');
+  assert.equal(find(view.render(), 'ErrorMessage').props.message, null);
+  await find(view.render(), 'ActionButton', 'Registrar pago\u00A0·\u00A0$\u00A050,00').props.onPress();
+  assert.deepEqual(view.transfers.map(item => item.amountMinor), [5000]);
+  const spanish = bindLocale('es-AR').errorText('transferForm.overCardDebt'), english = bindLocale('en-US').errorText('transferForm.overCardDebt');
+  assert.equal(spanish, 'El pago supera el saldo pendiente registrado. Si tu resumen tiene compras, intereses o cargos que faltan, registralos primero como gastos de la tarjeta.');
+  assert.equal(english, 'The payment is more than the recorded outstanding balance. If your statement has purchases, interest or fees that are missing, record them first as expenses on the card.');
+  assert.ok(spanish.startsWith('El pago supera el saldo pendiente'), 'the opening the device checklist pins');
+  assert.doesNotMatch(spanish + ' ' + english, /resumen real|actual statement/);
+});
+
+test('25Q4 review: Pagar tarjeta follows a charge recorded while the form is open: the link\'s cap never falls below what the card owes now', async () => {
+  const view = harness('src/ui/transfer-form.tsx', { toAccountId: 'card-acc', maxAmountMinor: '5000' }, { data: liabilityData });
+  find(view.render(), 'AmountField').props.onChangeText('60');
+  assert.equal(lineOf(view.render()).message, 'transferForm.overCardDebt', 'the card owes 50,00 when the form opens');
+  // Back from the background, the foreground catch-up records a 10,00 instalment on the card under the open form.
+  view.setData({ ...liabilityData, records: [...liabilityData.records, domain.initialRecord({ ...entry, id: 'charge', accountId: 'card-acc', amountMinor: 1000 })] });
+  assert.equal(find(view.render(), 'SelectorCard', 'Tarjeta').props.detail, 'Saldo pendiente ARS 60,00');
+  assert.equal(lineOf(view.render()).message, null, 'the recorded balance is never «supera el saldo pendiente»');
+  find(view.render(), 'AmountShortcut').props.onPress();
+  assert.equal(find(view.render(), 'AmountField').props.value, '60', '«Pagar total» fills what the card owes now, not the link\'s 50,00');
+  find(view.render(), 'AmountField').props.onChangeText('60,01');
+  assert.equal(lineOf(view.render()).message, 'transferForm.overCardDebt', 'above it stays refused');
+  find(view.render(), 'AmountField').props.onChangeText('60');
+  await find(view.render(), 'ActionButton').props.onPress();
+  assert.deepEqual([view.transfers.map(item => item.amountMinor).join(','), view.haptics.join(',')], ['6000', 'Success']);
+});
+
+test('25Q4: undoing or restoring a card purchase says how the card will read, in its own words, never «Se sumarán … a Visa»', async () => {
+  const purchase = domain.initialRecord({ ...entry, id: 'cp', accountId: 'card-acc' });
+  const undo = (data: domain.LedgerArchive, locale: AppLocale = 'es-AR') => {
+    const view = harness('app/entry/[id].tsx', {}, { data, params: { id: 'cp' }, locale });
+    find(view.render(), 'ActionButton', locale === 'es-AR' ? 'Deshacer movimiento' : 'Undo transaction').props.onPress();
+    return view;
+  };
+  // Visa owes 173,45: 50,00 before the purchase.
+  const view = undo({ ...liabilityData, records: [purchase] });
+  assert.equal(view.alerts[0].message, 'Visa quedará con un saldo pendiente de 50,00 ARS. Este movimiento dejará de contar en tus saldos y reportes. Podés recuperarlo después desde Movimientos deshechos, en Movimientos.');
+  view.alerts[0].buttons[1].onPress(); await flush();
+  view.setData({ ...liabilityData, records: [view.updates[0].after] });
+  find(view.render(), 'ActionButton', 'Recuperar movimiento').props.onPress();
+  assert.equal(view.alerts[1].message, 'Visa quedará con un saldo pendiente de 173,45 ARS. Este movimiento volverá a contar en tus saldos y reportes.');
+  // A card that starts at zero: paid off by a transfer, the undo leaves it in credit; with only the purchase, owing nothing.
+  const fresh = { ...liabilityData, accounts: liabilityData.accounts.map(item => item.id === 'card-acc' ? { ...item, openingMinor: 0 } : item), records: [purchase] };
+  const paid = undo({ ...fresh, transfers: [storedTransfer('pay', 'a', 'card-acc', 12345)] });
+  assert.ok(paid.alerts[0].message.startsWith('Visa quedará con 123,45 ARS a favor. '), paid.alerts[0].message);
+  const only = undo(fresh);
+  assert.ok(only.alerts[0].message.startsWith('Visa quedará sin saldo pendiente. '), only.alerts[0].message);
+  const english = undo({ ...liabilityData, records: [purchase] }, 'en-AR');
+  assert.equal(english.alerts[0].message, 'Visa will have an outstanding balance of 50,00 ARS. This transaction will stop counting in your balances and reports. You can restore it later from Undone transactions, in Activity.');
+  english.alerts[0].buttons[1].onPress(); await flush();
+  english.setData({ ...liabilityData, records: [english.updates[0].after] });
+  find(english.render(), 'ActionButton', 'Restore transaction').props.onPress();
+  // 25Q4 review: the sentence after the card's names the transaction, so it never reads as the card coming back.
+  assert.equal(english.alerts[1].message, 'Visa will have an outstanding balance of 173,45 ARS. This transaction will count again in your balances and reports.');
+  for (const message of [...view.alerts, paid.alerts[0], only.alerts[0]].map(alert => alert.message)) assert.doesNotMatch(message, /se sumarán|se descontarán|deuda/i);
+});
+
+test('25Q4: undoing or restoring a card payment, a debt payment or a collection says each side in its own words, and only an undo says where it is restored', () => {
+  const ask = (original: domain.TransferRecord, locale: AppLocale = 'es-AR') => {
+    const view = harness('app/transfer/[id].tsx', {}, { data: { ...withAna, transfers: [original] }, params: { id: original.transfer.id }, locale });
+    const action = locale === 'es-AR' ? (original.voided ? 'Recuperar transferencia' : 'Deshacer transferencia') : original.voided ? 'Restore transfer' : 'Undo transfer';
+    find(view.render(), 'ActionButton', action).props.onPress();
+    return view.alerts[0].message;
+  };
+  const payment = storedTransfer('pay', 'a', 'card-acc', 5000);
+  assert.equal(ask(payment), 'Se sumarán 50,00 ARS a Prueba ARS. Visa quedará con un saldo pendiente de 50,00 ARS. Solo cambia el registro en esta app, no mueve dinero en el banco. '
+    + 'Podés recuperar la transferencia después desde Movimientos deshechos, en Movimientos.');
+  assert.equal(ask(domain.makeTransferChange('undo', payment, 'void', createdAt).after),
+    'Se descontarán 50,00 ARS de Prueba ARS. Visa quedará sin saldo pendiente. Solo cambia el registro en esta app, no mueve dinero en el banco.');
+  assert.equal(ask(storedTransfer('pay', 'a', 'debt-acc', 3000)), 'Se sumarán 30,00 ARS a Prueba ARS. Le vas a deber 70,00 ARS a Juan. '
+    + 'Solo cambia el registro en esta app, no mueve dinero en el banco. Podés recuperar la transferencia después desde Movimientos deshechos, en Movimientos.');
+  assert.equal(ask(storedTransfer('collect', 'rec-acc', 'a', 1000)), 'Se descontarán 10,00 ARS de Prueba ARS. Ana te va a deber 40,00 ARS. '
+    + 'Solo cambia el registro en esta app, no mueve dinero en el banco. Podés recuperar la transferencia después desde Movimientos deshechos, en Movimientos.');
+  assert.equal(ask(payment, 'en-AR'), '50,00 ARS will be added to Prueba ARS. Visa will have an outstanding balance of 50,00 ARS. '
+    + 'This only changes the record in this app; it moves no money at the bank. You can restore the transfer later from Undone transactions, in Activity.');
+  // 25Q4 review: a restore that settles a debt says so by its direction; «la deuda con» is only money the person owes.
+  const undone = (record: domain.TransferRecord) => domain.makeTransferChange('undo', record, 'void', createdAt).after;
+  const collected = undone(storedTransfer('collect', 'rec-acc', 'a', 4000)), paid = undone(storedTransfer('pay', 'a', 'debt-acc', 7000));
+  assert.equal(ask(collected), 'Se sumarán 40,00 ARS a Prueba ARS. Lo que te debe Ana quedará saldado. Solo cambia el registro en esta app, no mueve dinero en el banco.');
+  assert.equal(ask(collected, 'en-AR'), '40,00 ARS will be added to Prueba ARS. What Ana owes you will be settled. This only changes the record in this app; it moves no money at the bank.');
+  assert.equal(ask(paid), 'Se descontarán 70,00 ARS de Prueba ARS. La deuda con Juan quedará saldada. Solo cambia el registro en esta app, no mueve dinero en el banco.');
+  assert.equal(ask(paid, 'en-AR'), '70,00 ARS will be taken from Prueba ARS. Your debt to Juan will be settled. This only changes the record in this app; it moves no money at the bank.');
+});
+
+test('25Q4: restoring a debt payment or a collection over what is pending is refused before any confirmation, with the way to the debt; within it restores; a card payment is not capped', async () => {
+  const undone = (record: domain.TransferRecord) => domain.makeTransferChange('undo-' + record.transfer.id, record, 'void', createdAt).after;
+  const restore = (data: domain.LedgerArchive, id: string) => {
+    const view = harness('app/transfer/[id].tsx', {}, { data, params: { id } });
+    find(view.render(), 'ActionButton', 'Recuperar transferencia').props.onPress();
+    return view;
+  };
+  // Juan was owed 70,00 and a second 50,00 payment leaves 20,00: the undone first one would overpay.
+  const p1 = undone(storedTransfer('p1', 'a', 'debt-acc', 5000)), p2 = storedTransfer('p2', 'a', 'debt-acc', 5000);
+  const view = restore({ ...withAna, transfers: [p1, p2] }, 'p1');
+  assert.equal(JSON.stringify([view.alerts[0].title, view.alerts[0].message, view.alerts[0].buttons.map((button: any) => button.text)]),
+    JSON.stringify(['No se puede recuperar ahora', 'Este pago es mayor que lo que todavía le debés a Juan (20,00 ARS). Recuperarlo pagaría de más.', ['Cancelar', 'Ver deuda']]));
+  view.alerts[0].buttons[1].onPress();
+  assert.equal(JSON.stringify(view.pushed), JSON.stringify([{ pathname: '/debt/[id]', params: { id: 'debt' } }]));
+  assert.equal(view.transferChanges.length, 0, 'nothing built or sent');
+  find(view.render(), 'ActionButton', 'Recuperar transferencia').props.onPress();
+  assert.equal(view.alerts.length, 2, 'released: the next tap asks again');
+  // 25Q4 review: Cancelar releases it too (on iOS an alert has no dismissal of its own).
+  view.alerts[1].buttons[0].onPress();
+  find(view.render(), 'ActionButton', 'Recuperar transferencia').props.onPress();
+  assert.equal(view.alerts.length, 3, 'Cancelar released it');
+  // An undo is never capped: undoing the 50,00 payment that left 20,00 asks as usual and says what will be owed again.
+  const undo = harness('app/transfer/[id].tsx', {}, { data: { ...liabilityData, transfers: [storedTransfer('pay', 'a', 'debt-acc', 5000)] }, params: { id: 'pay' } });
+  find(undo.render(), 'ActionButton', 'Deshacer transferencia').props.onPress();
+  assert.equal(undo.alerts[0].title, '¿Deshacer transferencia?');
+  assert.ok(undo.alerts[0].message.includes('Le vas a deber 70,00 ARS a Juan'), undo.alerts[0].message);
+  // Within what is pending it restores, as before.
+  const within = restore({ ...withAna, transfers: [undone(storedTransfer('p3', 'a', 'debt-acc', 2000)), p2] }, 'p3');
+  assert.equal(within.alerts[0].title, '¿Recuperar transferencia?');
+  within.alerts[0].buttons[1].onPress(); await flush();
+  assert.deepEqual(within.transferChanges.map(change => change.action), ['restore']);
+  // A collection: Ana owed 40,00 and a second 30,00 leaves 10,00.
+  const collection = restore({ ...withAna, transfers: [undone(storedTransfer('c1', 'rec-acc', 'a', 3000)), storedTransfer('c2', 'rec-acc', 'a', 3000)] }, 'c1');
+  assert.equal(collection.alerts[0].message, 'Este cobro es mayor que lo que Ana todavía te debe (10,00 ARS). Recuperarlo cobraría de más.');
+  // 25Q4 review: in the debt screens' words, in English too.
+  const english = (transfers: domain.TransferRecord[], id: string) => {
+    const view = harness('app/transfer/[id].tsx', {}, { data: { ...withAna, transfers }, params: { id }, locale: 'en-AR' });
+    find(view.render(), 'ActionButton', 'Restore transfer').props.onPress();
+    return view.alerts[0].message;
+  };
+  assert.equal(english([p1, p2], 'p1'), 'This payment is more than you still owe Juan (20,00 ARS). Restoring it would overpay.');
+  assert.equal(english([undone(storedTransfer('c1', 'rec-acc', 'a', 3000)), storedTransfer('c2', 'rec-acc', 'a', 3000)], 'c1'),
+    'This collection is more than Ana still owes you (10,00 ARS). Restoring it would collect too much.');
+  // A card's credit is modelled: a 60,00 payment on a card that owes 50,00 is asked as usual.
+  assert.equal(restore({ ...withAna, transfers: [undone(storedTransfer('k', 'a', 'card-acc', 6000))] }, 'k').alerts[0].title, '¿Recuperar transferencia?');
+  // A deleted debt has no screen to open: the refusal offers only Cancelar.
+  const gone = restore({ ...withAna, debts: [{ ...debt, active: false, deleted: true }, ana], transfers: [p1, p2] }, 'p1');
+  assert.equal(JSON.stringify([gone.alerts[0].title, gone.alerts[0].buttons.map((button: any) => button.text)]), JSON.stringify(['No se puede recuperar ahora', ['Cancelar']]));
+  gone.alerts[0].buttons[0].onPress();
+  find(gone.render(), 'ActionButton', 'Recuperar transferencia').props.onPress();
+  assert.equal(gone.alerts.length, 2, 'Cancelar, its only button, released it');
+});
+
+// ---- 25O1: the composer's «Agregar cuenta» comes back to what was being recorded ---------------------------------------
+
+test('25O1: with no account at all, the expense and the recurring forms push the account form over themselves (never replace) and, once it is saved, come back on the new account with what was typed', () => {
+  const empty: domain.LedgerArchive = { accounts: [], records: [] };
+  const cash: domain.Account = { id: 'nueva', name: 'Efectivo', currency: 'ARS', openingMinor: 0, createdAt };
+  for (const file of ['src/ui/entry-form.tsx', 'src/ui/recurring-form.tsx']) {
+    const view = harness(file, file.includes('entry') ? { kind: 'expense', onKindChange: () => {} } : {}, { data: empty });
+    let root = view.render();
+    find(root, 'EmptyState').props.action.props.onPress();
+    assert.deepEqual([JSON.stringify(view.pushed), view.replaced.length], [JSON.stringify(['/new-account']), 0], file + ': the form stays under the account form');
+    // Nueva cuenta saves and goes back: the ledger now holds the account, and the same form instance renders again.
+    view.setData({ accounts: [cash], records: [] });
+    root = view.render();
+    assert.equal(nodes(root).some(node => node.type === 'EmptyState'), false, file);
+    assert.equal(find(root, 'AccountField').props.value, 'nueva', file + ': on the account just added');
+    find(root, 'AmountField').props.onChangeText('2500');
+    root = view.render();
+    assert.equal(find(root, 'AmountField').props.value, '2500', file + ': ready to record');
+  }
+  // A prefilled draft in a currency (the Assistant's Editar) asks for an account in that currency, so the draft fits it.
+  const prefilled = harness('src/ui/entry-form.tsx', { kind: 'expense', onKindChange: () => {}, currency: 'USD' }, { data: empty });
+  find(prefilled.render(), 'EmptyState').props.action.props.onPress();
+  assert.equal(JSON.stringify(prefilled.pushed), JSON.stringify([{ pathname: '/new-account', params: { currency: 'USD' } }]));
+});
+
+test('25O1: a card payment, a debt payment or a collection opened before a cash account in its currency existed push the account form and come back with the obligation, its note and the new account as the cash side; a plain transfer comes back on it as the source', () => {
+  const receivableAccount: domain.Account = { ...account, id: 'rec-acc', name: 'Me deben · Ana', openingMinor: 4000 };
+  const receivable: domain.PersonalDebtProfile = { ...debt, id: 'rec', accountId: receivableAccount.id, direction: 'owed_to_me', counterparty: 'Ana' };
+  // Only the obligations and a USD account: nothing in ARS to pay from or collect into.
+  const usd: domain.Account = { ...account, id: 'u', name: 'Dólares', currency: 'USD' };
+  const before: domain.LedgerArchive = { accounts: [usd, cardAccount, debtAccount, receivableAccount], records: [], cards: [card], debts: [debt, receivable] };
+  const pesos: domain.Account = { ...account, id: 'nueva', name: 'Efectivo' };
+  const after: domain.LedgerArchive = { ...before, accounts: [...before.accounts, pesos] };
+  const cases = [
+    [{ toAccountId: 'card-acc', maxAmountMinor: '5000' }, 'Desde', 'Pago Visa'],
+    [{ toAccountId: 'debt-acc' }, 'Desde', 'Pago a Juan'],
+    [{ fromAccountId: 'rec-acc' }, 'Hacia', 'Cobro de Ana'],
+  ] as const;
+  for (const [props, side, note] of cases) {
+    const view = harness('src/ui/transfer-form.tsx', props, { data: before });
+    let root = view.render();
+    assert.equal(find(root, 'EmptyState').props.title, 'Primero, una cuenta');
+    find(root, 'EmptyState').props.action.props.onPress();
+    assert.deepEqual([JSON.stringify(view.pushed), view.replaced.length], [JSON.stringify([{ pathname: '/new-account', params: { currency: 'ARS' } }]), 0], note + ': pushed, in the obligation\'s currency');
+    view.setData(after);
+    root = view.render();
+    assert.equal(nodes(root).some(node => node.type === 'EmptyState'), false, note);
+    assert.equal(find(root, 'AccountField', side).props.value, 'nueva', note + ': the account just added is the cash side');
+    assert.equal(find(root, 'Field').props.value, note, note + ': the obligation and its note are still there');
+  }
+  // A plain transfer with no account at all: back on the new account as the source, then «Falta otra cuenta en esta moneda».
+  const plain = harness('src/ui/transfer-form.tsx', {}, { data: { accounts: [], records: [] } });
+  find(plain.render(), 'EmptyState').props.action.props.onPress();
+  assert.deepEqual([JSON.stringify(plain.pushed), plain.replaced.length], [JSON.stringify([{ pathname: '/new-account', params: {} }]), 0]);
+  plain.setData({ accounts: [pesos], records: [] });
+  const root = plain.render();
+  assert.equal(find(root, 'AccountField', 'Desde').props.value, 'nueva');
+  assert.equal(find(root, 'EmptyState').props.title, 'Falta otra cuenta en esta moneda');
+  // A side the person chose is never moved (an edit's stored sides are pinned by the edit tests above).
+  const chosen = harness('src/ui/transfer-form.tsx', { toAccountId: 'card-acc', maxAmountMinor: '5000' }, { data: { ...after, accounts: [...after.accounts, { ...pesos, id: 'otra', name: 'Banco' }] } });
+  find(chosen.render(), 'AccountField', 'Desde').props.onChange('otra');
+  assert.equal(find(chosen.render(), 'AccountField', 'Desde').props.value, 'otra');
+});
+
+test('25O1: the recurring form says what a rule does right under its date (Recurrentes\' empty state no longer does): one line, the whole story behind its information button', () => {
+  const view = harness('src/ui/recurring-form.tsx');
+  let root = view.render();
+  const types = nodes(root).map(node => node.type).filter(type => type === 'DateField' || type === 'FieldNote' || type === 'ActionButton');
+  assert.deepEqual(types, ['DateField', 'FieldNote', 'ActionButton'], 'the note follows the date it explains');
+  const note = find(root, 'FieldNote');
+  assert.equal(note.props.children, 'Se anota en cada vencimiento; no paga ni cobra nada.');
+  assert.equal(note.props.help.title, 'Cómo se anota');
+  assert.match(note.props.help.detail, /^Si la próxima fecha es hoy, el movimiento se anota al guardar; .*una sola vez\. Un recurrente solo anota: no paga ni cobra nada\.$/);
+  view.setLocale('en-AR');
+  root = view.render();
+  assert.equal(find(root, 'FieldNote').props.children, 'It’s recorded on each due date; it doesn’t pay or collect anything.');
+});
+
+test('25R1: between a change of day and the catch-up for it, a rule due meanwhile is not «behind»: Revisar and Continuar desde hoy wait for the pass', () => {
+  // The screen's day is 2026-09-20; the rule fell due on the 19th.
+  const data: domain.LedgerArchive = { ...archive, recurring: [{ ...streaming, nextDateISO: '2026-09-19' }] };
+  const labels = (asOfISO?: string) => nodes(harness('app/recurring/[id].tsx', {}, { data, params: { id: 'netflix' }, asOfISO }).render())
+    .filter(node => node.type === 'ActionButton').map(node => node.props.label);
+  assert.ok(!labels('2026-09-19').includes('Continuar desde hoy'), 'the archive is current to the 19th: its catch-up for the 20th has not run yet');
+  assert.ok(labels('2026-09-20').includes('Continuar desde hoy'), 'a pass for the 20th ran and left it behind: review');
+  assert.ok(labels().includes('Continuar desde hoy'), 'without a pass day, the screen\'s own day');
+});
+
+test('25R1: a movement or transfer change whose outcome was unknown gives way once the ledger shows it applied: no «Reintentar cambio», the applied state\'s own action', async () => {
+  const view = harness('app/entry/[id].tsx', {}, { params: { id: entry.id }, update: async () => { throw new Error(VIEW_REFRESH_MESSAGE); } });
+  find(view.render(), 'ActionButton', 'Deshacer movimiento').props.onPress();
+  view.alerts[0].buttons[1].onPress(); await flush();
+  assert.ok(find(view.render(), 'ActionButton', 'Reintentar cambio'), 'unknown outcome: the change stays frozen');
+  // A later read (the foreground, the banner's retry) brings the undo: committed.
+  view.setData({ ...archive, records: archive.records.map(record => record.entry.id === entry.id ? view.updates[0].after : record) });
+  view.render();
+  let root = view.render();
+  assert.equal(nodes(root).some(node => node.props.label === 'Reintentar cambio'), false);
+  assert.ok(find(root, 'ActionButton', 'Recuperar movimiento'));
+  assert.equal(nodes(root).some(node => node.type === 'ErrorMessage' && node.props.message), false);
+  // The same for a transfer; Editar comes back unlocked once its restore shows.
+  const transfers = harness('app/transfer/[id].tsx', {}, { data: { ...transferData, transfers: [domain.initialTransferRecord(transfer)] }, params: { id: transfer.id },
+    updateTransfer: async () => { throw new Error(VIEW_REFRESH_MESSAGE); } });
+  find(transfers.render(), 'ActionButton', 'Deshacer transferencia').props.onPress();
+  transfers.alerts[0].buttons[1].onPress(); await flush();
+  assert.ok(find(transfers.render(), 'ActionButton', 'Reintentar cambio'));
+  transfers.setData({ ...transferData, transfers: [transfers.transferChanges[0].after] });
+  transfers.render();
+  root = transfers.render();
+  assert.equal(nodes(root).some(node => node.props.label === 'Reintentar cambio'), false);
+  assert.ok(find(root, 'ActionButton', 'Recuperar transferencia'));
 });

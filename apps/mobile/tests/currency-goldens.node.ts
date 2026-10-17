@@ -97,11 +97,12 @@ test('the day-net header of the movement list: sign, visible amount and spoken t
   };
   const mixed = [entry('e1', 'a', 'expense', 123456), entry('i1', 'a', 'income', 500000)];
   // The visible amount keeps a no-break space after the symbol; the spoken twin uses the language's decimal mark and no symbol.
-  assert.deepEqual(read(bindLocale('es-AR'), mixed), { date: 'Ayer · 19 sep', net: '+$\u00A03.765,44', spoken: 'Neto del día 3765,44 ARS' });
-  assert.deepEqual(read(bindLocale('es-AR'), [entry('e1', 'a', 'expense', 123456)]), { date: 'Ayer · 19 sep', net: '−$\u00A01.234,56', spoken: 'Neto del día menos 1234,56 ARS' });
-  assert.deepEqual(read(bindLocale('en-US'), [entry('e1', 'u', 'expense', 99)]), { date: 'Yesterday · Sep 19', net: '−US$\u00A00.99', spoken: 'Net for the day minus 0.99 USD' });
-  assert.deepEqual(read(bindLocale('en-AR'), [entry('e1', 'a', 'expense', 100)]), { date: 'Yesterday · Sep 19', net: '−$\u00A01,00', spoken: 'Net for the day minus 1.00 ARS' });
-  assert.deepEqual(read(bindLocale('es-US'), [entry('i1', 'a', 'income', 100)]), { date: 'Ayer · 19 sep', net: '+AR$\u00A01.00', spoken: 'Neto del día 1,00 ARS' });
+  // 25D2 (a recorded golden change): the day's net speaks its unit in words, as every other VoiceOver amount (docs/currency.md §6).
+  assert.deepEqual(read(bindLocale('es-AR'), mixed), { date: 'Ayer · 19 sep', net: '+$\u00A03.765,44', spoken: 'Neto del día 3765,44 pesos' });
+  assert.deepEqual(read(bindLocale('es-AR'), [entry('e1', 'a', 'expense', 123456)]), { date: 'Ayer · 19 sep', net: '−$\u00A01.234,56', spoken: 'Neto del día menos 1234,56 pesos' });
+  assert.deepEqual(read(bindLocale('en-US'), [entry('e1', 'u', 'expense', 99)]), { date: 'Yesterday · Sep 19', net: '−US$\u00A00.99', spoken: 'Net for the day minus ' + bindLocale('en-US').spokenMoney(99, 'USD') });
+  assert.deepEqual(read(bindLocale('en-AR'), [entry('e1', 'a', 'expense', 100)]), { date: 'Yesterday · Sep 19', net: '−$\u00A01,00', spoken: 'Net for the day minus ' + bindLocale('en-AR').spokenMoney(100, 'ARS') });
+  assert.deepEqual(read(bindLocale('es-US'), [entry('i1', 'a', 'income', 100)]), { date: 'Ayer · 19 sep', net: '+AR$\u00A01.00', spoken: 'Neto del día ' + bindLocale('es-US').spokenMoney(100, 'ARS') });
   // A day that mixes currencies shows no net at all, and a zero net shows nothing either.
   assert.deepEqual(read(bindLocale('es-AR'), [entry('e1', 'a', 'expense', 1), entry('e2', 'u', 'expense', 1)]).net, null);
   assert.deepEqual(read(bindLocale('es-AR'), [entry('e1', 'a', 'expense', 7), entry('i1', 'a', 'income', 7)]).net, null);
@@ -167,6 +168,6 @@ test('24B3: the spending timeline and the day-net header show and speak yen with
     const texts = flat(list.props.renderSectionHeader({ section: list.props.sections[0] })).filter(node => node.type === 'AppText');
     return { net: [texts[1].props.children].flat().join(''), spoken: texts[1].props.accessibilityLabel };
   };
-  assert.deepEqual(dayNet(bindLocale('es-AR'), [entry('e', 'y', 'expense', 1500), entry('i', 'y', 'income', 4000)]), { net: '+JP¥ 2.500', spoken: 'Neto del día 2500 JPY' });
-  assert.deepEqual(dayNet(bindLocale('en-US'), [entry('e', 'k', 'expense', 1234567)]), { net: '−KWD 1,234.567', spoken: 'Net for the day minus 1234.567 KWD' });
+  assert.deepEqual(dayNet(bindLocale('es-AR'), [entry('e', 'y', 'expense', 1500), entry('i', 'y', 'income', 4000)]), { net: '+JP¥ 2.500', spoken: 'Neto del día 2500 yenes japoneses' });
+  assert.deepEqual(dayNet(bindLocale('en-US'), [entry('e', 'k', 'expense', 1234567)]), { net: '−KWD 1,234.567', spoken: 'Net for the day minus 1234.567 Kuwaiti dinars' });
 });

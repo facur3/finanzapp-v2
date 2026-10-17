@@ -1,6 +1,6 @@
 import { isLedgerCurrency, majorStringToMinor, type Account, type Currency, type Entry, type EntryKind, type ReviewDraft } from '@finanzapp/domain';
 import type { AssistantFact } from '../../../../packages/integrations/contracts.js';
-import type { AssistantResultV2, ClarificationField, DroppableField, NavigationIntent, ProposalDraft } from '../../../../packages/integrations/assistant-protocol.js';
+import { PROTOCOL_LIMITS, type AssistantResultV2, type ClarificationField, type DroppableField, type NavigationIntent, type ProposalDraft } from '../../../../packages/integrations/assistant-protocol.js';
 import { factCategory } from '../integrations/evidence.ts';
 import type { LanguageCode } from '../i18n/locale.ts';
 import { translator, type MessageKey, type Translate } from '../i18n/messages.ts';
@@ -23,6 +23,10 @@ import { translator, type MessageKey, type Translate } from '../i18n/messages.ts
  * a thread already on screen follows a language change. The model's words
  * (`AssistantResultV2.message`) and the user's words are content: stored and
  * shown exactly as they arrived, never translated. */
+
+/** The longest message the composer takes: the protocol's own bound on a request's text (UTF-16 units, the validator's),
+ * so a pasted receipt is cut where the person sees it, never refused later as a failure that Reintentar cannot fix. */
+export const MESSAGE_MAX_CHARS: number = PROTOCOL_LIMITS.textChars;
 
 export type AssistantReason = 'unavailable' | 'session' | 'offline' | 'limit' | 'failed' | 'info';
 
@@ -82,8 +86,11 @@ export function optionText(option: ClarificationOption, t: Translate = translato
   return option.labelKey ? t(option.labelKey) : option.label ?? '';
 }
 
-/** `currency` is the one the facts were computed in: the rows keep it even if the screen later shows another. */
-export type AnswerContent = { kind: 'answer'; rows: EvidenceRow[]; links: EvidenceLink[]; currency: Currency };
+/** `currency` is the one the facts were computed in: the rows keep it even if the screen later shows another.
+ * `untilISO`: the cited facts of this month end before the day asked (the comparison's like-for-like window after a shorter
+ * month), so the rows say «Del 1 al {day}». `scoped`: the ledger holds other currencies too, and these facts count only the
+ * accounts in `currency` (never a consolidated total), so the rows say so. */
+export type AnswerContent = { kind: 'answer'; rows: EvidenceRow[]; links: EvidenceLink[]; currency: Currency; untilISO?: string; scoped?: boolean };
 /** A resolved draft before the screen turns it into a proposal (it never reaches the reducer). */
 export type ResolvedContent = { kind: 'draft'; draft: ResolvedDraft };
 /** 25A-04: the frozen capture of one Assistant proposal into the review store: its item id, its write id and its capture
@@ -140,7 +147,7 @@ const id = (state: ConversationState, prefix: string) => `${prefix}-${state.next
 /** 25A-05: whether a tapped clarification owns the parked draft. The draft is parked by the newest assistant message
  * (an answer or a chosen option always replaces it), so a chip on an older clarification only repeats its words: it
  * never completes, clears or changes the draft parked behind a newer question. */
-export function ownsPending(state: ConversationState, messageId: string): boolean {
+export function ownsPending(state: Pick<ConversationState, 'messages' | 'pending'>, messageId: string): boolean {
   return state.pending !== null && state.messages.findLast(message => message.role === 'assistant')?.id === messageId;
 }
 
@@ -151,13 +158,18 @@ export function conversationReducer(state: ConversationState, action: Conversati
     case 'send': {
       const text = action.text.trim();
       if (!text || state.phase !== 'idle') return state;
-      return { ...state, messages: [...state.messages, { id: id(state, 'u'), role: 'user', text }], composer: '', phase: 'thinking', nextId: state.nextId + 1 };
+      // The reply's place is taken at once, empty and streaming: «Pensando…» until its first word (delta), replaced by the
+      // answer, dropped by a failure or a Stop that arrive before any word.
+      return { ...state, composer: '', phase: 'thinking', nextId: state.nextId + 2, messages: [...state.messages, { id: id(state, 'u'), role: 'user', text },
+        { id: `a-${state.nextId + 1}`, role: 'assistant', status: 'streaming', text: '', content: null }] };
     }
     case 'delta': {
       if (state.phase === 'idle') return state;
       const last = state.messages.at(-1);
       if (last?.role === 'assistant' && last.status === 'streaming') {
-        return { ...state, phase: 'streaming', messages: [...state.messages.slice(0, -1), { ...last, text: last.text + action.text }] };
+        // The place `send` took carries no language: the first word gives it, so a reply stopped mid-stream is still read in its own.
+        return { ...state, phase: 'streaming', messages: [...state.messages.slice(0, -1),
+          { ...last, text: last.text + action.text, ...(action.language && !last.language ? { language: action.language } : {}) }] };
       }
       return { ...state, phase: 'streaming', nextId: state.nextId + 1,
         messages: [...state.messages, { id: id(state, 'a'), role: 'assistant', status: 'streaming', text: action.text, content: null, ...(action.language ? { language: action.language } : {}) }] };
@@ -189,9 +201,12 @@ export function conversationReducer(state: ConversationState, action: Conversati
     case 'stop': {
       if (state.phase === 'idle') return state;
       const last = state.messages.at(-1);
-      const messages = last?.role === 'assistant' && last.status === 'streaming'
-        ? last.text ? [...state.messages.slice(0, -1), { ...last, status: 'stopped' as const }] : state.messages.slice(0, -1)
-        : state.messages;
+      if (last?.role === 'assistant' && last.status === 'streaming' && last.text) return { ...state, phase: 'idle', messages: [...state.messages.slice(0, -1), { ...last, status: 'stopped' }] };
+      // Stopped before the first word: nothing of the reply exists, so the question goes back to the composer, as typed, and
+      // its bubble leaves (never an orphan with no answer, note or Reintentar), unless the person has typed since.
+      const messages = last?.role === 'assistant' && last.status === 'streaming' ? state.messages.slice(0, -1) : state.messages;
+      const asked = messages.at(-1);
+      if (asked?.role === 'user' && !state.composer.trim()) return { ...state, phase: 'idle', composer: asked.text, messages: messages.slice(0, -1) };
       return { ...state, phase: 'idle', messages };
     }
     case 'choose': {
@@ -227,13 +242,36 @@ export function conversationReducer(state: ConversationState, action: Conversati
 export const SUGGESTIONS = ['assistant.suggestions.whySpentMore', 'assistant.suggestions.foodSpending', 'assistant.suggestions.recordExpense',
   'assistant.suggestions.budgetProgress'] as const satisfies readonly MessageKey[];
 
+// The words that open a question. «qué» and «cómo» (and their unaccented forms) ask only opening the text or after a «¿»:
+// after a bare comma they are usually a relative («, que era lo del gas») or a comparison («, como siempre»). The English
+// auxiliaries ask only opening the text: after a comma they tag a statement ("Spent 3000 at Carrefour, is that right?").
+// A lookahead stands in for \b, which ends at an accented letter («qué»).
+const ASKS = String.raw`cu[aá]nt[oa]s?|por qu[eé]|cu[aá]l(?:es)?|en qu[eé]|me alcanza|how|why|what`;
+const END = String.raw`(?![\p{L}\p{N}])`;
+const OPENS = new RegExp(String.raw`^(?:¿|(?:${ASKS}|qu[eé]|c[oó]mo|did|do|does|is|are|can (?:i|we))${END})`, 'u');
+const ASKS_WITHIN = new RegExp(String.raw`¿\s*(?:${ASKS}|qu[eé]|c[oó]mo)${END}|[,;:.]\s*(?:${ASKS}|qué|cómo)${END}`, 'u');
+// Digits that state no amount: a day («el 15», "the 15th", «15/9»), a year («en 2026»), a count («3 cuotas», «2 tarjetas»)
+// and a bound («más de 50000», "more than $500"), which compares rather than records.
+const NOT_AN_AMOUNT = [
+  /\b\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?\b/g,
+  /\b(?:el|del|al|the)\s+\d{1,2}(?:st|nd|rd|th)?(?!\d|[.,]\d)/gu,
+  /\b\d{1,2}(?:st|nd|rd|th)\b/g,
+  /\b(?:en|in)\s+(?:19|20)\d{2}(?!\d|[.,]\d)/gu,
+  /\d+\s*(?:cuotas?|tarjetas?|mes(?:es)?|d[ií]as?|semanas?|a[ñn]os?|veces|cards?|instal+ments?|months?|days?|weeks?|years?|times)(?![\p{L}])/gu,
+  /(?:(?:m[aá]s|menos)\s+(?:de|que)|(?:more|less|fewer)\s+than|\b(?:over|under|above|below))\s+\D{0,4}\d[\d.,]*/gu,
+];
+const statesAmount = (t: string) => /\d/.test(NOT_AN_AMOUNT.reduce((rest, pattern) => rest.replace(pattern, ' '), t));
+
 /** A question about recorded money is explained against local evidence;
  * anything else is parsed as an action. It reads the user's own words, so it
- * knows the question openers of every interface language. */
+ * knows the question openers of every interface language: opening the text, after a «¿» or after a clause
+ * («Este mes, ¿cuánto gasté…?», "This month, how much…"). A question mark elsewhere asks only when the sentence states
+ * no amount: «Gasté 2000 en el súper?» and «Gasté 3.000 en Carrefour, ¿está bien?» are movements to record (and send no
+ * facts); «Gasté más de 50000 en comida?», «Me alcanza para las 3 cuotas?» and «En qué gasté el 15?» are questions. */
 export function classifyIntent(text: string): 'explain' | 'parse' {
   const t = text.trim().toLowerCase();
-  if (/[?¿]/.test(t)) return 'explain';
-  return /^(cu[aá]nt[oa]s?|por qu[eé]|c[oó]mo voy|cu[aá]l|qu[eé] tal|how (much|many|am i|is|are)|why|what)\b/.test(t) ? 'explain' : 'parse';
+  if (OPENS.test(t) || ASKS_WITHIN.test(t)) return 'explain';
+  return /[?¿]/.test(t) && !statesAmount(t) ? 'explain' : 'parse';
 }
 
 /** Whether new content should pull the list to its end: only when the reader is already near it. */
@@ -433,7 +471,7 @@ export function evidenceLabel(row: EvidenceRow, t: Translate = translator('es'),
  * the amount. Links open the FinanzApp screens that hold those records. The
  * model's navigation intent only moves the link it names first when that link
  * was derived here from the same cited fact: it never adds a link or a route. */
-export function answerContent(result: { evidenceIds: string[]; navigation?: NavigationIntent | null }, facts: AssistantFact[], currency: Currency): AnswerContent {
+export function answerContent(result: { evidenceIds: string[]; navigation?: NavigationIntent | null }, facts: AssistantFact[], currency: Currency, todayISO?: string): AnswerContent {
   const cited = result.evidenceIds.map(id => facts.find(fact => fact.id === id)).filter((fact): fact is AssistantFact => !!fact);
   const current = cited.filter(fact => fact.id.startsWith('current.'));
   const previous = cited.filter(fact => fact.id.startsWith('previous.'));
@@ -458,7 +496,8 @@ export function answerContent(result: { evidenceIds: string[]; navigation?: Navi
     budget: id => budget?.id === id, movements: id => cited.some(fact => fact.id === id) };
   const first = intent ? links.findIndex(link => link.id === intent.target && source[link.id](intent.factId)) : -1;
   if (first > 0) links.unshift(...links.splice(first, 1));
-  return { kind: 'answer', rows: rows.slice(0, 5), links, currency };
+  const end = current.map(fact => fact.endISO).sort().at(-1);
+  return { kind: 'answer', rows: rows.slice(0, 5), links, currency, ...(todayISO && end && end < todayISO && rows.length ? { untilISO: end } : {}) };
 }
 
 /** The protocol's clarification fields the conversation has a field for; the others (currency, date, merchant, period)
@@ -489,7 +528,7 @@ export function contentFromResult(result: AssistantResultV2, facts: AssistantFac
     const options = result.clarification.candidateIds.map(id => facts.find(fact => fact.id === id)).filter((fact): fact is AssistantFact => !!fact).map(factOption);
     return { text: result.message, content: { kind: 'clarification', field: CLARIFIED[result.clarification.field] ?? null, options, chosen: null }, pending: null };
   }
-  if (result.type === 'answer') return { text: result.message, content: answerContent(result, facts, currency), pending: null };
+  if (result.type === 'answer') return { text: result.message, content: answerContent(result, facts, currency, todayISO), pending: null };
   return { text: result.message, content: null, pending: null };
 }
 

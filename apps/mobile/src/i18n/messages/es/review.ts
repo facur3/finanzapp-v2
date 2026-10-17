@@ -57,9 +57,22 @@ export const review = {
       merchant: 'Falta el comercio o concepto.',
       category: 'Elegí una categoría que ya uses.',
       date: 'Elegí una fecha de hoy o anterior.',
+      /** The draft names an account that was deleted, or a card archived or deleted, since the proposal. */
+      destinationUnavailable: 'Esa cuenta o tarjeta ya no está disponible. Elegí otra.',
+      /** The draft names a category archived since the proposal (or an archived one). */
+      categoryArchived: 'Esa categoría está archivada. Elegí otra.',
+      /** A chosen count larger than the amount's cents. */
+      installmentCountTooMany: 'Esa cantidad de cuotas no entra en este monto.',
+    },
+    /** A name the draft holds that is no longer valid, drawn with why (never as a current value): «Banco Nación (ya no disponible)». */
+    value: {
+      unavailable: '{value} (ya no disponible)',
+      archived: '{value} (archivada)',
     },
     detail: {
       notFoundTitle: 'Esta propuesta ya no está pendiente',
+      /** 25D2: VoiceOver, once Confirmar recorded the item and its surface closed. */
+      confirmedSpoken: 'Registrado.',
       notFoundDetail: 'Se confirmó, se descartó o no se puede leer.',
       /** What Confirmar writes, said before it is pressed. */
       willExpense: 'Al confirmar se registra un gasto.',
@@ -76,6 +89,11 @@ export const review = {
       dismiss: 'Descartar',
       dismissQuestion: '¿Descartar esta propuesta?',
       dismissDetail: 'No se registra nada y no vuelve a aparecer. Tus movimientos no cambian.',
+      /** 25Q4: Confirmar failed with an error the catalogue does not know (an engine's). True either way: the write id makes a
+       * retry, or the reconciliation of a write that did commit, record it once. */
+      confirmFailed: 'No pudimos confirmar la propuesta. Podés reintentarlo: se registra una sola vez.',
+      /** 25Q4: Descartar failed the same way; it writes only the review file, whose transaction rolled back. */
+      dismissFailed: 'No pudimos descartar la propuesta. Sigue pendiente.',
       recordedLater: 'Registrado. La propuesta se marcará como confirmada la próxima vez que se abra la app.',
     },
     /** 25A-04: the review sheet a producer presents over itself, right after a capture. */
@@ -98,6 +116,10 @@ export const review = {
       placementNext: 'El siguiente',
       noInterest: 'Sin interés. Una compra financiada se registra desde el formulario de compra.',
       categoryNote: 'Solo una categoría que ya uses: una nueva se crea desde el formulario de gasto o ingreso.',
+      /** Under the merchant field when it holds a character nobody can see (pasted text): saving waits until it is retyped. */
+      hiddenCharacters: 'Este nombre tiene caracteres invisibles de un texto copiado. Escribilo de nuevo.',
+      /** 25Q4: Guardar cambios failed with an error the catalogue does not know; the fields stay on screen. */
+      saveFailed: 'No pudimos guardar los cambios. La propuesta sigue como estaba.',
     },
   },
 } as const;

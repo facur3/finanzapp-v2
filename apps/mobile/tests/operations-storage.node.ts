@@ -200,7 +200,7 @@ test('a plan devolución: recognised principal first, then the last instalments;
   const done = await readArchive(db);
   assert.equal(installmentPlanFigures(done.installmentPlans![0], done.records, done.purchaseOperations ?? []).status, 'completed');
   // Any operation, undone or not, keeps the plan from being deleted.
-  await assert.rejects(deleteInstallmentPlan(db, 'tv', now), /devoluciones o adelantos registrados|registró cuotas/);
+  await assert.rejects(deleteInstallmentPlan(db, 'tv', now, '2030-01-01'), /devoluciones o adelantos registrados|registró cuotas/);
 });
 
 test('an adelanto de cuotas recognises every share left on its date, once; its projected ids are taken; undo records what closed since on its own dates and restore is then refused; receipts make both idempotent', async () => {
@@ -442,7 +442,7 @@ test('a plan with any operation, even an undone devolución that only lowered fu
   await createPurchaseOperation(db, refund, '2026-09-15');
   assert.equal((await readSnapshot(db)).entries.some(entry => entry.id === 'r-future'), false);
   await changePurchaseOperation(db, makeOperationChange('u-future', refund, 'void', now), '2026-09-15');
-  await assert.rejects(deleteInstallmentPlan(db, 'tv', now), new RegExp(PLAN_OPERATION_HISTORY_MESSAGE));
+  await assert.rejects(deleteInstallmentPlan(db, 'tv', now, '2026-09-15'), new RegExp(PLAN_OPERATION_HISTORY_MESSAGE));
   assert.equal((await readArchive(db)).installmentPlans![0].deleted, false);
 });
 

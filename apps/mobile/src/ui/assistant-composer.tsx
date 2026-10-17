@@ -1,12 +1,14 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Platform, StyleSheet, TextInput, View, useWindowDimensions } from 'react-native';
 import Animated, { useAnimatedKeyboard, useAnimatedStyle } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { MESSAGE_MAX_CHARS } from '../assistant/conversation';
 import { useI18n } from '../i18n/provider';
 import { PressFeedback } from './components';
 import { ControlSurface, useMaterial } from './material';
 import { composerBottomPadding } from './material-policy';
+import { WAIT_REVEAL_MS } from './motion';
 import { space, usePalette } from './theme';
 
 /** The placeholder's catalogue key. */
@@ -21,7 +23,8 @@ const LINE_HEIGHT = 22;
  * rather than show a control that does nothing.
  *
  * Send is disabled on an empty message and becomes Stop while the Assistant is
- * answering. The whole bar rides the keyboard through Reanimated's keyboard
+ * answering, once the wait has lasted `WAIT_REVEAL_MS` (until then it stays a disabled Send, so a quick second tap never
+ * cancels the request it just sent). The field takes at most the protocol's characters (`MESSAGE_MAX_CHARS`). The whole bar rides the keyboard through Reanimated's keyboard
  * tracker (UI thread, exact frame, interactive dismissal included) and keeps
  * the home indicator clear when the keyboard is down. As a tab root the
  * screen ends above the tab bar, so the bar measures what sits below it and
@@ -42,21 +45,27 @@ export function AssistantComposer({ value, onChange, onSend, onStop, busy, disab
   const insets = useSafeAreaInsets();
   const { fontScale } = useWindowDimensions();
   const canSend = value.trim().length > 0 && !busy && !disabled;
+  const [stoppable, setStoppable] = useState(false);
+  useEffect(() => {
+    if (!busy) { setStoppable(false); return; }
+    const timer = setTimeout(() => setStoppable(true), WAIT_REVEAL_MS);
+    return () => clearTimeout(timer);
+  }, [busy]);
   const maxHeight = Math.round(LINE_HEIGHT * Math.min(fontScale, 1.6) * COMPOSER_MAX_LINES);
-  const opaque = { backgroundColor: p.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: p.isDark ? 'rgba(255,255,255,0.10)' : 'rgba(10,10,12,0.08)',
-    ...(p.isDark ? {} : styles.barShadow) };
+  const opaque = { backgroundColor: p.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: p.edge,
+    ...(p.isDark ? {} : { ...styles.barShadow, shadowColor: p.shadow }) };
   return <KeyboardSpace bottomInset={insets.bottom}>
     <ControlSurface material={material} style={styles.bar} opaque={opaque}>
-      <TextInput value={value} onChangeText={onChange} multiline editable={!disabled} placeholder={t(COMPOSER_PLACEHOLDER)} placeholderTextColor={p.tertiary}
+      <TextInput value={value} onChangeText={onChange} multiline editable={!disabled} maxLength={MESSAGE_MAX_CHARS} placeholder={t(COMPOSER_PLACEHOLDER)} placeholderTextColor={p.tertiary}
         accessibilityLabel={t('assistant.composer.label')} accessibilityHint={t('assistant.composer.hint')} accessibilityLanguage={speechLanguage}
         selectionColor={p.primary} keyboardAppearance={p.isDark ? 'dark' : 'light'} textAlignVertical="center"
         style={[styles.input, { color: p.text, maxHeight, lineHeight: LINE_HEIGHT }]} />
-      {busy
-        ? <PressFeedback accessibilityRole="button" accessibilityLabel={t('assistant.composer.stop')} onPress={onStop} style={styles.round}>
+      {busy && stoppable
+        ? <PressFeedback accessibilityRole="button" accessibilityLabel={t('assistant.composer.stop')} onPress={onStop} containerStyle={styles.roundSlot} style={styles.round}>
           <View style={[styles.send, { backgroundColor: p.inset }]}><Ionicons name="stop" size={14} color={p.text} accessible={false} /></View>
         </PressFeedback>
         : <PressFeedback accessibilityRole="button" accessibilityLabel={t('assistant.composer.send')} accessibilityState={{ disabled: !canSend }} disabled={!canSend}
-          onPress={onSend} style={styles.round}>
+          onPress={onSend} containerStyle={styles.roundSlot} style={styles.round}>
           <View style={[styles.send, { backgroundColor: canSend ? p.primaryFill : p.inset }]}>
             <Ionicons name="arrow-up" size={18} color={canSend ? p.onPrimary : p.tertiary} accessible={false} />
           </View>
@@ -87,8 +96,11 @@ function KeyboardSpace({ children, bottomInset }: { children: ReactNode; bottomI
 const styles = StyleSheet.create({
   space: { paddingHorizontal: space.l, paddingTop: space.s, gap: space.s },
   bar: { flexDirection: 'row', alignItems: 'flex-end', gap: 2, paddingLeft: 16, paddingRight: 6, paddingVertical: 4, borderRadius: 24, minHeight: 48 },
-  barShadow: { shadowColor: '#0A0A0C', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } },
+  barShadow: { shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } },
   input: { flex: 1, fontSize: 17, paddingTop: Platform.OS === 'ios' ? 9 : 6, paddingBottom: Platform.OS === 'ios' ? 9 : 6, minHeight: 40 },
-  round: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', minHeight: 40 },
+  // 25D1: a real 44 pt target (it was 40) that still costs 40 pt of layout: the extra 2 pt each side sit inside the bar's
+  // 4 pt padding, so the 32 pt disc, the field and the 48 pt bar do not move.
+  round: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', minHeight: 44 },
+  roundSlot: { margin: -2 },
   send: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
 });

@@ -17,7 +17,8 @@ export default function UndoneEntriesScreen() {
   // instalments included), above the movements. «Restaurar» only when the domain's dry run passes; otherwise the reason.
   const operations = useMemo(() => archive ? undoneOperationLines(archive) : [], [archive]);
   // 24UX6E: nothing here counts in a balance or a report, so the day sections carry no net (`dayNet={false}`); the
-  // explanation sits on the type scale and only over a list, never above «Nada para recuperar».
+  // explanation sits on the type scale and only over a list, never above «Nada para recuperar». 25N1: no row looks live
+  // either (`voided`): its amount in the tertiary ink, without the «+», and «deshecho» for VoiceOver.
   const anything = entries.length + transfers.length + operations.length > 0;
   const accounts = archive?.accounts ?? [];
   const explanation = <AppText secondary variant="subhead" style={{ paddingBottom: 8 }}>{t('activity.undoneHeader')}</AppText>;
@@ -34,7 +35,7 @@ export default function UndoneEntriesScreen() {
         const frozen = changes.pending?.after.id === id;
         const error = changes.error?.id === id ? changes.error.message : null;
         return <View key={id} style={{ gap: 8 }}>
-          <Surface grouped><EntryRow entry={line} account={account} last /></Surface>
+          <Surface grouped><EntryRow entry={line} account={account} last voided /></Surface>
           <ErrorMessage message={error} />
           {check.ok || frozen
             ? <ActionButton label={frozen ? t('common.retryChange') : t('operations.undone.restore')} icon="arrow-redo-outline" compact secondary
@@ -44,6 +45,6 @@ export default function UndoneEntriesScreen() {
       })}
     </View>
   </View>;
-  return <EntryList entries={entries} transfers={transfers} accounts={accounts} dayNet={false} header={header}
+  return <EntryList entries={entries} transfers={transfers} accounts={accounts} dayNet={false} voided header={header}
     empty={operations.length ? undefined : <EmptyState title={t('activity.undoneEmptyTitle')} detail={t('activity.undoneEmptyDetail')} icon="arrow-undo-outline" />} />;
 }

@@ -4,11 +4,13 @@ import { useLocalSearchParams } from 'expo-router';
 import { categoryKey, expensesInPeriod, isStorableCurrency, spendingReport } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { useFinanceView } from '../src/fx/rates-provider';
-import { lineCounts, listingSnapshot, recordedCountLabel } from '../src/fx/finance-view';
+import { lineCounts, listingSnapshot, recordedCountLabel, spendingFigure } from '../src/fx/finance-view';
+import { shortfallLine } from '../src/fx/fx-copy';
+import { CurrencyParts } from '../src/ui/home-modules';
 import { AppText, CategoryBadge, EmptyState, Money, Screen, SectionTitle } from '../src/ui/components';
 import { EntryList } from '../src/ui/entry-list';
 import { selectEntries } from '../src/ui/presentation';
-import { reportPeriodLabel, strictReportSelection, reportCutoff } from '../src/ui/report-presentation';
+import { reportPeriodLabel, requestedReportMonth, strictReportSelection, reportCutoff } from '../src/ui/report-presentation';
 import { useI18n } from '../src/i18n/provider';
 import { useCategoryLookOf } from '../src/ui/category-hues';
 import { useCurrentDay } from '../src/ui/theme';
@@ -18,11 +20,12 @@ export default function ReportCategoryScreen() {
   const { snapshot: real } = useLedger();
   const day = useCurrentDay();
   // 24C1: the category as Reportes counts it (converted in consolidated mode); its rows keep their original amounts.
-  const month = typeof params.month === 'string' ? params.month : day.slice(0, 7);
+  // A malformed month never reaches the rate store (strictReportSelection says the link is invalid below).
+  const month = requestedReportMonth(params.month, day);
   const months = useMemo(() => [month], [month]);
   const view = useFinanceView(months, isStorableCurrency(params.currency) ? params.currency : undefined);
   const snapshot = view?.snapshot ?? null;
-  const { t, formatMonth } = useI18n();
+  const { t, formatMonth, formatNumericDate, currencyName } = useI18n();
   const lookOf = useCategoryLookOf('expense');
   // 25Q1: compared as the report's key, whatever spelling the link carries (as the spending detail does).
   const key = typeof params.category === 'string' ? categoryKey(params.category) : '';
@@ -43,7 +46,10 @@ export default function ReportCategoryScreen() {
       detail={t('reports.category.emptyDetail')} />
   </Screen>;
   // A category with a movement that has no rate shows no total rather than a partial one.
-  const category = view.complete(report.startISO, report.endISO, 'expense') ? report.categories.find(item => item.key === key) : undefined;
+  const complete = view.complete(report.startISO, report.endISO, 'expense');
+  const category = complete ? report.categories.find(item => item.key === key) : undefined;
+  // 25R1: a missing rate is said as Reportes says it (with its reason behind ⓘ); the precision sentence is for an overflow only.
+  const shortfall = complete ? null : shortfallLine(spendingFigure(real, view, report, view.activity, view.loaded), { t, date: formatNumericDate, currencyName });
   const label = category?.category ?? entries[0].category;
   // 25Q1: no «Neto del día» on the headings: these rows are one category's expenses, not the day's movements.
   return <EntryList entries={entries} accounts={real.accounts} dayNet={false} header={<View style={{ gap: 22 }}>
@@ -54,6 +60,7 @@ export default function ReportCategoryScreen() {
     </View>
     <View style={{ gap: 10 }}>
       {category ? <Money minor={category.amountMinor} currency={selection.currency} large />
+        : shortfall ? <CurrencyParts parts={[]} line={shortfall.line} detail={shortfall.detail} />
         : <AppText secondary>{t('reports.category.totalUnavailable')}</AppText>}
       {/* 24T3 (A23): every line is listed (so the rows add up to the total), but only purchases count as gastos; a
           devolución is named as such. */}

@@ -9,6 +9,7 @@ import * as budgetPresentation from '../src/ui/budget-presentation.ts';
 import * as liabilityPresentation from '../src/ui/liability-presentation.ts';
 import * as moneyInput from '../src/ui/money-input.ts';
 import * as entryPrefill from '../src/ui/entry-prefill.ts';
+import { memoryOf } from './preference-memory.ts';
 import * as purchasePlan from '../src/ui/purchase-plan.ts';
 import * as installmentPresentation from '../src/ui/installment-presentation.ts';
 import { INSTALLMENT_COUNT_CHOICES } from '../src/ui/installment-presentation.ts';
@@ -17,6 +18,8 @@ import { bindLocale } from '../src/i18n/bind.ts';
 import { translate } from '../src/i18n/messages.ts';
 import type { AppLocale } from '../src/i18n/locale.ts';
 import { realModule } from './real-module.ts';
+/** 25D2: what VoiceOver was told through motion.tsx's `announce`, in order (its iOS-only queue is tested in motion.node.ts). */
+const announced: string[] = [];
 
 // Producto 24T2 (stream B): the entry form's «Pago» section and the restricted edit of an instalment's movement. The
 // real EntryForm (src/ui/entry-form.tsx) runs with the real section (src/ui/installment-purchase.tsx) and the real
@@ -74,7 +77,7 @@ function harness(props: Record<string, unknown> = {}, options: Options = {}) {
     'react-native': { View: 'View', Keyboard: { dismiss() {} } },
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, router: { canGoBack: () => true, back: () => { backs++; }, push: (to: unknown) => pushed.push(to), replace: (to: unknown) => pushed.push(to) } },
     'expo-crypto': { randomUUID: () => 'operation-' + (++uuid) },
-    'expo-haptics': { NotificationFeedbackType: { Success: 'Success' }, notificationAsync: async () => {}, selectionAsync: async () => {} },
+    './motion': { announce: (text: string, after = 'now') => { announced.push(after === 'leave' ? 'after leaving: ' + text : text); }, successHaptic() {}, errorHaptic() {}, warningHaptic() {} },
     // The real domain, with today read from the fixed clock (the form checks future dates and closed statements with it).
     '@finanzapp/domain': { ...domain, todayKey: (date?: Date) => domain.todayKey(date ?? new FixedDate()) },
     '../storage/LedgerProvider': ledger,
@@ -84,7 +87,7 @@ function harness(props: Record<string, unknown> = {}, options: Options = {}) {
     './budget-presentation': budgetPresentation, './money-input': moneyInput, './entry-prefill': entryPrefill,
     './liability-presentation': liabilityPresentation, './presentation': presentation, './purchase-plan': purchasePlan,
     './installment-presentation': installmentPresentation,
-    './switch-row': { SwitchRow: 'SwitchRow' },
+    './switch-row': { SwitchRow: 'SwitchRow' }, './last-account': memoryOf({}),
     './theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, usePalette: () => ({ warning: '#B45309', secondary: '#66686F', text: '#0A0A0C' }) },
   };
   const require = (name: string) => {

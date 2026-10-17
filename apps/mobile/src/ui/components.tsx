@@ -9,10 +9,12 @@ import { router } from 'expo-router';
 import { radius, space, type, useCurrentDay, usePalette, useReduceMotion, type Palette } from './theme';
 import type { IconName } from './categories';
 import { tintOf } from './category-color';
+import { lightPalette, quietTones } from './palette';
 import { useDockInset } from './dock-clearance';
 import { useAccountLook, useAccountNameOf, useCategoryLook } from './category-hues';
-import { AMOUNT_FIELD, PROMINENT_SEGMENT, ROW_CHEVRON, ROW_STACK_SCALE, SEGMENT_GAP, SEGMENT_PADDING, amountFieldLayout, fitFontSize, rowStacks, segmentLayout } from './geometry';
-import { duration, easeOut, selectionHaptic, timing } from './motion';
+import { AMOUNT_FIELD, HERO_MAX_SCALE, PROMINENT_SEGMENT, ROW_CHEVRON, ROW_STACK_SCALE, SEGMENT_GAP, SEGMENT_PADDING, TEXT_STYLE_MAX_SCALE, amountFieldLayout, amountMaxScale, fitFontSize,
+  rowStacks, segmentLayout } from './geometry';
+import { duration, easeOut, easeOutCss, selectionHaptic, timing } from './motion';
 import { AmountInput, displayAmount, precisionOf, splitAmount, type AmountNotice, type PasteRejection } from './money-input';
 import { BUILD_MERCHANT_MARK_PREVIEW, merchantMark } from './merchant-mark';
 import { presentedAmount } from './movement-amount';
@@ -70,15 +72,21 @@ export const UNAVAILABLE_AMOUNT = '—';
  * and the read-only SelectionRow here; raw elements at their call sites). It
  * is undefined unless the interface language differs from the device's first
  * language, so a matching setup keeps the voice chosen in iOS Settings. An
- * explicit `accessibilityLanguage` from the caller wins (an autonym). */
+ * explicit `accessibilityLanguage` from the caller wins (an autonym).
+ *
+ * 25D1: every style stops at the size iOS gives it at AX5 (`TEXT_STYLE_MAX_SCALE`);
+ * an explicit `maxFontSizeMultiplier` still wins.
+ *
+ * 25O1: `ref` reaches the native text (React 19 passes it with the props), so a screen that changes in place (the first
+ * opening's steps) can move VoiceOver to its new title. */
 export function AppText({ children, style, secondary = false, tertiary = false, variant = 'body', ...props }: TextProps & {
-  secondary?: boolean; tertiary?: boolean; variant?: keyof typeof type;
+  secondary?: boolean; tertiary?: boolean; variant?: keyof typeof type; ref?: Ref<Text>;
 }) {
   const p = usePalette();
   const { speechLanguage } = useI18n();
   const flat = StyleSheet.flatten(style);
   const fits = flat?.fontSize && !flat.lineHeight ? { lineHeight: Math.round(flat.fontSize * 1.25) } : null;
-  return <Text {...props} accessibilityLanguage={props.accessibilityLanguage ?? speechLanguage}
+  return <Text {...props} accessibilityLanguage={props.accessibilityLanguage ?? speechLanguage} maxFontSizeMultiplier={props.maxFontSizeMultiplier ?? TEXT_STYLE_MAX_SCALE[variant]}
     style={[type[variant], { color: tertiary ? p.tertiary : secondary ? p.secondary : p.text }, style, fits]}>{children}</Text>;
 }
 
@@ -98,7 +106,7 @@ export function Screen({ children, gap = space.xl, scrollRef }: { children: Reac
 
 /** Light: white card with a soft shadow. Dark: a surface step, no shadow. */
 export function surfaceShadow(p: Palette): ViewStyle {
-  return p.isDark ? {} : { shadowColor: '#0A0A0C', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } };
+  return p.isDark ? {} : { shadowColor: p.shadow, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } };
 }
 
 /** A card (padded, soft shadow in light) or a grouped list (flat, clipped rows,
@@ -109,25 +117,29 @@ export function Surface({ children, style, grouped = false }: { children: ReactN
 }
 
 /** A section heading with an optional text action on the right. `quiet` (Inicio, 24UX3) draws the action at footnote
- * size with a small chevron in the `link` ink (the brand text: olive-lime in light, soft lime in dark since 25VIS1): a visible, 44 pt tappable link
+ * size with a small chevron in the `link` ink (the brand text: sapphire in light, periwinkle in dark since 25VIS2): a visible, 44 pt tappable link
  * that reads as navigation without competing with the financial field. Elsewhere the action is the brand primary. */
 export function SectionTitle({ children, action, onAction, caption, captionLabel, quiet = false }: {
   /** `captionLabel`: what VoiceOver reads for the caption when it holds an amount (its spoken twin). */
   children: ReactNode; action?: string; onAction?: () => void; caption?: string; captionLabel?: string; quiet?: boolean;
 }) {
   const p = usePalette();
+  // 25D2: the action names its section after its own words («Ver todos, Próximos compromisos»): two «Ver todos» on one
+  // screen were one name twice in the rotor and in Voice Control, which still finds it by the visible words it starts with.
+  const actionName = action && typeof children === 'string' ? action + ', ' + children : action;
   return <View style={styles.sectionHeading}>
     <View style={{ flex: 1, gap: 2 }}>
       <AppText accessibilityRole="header" variant="headline">{children}</AppText>
       {caption && <AppText secondary variant="footnote" accessibilityLabel={captionLabel}>{caption}</AppText>}
     </View>
     {action && onAction && (quiet
-      ? <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={action} onPress={onAction} hitSlop={{ top: 4, bottom: 4 }}
+      ? <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={actionName} onPress={onAction} hitSlop={{ top: 4, bottom: 4 }}
         style={{ paddingLeft: 12, minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 2 }}>
         <AppText variant="footnote" style={{ color: p.link, fontWeight: '500' }}>{action}</AppText>
         <Ionicons name="chevron-forward" size={13} color={p.link} accessible={false} />
       </PressFeedback>
-      : <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={action} onPress={onAction} style={{ paddingLeft: 12, minHeight: 36 }}>
+      : <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={actionName} onPress={onAction} hitSlop={{ top: 4, bottom: 4 }}
+        style={{ paddingLeft: 12, minHeight: 36 }}>
         <AppText variant="subhead" style={{ color: p.primary, fontWeight: '500' }}>{action}</AppText>
       </PressFeedback>)}
   </View>;
@@ -140,46 +152,57 @@ export function SectionTitle({ children, action, onAction, caption, captionLabel
  * shrink; `opacity` (0.4) for bare text and icon buttons, like a bar button. */
 export type PressTreatment = 'scale' | 'highlight' | 'opacity';
 
-export function PressFeedback({ children, style, containerStyle, feedback = 'scale', backdrop, ...props }: PressableProps & {
+export function PressFeedback({ children, style, containerStyle, feedback = 'scale', backdrop, reducedDim = true, ...props }: PressableProps & {
   children: ReactNode; style?: StyleProp<ViewStyle>; containerStyle?: StyleProp<ViewStyle>; feedback?: PressTreatment;
   /** Drawn under the highlight and the content: a proportional fill behind a row. */
   backdrop?: ReactNode;
+  /** Under Reduce Motion a `scale` control dims instead (25VIS2). `false` only where the control wraps drawn glass, which
+   * an opacity change would break (an account detail's quick-action pills while they are glass): no pressed state then. */
+  reducedDim?: boolean;
 }) {
   const p = usePalette();
   const reduced = useReduceMotion();
   const { speechLanguage } = useI18n();
   const pressed = useSharedValue(0);
   useEffect(() => { if (props.disabled) pressed.value = 0; }, [props.disabled, pressed]);
-  const animatedStyle = useAnimatedStyle(() => feedback === 'scale' ? { transform: [{ scale: 1 - 0.03 * pressed.value }] }
+  // Reduce Motion drops the scale and keeps a pressed state as a colour change, which is not movement: the tint of a row,
+  // the dim of a text button, and since 25VIS2 a dim for a `scale` control too (it used to have none at all).
+  const dim = feedback === 'scale' && reduced && reducedDim;
+  const animatedStyle = useAnimatedStyle(() => dim ? { opacity: 1 - 0.3 * pressed.value }
+    : feedback === 'scale' ? { transform: [{ scale: 1 - 0.03 * pressed.value }] }
     : feedback === 'opacity' ? { opacity: 1 - 0.6 * pressed.value } : {});
   const highlightStyle = useAnimatedStyle(() => ({ opacity: pressed.value }));
-  // Reduce Motion drops the scale but keeps the tint and dim: a colour change is not movement.
-  const active = feedback !== 'scale' || !reduced;
+  const active = feedback !== 'scale' || !reduced || dim;
   // The Pressable is the VoiceOver element (its children's languages are not consulted), so it carries the language (see AppText).
   return <Animated.View style={[containerStyle, animatedStyle]}><Pressable {...props} accessibilityLanguage={props.accessibilityLanguage ?? speechLanguage}
-    style={[{ minHeight: 44, justifyContent: 'center' }, style]} pressRetentionOffset={12}
+    style={[{ minHeight: 44, justifyContent: 'center' }, style]}
     onPressIn={event => { pressed.value = active ? withTiming(1, { duration: duration.press, easing: easeOut }) : 0; props.onPressIn?.(event); }}
     onPressOut={event => { pressed.value = withTiming(0, { duration: active ? duration.release : 0, easing: easeOut }); props.onPressOut?.(event); }}>
     {backdrop}
-    {feedback === 'highlight' && <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: p.isDark ? 'rgba(255,255,255,0.07)' : 'rgba(10,10,12,0.05)' }, highlightStyle]} />}
+    {feedback === 'highlight' && <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: p.pressWash }, highlightStyle]} />}
     {children}
   </Pressable></Animated.View>;
 }
 
-/** The one filled call to action on a screen is the brand fill (Electric Lime
- * since 25VIS1) with ink on it. Secondary actions stay ink on the inset fill, so
- * a screen has at most one lime button; a semantic tone (a transfer, an income) still wins.
+/** The one filled call to action on a screen is the brand fill (sapphire since
+ * 25VIS2) with `onPrimary` on it. Secondary actions stay ink on the inset fill, so
+ * a screen has at most one brand-filled button; a semantic tone (a transfer, an income) still wins.
  * `spokenLabel` is the label for VoiceOver when it carries an amount ("Guardar
  * gasto, 1234,50 pesos", built with the spoken formatters); the button shows
  * `label` unchanged. */
-export function ActionButton({ label, spokenLabel, onPress, disabled = false, busy = false, secondary = false, tone, icon, containerStyle, compact = false }: {
+export function ActionButton({ label, spokenLabel, onPress, disabled = false, busy = false, secondary = false, tone, icon, containerStyle, compact = false, onField = false }: {
   label: string; spokenLabel?: string; onPress: () => void; disabled?: boolean; busy?: boolean; secondary?: boolean; tone?: Exclude<Tone, 'neutral'>;
   icon?: IconName; containerStyle?: StyleProp<ViewStyle>; compact?: boolean;
+  /** 25O1: on the sapphire field (the onboarding's close, like Inicio's chosen segment): the sand-white thumb with ink on
+   * it; secondary, the field's own ink on no fill. */
+  onField?: boolean;
 }) {
   const p = usePalette();
   const semantic = tone ? toneColors(p, tone) : null;
-  const background = semantic ? (secondary ? semantic.soft : semantic.color) : secondary ? p.inset : p.primaryFill;
-  const color = semantic ? (secondary ? semantic.color : p.onSemantic) : secondary ? p.text : p.onPrimary;
+  const background = onField ? (secondary ? 'transparent' : p.heroThumb)
+    : semantic ? (secondary ? semantic.soft : semantic.color) : secondary ? p.inset : p.primaryFill;
+  const color = onField ? (secondary ? p.heroInk : p.heroThumbInk)
+    : semantic ? (secondary ? semantic.color : p.onSemantic) : secondary ? p.text : p.onPrimary;
   return <PressFeedback accessibilityRole="button" accessibilityLabel={spokenLabel ?? label} containerStyle={containerStyle}
     accessibilityState={{ disabled: disabled || busy, busy }} disabled={disabled || busy}
     onPress={onPress} style={[styles.button, compact && styles.buttonCompact, { backgroundColor: background, opacity: disabled || busy ? 0.5 : 1 }]}>
@@ -192,8 +215,10 @@ export function ActionButton({ label, spokenLabel, onPress, disabled = false, bu
 
 export function IconButton({ name, label, onPress, disabled = false, color }: { name: IconName; label: string; onPress: () => void; disabled?: boolean; color?: string }) {
   const p = usePalette();
+  // 25D1: a control that cannot grow with the text offers the Large Content Viewer (a long press at the accessibility
+  // sizes shows its name large), as the dock tabs do.
   return <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={label} onPress={onPress}
-    disabled={disabled} accessibilityState={{ disabled }}
+    disabled={disabled} accessibilityState={{ disabled }} accessibilityShowsLargeContentViewer accessibilityLargeContentTitle={label}
     style={{ width: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.35 : 1 }}><Ionicons name={name} size={24} color={color ?? p.text} /></PressFeedback>;
 }
 
@@ -211,14 +236,37 @@ export function SearchField({ label, ...props }: TextInputProps & { label: strin
   </View>;
 }
 
+/** Keyboards with no Return key: a field on one gets the «Listo» bar the amount field has. */
+const PAD_KEYBOARDS: ReadonlySet<string> = new Set(['number-pad', 'decimal-pad', 'numeric', 'phone-pad']);
+
+/** A text field. Clear while editing (iOS hides it while the field is locked), a «Listo» bar over a keyboard with no
+ * Return key, and a locked field (editable false) drawn at the row family's disabled strength. */
 export function Field({ label, ...props }: TextInputProps & { label: string }) {
   const p = usePalette();
   const { speechLanguage } = useI18n();
-  return <View style={{ gap: 8 }}><AppText secondary variant="footnote" style={{ fontWeight: '500' }}>{label}</AppText>
-    <TextInput returnKeyType="done" onSubmitEditing={Keyboard.dismiss} {...props} accessibilityLabel={label}
+  const accessoryId = useId();
+  const pad = Platform.OS === 'ios' && PAD_KEYBOARDS.has(props.keyboardType ?? '');
+  // The caption is the field's accessibility label, so VoiceOver reads it once, on the field, not as a stop of its own.
+  return <View style={{ gap: 8, opacity: props.editable === false ? 0.6 : 1 }}><AppText accessible={false} secondary variant="footnote" style={{ fontWeight: '500' }}>{label}</AppText>
+    <TextInput returnKeyType="done" onSubmitEditing={Keyboard.dismiss} clearButtonMode="while-editing" inputAccessoryViewID={pad ? accessoryId : undefined} {...props} accessibilityLabel={label}
       accessibilityLanguage={props.accessibilityLanguage ?? speechLanguage} placeholderTextColor={p.tertiary}
       selectionColor={p.primary} style={[styles.input, { color: p.text, backgroundColor: p.surface }, props.style]} />
+    {pad && <DoneAccessory id={accessoryId} />}
   </View>;
+}
+
+/** The bar over a keyboard with no Return key: one «Listo» that dismisses it. */
+function DoneAccessory({ id }: { id: string }) {
+  const p = usePalette();
+  const { t } = useI18n();
+  return <InputAccessoryView nativeID={id} backgroundColor={p.surface}>
+    <View style={{ alignItems: 'flex-end', paddingHorizontal: 20 }}>
+      {/* Named as it reads, so Voice Control's «Tocar Listo» finds it. */}
+      <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('common.done')} onPress={Keyboard.dismiss} style={{ paddingHorizontal: 12 }}>
+        <AppText style={{ color: p.primary, fontWeight: '600' }}>{t('common.done')}</AppText>
+      </PressFeedback>
+    </View>
+  </InputAccessoryView>;
 }
 
 type Caret = { start: number; end: number };
@@ -257,9 +305,12 @@ type Caret = { start: number; end: number };
  * left-aligned like the hero amounts of Inicio and the detail screens. No
  * negative tracking: on iOS it draws the last glyph past the measured width,
  * under the caret. */
-export function AmountField({ label, currency, tone, value = '', onChangeText, stored, ...props }: TextInputProps & { label?: string; currency: Currency; tone?: Tone;
+export function AmountField({ label, currency, tone, value = '', onChangeText, stored, bare = false, ...props }: TextInputProps & { label?: string; currency: Currency; tone?: Tone;
   /** The stored amount an edit form prefilled the field from: while the text is exactly that prefill in its own currency, it always fits (a stored amount may exceed the entry bound). */
-  stored?: StoredDraft }) {
+  stored?: StoredDraft;
+  /** 25O1: the amount alone, without its caption, where what surrounds it already says what it is and in which currency
+   * (the first opening's question and currency chip). VoiceOver still hears the label and the currency. */
+  bare?: boolean }) {
   const p = usePalette();
   const { t, amountFormat, currencySymbol, currencyUnit, speechLanguage } = useI18n();
   const accessoryId = useId();
@@ -327,8 +378,9 @@ export function AmountField({ label, currency, tone, value = '', onChangeText, s
     setSelection({ start: result.view.caret, end: result.view.caret });
     emit(result.draft);
   };
-  return <View style={{ gap: 6, paddingVertical: 8 }}>
-    <AppText secondary variant="footnote" style={{ fontWeight: '500' }}>{title} · {currency}</AppText>
+  return <View style={{ gap: 6, paddingVertical: 8, opacity: props.editable === false ? 0.6 : 1 }}>
+    {/* Said by the field itself (`amount.accessibility`: the label and the currency in words), never twice. */}
+    {!bare && <AppText accessible={false} secondary variant="footnote" style={{ fontWeight: '500' }}>{title} · {currency}</AppText>}
     <View style={styles.amountRow} onLayout={event => setRowWidth(event.nativeEvent.layout.width)}>
       <AppText accessible={false} maxFontSizeMultiplier={HERO_MAX_SCALE}
         style={{ fontSize: symbolSize, lineHeight: Math.round(symbolSize * 1.25), color: p.secondary, fontWeight: '500' }}>{symbol}</AppText>
@@ -342,13 +394,7 @@ export function AmountField({ label, currency, tone, value = '', onChangeText, s
         style={[styles.amountInput, { color, fontSize, paddingRight: AMOUNT_FIELD.caret }, props.style]} />
     </View>
     {noticeText && <AppText variant="footnote" style={{ color: p.warning }}>{noticeText}</AppText>}
-    {Platform.OS === 'ios' && <InputAccessoryView nativeID={accessoryId} backgroundColor={p.surface}>
-      <View style={{ alignItems: 'flex-end', paddingHorizontal: 20 }}>
-        <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('common.closeAmountKeyboard')} onPress={Keyboard.dismiss} style={{ paddingHorizontal: 12 }}>
-          <AppText style={{ color: p.primary, fontWeight: '600' }}>{t('common.done')}</AppText>
-        </PressFeedback>
-      </View>
-    </InputAccessoryView>}
+    {Platform.OS === 'ios' && <DoneAccessory id={accessoryId} />}
   </View>;
 }
 
@@ -373,10 +419,12 @@ export function AmountShortcut({ label, caption, spokenCaption, onPress, disable
   label?: string; caption: string; spokenCaption?: string; onPress?: () => void; disabled?: boolean;
 }) {
   const p = usePalette();
+  // 25VIS2 (V15): the fill lowers the keyboard, so Save and its echo of the filled amount come into view.
+  const fill = () => { Keyboard.dismiss(); onPress?.(); };
   return <View style={{ flexDirection: 'row', justifyContent: 'flex-start', alignItems: 'center', flexWrap: 'wrap', gap: 4, marginTop: -8 }}>
     <AppText secondary variant="footnote" accessibilityLabel={spokenCaption}>{caption}{label && onPress ? ' ·' : ''}</AppText>
     {label && onPress && <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={label + ', ' + (spokenCaption ?? caption)}
-      onPress={onPress} disabled={disabled} accessibilityState={{ disabled }} hitSlop={8}
+      onPress={fill} disabled={disabled} accessibilityState={{ disabled }} hitSlop={8}
       style={{ paddingVertical: 6, paddingHorizontal: 4, opacity: disabled ? 0.5 : 1 }}>
       <AppText variant="footnote" style={{ color: p.primary, fontWeight: '600' }}>{label}</AppText>
     </PressFeedback>}
@@ -390,17 +438,23 @@ function Choice({ label, spokenLabel, selected, disabled, onPress, compact = fal
   const reduced = useReduceMotion();
   const { speechLanguage } = useI18n();
   const color = onField ? (selected ? p.heroThumbInk : p.heroSecondary) : selected ? (compact ? p.text : p.primary) : p.secondary;
-  // Compact: 28 pt segments (32 pt with the track) and an 8 pt vertical slop, so the target stays 44 pt tall; none sideways, where the neighbour is.
+  // Every segment is a 44 pt target without being drawn taller: compact 28 pt + 8 pt of vertical slop, the default 32 pt + 6
+  // (25VIS2; it was 4, 40 pt), none sideways, where the neighbour is. The field's 36 pt and the prominent 40 pt keep 4.
+  // On the new architecture a child's slop outside its parent still hits (the parent's overflow inset includes it), as long
+  // as nothing clips the track and no later sibling covers the slop (the composer's switch leaves room under it).
   return <Pressable accessibilityRole="button" accessibilityLabel={spokenLabel} accessibilityState={{ selected, disabled }} disabled={disabled} accessibilityLanguage={speechLanguage}
-    onPress={onPress} style={[styles.choice, compact && styles.choiceCompact, onField && styles.choiceField, prominent && { minHeight: PROMINENT_SEGMENT.minHeight }]}
-    hitSlop={compact ? { top: 8, bottom: 8 } : 4}>
+    // 25D1: a segment under the finger dims to 60 % until it lifts (touch-down feedback, colour only, so Reduce Motion
+    // needs nothing); the chosen one never dims, since tapping it does nothing.
+    onPress={onPress} style={({ pressed }) => [styles.choice, compact && styles.choiceCompact, onField && styles.choiceField, prominent && { minHeight: PROMINENT_SEGMENT.minHeight },
+      pressed && !selected ? { opacity: 0.6 } : null]}
+    hitSlop={compact ? { top: 8, bottom: 8 } : onField || prominent ? 4 : { top: 6, bottom: 6 }}>
     {/* 24T3: the prominent label has no shrink-to-fit at all (its labels fit at the 1.3× cap; see PROMINENT_SEGMENT). */}
     {prominent ? <Animated.Text numberOfLines={1} maxFontSizeMultiplier={PROMINENT_SEGMENT.maxScale}
       style={{ fontSize: PROMINENT_SEGMENT.fontSize, lineHeight: PROMINENT_SEGMENT.lineHeight, textAlign: 'center', fontWeight: selected ? '600' : '500',
-        color, transitionProperty: 'color', transitionDuration: reduced ? 0 : duration.state }}>{label}</Animated.Text>
+        color, transitionProperty: 'color', transitionDuration: reduced ? 0 : duration.state, transitionTimingFunction: easeOutCss }}>{label}</Animated.Text>
     : <Animated.Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={1.3}
       style={{ fontSize: onField ? 15 : 13, lineHeight: onField ? 20 : 18, textAlign: 'center', fontWeight: (compact || onField) && !selected ? '500' : '600',
-        color, transitionProperty: 'color', transitionDuration: reduced ? 0 : duration.state }}>{label}</Animated.Text>}
+        color, transitionProperty: 'color', transitionDuration: reduced ? 0 : duration.state, transitionTimingFunction: easeOutCss }}>{label}</Animated.Text>}
   </Pressable>;
 }
 
@@ -443,10 +497,11 @@ export function Choices<T extends string>({ value, options, onChange, disabled, 
   const track = onField ? p.heroControl : compact && p.isDark ? p.surface : p.inset;
   const thumb = onField ? p.heroThumb : p.isDark ? (compact ? p.thumb : p.elevated) : p.surface;
   // The compact thumb carries a hairline edge in both themes, so the chosen segment reads as a state, not a tint.
-  const thumbEdge = compact && !onField ? { borderWidth: StyleSheet.hairlineWidth, borderColor: p.isDark ? 'rgba(255,255,255,0.10)' : 'rgba(10,10,12,0.08)' } : {};
-  return <View style={[styles.choices, onField && styles.choicesField, { backgroundColor: track }]} onLayout={event => setTrackWidth(event.nativeEvent.layout.width)}>
+  const thumbEdge = compact && !onField ? { borderWidth: StyleSheet.hairlineWidth, borderColor: p.edge } : {};
+  // A disabled switch looks disabled (25VIS2), as a disabled button does: the whole track at half opacity.
+  return <View style={[styles.choices, onField && styles.choicesField, { backgroundColor: track, opacity: disabled ? 0.5 : 1 }]} onLayout={event => setTrackWidth(event.nativeEvent.layout.width)}>
     {width > 0 && found >= 0 && <Animated.View pointerEvents="none" style={[styles.thumb, onField && styles.thumbField, { width, backgroundColor: thumb }, thumbEdge,
-      p.isDark || onField ? {} : { shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } }, thumbStyle]} />}
+      p.isDark || onField ? {} : { shadowColor: p.shadow, shadowOpacity: 0.1, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } }, thumbStyle]} />}
     {options.map(option => <Choice key={option.value} label={option.label} spokenLabel={option.spokenLabel} selected={value === option.value} compact={compact}
       onField={onField} prominent={prominent} disabled={disabled} onPress={() => { if (option.value !== value) { selectionHaptic(); onChange(option.value); } }} />)}
   </View>;
@@ -501,7 +556,9 @@ export function LifecycleNote({ icon, title, detail, tone = 'neutral' }: { icon:
 export function InfoButton({ title, detail, label }: { title: string; detail: string; label?: string }) {
   const p = usePalette();
   const { t } = useI18n();
-  return <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={label ?? t('common.moreInfoAbout', { title: title.toLowerCase() })} hitSlop={8}
+  const name = label ?? t('common.moreInfoAbout', { title: title.toLowerCase() });
+  return <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={name} hitSlop={8}
+    accessibilityShowsLargeContentViewer accessibilityLargeContentTitle={name}
     onPress={() => Alert.alert(title, detail, [{ text: t('common.ok'), style: 'cancel' }])} style={{ minHeight: 28, minWidth: 28, alignItems: 'center', justifyContent: 'center' }}>
     <Ionicons name="information-circle-outline" size={18} color={p.tertiary} accessible={false} />
   </PressFeedback>;
@@ -518,15 +575,22 @@ export function FieldNote({ children, help }: { children: string; help?: { title
 /** A caught or stored error, shown in the interface language: a catalogue key
  * or a known thrown message is translated here, at display time, so an error
  * already on screen follows a language change (see `src/i18n/errors.ts`). */
-export function ErrorMessage({ message }: { message: string | null }) {
+export function ErrorMessage({ message, announce = true }: {
+  message: string | null;
+  /** `false` for a line a form derives while the person types (a refusal shown live): only what Save refused is spoken. */
+  announce?: boolean;
+}) {
   const p = usePalette();
   const { errorText, speechLanguage } = useI18n();
+  // 25VIS2: iOS has no live region (`accessibilityLiveRegion` is Android's), so VoiceOver is told when an error appears or
+  // changes. On Android TalkBack speaks the live region below by itself, so announcing too would say each error twice
+  // (AGENTS rule 13). The same message set again in one update (a repeated refusal) is not repeated; it is still on screen.
+  useEffect(() => { if (Platform.OS === 'ios' && announce && message) AccessibilityInfo.announceForAccessibility?.(errorText(message)); }, [message, announce]);
   return message ? <View style={{ padding: 14, borderRadius: radius.button, backgroundColor: p.expenseSoft }}>
     <Text accessibilityRole="alert" accessibilityLiveRegion="polite" accessibilityLanguage={speechLanguage} style={[type.subhead, { color: p.expense }]}>{errorText(message)}</Text>
   </View> : null;
 }
 
-const HERO_MAX_SCALE = 1.4, ROW_MAX_SCALE = 1.8;
 const AMOUNT_GAP = 6;
 /** The widest share of a row an amount may take beside a name before the row stacks: a full ARS price fits whole, the name still has half the row. */
 const AMOUNT_COLUMN = '56%';
@@ -540,11 +604,15 @@ const AMOUNT_COLUMN = '56%';
  * measured height and collapsed long amounts to a few points. Row amounts keep
  * the native fit with a 3/4 floor and no fixed line height. Dynamic Type still
  * applies, capped so a hero cannot outgrow the screen. */
-export function Money({ minor, currency, large = false, color, signed = false, size, tone = 'neutral', weight, align = 'left', onField = false }: {
+export function Money({ minor, currency, large = false, color, signed = false, size, tone = 'neutral', weight, align = 'left', onField = false, spokenLabel }: {
   minor: number; currency: Currency; large?: boolean; color?: string; signed?: boolean; size?: number; tone?: Tone; weight?: '500' | '600' | '700';
   align?: 'left' | 'center';
-  /** On Inicio's lime field (25A-03): a hero's symbol and cents take the field's solid graphite tones (`heroMoneySymbol`,
-   * `heroMoneyCents`) instead of the ink at an alpha. The whole units keep `color`. */
+  /** 25D2: what VoiceOver says instead of the bare amount when the number needs its name to mean anything (Inicio's hero:
+   * «Gastado en octubre, 1234,50 pesos»). Built with the spoken formatters; the visible amount is unchanged. */
+  spokenLabel?: string;
+  /** On Inicio's field (25A-03): a hero's symbol and cents take the field's solid quiet tones (`heroMoneySymbol`,
+   * `heroMoneyCents`) instead of the ink at an alpha. The whole units keep `color`. 25N1: a hero drawn quieter than the
+   * field's ink (the zero month's `heroSecondary`) is one tone throughout, never units dimmer than their own symbol. */
   onField?: boolean;
 }) {
   const p = usePalette();
@@ -556,18 +624,26 @@ export function Money({ minor, currency, large = false, color, signed = false, s
   const hero = base >= 28;
   const safe = Number.isSafeInteger(minor);
   const text = rowAmountText(minor, currency, signed, locale);
-  const fontSize = hero ? fitFontSize(text, width, base, Math.round(base / 2), Math.min(fontScale, HERO_MAX_SCALE)) : base;
+  const scaleCap = amountMaxScale(base, hero);
+  const fontSize = hero ? fitFontSize(text, width, base, Math.round(base / 2), Math.min(fontScale, scaleCap)) : base;
   // An unrepresentable value shows a dash and says so: never NaN, Infinity or a misleading zero (24B3).
-  const label = safe ? spokenMoney(minor, currency) : t('amount.unavailable');
+  const label = safe ? spokenLabel ?? spokenMoney(minor, currency) : t('amount.unavailable');
   const ink = color ?? semantic;
   // A hero is one amount in three weights of the same colour: the symbol and
   // the cents step back so the whole units carry the number. Same size, same
-  // baseline, one accessibility label; nested spans keep it one line.
+  // baseline, one accessibility label; nested spans keep it one line. 25D1: a
+  // coloured hero keeps its hue and lowers its alpha only as far as 3:1 allows
+  // (QUIET_ALPHA); a colour that is not a six-digit hex takes the neutral pair.
+  // With iOS's Increase Contrast on, nothing steps back: the quiet parts are a
+  // composition choice, never one a person who asked for contrast pays for.
   const parts = hero && safe ? splitAmount(text, amountFormat) : null;
-  const quiet = onField ? { symbol: p.heroMoneySymbol, cents: p.heroMoneyCents }
-    : ink === p.text ? { symbol: p.secondary, cents: p.tertiary } : { symbol: ink + 'B3', cents: ink + '8C' };
+  const quiet = p.increaseContrast || (onField && ink !== p.heroInk) ? { symbol: ink, cents: ink } : onField ? { symbol: p.heroMoneySymbol, cents: p.heroMoneyCents }
+    : ink === p.text ? { symbol: p.secondary, cents: p.tertiary }
+    // 25O1 review: the light palette's ink only sits on a light ground (the close's sand-white card): its quiet pair in both themes.
+    : ink === lightPalette.text ? { symbol: lightPalette.secondary, cents: lightPalette.tertiary }
+    : quietTones(ink, p.isDark) ?? { symbol: p.secondary, cents: p.tertiary };
   const body = <Text accessibilityLabel={label} accessibilityLanguage={speechLanguage} numberOfLines={1} adjustsFontSizeToFit={!hero} minimumFontScale={0.75}
-    maxFontSizeMultiplier={hero ? HERO_MAX_SCALE : ROW_MAX_SCALE}
+    maxFontSizeMultiplier={scaleCap}
     style={{ color: ink, fontSize, lineHeight: hero ? Math.round(fontSize * 1.18) : undefined, fontWeight: weight ?? (large ? '700' : '600'),
       letterSpacing: hero ? -fontSize * 0.03 : -0.2, fontVariant: ['tabular-nums'], flexShrink: 1, maxWidth: '100%', textAlign: align }}>
     {parts ? <>
@@ -585,74 +661,92 @@ export function Money({ minor, currency, large = false, color, signed = false, s
  * into short fragments (the currency code or the amount alone on a line). */
 export const DETAIL_INLINE_LIMIT = 30;
 
-export function DetailRow({ label, value, spokenValue, icon, leading, onPress, last = false, disabled = false, tone = 'neutral', layout = 'auto' }: {
+export function DetailRow({ label, value, spokenValue, spokenLabel, hint, icon, leading, onPress, last = false, disabled = false, tone = 'neutral', layout = 'auto' }: {
   label: string; value: string; icon?: IconName; onPress?: () => void; last?: boolean; disabled?: boolean; tone?: Tone;
   /** What VoiceOver says for the value when the shown one would be misread: an
    * amount from the spoken formatters (the language's decimal mark, no
-   * grouping) or a date written out ("22 de septiembre de 2026"). A pressable
-   * row reads label + ': ' + this; a plain row gives it to the value text. The
-   * visible value is unchanged. */
+   * grouping) or a date written out ("22 de septiembre de 2026"). Every row is
+   * one VoiceOver element read label + ': ' + this (25D2: a plain row was two
+   * stops, the value heard without its name). The visible value is unchanged. */
   spokenValue?: string;
+  /** 25D2: the label VoiceOver says when the visible one depends on what stands beside it (Comparar's «Este período»
+   * under a category name it does not repeat). It starts with the visible label, so Voice Control still finds the row. */
+  spokenLabel?: string;
+  /** 25D2: what a pressable row opens, for VoiceOver. */
+  hint?: string;
   /** An identity tile (an account's look, a Más row) in place of the bare glyph. */
   leading?: ReactNode;
   /** `auto` stacks at large text or when the pair is long; `stacked` always; `inline` only at large text. */
   layout?: 'auto' | 'stacked' | 'inline';
 }) {
   const p = usePalette();
+  const { speechLanguage } = useI18n();
   const large = useStacked();
   const stacked = layout === 'stacked' || large || (layout === 'auto' && label.length + value.length > DETAIL_INLINE_LIMIT);
   const content = <>
     {leading ?? (icon && <Ionicons name={icon} size={20} color={tone === 'neutral' ? p.secondary : toneColors(p, tone).color} accessible={false} />)}
     <View style={{ flex: 1, minWidth: 0, gap: 3, flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center' }}>
       <AppText secondary variant="subhead" style={{ flexShrink: 1 }}>{label}</AppText>
-      <AppText accessibilityLabel={spokenValue} style={{ flex: stacked ? undefined : 1, textAlign: stacked ? 'left' : 'right', flexShrink: 1 }}>{value}</AppText>
+      <AppText style={{ flex: stacked ? undefined : 1, textAlign: stacked ? 'left' : 'right', flexShrink: 1 }}>{value}</AppText>
     </View>
     {onPress && <Ionicons name="chevron-forward" size={16} color={p.tertiary} accessible={false} />}
   </>;
-  const style: StyleProp<ViewStyle> = [styles.detailRow, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }];
-  return onPress ? <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={label + ': ' + (spokenValue ?? value)}
-    disabled={disabled} accessibilityState={{ disabled }} onPress={onPress} style={style}>{content}</PressFeedback> : <View style={style}>{content}</View>;
+  const style: StyleProp<ViewStyle> = [styles.detailRow, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, opacity: disabled ? 0.6 : 1 }];
+  const spoken = (spokenLabel ?? label) + ': ' + (spokenValue ?? value);
+  return onPress ? <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={spoken} accessibilityHint={hint}
+    disabled={disabled} accessibilityState={{ disabled }} onPress={onPress} style={style}>{content}</PressFeedback>
+    : <View accessible accessibilityLabel={spoken} accessibilityLanguage={speechLanguage} style={style}>{content}</View>;
 }
 
 /** A row that leads somewhere: a tinted identity tile or a neutral glyph, the
  * title as the primary line, the description underneath it in the secondary
  * colour, and a chevron. Title and subtitle never compete for one line, so a
  * long title ("Deudas y cobros") and a long description ("Debo · me deben")
- * both fit at any text size; each may wrap to two lines before truncating. */
+ * each get two lines before truncating at the default sizes; above the shared
+ * stacking threshold (`useStacked`, 1.2×) the limit is lifted, as EntryRow
+ * does, so nothing is cut at the accessibility sizes (25D1). */
 export function NavigationRow({ title, subtitle, icon, leading, onPress, last = false, disabled = false }: {
   title: string; subtitle?: string; icon?: IconName; leading?: ReactNode; onPress: () => void; last?: boolean; disabled?: boolean;
 }) {
   const p = usePalette();
+  const lines = useStacked() ? undefined : 2;
   return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={subtitle ? title + ', ' + subtitle : title}
     disabled={disabled} accessibilityState={{ disabled }} onPress={onPress}
     style={[styles.navigationRow, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, opacity: disabled ? 0.6 : 1 }]}>
     {leading ?? (icon && <View style={styles.navigationGlyph}><Ionicons name={icon} size={22} color={p.secondary} accessible={false} /></View>)}
     <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-      <AppText numberOfLines={2} style={{ fontWeight: '600' }}>{title}</AppText>
-      {!!subtitle && <AppText secondary variant="footnote" numberOfLines={2}>{subtitle}</AppText>}
+      <AppText numberOfLines={lines} style={{ fontWeight: '600' }}>{title}</AppText>
+      {!!subtitle && <AppText secondary variant="footnote" numberOfLines={lines}>{subtitle}</AppText>}
     </View>
     <Ionicons name="chevron-forward" size={16} color={p.tertiary} accessible={false} />
   </PressFeedback>;
 }
 
 /** One option of a list where exactly one is chosen (Idioma, Región): the
- * NavigationRow shape (title over a footnote subtitle, each up to two lines,
- * 60 pt minimum) with a checkmark on the chosen option instead of a chevron,
+ * NavigationRow shape (title over a footnote subtitle, each up to two lines
+ * until the text is large enough to stack, then whole; 60 pt minimum) with a checkmark on the chosen option instead of a chevron,
  * because pressing it chooses rather than navigates. VoiceOver reads the
  * title and subtitle as one label and "selected" on the chosen one.
  * `accessibilityLanguage` overrides the interface language for that label: a
  * language option named in its own language ("English", "Español") is spoken
  * by a voice of that language, as iOS Settings does. */
-export function CheckRow({ title, subtitle, selected, onPress, last = false, disabled = false, accessibilityLanguage }: {
+export function CheckRow({ title, subtitle, selected, onPress, last = false, disabled = false, accessibilityLanguage, leading }: {
   title: string; subtitle?: string; selected: boolean; onPress: () => void; last?: boolean; disabled?: boolean; accessibilityLanguage?: string;
+  /** 25O1: a mark before the title (a region's flag), hidden from VoiceOver by its own component. 25O1 review: drawn only
+   * below the stacking threshold; above it the title takes its room («Argentina» at 53 pt no longer fits a 375 pt iPhone
+   * whole beside a 40 pt flag). */
+  leading?: ReactNode;
 }) {
   const p = usePalette();
+  const stacked = useStacked();
+  const lines = stacked ? undefined : 2;
   return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={subtitle ? title + ', ' + subtitle : title}
     accessibilityLanguage={accessibilityLanguage} disabled={disabled} accessibilityState={{ disabled, selected }} onPress={onPress}
     style={[styles.navigationRow, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, opacity: disabled ? 0.6 : 1 }]}>
+    {!stacked && leading}
     <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-      <AppText numberOfLines={2} style={{ fontWeight: '600' }}>{title}</AppText>
-      {!!subtitle && <AppText secondary variant="footnote" numberOfLines={2}>{subtitle}</AppText>}
+      <AppText numberOfLines={lines} style={{ fontWeight: '600' }}>{title}</AppText>
+      {!!subtitle && <AppText secondary variant="footnote" numberOfLines={lines}>{subtitle}</AppText>}
     </View>
     <View style={styles.navigationGlyph}>{selected && <Ionicons name="checkmark" size={22} color={p.primary} accessible={false} />}</View>
   </PressFeedback>;
@@ -754,12 +848,15 @@ export function AccountBadge({ accountId, large = false, size }: { accountId: st
 /** One transaction line: merchant, then category · account · date; amount on the right. VoiceOver hears the full
  * sentence. (24UX6A: Inicio's «Actividad reciente» uses this same row in a grouped surface, so the open `home` variant
  * of 24UX3/24UX5 is gone.) */
-export function EntryRow({ entry, account, last = false, showDate = true, showAccount = true }: {
+export function EntryRow({ entry, account, last = false, showDate = true, showAccount = true, voided = false }: {
   entry: Entry; account: Account; last?: boolean; showDate?: boolean; showAccount?: boolean;
+  /** 25N1: a row of Movimientos deshechos. It counts nowhere, so it never looks live: the amount in the tertiary ink with no
+   * «+» (as the detail dims a voided amount) and VoiceOver hears «deshecho» after the kind. */
+  voided?: boolean;
 }) {
   const p = usePalette();
   const day = useCurrentDay();
-  const { t, relativeDate, spokenAmount } = useI18n();
+  const { t, relativeDate, spokenMoney } = useI18n();
   const dateLabel = relativeDate(entry.dateISO, day);
   const income = entry.kind === 'income';
   // 24T3 (A26): a line a devolución or an adelanto de cuotas projected. A devolución is a contra-expense (stored negative
@@ -782,7 +879,7 @@ export function EntryRow({ entry, account, last = false, showDate = true, showAc
     : component === undefined ? [entry.merchant, t(income ? 'movement.incomeWord' : 'movement.expenseWord')]
       : [t('operations.row.payoffWord'), ...(component === 'principal' ? [] : [t(`operations.row.payoffShareSpoken.${component}`)]), entry.merchant];
   return <PressFeedback feedback="highlight" accessibilityRole="button"
-    accessibilityLabel={[...spokenKind, spokenAmount(amount.minor, account.currency), category, account.name, dateLabel].join(', ')}
+    accessibilityLabel={[...spokenKind, ...(voided ? [t(refund ? 'rows.undoneTransfer' : 'rows.undone')] : []), spokenMoney(amount.minor, account.currency), category, account.name, dateLabel].join(', ')}
     onPress={() => router.push(operationId !== undefined ? { pathname: '/operation/[id]', params: { id: operationId } } : { pathname: '/entry/[id]', params: { id: entry.id } })}
     style={[styles.row, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
     {refund ? <GlyphTile icon="arrow-undo-outline" />
@@ -793,7 +890,7 @@ export function EntryRow({ entry, account, last = false, showDate = true, showAc
         {!!detail && <AppText secondary variant="footnote" numberOfLines={stacked ? undefined : 2}>{detail}</AppText>}
       </View>
       <View style={{ maxWidth: stacked ? '100%' : AMOUNT_COLUMN, alignItems: 'flex-end' }}>
-        <Money minor={amount.minor} currency={account.currency} signed={amount.signed} tone={amount.tone} />
+        <Money minor={amount.minor} currency={account.currency} signed={amount.signed && !voided} tone={amount.tone} color={voided ? p.tertiary : undefined} />
       </View>
     </View>
   </PressFeedback>;
@@ -809,11 +906,11 @@ export function AccountRow({ account, entries, transfers, last = false, accessib
   accessibility?: Pick<PressableProps, 'accessibilityActions' | 'onAccessibilityAction'>;
 }) {
   const p = usePalette();
-  const { t, spokenAmount, locale } = useI18n();
+  const { t, spokenMoney, locale } = useI18n();
   const { width, fontScale } = useWindowDimensions();
   const balance = accountBalanceMinor(account, entries, transfers);
   const stacked = rowStacks(width - ROW_CHEVRON, fontScale, rowAmountText(balance, account.currency, false, locale));
-  return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={t('rows.accountLabel', { name: account.name, amount: spokenAmount(balance, account.currency) })}
+  return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={t('rows.accountLabel', { name: account.name, amount: spokenMoney(balance, account.currency) })}
     {...accessibility} onPress={() => router.push({ pathname: '/account/[id]', params: { id: account.id } })}
     style={[styles.row, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
     <AccountBadge accountId={account.id} />
@@ -833,19 +930,21 @@ export function AccountRow({ account, entries, transfers, last = false, accessib
  * a transfer is a payment/collection and reads better without a +/− sign. */
 export type RowContext = 'card' | 'debt';
 
-export function MovementRow({ item, accounts, accountId, last, showDate = true, context }: {
-  item: ActivityItem; accounts: Account[]; accountId?: string; last?: boolean; showDate?: boolean; context?: RowContext;
+export function MovementRow({ item, accounts, accountId, last, showDate = true, context, voided }: {
+  item: ActivityItem; accounts: Account[]; accountId?: string; last?: boolean; showDate?: boolean; context?: RowContext; voided?: boolean;
 }) {
-  return item.type === 'entry' ? <EntryRow entry={item.value} account={accounts.find(a => a.id === item.value.accountId)!} last={last} showDate={showDate} showAccount={!accountId} />
-    : <TransferRow transfer={item.value} accounts={accounts} accountId={accountId} last={last} showDate={showDate} context={context} />;
+  return item.type === 'entry' ? <EntryRow entry={item.value} account={accounts.find(a => a.id === item.value.accountId)!} last={last} showDate={showDate} showAccount={!accountId} voided={voided} />
+    : <TransferRow transfer={item.value} accounts={accounts} accountId={accountId} last={last} showDate={showDate} context={context} voided={voided} />;
 }
 
-export function TransferRow({ transfer: t, accounts, accountId, last = false, showDate = true, context }: {
+export function TransferRow({ transfer: t, accounts, accountId, last = false, showDate = true, context, voided = false }: {
   transfer: Transfer; accounts: Account[]; accountId?: string; last?: boolean; showDate?: boolean; context?: RowContext;
+  /** 25N1: as on EntryRow, a row of Movimientos deshechos: the amount in the tertiary ink, «deshecha» after the kind. */
+  voided?: boolean;
 }) {
   const p = usePalette();
   const day = useCurrentDay();
-  const { t: tr, relativeDate, spokenAmount } = useI18n();
+  const { t: tr, relativeDate, spokenMoney } = useI18n();
   const from = accounts.find(a => a.id === t.fromAccountId)!, to = accounts.find(a => a.id === t.toAccountId)!;
   // A debt's hidden account is named from the debt, in the interface language.
   const nameOf = useAccountNameOf();
@@ -861,9 +960,9 @@ export function TransferRow({ transfer: t, accounts, accountId, last = false, sh
   const stacked = useStacked({ minor: amount.minor, currency: from.currency, signed: amount.signed });
   // VoiceOver hears the kind even when a note names the row («Transferencia, Alquiler, de … a …»).
   const kindWord = tr('rows.transfer');
-  const spokenTitle = context || title === kindWord ? title : kindWord + ', ' + title;
+  const spokenTitle = (context || title === kindWord ? title : kindWord + ', ' + title) + (voided ? ', ' + tr('rows.undoneTransfer') : '');
   return <PressFeedback feedback="highlight" accessibilityRole="button"
-    accessibilityLabel={tr('rows.transferLabel', { title: spokenTitle, from: fromName, to: toName, amount: spokenAmount(t.amountMinor, from.currency), date }) + (t.note && t.note !== title ? ', ' + t.note : '')}
+    accessibilityLabel={tr('rows.transferLabel', { title: spokenTitle, from: fromName, to: toName, amount: spokenMoney(t.amountMinor, from.currency), date }) + (t.note && t.note !== title ? ', ' + t.note : '')}
     onPress={() => router.push({ pathname: '/transfer/[id]', params: { id: t.id } })}
     style={[styles.row, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
     <GlyphTile icon={context === 'card' ? 'card-outline' : context === 'debt' ? 'people-outline' : 'swap-horizontal-outline'} tone="transfer" />
@@ -873,7 +972,7 @@ export function TransferRow({ transfer: t, accounts, accountId, last = false, sh
         <AppText secondary variant="footnote" numberOfLines={stacked ? undefined : 2}>{detail}</AppText>
       </View>
       <View style={{ maxWidth: stacked ? '100%' : AMOUNT_COLUMN, alignItems: 'flex-end' }}>
-        <Money minor={amount.minor} currency={from.currency} signed={amount.signed} tone={amount.tone} />
+        <Money minor={amount.minor} currency={from.currency} signed={amount.signed} tone={amount.tone} color={voided ? p.tertiary : undefined} />
       </View>
     </View>
   </PressFeedback>;
@@ -905,3 +1004,6 @@ const styles = StyleSheet.create({
   navigationGlyph: { width: 30, alignItems: 'center' },
   selectionRow: { minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 10 },
 });
+
+/** The geometry of a list row (EntryRow, AccountRow, TransferRow), for a row drawn elsewhere (DebtRow). */
+export const rowStyle = styles.row;

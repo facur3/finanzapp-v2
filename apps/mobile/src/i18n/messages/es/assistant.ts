@@ -20,10 +20,12 @@ export const assistant = {
     },
     /** One calm line in the thread for a state the Assistant cannot get past. */
     reasons: {
-      unavailable: 'El Asistente todavía no está conectado en esta versión. Tu mensaje quedó escrito para cuando lo esté.',
-      session: 'Iniciá sesión para usar el Asistente. Tu mensaje sigue en el cuadro.',
+      unavailable: 'El Asistente todavía no está disponible en esta versión. Tu mensaje sigue en el cuadro.',
+      /** No session to present; this build has no sign-in, so the same truth as `unavailable`. */
+      session: 'El Asistente todavía no está disponible en esta versión. Tu mensaje sigue en el cuadro.',
       offline: 'Sin conexión. Tus movimientos no cambiaron; podés reintentar.',
-      limit: 'Llegaste al límite de consultas de hoy. Podés registrar manualmente.',
+      /** Any of the server's windows (a minute, an hour, a day, a month, one request at a time): never «de hoy». */
+      limit: 'Llegaste al límite de consultas por ahora. Tus movimientos no cambiaron.',
       failed: 'No se pudo completar la consulta. Tus movimientos no cambiaron.',
     },
     /** 25A-06 (decision A): one calm line after a reply whose merchant or category the server left blank because the
@@ -51,6 +53,8 @@ export const assistant = {
       /** Under an answer the user stopped mid-stream. */
       stopped: 'Respuesta interrumpida.',
       retry: 'Reintentar',
+      /** Text button beside a note the Assistant cannot get past (not available, a limit): opens the manual expense form. */
+      recordManually: 'Registrar a mano',
     },
     /** Questions the app itself asks when a parsed draft has a gap (never the model's words). */
     clarify: {
@@ -76,6 +80,8 @@ export const assistant = {
       previousMonth: '{label} (mes anterior)',
       /** VoiceOver for a difference that grew against the previous month (the screen shows "+$ 42.500,00"): "42500,00 pesos más". */
       spokenIncrease: '{amount} más',
+      /** Under the rows when the ledger holds other currencies: these facts count only the accounts in {currency} (its code). */
+      scope: 'Solo cuentas en {currency}, sin conversiones.',
     },
     /** Text buttons under an answer that open the screens holding the records. */
     links: {
