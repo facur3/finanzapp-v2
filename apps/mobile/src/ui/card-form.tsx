@@ -1,13 +1,14 @@
 import { useMemo, useRef, useState } from 'react';
 import { Alert, Keyboard, View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
-import { addDaysISO, cardCycleDatesOf, cardCycleView, draftFitsCurrency, editedDraftFits, minorFromEditedDraft, minorFromLedgerDraft, newCardCycle, planCardCycle,
+import { addDaysISO, CYCLE_DUE_ORDER_MESSAGE, cardCycleDatesOf, cardCycleView, draftFitsCurrency, editedDraftFits, minorFromEditedDraft, minorFromLedgerDraft, newCardCycle, planCardCycle,
   sameCreditCardProfile, todayKey, validateAccount, validateCreditCardProfile, type StoredDraft, type Account, type CardCycleDates, type CardCycleDays,
   type CardCycleIntent, type CreditCardProfile, type Currency, LEDGER_CURRENCIES } from '@finanzapp/domain';
 import { useI18n } from '../i18n/provider';
 import { useLedger } from '../storage/LedgerProvider';
-import { ActionButton, AmountField, AppText, DetailRow, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
+import { ActionButton, AmountField, AppText, DetailRow, ErrorMessage, Field, IconButton, PressFeedback, Screen, Surface } from './components';
 import { cycleEditResult, daysOfDates } from './card-cycle-form';
 import { CurrencySwitch } from './currency-switch';
 import { useDefaultCurrency } from './use-default-currency';
@@ -15,9 +16,9 @@ import { useCardManagement } from './commitment-actions';
 import { offeredCurrencies } from './currencies';
 import { DateField } from './form-controls';
 import { draftFromMinor } from './money-input';
-import { errorHaptic, successHaptic, warningHaptic } from './motion';
+import { errorHaptic, Reflow, successHaptic, warningHaptic } from './motion';
 import { SwitchRow } from './switch-row';
-import { space, useCurrentDay } from './theme';
+import { space, useCurrentDay, usePalette } from './theme';
 
 type PendingCreate = { account: Account; card: CreditCardProfile; rows: CardCycleDates[] };
 /** 24T2: an edit sends the profile (its usual days included) and the exact dates the person changed, together. */
@@ -44,6 +45,7 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
   const { t, locale, formatDate, failureMessage } = useI18n();
   const { snapshot, archive: ledger, addCard, saveCard, gate = LEDGER_CURRENCIES } = useLedger();
   const today = useCurrentDay();
+  const p = usePalette();
   // 146 currencies since 24M: ordered and named once per gate and language, not on every keystroke.
   const offered = useMemo(() => offeredCurrencies(gate, locale), [gate, locale]);
   const account = snapshot?.accounts.find(item => item.id === original?.accountId);
@@ -66,6 +68,9 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
   const [due, setDue] = useState<string | null>(shown?.open.dueISO ?? null);
   const [toPayDue, setToPayDue] = useState<string | null>(shown?.toPay?.dueISO ?? null);
   const [everyMonth, setEveryMonth] = useState(false);
+  // 25N1: a new card shows what it needs (name, currency, today's balance, the two dates); issuer, last four digits and limit
+  // wait behind «Más datos (opcional)», which opens in place and stays open, so nothing typed is ever hidden. An edit shows them.
+  const [more, setMore] = useState(false);
   const [busy, setBusy] = useState(false);
   const [pendingCreate, setPendingCreate] = useState<PendingCreate | null>(null);
   const [pendingEdit, setPendingEdit] = useState<PendingEdit | null>(null);
@@ -81,6 +86,9 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
   // new card's usual days, once both dates are chosen.
   const edit = before && shown && closing && due ? cycleEditResult(before, shown, { closingISO: closing, dueISO: due, toPayDueISO: toPayDue, everyMonth }) : null;
   const days: CardCycleDays | null = edit ? edit.days : !before && closing && due ? daysOfDates(closing, due) : null;
+  // 25N1: a closing moved on or past the due date chosen before is said while editing, not first at Save (the due keeps the
+  // person's date: they move one of the two).
+  const dueBeforeClosing = !!closing && !!due && due <= closing;
   // A statement of another year carries its year; this year's reads as a short day.
   const shortDate = (dateISO: string) => formatDate(dateISO, dateISO.slice(0, 4) === today.slice(0, 4) ? 'day' : 'dayYear');
 
@@ -174,6 +182,16 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
   }
 
   const pick = (set: (dateISO: string) => void) => (value: Date) => { set(todayKey(value)); setError(null); };
+  const optional = <View style={{ gap: space.xl }}>
+    <View style={{ gap: space.l }}>
+      <Field label={t('cards.form.issuer')} value={issuer} onChangeText={setIssuer}
+        placeholder={t('cards.form.issuerPlaceholder')} maxLength={80} autoCapitalize="words" editable={!locked} />
+      <Field label={t('cards.form.last4')} value={last4} onChangeText={value => setLast4(value.replace(/\D/g, '').slice(0, 4))}
+        placeholder="4009" keyboardType="number-pad" maxLength={4} editable={!locked} />
+    </View>
+    <AmountField label={t('cards.form.limit')} currency={currency} value={limit} stored={storedLimit ?? undefined}
+      onChangeText={value => { setLimit(value); setError(null); }} editable={!locked} />
+  </View>;
   return <Screen>
     <Stack.Screen options={{ title: t(before ? 'nav.titles.editCard' : 'nav.titles.newCard'), gestureEnabled: !busy,
       headerLeft: () => <IconButton name="close" label={t('common.close')} onPress={close} disabled={busy} /> }} />
@@ -190,15 +208,7 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
       <AppText secondary variant="footnote" style={{ marginTop: -space.m }}>{t('cards.form.openingDebtNote')}</AppText>
     </>}
 
-    <View style={{ gap: space.l }}>
-      <Field label={t('cards.form.issuer')} value={issuer} onChangeText={setIssuer}
-        placeholder={t('cards.form.issuerPlaceholder')} maxLength={80} autoCapitalize="words" editable={!locked} />
-      <Field label={t('cards.form.last4')} value={last4} onChangeText={value => setLast4(value.replace(/\D/g, '').slice(0, 4))}
-        placeholder="4009" keyboardType="number-pad" maxLength={4} editable={!locked} />
-    </View>
-
-    <AmountField label={t('cards.form.limit')} currency={currency} value={limit} stored={storedLimit ?? undefined}
-      onChangeText={value => { setLimit(value); setError(null); }} editable={!locked} />
+    {before && optional}
 
     {/* 24T2: the statement still to pay first (its due is the next one), then the open statement: two separate facts. */}
     {shown?.toPay && <Surface grouped>
@@ -219,14 +229,24 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
         {[t('cards.form.datesNote'), edit && !edit.repeats && edit.intent.open ? t('cards.form.oneOff') : null,
           days ? t('cards.form.usualDays', { closing: days.closingDay, due: days.dueDay }) : null].filter(Boolean).join(' ')}
       </AppText>
+      <ErrorMessage message={dueBeforeClosing ? CYCLE_DUE_ORDER_MESSAGE : null} announce={false} />
     </View>
+
+    {!before && (more ? <Reflow>{optional}</Reflow> : <Surface grouped>
+      <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={t('cards.form.more')} accessibilityState={{ expanded: false, disabled: locked }}
+        disabled={locked} onPress={() => setMore(true)} style={{ minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 10 }}>
+        <AppText style={{ flex: 1, color: p.primary }}>{t('cards.form.more')}</AppText>
+        <Ionicons name="chevron-down" size={16} color={p.primary} accessible={false} />
+      </PressFeedback>
+    </Surface>)}
+    {!before && (!closing || !due) && <AppText secondary variant="footnote">{t('cards.form.datesMissing')}</AppText>}
 
     <ErrorMessage message={error} />
     {(pendingCreate || pendingEdit) && error && <AppText secondary variant="footnote">
       {t('cards.form.frozenNote')}
     </AppText>}
     <ActionButton label={error && (pendingCreate || pendingEdit) ? t('common.retrySave') : before ? t('common.saveChanges') : t('cards.form.create')}
-      onPress={save} busy={busy} disabled={(before ? false : !name.trim()) || !closing || !due || !fitsCurrency} />
+      onPress={save} busy={busy} disabled={(before ? false : !name.trim()) || !closing || !due || dueBeforeClosing || !fitsCurrency} />
     {before && <ActionButton label={t(pendingArchive && error ? 'cards.form.retry' : before.active ? 'cards.form.archive' : 'cards.form.reactivate')}
       onPress={archive} secondary disabled={busy || !!pendingEdit} />}
     {/* 25B2: deleting is the last, clearly destructive action; the confirmation names the recorded debt and what stays. */}

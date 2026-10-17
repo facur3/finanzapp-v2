@@ -122,6 +122,10 @@ export const cards = {
       everyMonth: 'Usar estos días todos los meses',
       frozenNote: 'El envío quedó congelado para que Reintentar no cree otra tarjeta ni aplique cambios dos veces.',
       create: 'Crear tarjeta',
+      /** A new card's disclosure row for issuer, last four digits and limit. */
+      more: 'Más datos (opcional)',
+      /** Above «Crear tarjeta» while a statement date is still to choose. */
+      datesMissing: 'Elegí el próximo cierre y su vencimiento.',
       retry: 'Reintentar',
       archive: 'Archivar tarjeta',
       reactivate: 'Reactivar tarjeta',

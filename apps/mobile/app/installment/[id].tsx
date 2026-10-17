@@ -19,7 +19,7 @@ import { space, useCurrentDay, usePalette } from '../../src/ui/theme';
  * 24UX6D (Forest): a calm hero (the merchant, «Compra en cuotas · ARS», the price, «12 cuotas sin interés», the state),
  * then the schedule's progress flat on the canvas (`PlanProgressSummary`: a bar, «3 de 12 registradas» by the domain's
  * recognised count, the next instalment and, while the plan is live, the principal still to come), then one grouped list
- * with the purchase and the figures not already in that summary, then the Calendario.
+ * with the purchase and the figures not already in that summary, then the actions (25N1: above the calendar), then the Calendario.
  *
  * 24T3: what can be done with the plan, each action offered only when storage would accept it (`planActions`, the
  * domain's dry runs on the caught-up view), primary first and the destructive last:
@@ -196,6 +196,20 @@ export default function InstallmentPlanScreen() {
       {facts.map((fact, index) => <DetailRow key={fact.key} label={fact.label} value={fact.value} spokenValue={fact.spokenValue} icon={fact.icon}
         onPress={fact.onPress} disabled={busy} last={index === facts.length - 1} />)}
     </Surface>
+    {/* 25N1: what the screen is for once the plan is read, above the calendar (up to 120 rows), the destructive pair last. */}
+    {any && <View style={{ gap: space.m }}>
+      <ErrorMessage message={error} />
+      {actions.refund && <ActionButton secondary icon="return-down-back-outline" label={t('installments.detail.refund')} disabled={locked}
+        onPress={() => router.push({ pathname: '/new-refund', params: { planId } })} />}
+      {actions.payoff && <ActionButton secondary icon="play-forward-circle-outline" label={t('installments.detail.payoff')} disabled={locked}
+        onPress={() => router.push({ pathname: '/plan-payoff/[id]', params: { id: planId } })} />}
+      {offers.reactivate && <ActionButton secondary icon="play-circle-outline" label={label('reactivate', t('installments.detail.reactivate'))}
+        busy={busy && pending?.action === 'reactivate'} disabled={locked && pending?.action !== 'reactivate'} onPress={() => ask('reactivate')} />}
+      {offers.stop && <ActionButton secondary tone="expense" icon="stop-circle-outline" label={label('stop', t('installments.detail.stop'))}
+        busy={busy && pending?.action === 'stop'} disabled={locked && pending?.action !== 'stop'} onPress={() => ask('stop')} />}
+      {offers.remove && <ActionButton secondary tone="expense" icon="trash-outline" label={label('delete', t('installments.detail.delete'))}
+        busy={busy && pending?.action === 'delete'} disabled={locked && pending?.action !== 'delete'} onPress={() => ask('delete')} />}
+    </View>}
     <View>
       <SectionTitle caption={t('installments.detail.scheduleCaption')}>{t('installments.detail.schedule')}</SectionTitle>
       <Surface grouped>
@@ -219,19 +233,6 @@ export default function InstallmentPlanScreen() {
             last={index === planOperations.length - 1} onPress={() => router.push({ pathname: '/operation/[id]', params: { id: operation.id } })} />;
         })}
       </Surface>
-    </View>}
-    {any && <View style={{ gap: space.m }}>
-      <ErrorMessage message={error} />
-      {actions.refund && <ActionButton secondary icon="return-down-back-outline" label={t('installments.detail.refund')} disabled={locked}
-        onPress={() => router.push({ pathname: '/new-refund', params: { planId } })} />}
-      {actions.payoff && <ActionButton secondary icon="play-forward-circle-outline" label={t('installments.detail.payoff')} disabled={locked}
-        onPress={() => router.push({ pathname: '/plan-payoff/[id]', params: { id: planId } })} />}
-      {offers.reactivate && <ActionButton secondary icon="play-circle-outline" label={label('reactivate', t('installments.detail.reactivate'))}
-        busy={busy && pending?.action === 'reactivate'} disabled={locked && pending?.action !== 'reactivate'} onPress={() => ask('reactivate')} />}
-      {offers.stop && <ActionButton secondary tone="expense" icon="stop-circle-outline" label={label('stop', t('installments.detail.stop'))}
-        busy={busy && pending?.action === 'stop'} disabled={locked && pending?.action !== 'stop'} onPress={() => ask('stop')} />}
-      {offers.remove && <ActionButton secondary tone="expense" icon="trash-outline" label={label('delete', t('installments.detail.delete'))}
-        busy={busy && pending?.action === 'delete'} disabled={locked && pending?.action !== 'delete'} onPress={() => ask('delete')} />}
     </View>}
   </Screen>;
 }

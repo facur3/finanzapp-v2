@@ -404,10 +404,11 @@ test('plan detail: the price first, then only its figures (recorded, future, rem
     'Tarjeta=Visa Gold', 'Categoría=Hogar', 'Fecha de compra=10 ago 2026 (10 de agosto de 2026)', 'Precio=$ 1.200.000,00 (1200000,00 pesos)',
     'Ya registrado=$ 200.000,00 (200000,00 pesos)', 'Cuotas futuras=$ 1.000.000,00 (1000000,00 pesos)',
   ].map(row => row.replace(/\$ /g, '$' + NBSP)));
-  // The hero, then the progress, then the facts, then the Calendario.
+  // The hero, then the progress, then the facts, then (25N1) the actions, then the Calendario.
   const order = nodes(root).map(node => node.type === 'Money' && node.props.minor === 120000000 ? 'hero' : typeof node.type === 'function' && node.type.name === 'PlanProgressSummary' ? 'progress'
-    : node.type === 'DetailRow' ? 'facts' : node.type === 'SectionTitle' ? 'schedule' : null).filter((item, index, all) => item && all.indexOf(item) === index);
-  assert.deepEqual(order, ['hero', 'progress', 'facts', 'schedule'])
+    : node.type === 'DetailRow' ? 'facts' : node.type === 'ActionButton' ? 'actions' : node.type === 'SectionTitle' ? 'schedule' : null).filter((item, index, all) => item && all.indexOf(item) === index);
+  assert.deepEqual(order, ['hero', 'progress', 'facts', 'actions', 'schedule'], 'the actions above a calendar of up to 120 rows')
+  assert.deepEqual(nodes(root).filter(node => node.type === 'ActionButton').map(node => node.props.tone ?? 'plain'), ['plain', 'plain', 'expense'], 'refund, adelanto, then the destructive one last')
   find(root, 'DetailRow', 'Tarjeta').props.onPress();
   assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/card/[id]', params: { id: 'card' } }));
   // The calendar: one row per instalment, its statement's closing and due, its state.
