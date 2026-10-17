@@ -10,7 +10,7 @@ import { realModule } from './real-module.ts';
 type Node = { type: any; props: Record<string, any> };
 const jsx = (type: unknown, props: Record<string, unknown>) => ({ type, props });
 const modules: Record<string, unknown> = {
-  react: { useRef: (initial: unknown) => ({ current: initial }) },
+  react: { useRef: (initial: unknown) => ({ current: initial }), useState: (initial: unknown) => [initial, (next: unknown) => { opened.push(next); }] },
   'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
   'react-native': { Pressable: 'Pressable', View: 'View' },
   'react-native-gesture-handler/ReanimatedSwipeable': { __esModule: true, default: 'Swipeable' },
@@ -25,6 +25,8 @@ const load = () => realModule('src/ui/swipe-actions.tsx', name => {
   return modules[name];
 });
 const calls: string[] = [];
+/** 25D2: every open state the row set, in order. */
+const opened: unknown[] = [];
 const actions = [
   { key: 'pause', label: 'Pausar', icon: 'pause', tone: 'neutral', onPress: () => calls.push('pause') },
   { key: 'delete', label: 'Eliminar', icon: 'trash', tone: 'destructive', onPress: () => calls.push('delete') },
@@ -75,6 +77,17 @@ test('24UX4: opening one row closes the row that was open, like a UITableView', 
   second.props.onSwipeableClose('right');
   first.props.onSwipeableWillOpen('right');
   assert.equal(log.join(','), 'first closed', 'a row closed by the finger is no longer tracked');
+});
+
+test('25D2: a closed row\'s actions are not VoiceOver stops (the row\'s custom actions carry them); an open row\'s are', () => {
+  const { SwipeRow } = load();
+  const row: Node = SwipeRow({ actions, children: 'content' });
+  const panel: Node = row.props.renderRightActions({ value: 0 }, { value: 0 }, { close: () => {} });
+  assert.deepEqual([panel.props.accessibilityElementsHidden, panel.props.importantForAccessibility], [true, 'no-hide-descendants'], 'mounted under the row, faded, never reached');
+  opened.length = 0;
+  row.props.onSwipeableWillOpen('right');
+  row.props.onSwipeableClose('right');
+  assert.equal(JSON.stringify(opened), JSON.stringify([true, false]), 'opening shows them to VoiceOver, closing hides them again');
 });
 
 test('24UX4: the same actions reach VoiceOver as the row\'s custom actions', () => {

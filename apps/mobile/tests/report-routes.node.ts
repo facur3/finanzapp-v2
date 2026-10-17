@@ -283,6 +283,10 @@ test('comparison category drilldown preserves the cutoff, not the whole previous
   const list = view.render();
   const category = list.props.data.find((item: domain.CategoryChange) => item.key === 'salud');
   const row = list.props.renderItem({ item: category });
+  // 25D2: each button says its category after its visible words, and where it leads; never a bare «Anterior: …».
+  const [now, before] = ['Este período', 'Anterior'].map(label => find(row, 'DetailRow', label));
+  assert.deepEqual([now.props.spokenLabel, before.props.spokenLabel], ['Este período, Salud', 'Anterior, Salud']);
+  assert.deepEqual([now.props.hint, before.props.hint], ['Abre los gastos de esta categoría en ese período', 'Abre los gastos de esta categoría en ese período']);
   find(row, 'DetailRow', 'Anterior').props.onPress();
   assert.equal(view.pushed[0].params.through, '2026-08-12');
   const detail = routeHarness('report-category.tsx', view.pushed[0].params, data).render();
@@ -533,6 +537,12 @@ test('24UX3 review: Dónde más gastaste is an open ranked list on the ground, n
   const badges = nodes(section).filter(node => node.type === 'CategoryBadge');
   assert.ok(badges.length > 0);
   assert.equal(badges.every(badge => badge.props.size === 32), true, 'compact marks, lighter than the category card');
+  // 25D2: each ranked row is one VoiceOver stop (four before, the first a lone digit), with the amount in words.
+  const rows = nodes(section).filter(node => node.type === 'View' && node.props.accessible);
+  assert.ok(rows.length > 0);
+  assert.match(rows[0].props.accessibilityLabel, /^1\. .+, \d+ compras?, .+, \d+,\d{2} pesos$/);
+  assert.ok('accessibilityLanguage' in rows[0].props);
+  assert.equal(rows.some(row => nodes(row).slice(1).some(node => node.props.accessible)), false, 'nothing inside is a stop of its own');
 });
 
 test('24UX5 review: the month heading raises only its first letter, and the period line does not repeat the currency the chip names', () => {

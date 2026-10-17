@@ -50,6 +50,7 @@ export const reports: Pick<Messages, 'reports'> = {
     merchants: {
       title: 'Where you spent most',
       purchases: { one: '{count} purchase', other: '{count} purchases' },
+      rowSpoken: '{rank}. {merchant}, {purchases}, {category}, {amount}',
     },
     insights: {
       title: 'Worth noting',
@@ -148,6 +149,8 @@ export const reports: Pick<Messages, 'reports'> = {
       amountLess: '{amount} less',
       thisPeriod: 'This period',
       previous: 'Previous',
+      rowSpoken: '{period}, {category}',
+      openHint: 'Opens this category’s expenses for that period',
       footer: 'Only expenses recorded in {currency}, excluding transfers and opening balances. The differences describe your records, not the reasons for your spending or confirmed savings.',
     },
   },

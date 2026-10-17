@@ -74,12 +74,16 @@ function SelectionSheet({ visible, title, onClose, onDone, children }: {
   return <Modal visible={visible} animationType={reduced ? 'fade' : 'slide'} presentationStyle="pageSheet"
     allowSwipeDismissal onRequestClose={onClose}>
     <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: p.background }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 }}>
-        <SheetBarButton label={t('common.cancel')} onPress={onClose} />
-        <AppText accessibilityRole="header" numberOfLines={2} maxFontSizeMultiplier={SHEET_BAR_MAX_SCALE} style={{ flex: 1, textAlign: 'center', fontWeight: '600' }}>{title}</AppText>
-        {onDone && <SheetBarButton label={t('common.done')} onPress={onDone} strong />}
+      {/* 25D2: VoiceOver's escape (the two-finger scrub) is Cancelar, as on the date sheet: React Native's page-sheet host
+          answers only the swipe-down (onRequestClose), never the scrub. */}
+      <View accessibilityViewIsModal onAccessibilityEscape={onClose} style={{ flex: 1 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 }}>
+          <SheetBarButton label={t('common.cancel')} onPress={onClose} />
+          <AppText accessibilityRole="header" numberOfLines={2} maxFontSizeMultiplier={SHEET_BAR_MAX_SCALE} style={{ flex: 1, textAlign: 'center', fontWeight: '600' }}>{title}</AppText>
+          {onDone && <SheetBarButton label={t('common.done')} onPress={onDone} strong />}
+        </View>
+        {children}
       </View>
-      {children}
     </SafeAreaView>
   </Modal>;
 }
@@ -158,7 +162,8 @@ export function CurrencyField({ value, onChange, disabled = false, currencies }:
   const open = () => { Keyboard.dismiss(); setVisible(true); };
   return <>
     <Surface grouped>
-      <SelectionRow label={t('selection.currency')} value={selected.name} detail={selected.code + ' · ' + selected.symbol}
+      {/* 25D2: VoiceOver hears the currency by its name («Moneda: Pesos argentinos»), never «ARS · $» read out symbol by symbol. */}
+      <SelectionRow label={t('selection.currency')} value={selected.name} detail={selected.code + ' · ' + selected.symbol} spokenDetail=""
         leading={<CurrencyMark currency={value} size={30} />} last disabled={disabled} onPress={onChange ? open : undefined} />
     </Surface>
     {onChange && <CurrencySheet visible={visible} title={t('selection.chooseCurrency')} options={options} value={value} searchable={options.length >= SEARCHABLE_FROM}

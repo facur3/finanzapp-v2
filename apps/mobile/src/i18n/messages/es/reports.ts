@@ -70,6 +70,8 @@ export const reports = {
     merchants: {
       title: 'Dónde más gastaste',
       purchases: { one: '{count} compra', other: '{count} compras' },
+      /** 25D2: VoiceOver reads a ranked row as one element: «1. Coto, 3 compras, Supermercado, 1234,50 pesos». */
+      rowSpoken: '{rank}. {merchant}, {purchases}, {category}, {amount}',
     },
     insights: {
       title: 'Para tener en cuenta',
@@ -198,6 +200,9 @@ export const reports = {
       amountLess: '{amount} menos',
       thisPeriod: 'Este período',
       previous: 'Anterior',
+      /** 25D2: VoiceOver's name of a comparison row, the visible words first (Voice Control): «Este período, Comida». */
+      rowSpoken: '{period}, {category}',
+      openHint: 'Abre los gastos de esta categoría en ese período',
       footer: 'Solo gastos registrados en {currency}, sin transferencias ni saldos iniciales. Las diferencias describen tus registros, no los motivos de tus gastos ni un ahorro confirmado.',
     },
   },

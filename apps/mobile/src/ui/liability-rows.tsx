@@ -21,7 +21,7 @@ export function DebtRow({ debt, last, actions = [] }: { debt: PersonalDebtProfil
   const { snapshot } = useLedger();
   const p = usePalette();
   const day = useCurrentDay();
-  const { t, relativeDate, spokenMinor, locale } = useI18n();
+  const { t, relativeDate, spokenMoney, locale } = useI18n();
   const account = snapshot?.accounts.find(item => item.id === debt.accountId);
   const outstanding = snapshot && account ? debtOutstandingMinor(debt, snapshot) : 0;
   // A hook, so it runs before the early return on every render.
@@ -37,7 +37,7 @@ export function DebtRow({ debt, last, actions = [] }: { debt: PersonalDebtProfil
   const spokenStatus = statusWith((iso, inline) => spokenDueDay(iso, day, locale, inline));
   const tone = state === 'overdue' ? p.expense : state === 'soon' ? p.warning : undefined;
   return <SwipeRow actions={actions}><PressFeedback feedback="highlight" accessibilityRole="button"
-    accessibilityLabel={t(owed ? 'debts.row.owedLabel' : 'debts.row.receivableLabel', { name: debt.counterparty, amount: spokenMinor(outstanding, account.currency), currency: account.currency, status: spokenStatus })}
+    accessibilityLabel={t(owed ? 'debts.row.owedLabel' : 'debts.row.receivableLabel', { name: debt.counterparty, amount: spokenMoney(outstanding, account.currency), status: spokenStatus })}
     accessibilityHint={t('debts.row.openHint')}
     {...swipeAccessibility(actions)}
     onPress={() => router.push({ pathname: '/debt/[id]', params: { id: debt.id } })}

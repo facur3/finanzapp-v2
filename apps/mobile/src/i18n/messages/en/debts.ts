@@ -28,8 +28,8 @@ export const debts: Pick<Messages, 'debts'> = {
       closed: 'Closed',
     },
     row: {
-      owedLabel: 'I owe {name}, {amount} {currency}, {status}',
-      receivableLabel: '{name} owes me, {amount} {currency}, {status}',
+      owedLabel: 'I owe {name}, {amount}, {status}',
+      receivableLabel: '{name} owes me, {amount}, {status}',
       openHint: 'Opens the debt details',
     },
     detail: {

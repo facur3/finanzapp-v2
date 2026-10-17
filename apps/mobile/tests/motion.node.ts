@@ -271,6 +271,15 @@ test('form selectors keep the category hue and give the account the interaction 
   const none = selector(render('AccountField', { accounts, value: '', onChange: () => {}, prominent: true }));
   assert.equal(tileOf(none).props.color, undefined);
   assert.equal(tileOf(none).props.tone, 'neutral');
+  // 25D2: the page-sheet picker answers VoiceOver's escape (the two-finger scrub) as Cancelar, inside one modal view.
+  const expand = (value: any): any[] => !value || typeof value !== 'object' ? [] : Array.isArray(value) ? value.flatMap(expand)
+    : !value.props ? [] : [value, ...(typeof value.type === 'function' ? expand(value.type(value.props)) : expand(value.props.children))];
+  const sheet = expand(render('AccountField', { accounts, value: 'a', onChange: () => {}, prominent: true })).find(node => node.type === 'Modal');
+  assert.equal(sheet.props.presentationStyle, 'pageSheet');
+  const modal = expand(sheet).find(node => typeof node.props.onAccessibilityEscape === 'function');
+  assert.ok(modal, 'the scrub closes the picker');
+  assert.equal(modal.props.accessibilityViewIsModal, true);
+  assert.equal(modal.props.onAccessibilityEscape, sheet.props.onRequestClose, 'the same handler as the swipe-down and Cancelar');
 });
 
 test('25Q4: every haptic comes from motion.tsx, and a write that taps Success also taps Error or Warning when it fails', () => {

@@ -362,7 +362,11 @@ export default function ReportsScreen() {
             tile carries the merchant's category, the one identity it really has. No decorative podium colours. The hairline starts
             under the text. */}
         <View>
-          {merchants.map((merchant, index) => <View key={merchant.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 60 }}>
+          {/* 25D2: one VoiceOver stop per row (four before, the first a lone digit): rank, merchant, purchases, category, amount. */}
+          {merchants.map((merchant, index) => <View key={merchant.key} accessible accessibilityLanguage={speechLanguage}
+            accessibilityLabel={t('reports.merchants.rowSpoken', { rank: index + 1, merchant: merchant.merchant, purchases: t('reports.merchants.purchases', { count: merchant.count }),
+              category: lookOf(merchant.category).label, amount: spoken(merchant.amountMinor) })}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 60 }}>
             <AppText tertiary variant="footnote" style={{ width: 16, textAlign: 'center', fontVariant: ['tabular-nums'], fontWeight: '600' }}>{index + 1}</AppText>
             <CategoryBadge category={merchant.category} size={32} />
             <View style={{ flex: 1, minWidth: 0, alignSelf: 'stretch', justifyContent: 'center', paddingVertical: 10,

@@ -124,18 +124,21 @@ export function SectionTitle({ children, action, onAction, caption, captionLabel
   children: ReactNode; action?: string; onAction?: () => void; caption?: string; captionLabel?: string; quiet?: boolean;
 }) {
   const p = usePalette();
+  // 25D2: the action names its section after its own words («Ver todos, Próximos compromisos»): two «Ver todos» on one
+  // screen were one name twice in the rotor and in Voice Control, which still finds it by the visible words it starts with.
+  const actionName = action && typeof children === 'string' ? action + ', ' + children : action;
   return <View style={styles.sectionHeading}>
     <View style={{ flex: 1, gap: 2 }}>
       <AppText accessibilityRole="header" variant="headline">{children}</AppText>
       {caption && <AppText secondary variant="footnote" accessibilityLabel={captionLabel}>{caption}</AppText>}
     </View>
     {action && onAction && (quiet
-      ? <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={action} onPress={onAction} hitSlop={{ top: 4, bottom: 4 }}
+      ? <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={actionName} onPress={onAction} hitSlop={{ top: 4, bottom: 4 }}
         style={{ paddingLeft: 12, minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 2 }}>
         <AppText variant="footnote" style={{ color: p.link, fontWeight: '500' }}>{action}</AppText>
         <Ionicons name="chevron-forward" size={13} color={p.link} accessible={false} />
       </PressFeedback>
-      : <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={action} onPress={onAction} hitSlop={{ top: 4, bottom: 4 }}
+      : <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={actionName} onPress={onAction} hitSlop={{ top: 4, bottom: 4 }}
         style={{ paddingLeft: 12, minHeight: 36 }}>
         <AppText variant="subhead" style={{ color: p.primary, fontWeight: '500' }}>{action}</AppText>
       </PressFeedback>)}
@@ -658,33 +661,41 @@ export function Money({ minor, currency, large = false, color, signed = false, s
  * into short fragments (the currency code or the amount alone on a line). */
 export const DETAIL_INLINE_LIMIT = 30;
 
-export function DetailRow({ label, value, spokenValue, icon, leading, onPress, last = false, disabled = false, tone = 'neutral', layout = 'auto' }: {
+export function DetailRow({ label, value, spokenValue, spokenLabel, hint, icon, leading, onPress, last = false, disabled = false, tone = 'neutral', layout = 'auto' }: {
   label: string; value: string; icon?: IconName; onPress?: () => void; last?: boolean; disabled?: boolean; tone?: Tone;
   /** What VoiceOver says for the value when the shown one would be misread: an
    * amount from the spoken formatters (the language's decimal mark, no
-   * grouping) or a date written out ("22 de septiembre de 2026"). A pressable
-   * row reads label + ': ' + this; a plain row gives it to the value text. The
-   * visible value is unchanged. */
+   * grouping) or a date written out ("22 de septiembre de 2026"). Every row is
+   * one VoiceOver element read label + ': ' + this (25D2: a plain row was two
+   * stops, the value heard without its name). The visible value is unchanged. */
   spokenValue?: string;
+  /** 25D2: the label VoiceOver says when the visible one depends on what stands beside it (Comparar's «Este período»
+   * under a category name it does not repeat). It starts with the visible label, so Voice Control still finds the row. */
+  spokenLabel?: string;
+  /** 25D2: what a pressable row opens, for VoiceOver. */
+  hint?: string;
   /** An identity tile (an account's look, a Más row) in place of the bare glyph. */
   leading?: ReactNode;
   /** `auto` stacks at large text or when the pair is long; `stacked` always; `inline` only at large text. */
   layout?: 'auto' | 'stacked' | 'inline';
 }) {
   const p = usePalette();
+  const { speechLanguage } = useI18n();
   const large = useStacked();
   const stacked = layout === 'stacked' || large || (layout === 'auto' && label.length + value.length > DETAIL_INLINE_LIMIT);
   const content = <>
     {leading ?? (icon && <Ionicons name={icon} size={20} color={tone === 'neutral' ? p.secondary : toneColors(p, tone).color} accessible={false} />)}
     <View style={{ flex: 1, minWidth: 0, gap: 3, flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center' }}>
       <AppText secondary variant="subhead" style={{ flexShrink: 1 }}>{label}</AppText>
-      <AppText accessibilityLabel={spokenValue} style={{ flex: stacked ? undefined : 1, textAlign: stacked ? 'left' : 'right', flexShrink: 1 }}>{value}</AppText>
+      <AppText style={{ flex: stacked ? undefined : 1, textAlign: stacked ? 'left' : 'right', flexShrink: 1 }}>{value}</AppText>
     </View>
     {onPress && <Ionicons name="chevron-forward" size={16} color={p.tertiary} accessible={false} />}
   </>;
   const style: StyleProp<ViewStyle> = [styles.detailRow, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, opacity: disabled ? 0.6 : 1 }];
-  return onPress ? <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={label + ': ' + (spokenValue ?? value)}
-    disabled={disabled} accessibilityState={{ disabled }} onPress={onPress} style={style}>{content}</PressFeedback> : <View style={style}>{content}</View>;
+  const spoken = (spokenLabel ?? label) + ': ' + (spokenValue ?? value);
+  return onPress ? <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={spoken} accessibilityHint={hint}
+    disabled={disabled} accessibilityState={{ disabled }} onPress={onPress} style={style}>{content}</PressFeedback>
+    : <View accessible accessibilityLabel={spoken} accessibilityLanguage={speechLanguage} style={style}>{content}</View>;
 }
 
 /** A row that leads somewhere: a tinted identity tile or a neutral glyph, the
@@ -845,7 +856,7 @@ export function EntryRow({ entry, account, last = false, showDate = true, showAc
 }) {
   const p = usePalette();
   const day = useCurrentDay();
-  const { t, relativeDate, spokenAmount } = useI18n();
+  const { t, relativeDate, spokenMoney } = useI18n();
   const dateLabel = relativeDate(entry.dateISO, day);
   const income = entry.kind === 'income';
   // 24T3 (A26): a line a devolución or an adelanto de cuotas projected. A devolución is a contra-expense (stored negative
@@ -868,7 +879,7 @@ export function EntryRow({ entry, account, last = false, showDate = true, showAc
     : component === undefined ? [entry.merchant, t(income ? 'movement.incomeWord' : 'movement.expenseWord')]
       : [t('operations.row.payoffWord'), ...(component === 'principal' ? [] : [t(`operations.row.payoffShareSpoken.${component}`)]), entry.merchant];
   return <PressFeedback feedback="highlight" accessibilityRole="button"
-    accessibilityLabel={[...spokenKind, ...(voided ? [t(refund ? 'rows.undoneTransfer' : 'rows.undone')] : []), spokenAmount(amount.minor, account.currency), category, account.name, dateLabel].join(', ')}
+    accessibilityLabel={[...spokenKind, ...(voided ? [t(refund ? 'rows.undoneTransfer' : 'rows.undone')] : []), spokenMoney(amount.minor, account.currency), category, account.name, dateLabel].join(', ')}
     onPress={() => router.push(operationId !== undefined ? { pathname: '/operation/[id]', params: { id: operationId } } : { pathname: '/entry/[id]', params: { id: entry.id } })}
     style={[styles.row, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
     {refund ? <GlyphTile icon="arrow-undo-outline" />
@@ -895,11 +906,11 @@ export function AccountRow({ account, entries, transfers, last = false, accessib
   accessibility?: Pick<PressableProps, 'accessibilityActions' | 'onAccessibilityAction'>;
 }) {
   const p = usePalette();
-  const { t, spokenAmount, locale } = useI18n();
+  const { t, spokenMoney, locale } = useI18n();
   const { width, fontScale } = useWindowDimensions();
   const balance = accountBalanceMinor(account, entries, transfers);
   const stacked = rowStacks(width - ROW_CHEVRON, fontScale, rowAmountText(balance, account.currency, false, locale));
-  return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={t('rows.accountLabel', { name: account.name, amount: spokenAmount(balance, account.currency) })}
+  return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={t('rows.accountLabel', { name: account.name, amount: spokenMoney(balance, account.currency) })}
     {...accessibility} onPress={() => router.push({ pathname: '/account/[id]', params: { id: account.id } })}
     style={[styles.row, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
     <AccountBadge accountId={account.id} />
@@ -933,7 +944,7 @@ export function TransferRow({ transfer: t, accounts, accountId, last = false, sh
 }) {
   const p = usePalette();
   const day = useCurrentDay();
-  const { t: tr, relativeDate, spokenAmount } = useI18n();
+  const { t: tr, relativeDate, spokenMoney } = useI18n();
   const from = accounts.find(a => a.id === t.fromAccountId)!, to = accounts.find(a => a.id === t.toAccountId)!;
   // A debt's hidden account is named from the debt, in the interface language.
   const nameOf = useAccountNameOf();
@@ -951,7 +962,7 @@ export function TransferRow({ transfer: t, accounts, accountId, last = false, sh
   const kindWord = tr('rows.transfer');
   const spokenTitle = (context || title === kindWord ? title : kindWord + ', ' + title) + (voided ? ', ' + tr('rows.undoneTransfer') : '');
   return <PressFeedback feedback="highlight" accessibilityRole="button"
-    accessibilityLabel={tr('rows.transferLabel', { title: spokenTitle, from: fromName, to: toName, amount: spokenAmount(t.amountMinor, from.currency), date }) + (t.note && t.note !== title ? ', ' + t.note : '')}
+    accessibilityLabel={tr('rows.transferLabel', { title: spokenTitle, from: fromName, to: toName, amount: spokenMoney(t.amountMinor, from.currency), date }) + (t.note && t.note !== title ? ', ' + t.note : '')}
     onPress={() => router.push({ pathname: '/transfer/[id]', params: { id: t.id } })}
     style={[styles.row, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
     <GlyphTile icon={context === 'card' ? 'card-outline' : context === 'debt' ? 'people-outline' : 'swap-horizontal-outline'} tone="transfer" />

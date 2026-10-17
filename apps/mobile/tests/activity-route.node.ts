@@ -98,6 +98,8 @@ test('24UX6C: Movimientos composes the search pill, the kind filter and the coun
   assert.deepEqual([search.props.label, search.props.placeholder], ['Buscar movimientos', 'Comercio, categoría o cuenta']);
   const choices = nodes.find(node => node.type === 'Choices')!;
   assert.equal(choices.props.options.map((option: { label: string }) => option.label).join(','), 'Todos,Gastos,Ingresos,Transf.');
+  // 25D2: VoiceOver hears the abbreviated segment whole; the others read as shown.
+  assert.equal(JSON.stringify(choices.props.options.map((option: { spokenLabel?: string }) => option.spokenLabel ?? null)), JSON.stringify([null, null, null, 'Transferencias']));
   assert.ok(nodes.some(node => node.type === 'AppText' && [node.props.children].flat().join('') === '2 movimientos'));
   assert.equal(JSON.stringify(root).includes('new-entry') && JSON.stringify(root).includes('headerRight'), false);
 });

@@ -74,8 +74,12 @@ export default function ReportComparisonScreen() {
         <AppText secondary>{item.deltaMinor === 0 ? t('reports.comparison.noChange')
           : t(item.deltaMinor > 0 ? 'reports.comparison.amountMore' : 'reports.comparison.amountLess', { amount: amount(Math.abs(item.deltaMinor)) })}</AppText>
       </View>
-      <DetailRow label={t('reports.comparison.thisPeriod')} value={amount(item.currentMinor)} spokenValue={spoken(item.currentMinor)} onPress={item.currentCount || item.currentMinor ? () => openCategory(current, item.key) : undefined} />
-      <DetailRow label={t('reports.comparison.previous')} value={amount(item.previousMinor)} spokenValue={spoken(item.previousMinor)} last onPress={(item.previousCount || item.previousMinor) && previous ? () => openCategory(previous, item.key) : undefined} />
+      {/* 25D2: out of reading order (the rotor's Buttons, Voice Control) «Este período» alone was a dozen identical names:
+          each row says its category and where it leads. */}
+      <DetailRow label={t('reports.comparison.thisPeriod')} spokenLabel={t('reports.comparison.rowSpoken', { category: lookOf(item.category).label, period: t('reports.comparison.thisPeriod') })}
+        hint={t('reports.comparison.openHint')} value={amount(item.currentMinor)} spokenValue={spoken(item.currentMinor)} onPress={item.currentCount || item.currentMinor ? () => openCategory(current, item.key) : undefined} />
+      <DetailRow label={t('reports.comparison.previous')} spokenLabel={t('reports.comparison.rowSpoken', { category: lookOf(item.category).label, period: t('reports.comparison.previous') })}
+        hint={t('reports.comparison.openHint')} value={amount(item.previousMinor)} spokenValue={spoken(item.previousMinor)} last onPress={(item.previousCount || item.previousMinor) && previous ? () => openCategory(previous, item.key) : undefined} />
     </Surface>}
     ListFooterComponent={<AppText secondary style={{ fontSize: 12, lineHeight: 18 }}>{t(view.mode === 'consolidated' ? 'fx.comparisonFooter' : 'reports.comparison.footer', { currency: selection.currency })}</AppText>} />;
 }

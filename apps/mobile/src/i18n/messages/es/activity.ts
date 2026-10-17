@@ -7,12 +7,14 @@ export const activity = {
     expenses: 'Gastos',
     incomes: 'Ingresos',
     transfers: 'Transf.',
+    /** 25D2: what VoiceOver says for the short filter segment above. */
+    transfersSpoken: 'Transferencias',
     noMatchesTitle: 'Sin coincidencias',
     noMatchesDetail: 'Probá con otro concepto, categoría o cuenta.',
     clearFilters: 'Limpiar filtros',
     emptyTitle: 'Tu actividad, en un lugar',
     emptyDetail: 'Tus gastos, ingresos y transferencias se ordenan acá por fecha.',
-    /** VoiceOver for a day's net beside its header: "Neto del día 1.234,56 ARS". */
+    /** VoiceOver for a day's net beside its header: "Neto del día 1234,56 pesos" (25D2: the unit in words). */
     dayNet: 'Neto del día {amount}',
     dayNetNegative: 'Neto del día menos {amount}',
     undoneHeader: 'Estos movimientos no cuentan en tus saldos ni reportes. Abrí uno para recuperarlo.',

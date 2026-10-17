@@ -79,7 +79,8 @@ export default function ActivityScreen() {
         <SearchField label={t('activity.search')} placeholder={t('activity.searchPlaceholder')} value={query} onChangeText={setQuery} />
         <Choices value={filter} onChange={setFilter}
           options={[{ value: 'all', label: t('activity.all') }, { value: 'expense', label: t('activity.expenses') }, { value: 'income', label: t('activity.incomes') },
-            { value: 'transfer', label: t('activity.transfers') }]} />
+            // 25D2: the short visible word is heard whole («Transferencias»), never as an abbreviation.
+            { value: 'transfer', label: t('activity.transfers'), spokenLabel: t('activity.transfersSpoken') }]} />
         <AppText secondary variant="footnote" style={{ paddingHorizontal: 4 }}>{t('count.movements', { count })}</AppText>
       </View> : undefined}
       empty={hasRecords ? <EmptyState title={t('activity.noMatchesTitle')} icon="search-outline"

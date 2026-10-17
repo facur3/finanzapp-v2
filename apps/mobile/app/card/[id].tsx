@@ -42,6 +42,8 @@ export default function CardDetailScreen() {
   // A day inside the cycle sentence starts in lower case: "Este ciclo, desde ayer".
   const inline = (iso: string) => relativeDate(iso, day, true);
   const money = (minor: number) => moneyText(minor, account.currency);
+  const movementsCaption = (format: (minor: number) => string) => statementCaption(statement, inline, t)
+    + (statement.refundsMinor > 0 ? t('cards.panel.refunds', { amount: format(statement.refundsMinor) }) : '');
   // «Cuotas futuras $ …» over the plans, with the interest those instalments still carry named beside it, never added in;
   // a sum out of the exact range says so instead of a rounded figure.
   const financing = summary.committedFinancingMinor;
@@ -75,7 +77,8 @@ export default function CardDetailScreen() {
             onPress={() => router.push({ pathname: '/new-transfer', params: { toAccountId: account.id, maxAmountMinor: String(debtMinor) } })} />}
         </View>}
 
-        <SectionTitle caption={statementCaption(statement, inline, t) + (statement.refundsMinor > 0 ? t('cards.panel.refunds', { amount: money(statement.refundsMinor) }) : '')}>{t('cards.panel.movements')}</SectionTitle>
+        {/* 25D2: the refunds' amount is read in words, as the «Cuotas» caption below already was. */}
+        <SectionTitle caption={movementsCaption(money)} captionLabel={movementsCaption(minor => spokenMoney(minor, account.currency))}>{t('cards.panel.movements')}</SectionTitle>
       </View>}
       empty={<AppText secondary variant="subhead">{t(summary.futurePlanCount > 0 ? 'cards.panel.noActivityPlans' : 'cards.panel.noActivity')}</AppText>}
       footer={plans.length > 0 ? <View>

@@ -9,6 +9,7 @@ export const activity: Pick<Messages, 'activity' | 'rows' | 'entryDetail' | 'tra
     expenses: 'Expenses',
     incomes: 'Income',
     transfers: 'Transfers',
+    transfersSpoken: 'Transfers',
     noMatchesTitle: 'No matches',
     noMatchesDetail: 'Try another description, category or account.',
     clearFilters: 'Clear filters',

@@ -469,18 +469,28 @@ test('the currency list is the 146 gated currencies (24M), ARS and USD first, wi
 /** The provider as the device would give it: `device` is the iPhone's first language (null: nothing read). */
 const speaking = (locale: AppLocale, device: string | null) => ({ '../i18n/provider': { useI18n: () => bindLocale(locale, 'native', device) } });
 
-test('a pressable DetailRow reads its spoken twin, a plain one gives it to the value text, and the screen keeps the visible value', () => {
+test('a DetailRow, pressable or plain, is one VoiceOver element that reads its name and its spoken twin; the screen keeps the visible value', () => {
   const ui = load('components.tsx');
   const pressable = ui.render('DetailRow', { label: 'Viernes 22', value: '$ 1.234,56', spokenValue: '1234,56 pesos', onPress: () => {} });
   assert.equal(nodes(pressable).find(node => is(node, 'PressFeedback'))!.props.accessibilityLabel, 'Viernes 22: 1234,56 pesos');
   assert.equal(texts(pressable)[1].props.children, '$ 1.234,56', 'the screen keeps the region\'s grouping');
+  // 25D2: a plain row was two stops (the label, then the value heard without its name): it is one element now.
   const plain = ui.render('DetailRow', { label: 'Banco después', value: 'ARS 1.234,56', spokenValue: '1234,56 ARS' });
-  assert.equal(texts(plain)[1].props.accessibilityLabel, '1234,56 ARS', 'VoiceOver reads the value text by itself: it says the twin');
+  const element = nodes(plain).find(node => is(node, 'View') && node.props.accessible)!;
+  assert.equal(element.props.accessibilityLabel, 'Banco después: 1234,56 ARS');
+  assert.ok('accessibilityLanguage' in element.props, 'UIKit reads an element without a language in the device\'s');
+  const english = load('components.tsx', speaking('en-US', 'es')).render('DetailRow', { label: 'Currency', value: 'ARS' });
+  assert.equal(nodes(english).find(node => node.props.accessible)!.props.accessibilityLanguage, 'en', 'the interface\'s language when the device differs');
+  assert.equal(nodes(plain).filter(node => node.props.accessible).length, 1, 'one stop');
   assert.equal(texts(plain)[1].props.children, 'ARS 1.234,56');
-  // Without a twin nothing changes: the label is the visible pair, the value text has no label of its own.
+  // Without a twin the label is the visible pair.
   const bare = ui.render('DetailRow', { label: 'Moneda', value: 'ARS', onPress: () => {} });
   assert.equal(nodes(bare).find(node => is(node, 'PressFeedback'))!.props.accessibilityLabel, 'Moneda: ARS');
-  assert.equal(texts(ui.render('DetailRow', { label: 'Moneda', value: 'ARS' }))[1].props.accessibilityLabel, undefined);
+  assert.equal(nodes(ui.render('DetailRow', { label: 'Moneda', value: 'ARS' })).find(node => node.props.accessible)!.props.accessibilityLabel, 'Moneda: ARS');
+  // 25D2: a label that leans on its neighbour says what it is about, starting with the visible words; a hint says where it leads.
+  const named = ui.render('DetailRow', { label: 'Este período', spokenLabel: 'Comida, Este período', value: 'ARS 10,00', spokenValue: '10,00 pesos', hint: 'Abre los gastos', onPress: () => {} });
+  const button = nodes(named).find(node => is(node, 'PressFeedback'))!;
+  assert.deepEqual([button.props.accessibilityLabel, button.props.accessibilityHint], ['Comida, Este período: 10,00 pesos', 'Abre los gastos']);
 });
 
 test('AmountShortcut and SelectionRow read their spoken twins; the visible caption and detail are untouched', () => {
@@ -741,8 +751,8 @@ test('24UX2: a movement row shows the name as typed beside its merchant mark, ke
   assert.ok(texts(ui.render('EntryRow', { entry, account })).map(node => [node.props.children].flat().join('')).some(text => text.includes('Banco')));
   // VoiceOver names the row's own account either way, so a hidden caption never hides which account paid.
   const spoken = (props: any) => nodes(ui.render('EntryRow', props)).find(node => is(node, 'PressFeedback'))!.props.accessibilityLabel;
-  assert.equal(spoken({ entry, account, showAccount: false }), 'netflix.com, gasto, 8999,00 ARS, x, Banco, Hoy');
-  assert.equal(spoken({ entry: { ...entry, accountId: 'b' }, account: { ...account, id: 'b', name: 'Efectivo' }, showAccount: true }), 'netflix.com, gasto, 8999,00 ARS, x, Efectivo, Hoy');
+  assert.equal(spoken({ entry, account, showAccount: false }), 'netflix.com, gasto, 8999,00 pesos, x, Banco, Hoy');
+  assert.equal(spoken({ entry: { ...entry, accountId: 'b' }, account: { ...account, id: 'b', name: 'Efectivo' }, showAccount: true }), 'netflix.com, gasto, 8999,00 pesos, x, Efectivo, Hoy');
 });
 
 // ---- 24UX6C: a typed movement is shown as stored; its kind says what it is ------------------------------------
@@ -772,7 +782,7 @@ test('24UX6C: an expense row shows the stored magnitude unsigned in ink, an inco
   assert.ok(drawn(row).includes('$ 1.234,50'), 'the amount reads as stored: ' + drawn(row).join(' | '));
   assert.equal(JSON.stringify(expense), before, 'rendering never changes the entry');
   // VoiceOver still names the kind and the magnitude.
-  assert.equal(pressOf(row).props.accessibilityLabel, 'Café, gasto, 1234,50 ARS, x, Banco, Hoy');
+  assert.equal(pressOf(row).props.accessibilityLabel, 'Café, gasto, 1234,50 pesos, x, Banco, Hoy');
 
   const income = { ...expense, id: 'i', kind: 'income', merchant: 'Sueldo', category: 'Sueldo', amountMinor: 500000 };
   const incomeRow = ui.render('EntryRow', { entry: income, account });
@@ -782,7 +792,7 @@ test('24UX6C: an expense row shows the stored magnitude unsigned in ink, an inco
   assert.equal(plus.props.tone, 'income');
   assert.ok(drawn(incomeRow).some(text => text.startsWith('+')), 'the «+» is drawn: ' + drawn(incomeRow).join(' | '));
   assert.equal(nodes(incomeRow).find(node => node.type === 'Text' && node.props.style?.fontVariant)!.props.style.color, '#1F7A4D', 'in the income green');
-  assert.equal(pressOf(incomeRow).props.accessibilityLabel, 'Sueldo, ingreso, 5000,00 ARS, x, Banco, Hoy');
+  assert.equal(pressOf(incomeRow).props.accessibilityLabel, 'Sueldo, ingreso, 5000,00 pesos, x, Banco, Hoy');
   assert.equal(income.amountMinor, 500000);
 });
 
@@ -810,16 +820,16 @@ test('24UX6C: a transfer row shows the stored amount unsigned in the transfer to
   }
   assert.equal(JSON.stringify(transfer), before, 'rendering never changes the transfer');
   const spoken = (props: Record<string, unknown>) => pressOf(ui.render('TransferRow', { accounts: [bank, cash], ...props })).props.accessibilityLabel;
-  assert.equal(spoken({ transfer }), 'Transferencia, de Banco a Efectivo, 2500,00 ARS, Hoy', 'an untitled transfer says its kind once');
-  assert.equal(spoken({ transfer: { ...transfer, note: 'Alquiler' } }), 'Transferencia, Alquiler, de Banco a Efectivo, 2500,00 ARS, Hoy',
+  assert.equal(spoken({ transfer }), 'Transferencia, de Banco a Efectivo, 2500,00 pesos, Hoy', 'an untitled transfer says its kind once');
+  assert.equal(spoken({ transfer: { ...transfer, note: 'Alquiler' } }), 'Transferencia, Alquiler, de Banco a Efectivo, 2500,00 pesos, Hoy',
     'a note titles the row: the kind leads and the note is not repeated');
-  assert.equal(spoken({ transfer: { ...transfer, note: 'Alquiler' }, accountId: 'a' }), 'Transferencia, Alquiler, de Banco a Efectivo, 2500,00 ARS, Hoy');
+  assert.equal(spoken({ transfer: { ...transfer, note: 'Alquiler' }, accountId: 'a' }), 'Transferencia, Alquiler, de Banco a Efectivo, 2500,00 pesos, Hoy');
   // Card and debt contexts keep their own titles.
-  assert.equal(spoken({ transfer, accountId: 'b', context: 'card' }), 'Pago de tarjeta, de Banco a Efectivo, 2500,00 ARS, Hoy');
-  assert.equal(spoken({ transfer, accountId: 'a', context: 'card' }), 'Transferencia, de Banco a Efectivo, 2500,00 ARS, Hoy');
-  assert.equal(spoken({ transfer, accountId: 'b', context: 'debt' }), 'Pago, de Banco a Efectivo, 2500,00 ARS, Hoy');
-  assert.equal(spoken({ transfer, accountId: 'a', context: 'debt' }), 'Cobro, de Banco a Efectivo, 2500,00 ARS, Hoy');
-  assert.equal(spoken({ transfer: { ...transfer, note: 'Cuota' }, accountId: 'b', context: 'card' }), 'Pago de tarjeta, de Banco a Efectivo, 2500,00 ARS, Hoy, Cuota',
+  assert.equal(spoken({ transfer, accountId: 'b', context: 'card' }), 'Pago de tarjeta, de Banco a Efectivo, 2500,00 pesos, Hoy');
+  assert.equal(spoken({ transfer, accountId: 'a', context: 'card' }), 'Transferencia, de Banco a Efectivo, 2500,00 pesos, Hoy');
+  assert.equal(spoken({ transfer, accountId: 'b', context: 'debt' }), 'Pago, de Banco a Efectivo, 2500,00 pesos, Hoy');
+  assert.equal(spoken({ transfer, accountId: 'a', context: 'debt' }), 'Cobro, de Banco a Efectivo, 2500,00 pesos, Hoy');
+  assert.equal(spoken({ transfer: { ...transfer, note: 'Cuota' }, accountId: 'b', context: 'card' }), 'Pago de tarjeta, de Banco a Efectivo, 2500,00 pesos, Hoy, Cuota',
     'in a card context the note is still read after the facts');
 });
 
@@ -832,21 +842,21 @@ test('25N1: a row of Movimientos deshechos never looks live: the amount in the t
   const [money] = moneyOf(row);
   assert.deepEqual([money.props.minor, money.props.signed, money.props.color], [500000, false, '#8E9098'], 'the stored amount, unsigned, in palette.tertiary');
   assert.equal(drawn(row).some(text => text.startsWith('+')), false, 'no «+» on an undone income: ' + drawn(row).join(' | '));
-  assert.equal(pressOf(row).props.accessibilityLabel, 'Sueldo, ingreso, deshecho, 5000,00 ARS, x, Banco, Hoy');
+  assert.equal(pressOf(row).props.accessibilityLabel, 'Sueldo, ingreso, deshecho, 5000,00 pesos, x, Banco, Hoy');
   const live = ui.render('EntryRow', { entry: income, account: bank });
   assert.deepEqual([moneyOf(live)[0].props.signed, moneyOf(live)[0].props.color], [true, undefined], 'a live row is unchanged');
   const expense = ui.render('EntryRow', { entry: { ...income, kind: 'expense', merchant: 'Café', category: 'Comida' }, account: bank, voided: true });
-  assert.equal(pressOf(expense).props.accessibilityLabel, 'Café, gasto, deshecho, 5000,00 ARS, x, Banco, Hoy');
+  assert.equal(pressOf(expense).props.accessibilityLabel, 'Café, gasto, deshecho, 5000,00 pesos, x, Banco, Hoy');
   // A devolución is feminine: «Devolución, Café, deshecha».
   const refundRow = ui.render('EntryRow', { entry: { ...income, merchant: 'Café', category: 'Comida', refund: { operationId: 'op' } }, account: bank, voided: true });
   assert.match(pressOf(refundRow).props.accessibilityLabel, /^Devolución, Café, deshecha, /);
   const transfer = { id: 't', fromAccountId: 'a', toAccountId: 'b', amountMinor: 250000, dateISO: '2026-09-22', createdAt: 't', note: '' };
   const undoneTransfer = ui.render('TransferRow', { transfer, accounts: [bank, cash], voided: true });
   assert.equal(moneyOf(undoneTransfer)[0].props.color, '#8E9098');
-  assert.equal(pressOf(undoneTransfer).props.accessibilityLabel, 'Transferencia, deshecha, de Banco a Efectivo, 2500,00 ARS, Hoy');
+  assert.equal(pressOf(undoneTransfer).props.accessibilityLabel, 'Transferencia, deshecha, de Banco a Efectivo, 2500,00 pesos, Hoy');
   // Through MovementRow, as EntryList draws them.
   const viaList = ui.render('MovementRow', { item: { type: 'transfer', value: { ...transfer, note: 'Alquiler' }, key: 't' }, accounts: [bank, cash], voided: true });
-  assert.equal(pressOf(viaList).props.accessibilityLabel, 'Transferencia, Alquiler, deshecha, de Banco a Efectivo, 2500,00 ARS, Hoy');
+  assert.equal(pressOf(viaList).props.accessibilityLabel, 'Transferencia, Alquiler, deshecha, de Banco a Efectivo, 2500,00 pesos, Hoy');
 });
 
 test('24UX6C: a computed sign is kept: a negative account balance still renders with its minus', () => {
@@ -890,7 +900,8 @@ test('24UX6E: AccountRow draws the name and the balance only (no «Cuenta · ARS
   const shown = texts(row).map(node => String(node.props.children));
   assert.deepEqual(shown, ['Banco'], 'only the name is an AppText: ' + shown.join(' | '));
   assert.equal(drawn(row).some(text => /Cuenta|·/.test(text)), false, drawn(row).join(' | '));
-  assert.equal(nodes(row).find(node => is(node, 'PressFeedback'))!.props.accessibilityLabel, 'Ver cuenta Banco, saldo 0,00 ARS');
+  // 25D2 (a recorded golden change): a row speaks its unit in words («0,00 pesos»), as docs/currency.md §6 says VoiceOver does; never the ISO code.
+  assert.equal(nodes(row).find(node => is(node, 'PressFeedback'))!.props.accessibilityLabel, 'Ver cuenta Banco, saldo 0,00 pesos');
   assert.ok(nodes(row).some(node => is(node, 'Ionicons') && node.props.name === 'chevron-forward'), 'it still pushes the detail');
 });
 
@@ -932,7 +943,7 @@ test('24UX6D: in a card\'s lists a purchase and a recorded instalment are unsign
   assert.equal(JSON.stringify([money.props.minor, money.props.signed, money.props.tone]), JSON.stringify([30000, false, 'transfer']), 'a payment is a transfer, never an expense');
   assert.equal(nodes(row).find(node => node.type === 'Text' && node.props.style?.fontVariant)!.props.style.color, '#2D6476');
   assert.ok(drawn(row).includes('Pago de tarjeta'), drawn(row).join(' | '));
-  assert.match(pressOf(row).props.accessibilityLabel, /^Pago de tarjeta, de Banco a Visa Gold, 300,00 ARS, /);
+  assert.match(pressOf(row).props.accessibilityLabel, /^Pago de tarjeta, de Banco a Visa Gold, 300,00 pesos, /);
 });
 
 // ---- 24T3: the lines a devolución and an adelanto de cuotas project (A26) ---------------------------------------
@@ -951,7 +962,7 @@ test('24T3: a devolución line reads «Devolución · comercio», unsigned in in
   assert.ok(drawn(row).includes('Devolución · Zara'), drawn(row).join(' | '));
   assert.equal(nodes(row).some(node => is(node, 'MerchantBadge')), false, 'its own glyph, not the purchase\'s');
   assert.equal(nodes(row).find(node => is(node, 'GlyphTile'))!.props.icon, 'arrow-undo-outline');
-  assert.equal(pressOf(row).props.accessibilityLabel, 'Devolución, Zara, 200,00 ARS, x, Banco, Hoy', 'the kind word first');
+  assert.equal(pressOf(row).props.accessibilityLabel, 'Devolución, Zara, 200,00 pesos, x, Banco, Hoy', 'the kind word first');
   pressOf(row).props.onPress();
   assert.equal(JSON.stringify(pushed.pop()), JSON.stringify({ pathname: '/operation/[id]', params: { id: 'r1' } }));
   assert.equal(refund.amountMinor, -20000, 'the line is never changed');
@@ -961,17 +972,17 @@ test('24T3: a devolución line reads «Devolución · comercio», unsigned in in
   const payoff = ui.render('EntryRow', { entry: principal, account });
   assert.ok(drawn(payoff).includes('Adelanto de cuotas · Electro'));
   assert.ok(nodes(payoff).some(node => is(node, 'MerchantBadge')), 'recognised card spending keeps the purchase\'s tile');
-  assert.equal(pressOf(payoff).props.accessibilityLabel, 'Adelanto de cuotas, Electro, 400,00 ARS, x, Banco, Hoy');
+  assert.equal(pressOf(payoff).props.accessibilityLabel, 'Adelanto de cuotas, Electro, 400,00 pesos, x, Banco, Hoy');
   pressOf(payoff).props.onPress();
   assert.equal(JSON.stringify(pushed.pop()), JSON.stringify({ pathname: '/operation/[id]', params: { id: 'p1' } }));
   const interest = ui.render('EntryRow', { entry: { ...principal, id: 'p1_i', amountMinor: 400, payoff: { ...principal.payoff, component: 'interest' } }, account });
   assert.ok(drawn(interest).includes('Adelanto de cuotas · interés · Electro'));
-  assert.equal(pressOf(interest).props.accessibilityLabel, 'Adelanto de cuotas, interés, Electro, 4,00 ARS, x, Banco, Hoy');
+  assert.equal(pressOf(interest).props.accessibilityLabel, 'Adelanto de cuotas, interés, Electro, 4,00 pesos, x, Banco, Hoy');
   // An ordinary movement keeps its row and its route.
   const plain = ui.render('EntryRow', { entry: { ...principal, id: 'e', payoff: undefined }, account });
   pressOf(plain).props.onPress();
   assert.equal(JSON.stringify(pushed.pop()), JSON.stringify({ pathname: '/entry/[id]', params: { id: 'e' } }));
-  assert.equal(pressOf(plain).props.accessibilityLabel, 'Electro, gasto, 400,00 ARS, x, Banco, Hoy');
+  assert.equal(pressOf(plain).props.accessibilityLabel, 'Electro, gasto, 400,00 pesos, x, Banco, Hoy');
 });
 
 test('25OPS1: Screen and EntryList (Más, Movimientos) take the dock clearance as bottom padding; a pushed screen keeps its own', () => {
@@ -1097,6 +1108,8 @@ test('25VIS2: a section\'s plain action reaches 44 pt with slop, as the quiet on
     const action = nodes(heading).find(node => is(node, 'PressFeedback'))!;
     assert.equal(flat(action.props.style).minHeight, 36, 'drawn as before');
     assert.ok(36 + action.props.hitSlop.top + action.props.hitSlop.bottom >= 44, quiet ? 'quiet' : 'plain');
+    // 25D2: the action says which section it belongs to, after the words it shows (Voice Control: «Tocar Ver todos»).
+    assert.equal(action.props.accessibilityLabel, 'Ver todos, Presupuestos');
   }
 });
 

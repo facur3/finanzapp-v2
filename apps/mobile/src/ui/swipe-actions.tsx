@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { Pressable, View, type AccessibilityActionEvent } from 'react-native';
 import Swipeable, { type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -27,13 +27,17 @@ export function SwipeRow({ actions, children, background }: { actions: SwipeActi
   const p = usePalette();
   const { speechLanguage } = useI18n();
   const methods = useRef<SwipeableMethods | null>(null);
+  // 25D2: the actions stay mounted under a closed row (Gesture Handler only fades them out), where VoiceOver would reach
+  // each one as a second stop beside the row's own custom actions. Hidden from it until the row is open.
+  const [open, setOpen] = useState(false);
   if (!actions.length) return <>{children}</>;
   const fill = (tone: SwipeAction['tone']) => tone === 'destructive' ? p.swipeDestructive : tone === 'accent' ? p.swipeAccent : p.swipeNeutral;
   return <Swipeable ref={methods} friction={1} overshootRight={false} rightThreshold={(ACTION_WIDTH * actions.length) / 2}
     childrenContainerStyle={{ backgroundColor: background ?? p.surface }}
-    onSwipeableWillOpen={() => { if (openRow && openRow !== methods.current) openRow.close(); openRow = methods.current; }}
-    onSwipeableClose={() => { if (openRow === methods.current) openRow = null; }}
-    renderRightActions={(_progress, _translation, swipeable) => <View style={{ flexDirection: 'row' }}>
+    onSwipeableWillOpen={() => { if (openRow && openRow !== methods.current) openRow.close(); openRow = methods.current; setOpen(true); }}
+    onSwipeableClose={() => { if (openRow === methods.current) openRow = null; setOpen(false); }}
+    renderRightActions={(_progress, _translation, swipeable) => <View style={{ flexDirection: 'row' }}
+      accessibilityElementsHidden={!open} importantForAccessibility={open ? 'auto' : 'no-hide-descendants'}>
       {actions.map(action => <Pressable key={action.key} accessibilityRole="button" accessibilityLabel={action.label} accessibilityLanguage={speechLanguage}
         onPress={() => { swipeable.close(); action.onPress(); }}
         style={({ pressed }) => ({ minWidth: ACTION_WIDTH, paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center', gap: 4,

@@ -390,7 +390,8 @@ test('23.1C2: a day inside a sentence starts in lower case; a day on its own kee
   // 24UX6E: the state line carries the day while the debt is due, so there is no Vencimiento row (nor Tipo, nor Estado).
   assert.deepEqual(detailOf(dueToday), { status: 'Vence hoy', rows: '' });
   assert.deepEqual(detailOf(overdue), { status: 'Vencida · Ayer', rows: '' });
-  assert.deepEqual(rowOf(dueToday), { label: 'Debo a Juan, 300,00 ARS, Vence hoy', caption: 'Debo · Vence hoy' });
+  // 25D2 (a recorded golden change): the debt row speaks the unit in words, never «300,00 ARS».
+  assert.deepEqual(rowOf(dueToday), { label: 'Debo a Juan, 300,00 pesos, Vence hoy', caption: 'Debo · Vence hoy' });
   assert.equal(rowOf(overdue).caption, 'Debo · Vencida · Ayer');
   assert.equal(rowOf(debt).caption, 'Debo · Vence 1 oct', 'a future date is never relative');
   // Closing day 18, today the 20th: the statement opened yesterday.
@@ -404,7 +405,7 @@ test('23.1C2: a day inside a sentence starts in lower case; a day on its own kee
   activeLocale = 'en-US';
   try {
     assert.deepEqual(detailOf(dueToday), { status: 'Due today', rows: '' });
-    assert.deepEqual(rowOf(dueToday), { label: 'I owe Juan, 300.00 ARS, Due today', caption: 'I owe · Due today' });
+    assert.deepEqual(rowOf(dueToday), { label: 'I owe Juan, 300.00 pesos, Due today', caption: 'I owe · Due today' });
     assert.equal(detailOf(debt).status, 'Due Oct 1', 'an English short date keeps its capital month');
     assert.match(caption('cards.tsx'), /^This cycle, since yesterday · /);
   } finally { activeLocale = 'es-AR'; }
@@ -594,7 +595,7 @@ test('24UX4: a closed row says Cerrada and carries its actions for VoiceOver; En
   const row = view.exports.DebtRow({ debt: closed, last: true, actions });
   assert.equal(row.type, 'SwipeRow');
   const press = find(row, 'PressFeedback');
-  assert.equal(press.props.accessibilityLabel, 'Debo a Juan, 300,00 ARS, Cerrada');
+  assert.equal(press.props.accessibilityLabel, 'Debo a Juan, 300,00 pesos, Cerrada');
   assert.equal(JSON.stringify(press.props.accessibilityActions), JSON.stringify([{ name: 'reopen', label: 'Reabrir' }]));
   activeLocale = 'en-AR';
   try {
@@ -771,18 +772,18 @@ test('24UX6E: the detail keeps only the facts the hero does not say: a settled d
 
 test('24UX6E: a debt row reads its day written out, hints that it opens the detail and draws a hairline separator', () => {
   const { press } = rowParts(debt);
-  assert.equal(press.props.accessibilityLabel, 'Debo a Juan, 300,00 ARS, Vence 1 de octubre de 2026');
+  assert.equal(press.props.accessibilityLabel, 'Debo a Juan, 300,00 pesos, Vence 1 de octubre de 2026');
   assert.equal(press.props.accessibilityHint, 'Abre el detalle de la deuda');
   // The list row's own geometry (components.tsx `rowStyle`), then the separator.
   assert.deepEqual(press.props.style[0], { name: 'rowStyle' });
   assert.equal(press.props.style[1].borderBottomWidth, 0.33, 'StyleSheet.hairlineWidth, never 0.5');
   const last = harness('src/ui/liability-rows.tsx').exports.DebtRow({ debt, last: true });
   assert.equal(find(last, 'PressFeedback').props.style[1].borderBottomWidth, 0);
-  assert.equal(rowParts({ ...debt, dueDateISO: '2026-09-19' }).press.props.accessibilityLabel, 'Debo a Juan, 300,00 ARS, Vencida · Ayer');
+  assert.equal(rowParts({ ...debt, dueDateISO: '2026-09-19' }).press.props.accessibilityLabel, 'Debo a Juan, 300,00 pesos, Vencida · Ayer');
   activeLocale = 'en-US';
   try {
     const english = rowParts(debt).press;
-    assert.equal(english.props.accessibilityLabel, 'I owe Juan, 300.00 ARS, Due October 1, 2026');
+    assert.equal(english.props.accessibilityLabel, 'I owe Juan, 300.00 pesos, Due October 1, 2026');
     assert.equal(english.props.accessibilityHint, 'Opens the debt details');
   } finally { activeLocale = 'es-AR'; }
 });

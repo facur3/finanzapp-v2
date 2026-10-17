@@ -20,7 +20,7 @@ export function EntryList({ entries, transfers, accounts, accountId, header, emp
 }) {
   const p = usePalette();
   const day = useCurrentDay();
-  const { t, locale, moneyText, spokenAmount } = useI18n();
+  const { t, locale, moneyText, spokenMoney } = useI18n();
   const sections = useMemo(() => groupActivity(mergeActivity(entries, transfers)), [entries, transfers]);
   // 25UX1: Movimientos runs under the floating dock (see `Screen`); a pushed list keeps its padding (clearance 0).
   const dock = useDockInset();
@@ -43,7 +43,7 @@ export function EntryList({ entries, transfers, accounts, accountId, header, emp
           {activityDateLabel(section.dateISO, day, locale)}
         </AppText>
         {net && net.minor !== 0 && <AppText secondary variant="footnote" style={{ fontVariant: ['tabular-nums'] }}
-          accessibilityLabel={t(net.minor < 0 ? 'activity.dayNetNegative' : 'activity.dayNet', { amount: spokenAmount(Math.abs(net.minor), net.currency) })}>
+          accessibilityLabel={t(net.minor < 0 ? 'activity.dayNetNegative' : 'activity.dayNet', { amount: spokenMoney(Math.abs(net.minor), net.currency) })}>
           {net.minor < 0 ? '−' : '+'}{moneyText(Math.abs(net.minor), net.currency)}
         </AppText>}
       </View>;
