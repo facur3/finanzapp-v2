@@ -1,14 +1,14 @@
 /** 25O1: the visual marks of a region and of a currency (owner, 2026-10-17: «indicadores visuales de países en el
  * selector de Región y, cuando corresponda, en las cuentas»). Pure, so Node pins every code.
  *
- * Semantics, kept apart on purpose (docs/i18n.md §5a):
+ * Semantics, kept apart on purpose (docs/i18n.md §11a.2, docs/currency.md §1):
  *   - A region is a country or territory: its own flag.
  *   - A currency shows the flag of its issuer, always beside its code («🇺🇸 USD»): a mark of the currency, never a claim
  *     about where an account is (an Argentine bank's dollar account is still in Argentina). ISO 4217 names the issuer in
  *     the code's first two letters; the euro is the European Union's; a supranational code (X…: XOF, XAF, XCD, XCG, XPF)
  *     has no single issuer and gets no flag.
  *   - A language never shows a flag (Spanish is not Spain's): its autonym says it.
- *   - An account has no country (it has a currency); adding one would change what the ledger stores (owner decision D16).
+ *   - An account has no country (it has a currency); adding one would change what the ledger stores (an open owner decision).
  *
  * Flags are the system's emoji (regional indicator pairs), so they scale with Dynamic Type and look like iOS's own; a
  * mark is decoration beside a name that already says it, so VoiceOver never reads it (marks.tsx). */
