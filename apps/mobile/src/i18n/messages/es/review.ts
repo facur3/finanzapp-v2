@@ -105,6 +105,8 @@ export const review = {
       placementNext: 'El siguiente',
       noInterest: 'Sin interés. Una compra financiada se registra desde el formulario de compra.',
       categoryNote: 'Solo una categoría que ya uses: una nueva se crea desde el formulario de gasto o ingreso.',
+      /** Under the merchant field when it holds a character nobody can see (pasted text): saving waits until it is retyped. */
+      hiddenCharacters: 'Este nombre tiene caracteres invisibles de un texto copiado. Escribilo de nuevo.',
       /** 25Q4: Guardar cambios failed with an error the catalogue does not know; the fields stay on screen. */
       saveFailed: 'No pudimos guardar los cambios. La propuesta sigue como estaba.',
     },

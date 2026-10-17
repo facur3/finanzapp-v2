@@ -1049,3 +1049,45 @@ test('a quick double tap on Editar presents one editor, in the sheet and in the 
     assert.equal(view.pushed.length, 2, file + ': the latch opens again once the screen is in front');
   }
 });
+
+test('the editor never shows an archived category as chosen: the field starts empty, saving without a choice keeps the gap, choosing another clears it', async () => {
+  const custom = domain.editedCategoryDefinition(domain.resolveCategory('expense', 'Mascotas'), { label: 'Mascotas' }, createdAt);
+  const archived: domain.LedgerArchive = { ...archive, categories: [{ ...custom, archived: true }] };
+  const item = itemOf(drafted({ category: 'Mascotas' }, archived));
+  const { ledger, root } = editor(item, { review: trayOf([item]), calls: [], archive: archived });
+  assert.equal(field(root(), 'CategoryField').props.value, '', 'the field reads «Elegir categoría», and so the picker adds no archived item');
+  button(root(), 'Guardar cambios')!.props.onPress();
+  await settle();
+  const kept = (ledger.calls[0] as any[])[3] as domain.ReviewDraft;
+  assert.ok(domain.reviewGaps(kept, archived as domain.ReviewArchive, today).includes('category'), 'still a gap, never confirmable');
+  field(root(), 'CategoryField').props.onChange('Supermercado');
+  assert.equal(field(root(), 'CategoryField').props.value, 'Supermercado');
+  ledger.calls.length = 0;
+  button(root(), 'Guardar cambios')!.props.onPress();
+  await settle();
+  assert.ok(!domain.reviewGaps((ledger.calls[0] as any[])[3] as domain.ReviewDraft, archived as domain.ReviewArchive, today).includes('category'));
+});
+
+test('the editor checks where it is typed: hidden characters in the merchant and a typed count outside 2-120 are named under their field and hold Guardar cambios', async () => {
+  const item = itemOf(drafted({ destinationId: cardAccount.id, purchase: { mode: 'installments', count: null, placement: 'current' } }));
+  const { ledger, root } = editor(item);
+  const merchant = () => all(root(), 'Field').find(node => /comercio|concepto/i.test(node.props.label))!;
+  merchant().props.onChangeText('Coto' + String.fromCharCode(0x200b));
+  assert.ok(texts(root()).includes('Este nombre tiene caracteres invisibles de un texto copiado. Escribilo de nuevo.'));
+  assert.equal(button(root(), 'Guardar cambios')!.props.disabled, true);
+  merchant().props.onChangeText('Coto');
+  assert.equal(button(root(), 'Guardar cambios')!.props.disabled, false);
+  assert.ok(!texts(root()).some(text => /invisibles/.test(text)));
+  // «Otra» with 1 (or 150) typed: said, and Save waits, instead of saving «sin cantidad» without a word.
+  choices(root())[2].props.onChange('other');
+  all(root(), 'Field').at(-1)!.props.onChangeText('1');
+  assert.ok(texts(root()).includes(bindLocale('es-AR').t('entryForm.plan.countInvalid')));
+  assert.equal(button(root(), 'Guardar cambios')!.props.disabled, true);
+  all(root(), 'Field').at(-1)!.props.onChangeText('15');
+  assert.equal(button(root(), 'Guardar cambios')!.props.disabled, false);
+  button(root(), 'Guardar cambios')!.props.onPress();
+  await settle();
+  assert.deepEqual(((ledger.calls[0] as any[])[3] as domain.ReviewDraft).purchase, { mode: 'installments', count: 15, placement: 'current' });
+  assert.equal(domain.hasHiddenCharacters('Coto'), false);
+  assert.equal(domain.hasHiddenCharacters('Co' + String.fromCharCode(0x202e) + 'to'), true);
+});

@@ -93,6 +93,7 @@ export const review: Pick<Messages, 'review'> = {
       placementNext: 'The next one',
       noInterest: 'No interest. A financed purchase is recorded from the purchase form.',
       categoryNote: 'Only a category you already use: a new one is created from the expense or income form.',
+      hiddenCharacters: 'This name has invisible characters from copied text. Type it again.',
       saveFailed: 'We couldn’t save your changes. The proposal is unchanged.',
     },
   },
