@@ -81,7 +81,7 @@ export const darkPalette: typeof lightPalette = {
   /** Brand text on the near-black: a periwinkle sapphire (4.8:1 even on the elevated step), far enough from the slate
    * transfer in colourfulness (the lighter #9DB4FF was the slate's own lightness). */
   primary: '#7E9BF7',
-  /** The sapphire fill with white on it (4.8:1). 25O1 (owner sheet D03, decided under the design delegation): the same
+  /** The sapphire fill with white on it (4.8:1). 25O1 (the 25VIS2 owner sheet's choice, decided under the design delegation): the same
    * value as the switch, so the dark theme carries two brand fills instead of three (this one, and the periwinkle «+»). */
   primaryFill: '#4568DA', onPrimary: '#FFFFFF',
   primarySoft: '#19223F',
