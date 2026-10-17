@@ -23,7 +23,7 @@ import { ScreenFailure } from '../src/ui/screen-failure';
 import { UIProvider, themePreferenceStore, usePalette, useReduceMotion } from '../src/ui/theme';
 import { HeldCurrenciesProvider, I18nProvider, useI18n } from '../src/i18n/provider';
 import { defaultPreferenceStore } from '../src/i18n/preference';
-import { markOnboardingDone, onboardingDecision } from '../src/ui/onboarding-flow';
+import { markOnboardingDone, markOnboardingStarted, onboardingDecision } from '../src/ui/onboarding-flow';
 
 void SplashScreen.preventAutoHideAsync().catch(() => {});
 // 24UX6A: the Apariencia choice is read and handed to iOS before the first render, so no frame is drawn in the other scheme.
@@ -69,6 +69,8 @@ function Navigation() {
     if (!snapshot || onboarding !== null) return;
     const decision = onboardingDecision(defaultPreferenceStore, snapshot.accounts.length > 0);
     if (decision === 'existing') markOnboardingDone(defaultPreferenceStore);
+    // 25O1 review: marked before the setup is shown, so a preference saved during it (and a relaunch) keeps it a new installation's.
+    if (decision === 'new') markOnboardingStarted(defaultPreferenceStore);
     setOnboarding(decision);
   }, [snapshot !== null]);
   // 25Q4: the redirect fires once: when the decision is 'new' and the stack exists (the fonts gate it, below). It never

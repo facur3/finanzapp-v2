@@ -147,7 +147,8 @@ function Pop({ value, children }: { value: SharedValue<number>; children: ReactN
 }
 
 /** 2 · «Tarjetas y cuotas, mes a mes.»: a purchase in six instalments as a calendar, the brand's commitments motif: the
- * paid months filled, this month's ring, the two to come as quiet rings, and the instalment due now. */
+ * paid months filled, this month's ring, the two to come as quiet rings, and when this month's instalment falls due
+ * (`storyCalendar`: never a day already past). */
 function Commitments({ play, still, currency }: ArtProps) {
   const p = usePalette();
   const reduced = useReduceMotion();
@@ -239,9 +240,11 @@ function Available({ play, still, currency }: ArtProps) {
   </View>;
 }
 
-export function RecordArt(props: ArtProps) { return <ArtBox size={RECORD}><Record {...props} /></ArtBox>; }
+// 25O1 review: a scene's state belongs to one currency (keyed by it): when the iPhone's Region changes under the story, the
+// scene starts again from the new currency's figures, never a stale keystroke count or figure. The box keeps its room.
+export function RecordArt(props: ArtProps) { return <ArtBox size={RECORD}><Record key={props.currency} {...props} /></ArtBox>; }
 export function CommitmentsArt(props: ArtProps) { return <ArtBox size={COMMITMENTS}><Commitments {...props} /></ArtBox>; }
-export function AvailableArt(props: ArtProps) { return <ArtBox size={AVAILABLE}><Available {...props} /></ArtBox>; }
+export function AvailableArt(props: ArtProps) { return <ArtBox size={AVAILABLE}><Available key={props.currency} {...props} /></ArtBox>; }
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 

@@ -24,7 +24,7 @@ import * as backupFile from '../src/ui/backup-file.ts';
 // Producto 25B, redesigned in 25O1: the first opening. The pure rules (when it is shown, what it suggests, its steps, the
 // illustrations' figures) are tested directly; the route and the illustrations run in harnesses with their hosts replaced
 // by names. Not a rendered iPhone screen: the motion's feel, VoiceOver's focus and the splash need the device.
-const { ONBOARDING_KEY, markOnboardingDone, nextStep, onboardingDecision, previousStep, suggestedCurrency } = onboardingFlow;
+const { ONBOARDING_KEY, ONBOARDING_STARTED, markOnboardingDone, markOnboardingStarted, nextStep, onboardingDecision, previousStep, suggestedCurrency } = onboardingFlow;
 
 function memory(initial: Record<string, string> = {}) {
   const rows = new Map(Object.entries(initial));
@@ -55,6 +55,14 @@ test('a new installation is shown the first opening; anyone with accounts or a s
   assert.equal(onboardingDecision(saved.store, false), 'done');
   const readOnly = memory(); readOnly.faults.set = true;
   assert.equal(markOnboardingDone(readOnly.store), false, 'reported, never thrown');
+  // 25O1 review: a first opening left half-way (the layout marked it started) is still a new installation's while the
+  // ledger is empty, whatever was chosen in it; with accounts (a copy restored before a relaunch) the person has data.
+  const started = memory();
+  assert.deepEqual([markOnboardingStarted(started.store), [...started.rows.entries()]], [true, [[ONBOARDING_KEY, ONBOARDING_STARTED]]]);
+  assert.equal(markOnboardingStarted(readOnly.store), false, 'best effort, never thrown');
+  assert.equal(onboardingDecision(memory({ [ONBOARDING_KEY]: ONBOARDING_STARTED, [LANGUAGE_PREFERENCE_KEY]: 'en' }).store, false), 'new');
+  assert.equal(onboardingDecision(memory({ [ONBOARDING_KEY]: ONBOARDING_STARTED, [REGION_PREFERENCE_KEY]: 'US', [DISPLAY_CURRENCY_KEY]: 'USD' }).store, false), 'new');
+  assert.equal(onboardingDecision(memory({ [ONBOARDING_KEY]: ONBOARDING_STARTED }).store, true), 'existing');
 });
 
 test('the region suggests the first account\'s currency when the build offers it; 25O1: four steps, and no way back from the close', () => {
@@ -117,7 +125,13 @@ test('25O1: the illustrations\' figures: pesos of their own, dollar-like elsewhe
   assert.equal(onboardingFlow.artScale({ width: 345, height: 200 }, size), 200 / 320);
   assert.equal(onboardingFlow.artScale({ width: 345, height: 159 }, size), 0, 'below the minimum, nothing');
   assert.equal(onboardingFlow.artScale({ width: 0, height: 0 }, size), 0, 'not measured yet');
-  assert.deepEqual(onboardingFlow.storyCalendar('2026-10-16'), { months: ['2026-07', '2026-08', '2026-09', '2026-10', '2026-11', '2026-12'], current: 3, due: '2026-10-12' });
+  // 25O1 review (deliberate golden change): the due day is the next 12th, this month's until the 12th and next month's
+  // after it, never a day already past (it read «vence el 12 oct» on 16 October).
+  assert.deepEqual(onboardingFlow.storyCalendar('2026-10-16'), { months: ['2026-07', '2026-08', '2026-09', '2026-10', '2026-11', '2026-12'], current: 3, due: '2026-11-12' });
+  assert.equal(onboardingFlow.storyCalendar('2026-10-12').due, '2026-10-12', 'the 12th itself is not past');
+  assert.equal(onboardingFlow.storyCalendar('2026-10-01').due, '2026-10-12');
+  assert.equal(onboardingFlow.storyCalendar('2026-12-20').due, '2027-01-12', 'across the year');
+  for (let day = '2028-01-01'; day <= '2028-12-31'; day = domain.addDaysISO(day, 1)) assert.ok(onboardingFlow.storyCalendar(day).due >= day, day + ': a due day already past');
   assert.deepEqual(onboardingFlow.storyCalendar('2026-01-31').months, ['2025-10', '2025-11', '2025-12', '2026-01', '2026-02', '2026-03'], 'across a year');
 });
 
@@ -125,6 +139,8 @@ test('25O1: the illustrations\' figures: pesos of their own, dollar-like elsewhe
 
 type Node = { type: any; props: Record<string, any> };
 const jsx = (type: unknown, props: Record<string, unknown>) => ({ type, props });
+/** 25O1 review: the illustrations' runtime keeps an element's key, so a keyed scene can be mounted as React does. */
+const keyedJsx = (type: unknown, props: Record<string, unknown>, key?: unknown) => key === undefined ? { type, props } : { type, props, key };
 const transpile = (path: string) => ts.transpileModule(readFileSync(new URL(path, import.meta.url), 'utf8'),
   { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
 const names = (...list: string[]) => Object.fromEntries(list.map(name => [name, name]));
@@ -211,7 +227,7 @@ const createdAt = '2026-09-26T12:00:00Z';
  * callback runs it at once while focused. `hardwareBack()` is Android's back button: the newest handler first, as
  * React Native asks them; true when one handled it. */
 function harness({ accounts = [] as domain.Account[], reading = device('es-AR', 'AR'), released = HOME_GATE, gate = domain.LEDGER_CURRENCIES, prefs = memory(), failSave = false,
-  reduced = false, os = 'ios' } = {}) {
+  reduced = false, os = 'ios', stacked = false, dark = false } = {}) {
   const localeStore = createLocaleStore({ devices: () => reading, store: prefs.store, released });
   const display: { currency: string | null; mode: string | null } = { currency: null, mode: null };
   const hooks = hookRuntime();
@@ -252,7 +268,10 @@ function harness({ accounts = [] as domain.Account[], reading = device('es-AR', 
         saved.push(account); looks.push(look); ledger.accounts = [...ledger.accounts, account];
       } }) },
     '../src/ui/appearance': appearance,
-    '../src/ui/components': names('ActionButton', 'AmountField', 'AppText', 'ErrorMessage', 'Field', 'GlyphTile', 'IconButton', 'NavigationRow', 'PressFeedback', 'Surface'),
+    '../src/ui/components': { ...names('ActionButton', 'AmountField', 'AppText', 'ErrorMessage', 'Field', 'GlyphTile', 'IconButton', 'NavigationRow', 'PressFeedback', 'Surface'),
+      useStacked: () => stacked },
+    // 25O1 review: the idle bars' ink, as charts.tsx computes it (tests/spending-chart.node.ts pins its contrast).
+    '../src/ui/charts': { idleBarColor: (p: { tertiary: string; isDark: boolean }) => p.tertiary + (p.isDark ? '99' : 'B3') },
     '../src/ui/currency-chip': names('CurrencyChip'),
     '../src/ui/marks': names('InlineFlag'),
     '../src/ui/locale-options': localeOptions,
@@ -265,7 +284,7 @@ function harness({ accounts = [] as domain.Account[], reading = device('es-AR', 
     '../src/ui/onboarding-art': names('AccountCard', 'AvailableArt', 'CommitmentsArt', 'RecordArt'),
     '../src/ui/onboarding-flow': onboardingFlow,
     '../src/ui/theme': { radius: { group: 16 }, space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, type: { display: { fontSize: 40 } },
-      usePalette: () => ({ ...paletteModule.lightPalette, isDark: false }), useReduceMotion: () => reduced },
+      usePalette: () => dark ? { ...paletteModule.darkPalette, isDark: true } : { ...paletteModule.lightPalette, isDark: false }, useReduceMotion: () => reduced },
     '../src/i18n/flags': flags,
     '../src/i18n/preference': { defaultPreferenceStore: prefs.store },
     '../src/i18n/provider': { useI18n: () => bindLocale(localeStore.getState().locale), useLocalePreferences: () => ({ state: localeStore.getState(), setLanguage: localeStore.setLanguage, setRegion: localeStore.setRegion }) },
@@ -306,7 +325,8 @@ function toStart(view: View, language: 'es' | 'en' = 'es') {
 }
 
 test('25O1, a new installation: the story\'s three pages, stepped or swiped, then where the money is, its opening balance and the close; one account saved, the totals\' currency seeded', async () => {
-  const view = harness({ reading: device('en-US', 'US') });
+  // As the layout leaves a new installation: marked started (25O1 review).
+  const view = harness({ reading: device('en-US', 'US'), prefs: memory({ [ONBOARDING_KEY]: ONBOARDING_STARTED }) });
   let root = view.render();
   view.focused();
   assert.equal(view.routes.length, 0, 'eligible: no redirect');
@@ -395,7 +415,7 @@ test('25O1, a new installation: the story\'s three pages, stepped or swiped, the
   assert.equal(find(root, 'SafeAreaView', undefined).props.edges.length, 2);
   assert.equal(nodes(root).some(n => n.type === 'IconButton') || !!skip(root), false, 'no back and no skip on the close');
   assert.equal(view.bars.at(-1), 'light', 'the field\'s own status bar');
-  assert.equal(view.prefs.rows.has(ONBOARDING_KEY), false, 'not done until Get started');
+  assert.equal(view.prefs.rows.get(ONBOARDING_KEY), ONBOARDING_STARTED, 'not done until Get started');
   assert.equal(find(root, 'ActionButton', 'Get started').props.onField, true);
   find(root, 'ActionButton', 'Get started').props.onPress();
   assert.equal(view.prefs.rows.get(ONBOARDING_KEY), 'done');
@@ -555,6 +575,69 @@ test('«Restaurar una copia» opens the import; back with an account in the ledg
   assert.deepEqual([view.prefs.rows.get(ONBOARDING_KEY), JSON.stringify(view.routes.at(-1)), view.saved.length], ['done', JSON.stringify({ replace: '/' }), 0]);
 });
 
+test('25O1 review: accounts that arrive while the story or «¿Dónde tenés tu plata?» is in front end the setup at once, with no focus event (a read retried from the banner, a return to the app)', () => {
+  const restored: domain.Account = { id: 'from-copy', name: 'Efectivo', currency: 'ARS', openingMinor: 0, createdAt };
+  const view = harness();
+  const root = toStart(view);
+  nodes(root).find(n => n.type === 'PressFeedback' && n.props.accessibilityLabel === 'Restaurar una copia')!.props.onPress();
+  view.blurred();
+  view.focused();
+  assert.deepEqual([view.routes.length, view.prefs.rows.has(ONBOARDING_KEY)], [1, false], 'back with nothing read: the setup goes on');
+  // The copy was written but its read failed; «Verificar de nuevo» brings its accounts in while this step is in front.
+  view.ledger.accounts = [restored];
+  view.render();
+  assert.deepEqual([view.prefs.rows.get(ONBOARDING_KEY), JSON.stringify(view.routes.at(-1)), view.saved.length], ['done', JSON.stringify({ replace: '/' }), 0]);
+  const story = harness();
+  story.render();
+  story.ledger.accounts = [restored];
+  story.render();
+  assert.equal(story.prefs.rows.get(ONBOARDING_KEY), 'done', 'on the story too');
+  // Under the import they wait for back (the restore test above); the account step's own save reaches the close (the flow test).
+});
+
+test('25O1 review: Android\'s back belongs to the setup only while it is in front: over it, a chooser or the import keeps its own back and the hidden setup never moves', () => {
+  const view = harness({ os: 'android' });
+  let root = toStart(view);
+  const openers = [() => nodes(root).find(n => n.type === 'PressFeedback' && n.props.accessibilityLabel === 'Restaurar una copia')!.props.onPress(),
+    () => pill(root, 'Región: Argentina')!.props.onPress(), () => pill(root, 'Idioma: Español')!.props.onPress()];
+  for (const open of openers) {
+    open();
+    view.blurred();
+    assert.equal(view.hardwareBack(), false, 'not the setup\'s: the stack pops the pushed screen');
+    root = view.render();
+    assert.deepEqual(headers(root), ['¿Dónde tenés tu plata?'], 'the setup under it never moved');
+    view.focused();
+  }
+  assert.deepEqual(view.routes, [{ push: '/backup-import' }, { push: '/region' }, { push: '/language' }]);
+  assert.equal(view.hardwareBack(), true, 'in front again, back is the setup\'s');
+  assert.equal(progressOf(view.render()), 'Página 3 de 3');
+});
+
+test('25O1 review: the opening balance is one row, the currency chip and then the amount filling the rest; from the stacking threshold, a column', () => {
+  for (const stacked of [false, true]) {
+    const view = harness({ stacked });
+    find(toStart(view), 'NavigationRow', 'Efectivo').props.onPress();
+    const block = nodes(view.render()).find(n => n.type === 'View' && [n.props.children].flat().some((child: Node | false) => !!child && child.type === 'CurrencyChip'))!;
+    const [chip, field] = [block.props.children].flat() as Node[];
+    assert.deepEqual([chip.type, field.props.children.type], ['CurrencyChip', 'AmountField']);
+    assert.deepEqual([block.props.style.flexDirection, block.props.style.alignItems, field.props.style.flex], stacked ? ['column', 'flex-start', undefined] : ['row', 'center', 1],
+      stacked ? 'large text: the amount gets the whole width' : 'beside the chip');
+  }
+});
+
+test('25O1 review: the story\'s progress draws the pages reached in ink and the pages to come in the idle bars\' ink (3:1 on the canvas), never the faint line colour', () => {
+  for (const dark of [false, true]) {
+    const view = harness({ dark });
+    const p = dark ? paletteModule.darkPalette : paletteModule.lightPalette;
+    const segments = () => [...nodes(view.render()).find(n => n.props.accessibilityRole === 'progressbar')!.props.children].map((segment: Node) => segment.props.style.backgroundColor);
+    const idle = p.tertiary + (dark ? '99' : 'B3');
+    assert.deepEqual(segments(), [p.text, idle, idle], dark ? 'dark' : 'light');
+    find(view.render(), 'ActionButton', 'Siguiente').props.onPress();
+    assert.deepEqual(segments(), [p.text, p.text, idle]);
+    assert.equal(segments().includes(p.line), false);
+  }
+});
+
 test('25O1: after a step or a page changes in place, VoiceOver is moved to the new title once it is up; the first page is left to VoiceOver itself', async () => {
   const view = harness();
   let root = view.render();
@@ -638,6 +721,7 @@ test('the root layout sends a new installation to the setup, which arrives as a 
   const layout = readFileSync(new URL('../app/_layout.tsx', import.meta.url), 'utf8');
   assert.match(layout, /onboardingDecision\(defaultPreferenceStore, snapshot\.accounts\.length > 0\)/);
   assert.match(layout, /if \(decision === 'existing'\) markOnboardingDone\(defaultPreferenceStore\)/);
+  assert.match(layout, /if \(decision === 'new'\) markOnboardingStarted\(defaultPreferenceStore\)/, '25O1 review: marked before the setup is shown');
   assert.ok(layout.includes("useEffect(() => { if (onboarding === 'new' && fontsLoaded) router.replace('/onboarding'); }, [onboarding, fontsLoaded]);"), '25Q4: once, with the stack');
   assert.match(layout, /<Stack\.Screen name="onboarding" options=\{\{ headerShown: false, gestureEnabled: false, animation: 'none' \}\} \/>/);
   assert.match(layout, /<Stack\.Screen name="\(tabs\)" options=\{\{ headerShown: false, animation: 'fade' \}\} \/>/);
@@ -732,7 +816,7 @@ test('25Q4: the root layout sends a new installation to the setup exactly once, 
   assert.deepEqual(view.routes, [], 'decided, but the fonts still hold the stack back: nothing to replace yet');
   view.fonts.loaded = true;
   view.render();
-  assert.deepEqual(view.routes, ['/onboarding']);
+  assert.deepEqual([view.routes, view.prefs.rows.get(ONBOARDING_KEY)], [['/onboarding'], ONBOARDING_STARTED], '25O1 review: marked started, never done');
   for (const error of [es.errors.storage.refreshFailed, null, es.errors.storage.installmentsFailed]) {
     view.ledger.error = error;
     view.render();
@@ -745,6 +829,29 @@ test('25Q4: the root layout sends a new installation to the setup exactly once, 
   existing.render();
   assert.deepEqual(existing.routes, []);
   assert.equal(existing.prefs.rows.get(ONBOARDING_KEY), 'done');
+});
+
+test('25O1 review: a first opening left half-way is still the new person\'s: a language chosen from its pill, then iOS relaunching the app from Settings, opens the setup again', () => {
+  const prefs = memory();
+  const launch = () => {
+    const layout = rootLayout({ prefs });
+    layout.ledger.snapshot = { accounts: [], entries: [] };
+    layout.fonts.loaded = true;
+    layout.render();
+    layout.render();
+    return layout;
+  };
+  assert.deepEqual([launch().routes, prefs.rows.get(ONBOARDING_KEY)], [['/onboarding'], ONBOARDING_STARTED]);
+  const view = harness({ prefs });
+  toStart(view);
+  // The pushed Idioma saves English, as Más does; «Abrir Configuración», and iOS quits the app to apply it there.
+  assert.equal(view.localeStore.setLanguage('en'), true);
+  assert.equal(onboardingDecision(prefs.store, false), 'new');
+  assert.deepEqual([launch().routes, prefs.rows.get(ONBOARDING_KEY), prefs.rows.get(LANGUAGE_PREFERENCE_KEY)], [['/onboarding'], ONBOARDING_STARTED, 'en'],
+    'sent to the setup again, never marked done');
+  const reopened = harness({ prefs });
+  assert.deepEqual([progressOf(reopened.render()), reopened.routes.length], ['Page 1 of 3', 0], 'the story again, in English');
+  assert.equal(onboardingDecision(prefs.store, true), 'existing', 'a copy restored before the relaunch: the person has data');
 });
 
 test('25O1: a new installation\'s splash waits for the first opening to draw (the timer only catches one that never does); anyone else\'s lifts once the app is ready', () => {
@@ -807,7 +914,7 @@ function artHarness({ reduced = false, locale = 'es-AR' as AppLocale, day = '202
   const modules: Record<string, unknown> = {
     react: { useState: (initial: unknown) => current.useState(initial), useRef: (initial: unknown) => current.useRef(initial),
       useEffect: (fn: () => void | (() => void), deps?: unknown[]) => current.useEffect(fn, deps) },
-    'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
+    'react/jsx-runtime': { jsx: keyedJsx, jsxs: keyedJsx, Fragment: 'Fragment' },
     'react-native': names('View'),
     'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View', createAnimatedComponent: (component: string) => 'Animated(' + component + ')' },
       useSharedValue: (initial: unknown) => current.useShared(initial), useAnimatedStyle: (fn: () => unknown) => fn, useAnimatedProps: (fn: () => unknown) => fn,
@@ -842,7 +949,19 @@ function artHarness({ reduced = false, locale = 'es-AR' as AppLocale, day = '202
   };
   /** A story scene without its box: the component the exported art wraps. */
   const scene = (name: string, props: Record<string, unknown>) => { const box = module.exports[name](props); return mount(box.props.children.type, box.props.children.props); };
-  return { exports: module.exports, mount, scene, timers, frames, time };
+  /** 25O1 review: an exported scene as React mounts it: the scene in its box keeps its hooks while its key stays and starts
+   * with new ones when the key changes. */
+  const keyed = (name: string) => {
+    let own = hookRuntime(), key: unknown;
+    return { render: (props: Record<string, unknown>) => {
+      const inner = module.exports[name](props).props.children as Node & { key?: unknown };
+      if (inner.key !== key) { own = hookRuntime(); key = inner.key; }
+      current = own;
+      own.reset();
+      return inner.type(inner.props) as Node;
+    } };
+  };
+  return { exports: module.exports, mount, scene, keyed, timers, frames, time };
 }
 /** The animated styles of a scene's Animated.Views, in tree order, each returning a plain object. */
 const animated = (root: Node) => nodes(root).filter(n => n.type === 'Animated.View').map(n => [n.props.style].flat().find(style => typeof style === 'function'))
@@ -932,7 +1051,7 @@ test('25O1: the commitments scene: six months from three before this one, the pa
   const months = nodes(root).filter(n => n.type === 'AppText' && n.props.variant === 'footnote');
   assert.deepEqual(months.map(n => textOf(n.props.children)), ['jul', 'ago', 'sep', 'oct', 'nov', 'dic']);
   assert.deepEqual(months.map(n => n.props.style?.color ?? null), [null, null, null, paletteModule.lightPalette.primary, null, null], 'this month in the brand colour');
-  assert.ok(texts(root).includes('Cuota 4 de 6') && texts(root).includes('vence el 12 oct'));
+  assert.ok(texts(root).includes('Cuota 4 de 6') && texts(root).includes('vence el 12 nov'), '16 October: the next 12th');
   const marks = nodes(root).filter(n => typeof n.type === 'function' && n.type.name === 'Pop');
   assert.ok(marks.every(mark => mark.props.value.value === 0), 'nothing filled before its page is current');
   assert.deepEqual((animated(root).at(-1) as () => unknown)(), { opacity: 0, transform: [{ translateY: 6 }] }, 'the pill waits 6 pt low');
@@ -940,7 +1059,7 @@ test('25O1: the commitments scene: six months from three before this one, the pa
   assert.deepEqual(marks.map(mark => mark.props.value.value.delay), [240, 300, 360, 420], '60 ms apart, left to right, this month last');
   assert.deepEqual([commitments.values().at(-1)!.value.delay, commitments.values().at(-1)!.value.then.to], [600, 1], 'then the pill');
   const english = artHarness({ locale: 'en-US' }).scene('CommitmentsArt', { play: true, still: true, currency: 'USD' }).render();
-  assert.ok(texts(english).includes('Fridge · 6 installments') && texts(english).includes('Installment 4 of 6') && texts(english).includes('due Oct 12'));
+  assert.ok(texts(english).includes('Fridge · 6 installments') && texts(english).includes('Installment 4 of 6') && texts(english).includes('due Nov 12'));
   assert.ok(texts(english).includes(bindLocale('en-US').moneyText(18_400, 'USD')));
 });
 
@@ -970,6 +1089,24 @@ test('25O1: what-is-left counts up on the app\'s curve in whole units and ends e
   assert.deepEqual([shown, [...sizes]], [[0, onboardingFlow.countUp(target, 0.5, 2), target], [size]]);
   assert.equal(shown[1] % 100, 0, 'whole pesos while it counts');
   assert.equal(art.frames.length, 0, 'it stops on the figure');
+});
+
+test('25O1 review: when the iPhone\'s Region changes under the story, a scene starts again from the new currency\'s figures: the yen coffee typed afresh, never a stale keystroke count', () => {
+  const art = artHarness();
+  const { currencySymbol, amountFormat } = bindLocale('es-AR');
+  const typed = (root: Node) => textOf(nodes(root).find(n => n.type === 'AppText' && n.props.style?.fontSize === 56)!.props.children);
+  const record = art.keyed('RecordArt');
+  record.render({ play: true, still: false, currency: 'ARS' });
+  art.timers.run();
+  assert.equal(typed(record.render({ play: true, still: false, currency: 'ARS' })), '$ 2.500');
+  record.render({ play: true, still: false, currency: 'JPY' });
+  art.timers.run();
+  assert.equal(typed(record.render({ play: true, still: false, currency: 'JPY' })), currencySymbol('JPY') + ' ' + moneyInput.displayAmount('680', amountFormat, 'JPY'));
+  // Drawn still (Reduce Motion, or a page seen before): the new currency's final figure at once.
+  const available = art.keyed('AvailableArt');
+  available.render({ play: true, still: true, currency: 'ARS' });
+  const money = find(available.render({ play: true, still: true, currency: 'JPY' }), 'Money');
+  assert.deepEqual([money.props.minor, money.props.currency], [onboardingFlow.sampleFigures('JPY').available, 'JPY']);
 });
 
 test('25O1: the close\'s card: one VoiceOver element with the spoken balance, light ink in both themes, and a check that draws itself after the card starts to rise', () => {
@@ -1026,6 +1163,7 @@ test('25O1: the currency chip shows the issuer\'s flag beside the code, names th
   let root = chip.render(props);
   const button = find(root, 'PressFeedback');
   assert.deepEqual([button.props.accessibilityRole, button.props.accessibilityLabel, button.props.disabled], ['button', 'Moneda: Pesos argentinos', false]);
+  assert.equal(button.props.containerStyle, undefined, '25O1 review: its row places it, centred beside the amount');
   assert.deepEqual([find(button, 'InlineFlag').props.flag, textOf(find(button, 'AppText').props.children), find(button, 'Ionicons').props.name],
     [flags.currencyFlag('ARS'), 'ARS', 'chevron-down']);
   let sheet = find(root, 'CurrencySheet');

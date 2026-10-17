@@ -11,7 +11,8 @@ import { LEDGER_CURRENCIES, draftFitsCurrency, makeAccountAppearance, minorFromL
   type Account, type AccountAppearance, type Currency } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { DEFAULT_LOOK, accountGlyph } from '../src/ui/appearance';
-import { ActionButton, AmountField, AppText, ErrorMessage, Field, GlyphTile, IconButton, NavigationRow, PressFeedback, Surface } from '../src/ui/components';
+import { ActionButton, AmountField, AppText, ErrorMessage, Field, GlyphTile, IconButton, NavigationRow, PressFeedback, Surface, useStacked } from '../src/ui/components';
+import { idleBarColor } from '../src/ui/charts';
 import { CurrencyChip } from '../src/ui/currency-chip';
 import { InlineFlag } from '../src/ui/marks';
 import { languageName, regionName, showsPreference } from '../src/ui/locale-options';
@@ -63,8 +64,10 @@ export default function OnboardingScreen() {
   const reduced = useReduceMotion();
   const { width, fontScale } = useWindowDimensions();
   const display = useDisplayCurrency([]);
+  const stacked = useStacked();
+  const hasAccounts = (snapshot?.accounts.length ?? 0) > 0;
   // The guard: decided once, when this screen mounts, from the same rule as the layout.
-  const [eligible] = useState(() => onboardingDecision(defaultPreferenceStore, (snapshot?.accounts.length ?? 0) > 0) === 'new');
+  const [eligible] = useState(() => onboardingDecision(defaultPreferenceStore, hasAccounts) === 'new');
   const [step, setStep] = useState<OnboardingStep>('story');
   const [page, setPage] = useState(0);
   // The furthest page reached (its scene has played) and whether the story was left and opened again (every scene still).
@@ -85,8 +88,6 @@ export default function OnboardingScreen() {
   const pager = useRef<ScrollView>(null);
   const titles = useRef<Partial<Record<string, Text | null>>>({});
   const lifted = useRef(false);
-  const accounts = useRef(0);
-  accounts.current = snapshot?.accounts.length ?? 0;
   const chosen = currency ?? suggested;
   const locked = busy || !!pending;
 
@@ -96,7 +97,9 @@ export default function OnboardingScreen() {
   const liftSplash = () => { if (!lifted.current) { lifted.current = true; void SplashScreen.hideAsync().catch(() => {}); } };
   useEffect(() => { if (!eligible) { liftSplash(); router.replace('/'); } }, [eligible]);
   // 25O1: back from the import with an account in the ledger (a copy restored), the setup is over: never a duplicate first account.
-  useFocusEffect(useCallback(() => { if (eligible && accounts.current > 0) finish(); }, [eligible]));
+  // 25O1 review: also when the accounts arrive while the story or «¿Dónde tenés tu plata?» is in front (a read retried from the
+  // banner, a return to the app); under the import they wait for back, and the account step's own save still reaches the close.
+  useFocusEffect(useCallback(() => { if (eligible && hasAccounts && (step === 'story' || step === 'start')) finish(); }, [eligible, hasAccounts, step]));
   // The close is the field's own colour under the status bar; every other step the scheme's.
   useEffect(() => { if (eligible) setStatusBarStyle(step === 'done' ? p.heroStatusBar : p.isDark ? 'light' : 'dark', true); }, [step, p.isDark, p.heroStatusBar]);
   // 25O1: a step or page changes in place, with no navigation event, so VoiceOver is moved to the new title once it is up.
@@ -127,11 +130,12 @@ export default function OnboardingScreen() {
   };
   const choose = (next: AccountPreset) => { setPreset(next); setName(t(ACCOUNT_PRESETS[next].name)); setError(null); setStep('account'); };
   // Android: the hardware back mirrors the back button, page by page in the story, and never leaves the setup (a no-op on iOS).
-  useEffect(() => {
+  // 25O1 review: only while the setup is in front; a screen pushed over it (Región, Idioma, the import) keeps its own back.
+  useFocusEffect(useCallback(() => {
     if (Platform.OS !== 'android') return;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => { back(); return true; });
     return () => subscription.remove();
-  }, [step, page, locked]);
+  }, [step, page, locked]));
 
   async function save() {
     if (saving.current) return;
@@ -185,7 +189,8 @@ export default function OnboardingScreen() {
       // One VoiceOver element the bar's full height, so touch exploration finds it; the segments are 4 pt in its middle.
       ? <View accessible accessibilityRole="progressbar" accessibilityLabel={t('onboarding.page', { current: page + 1, total: STORY_PAGES })}
         accessibilityLanguage={speechLanguage} style={{ flex: 1, alignSelf: 'stretch', flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        {STORY.map((item, index) => <Animated.View key={item.lead} style={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: index <= page ? p.text : p.line,
+        {/* 25O1 review: the pages to come in the idle bars' ink, 3:1 on the canvas (the line colour was 1.3:1). */}
+        {STORY.map((item, index) => <Animated.View key={item.lead} style={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: index <= page ? p.text : idleBarColor(p),
           transitionProperty: 'backgroundColor', transitionDuration: reduced ? 0 : duration.state }} />)}
       </View>
       : <View style={{ flex: 1, alignItems: 'flex-start', marginLeft: -10 }}>
@@ -264,10 +269,14 @@ export default function OnboardingScreen() {
         <AppText secondary>{t('onboarding.account.zero')}</AppText>
       </View>
       <View style={{ gap: space.m, marginTop: space.xxl }}>
-        <View style={{ gap: space.xs, padding: space.l, borderRadius: radius.group, backgroundColor: p.surface }}>
+        {/* 25O1 review: the chip, then the amount filling the rest, as one row; a column from the stacking threshold. */}
+        <View style={{ flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center', gap: stacked ? space.xs : space.m, padding: space.l,
+          borderRadius: radius.group, backgroundColor: p.surface }}>
           <CurrencyChip value={chosen} onChange={setCurrency} currencies={gate} disabled={locked} />
-          <AmountField bare label={t('accounts.form.openingBalance')} currency={chosen} value={opening} onChangeText={value => { setOpening(value); setError(null); }}
-            keyboardType="numbers-and-punctuation" inputMode={undefined} editable={!locked} />
+          <View style={stacked ? { alignSelf: 'stretch' } : { flex: 1, minWidth: 0 }}>
+            <AmountField bare label={t('accounts.form.openingBalance')} currency={chosen} value={opening} onChangeText={value => { setOpening(value); setError(null); }}
+              keyboardType="numbers-and-punctuation" inputMode={undefined} editable={!locked} />
+          </View>
         </View>
         <Field label={t('onboarding.account.name')} value={name} onChangeText={setName} maxLength={80} autoCapitalize="words" editable={!locked} />
         <ErrorMessage message={error} />

@@ -3,7 +3,8 @@
  *
  * Rules:
  *   - It is shown once, to a **new** installation only: no accounts, and no language, region or
- *     display-currency preference ever chosen. Anyone else (a ledger with accounts, a preference
+ *     display-currency preference ever chosen, unless it was chosen during a first opening left
+ *     half-way (25O1 review: the started mark). Anyone else (a ledger with accounts, a preference
  *     saved by an earlier build) is an existing person: the flow is marked done silently and
  *     nothing of theirs is read again, written or changed. An unreadable store counts as existing:
  *     never show a setup to someone the app cannot judge. The route checks this itself too, so a
@@ -30,6 +31,9 @@ export { suggestedCurrency } from './currency-defaults.ts';
 
 export const ONBOARDING_KEY = 'finanzapp.onboarding';
 export const ONBOARDING_DONE = 'done';
+/** 25O1 review: written by the layout as it sends a new installation to the first opening, so a preference saved during it
+ * (a language chosen from its pill, then iOS relaunching the app from Settings) stays the new person's own. */
+export const ONBOARDING_STARTED = 'started';
 
 export type OnboardingStep = 'story' | 'start' | 'account' | 'done';
 export const ONBOARDING_STEPS: readonly OnboardingStep[] = ['story', 'start', 'account', 'done'];
@@ -116,10 +120,12 @@ export function artScale(room: { width: number; height: number }, size: { width:
 }
 
 /** 25O1: the commitments page's calendar: the six months from three before today's to two after ("YYYY-MM"), the current
- * one at index 3 (the instalment due now, «Cuota 4 de 6»), and its due day, the 12th of this month. */
+ * one at index 3 («Cuota 4 de 6»), and its due day. 25O1 review: the next 12th, this month's until the 12th and next
+ * month's after it, never a day already past. */
 export function storyCalendar(todayISO: string): { months: string[]; current: number; due: string } {
   const month = todayISO.slice(0, 7);
-  return { months: [-3, -2, -1, 0, 1, 2].map(offset => shiftMonthISO(month, offset)), current: 3, due: month + '-12' };
+  const due = (Number(todayISO.slice(8, 10)) <= 12 ? month : shiftMonthISO(month, 1)) + '-12';
+  return { months: [-3, -2, -1, 0, 1, 2].map(offset => shiftMonthISO(month, offset)), current: 3, due };
 }
 
 export type OnboardingDecision = 'new' | 'existing' | 'done';
@@ -133,6 +139,8 @@ export function onboardingDecision(store: () => PreferenceStore, hasAccounts: bo
     chose = [LANGUAGE_PREFERENCE_KEY, REGION_PREFERENCE_KEY, DISPLAY_CURRENCY_KEY].some(key => kv.getItemSync(key) !== null);
   } catch { return 'existing'; }
   if (stored === ONBOARDING_DONE) return 'done';
+  // 25O1 review: a first opening left half-way goes on while the ledger is empty; the preferences saved in it are its own.
+  if (stored === ONBOARDING_STARTED) return hasAccounts ? 'existing' : 'new';
   return hasAccounts || chose ? 'existing' : 'new';
 }
 
@@ -140,4 +148,10 @@ export function onboardingDecision(store: () => PreferenceStore, hasAccounts: bo
  * store could not be written: the app goes on regardless, and the next launch decides again. */
 export function markOnboardingDone(store: () => PreferenceStore): boolean {
   try { store().setItemSync(ONBOARDING_KEY, ONBOARDING_DONE); return true; } catch { return false; }
+}
+
+/** 25O1 review: records that a new installation was sent to the first opening (best effort, like the done mark); Omitir
+ * and Empezar overwrite it with done. */
+export function markOnboardingStarted(store: () => PreferenceStore): boolean {
+  try { store().setItemSync(ONBOARDING_KEY, ONBOARDING_STARTED); return true; } catch { return false; }
 }

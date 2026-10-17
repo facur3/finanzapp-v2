@@ -245,6 +245,9 @@ test('24UX6B: idle month bars hold 3:1 on their surface in light and dark; the s
     const shown = over(idle, p.surface);
     assert.ok(ratio(shown, p.surface) >= 3, `idle bar on the surface: ${ratio(shown, p.surface).toFixed(2)}`);
     assert.ok(ratio(shown, p.surface) < ratio(p.primary, p.surface), 'the shown month stays the strongest mark');
+    // 25O1 review: the first opening's story draws its pages to come in this ink straight on the canvas, which is darker.
+    const onCanvas = over(idle, p.background);
+    assert.ok(ratio(onCanvas, p.background) >= 3, `idle segment on the canvas: ${ratio(onCanvas, p.background).toFixed(2)}`);
   }
   const points = [{ monthISO: '2026-08', amountMinor: 100, partial: false }, { monthISO: '2026-09', amountMinor: 50, partial: true }];
   const chart = charts.MonthBars({ points, selected: '2026-09', onSelect: () => {}, currency: 'ARS' });
