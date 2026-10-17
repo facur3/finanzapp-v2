@@ -1162,6 +1162,38 @@ test('the keyboard rising keeps a reader at the end at the end, in lockstep and 
   assert.equal(reader.scrolled.length, count);
 });
 
+test('a tap on the status bar to the top unpins the reader: the next streamed word does not pull them back down; the keyboard still never unpins', () => {
+  const view = harness({ client: disconnectedAssistant() });
+  const { list } = view.render();
+  list.props.onLayout({ nativeEvent: { layout: { height: 600 } } });
+  list.props.onContentSizeChange(0, 1700);
+  const before = view.scrolled.length;
+  // The list scrolls itself to the top (no drag, no momentum): only onScrollToTop says so.
+  list.props.onScroll(scrolledTo(0, 1700, 600));
+  list.props.onScrollToTop(scrolledTo(0, 1700, 600));
+  list.props.onContentSizeChange(0, 1750);
+  assert.equal(view.scrolled.length, before, 'a streamed word after the tap leaves the reader at the top');
+  for (const height of [470, 298]) list.props.onLayout({ nativeEvent: { layout: { height } } });
+  assert.equal(view.scrolled.length, before, 'nor does the keyboard');
+  // Content that still fits the viewport is at its end wherever the tap left it.
+  const short = harness({ client: disconnectedAssistant() });
+  const shortList = short.render().list;
+  shortList.props.onLayout({ nativeEvent: { layout: { height: 600 } } });
+  shortList.props.onContentSizeChange(0, 400);
+  shortList.props.onScrollToTop(scrolledTo(0, 400, 600));
+  shortList.props.onContentSizeChange(0, 450);
+  assert.equal(short.scrolled.length, 2);
+  // A reader still at the end after the keyboard rose stays pinned (a keyboard frame never unpins).
+  const pinned = harness({ client: disconnectedAssistant() });
+  const pinnedList = pinned.render().list;
+  pinnedList.props.onLayout({ nativeEvent: { layout: { height: 600 } } });
+  pinnedList.props.onContentSizeChange(0, 1700);
+  for (const height of [470, 298]) pinnedList.props.onLayout({ nativeEvent: { layout: { height } } });
+  const count = pinned.scrolled.length;
+  pinnedList.props.onContentSizeChange(0, 1750);
+  assert.equal(pinned.scrolled.length, count + 1);
+});
+
 test('New chat (session.reset) aborts the request in flight and empties the conversation; a late event from it is ignored', async () => {
   const scripted = scriptedClient();
   const view = harness({ client: scripted.client });

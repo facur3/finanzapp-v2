@@ -76,6 +76,10 @@ test('streaming grows one assistant message in place, the answer finalizes it an
   assert.equal(stopped.phase, 'idle');
   assert.equal(stopped.messages[1].role === 'assistant' && stopped.messages[1].status, 'stopped');
   assert.equal(stopped.messages[1].text, 'Gastaste $84.300 más');
+  // A reply in English stopped mid-stream keeps its language (the place `send` took has none; the first word gives it), so
+  // VoiceOver reads it in English, never with the interface voice.
+  const english = run([{ type: 'send', text: 'Why did I spend more?' }, { type: 'delta', text: 'You spent', language: 'en' }, { type: 'delta', text: ' more', language: 'en' }, { type: 'stop' }]);
+  assert.deepEqual([english.messages[1].role === 'assistant' && english.messages[1].status, english.messages[1].role === 'assistant' && english.messages[1].language], ['stopped', 'en']);
   // Stopping before any token arrived leaves no empty bubble and no orphaned question: the words go back to the composer.
   const early = run([{ type: 'send', text: 'hola' }, { type: 'stop' }]);
   assert.equal(early.messages.length, 0);
@@ -115,19 +119,49 @@ test('questions are explained against evidence; sentences are parsed as actions'
     for (const question of suggestions.filter(s => s.includes('?'))) assert.equal(classifyIntent(question), 'explain', question);
     assert.equal(classifyIntent(t('assistant.suggestions.recordExpense')), 'parse');
   }
-  assert.equal(classifyIntent('how much did I spend on food'), 'explain');
-  assert.equal(classifyIntent('cuánto gasté en comida'), 'explain');
-  assert.equal(classifyIntent('Cómo voy con el presupuesto'), 'explain');
-  assert.equal(classifyIntent('Registrar un gasto'), 'parse');
-  assert.equal(classifyIntent('Gasté 18.500 en Carrefour con la Visa'), 'parse');
-  // A question mark alone does not make a question: a movement with an amount stays a movement (and sends no facts).
-  assert.equal(classifyIntent('Gasté 3.000 en Carrefour con la Visa, ¿está bien?'), 'parse');
-  assert.equal(classifyIntent('Spent 3000 at Carrefour, right?'), 'parse');
-  assert.equal(classifyIntent('¿Cuánto gasté en comida?'), 'explain');
-  assert.equal(classifyIntent('¿Gasté más de 50000 en comida?'), 'explain', 'an opening ¿ asks, amount or not');
-  assert.equal(classifyIntent('Did I spend more on food?'), 'explain');
-  assert.equal(classifyIntent('En comida gasté más que en agosto?'), 'explain');
-  assert.equal(classifyIntent('What did I spend in 2026?'), 'explain');
+  // [text, intent]: a question opening the text, after a «¿» or after a clause, or a «?» sentence that states no amount
+  // (a day, a count or a bound is not one) is explained; a sentence that states an amount is a movement, «?» or not.
+  const table: [string, 'explain' | 'parse'][] = [
+    ['how much did I spend on food', 'explain'],
+    ['cuánto gasté en comida', 'explain'],
+    ['Cómo voy con el presupuesto', 'explain'],
+    ['¿Cuánto gasté en comida?', 'explain'],
+    ['¿Gasté más de 50000 en comida?', 'explain'],
+    ['Did I spend more on food?', 'explain'],
+    ['En comida gasté más que en agosto?', 'explain'],
+    ['What did I spend in 2026?', 'explain'],
+    ['¿Por qué gasté más este mes?', 'explain'],
+    // A mid-sentence opener, or numbers that are a day, a count or a bound, never make a question a movement.
+    ['Este mes, ¿cuánto gasté en las 2 tarjetas?', 'explain'],
+    ['This month, how much did I spend on the 2 cards?', 'explain'],
+    ['Did I spend more than 500 on food?', 'explain'],
+    ['Gasté más de 500 en comida?', 'explain'],
+    ['En qué gasté el 15?', 'explain'],
+    ['What did I spend on the 15th?', 'explain'],
+    ['Gasté más de 50000 en comida este mes?', 'explain'],
+    ['I spent more than $50000 on food this month?', 'explain'],
+    ['Me alcanza para las 3 cuotas?', 'explain'],
+    ['Can I afford the 3 instalments?', 'explain'],
+    ['Gasté mucho el 15/9?', 'explain'],
+    ['Spent a lot on 15/9?', 'explain'],
+    ['Registrar un gasto', 'parse'],
+    ['Record an expense', 'parse'],
+    ['Gasté 18.500 en Carrefour con la Visa', 'parse'],
+    ['Spent 18500 at Carrefour with the Visa', 'parse'],
+    // A question mark alone does not make a question: a movement with an amount stays a movement (and sends no facts).
+    ['Gasté 3.000 en Carrefour con la Visa, ¿está bien?', 'parse'],
+    ['Spent 3000 at Carrefour, right?', 'parse'],
+    ['Spent 3000 at Carrefour, is that right?', 'parse'],
+    ['Gasté 2000 en el súper?', 'parse'],
+    ['Spent 2000 at the supermarket?', 'parse'],
+    ['Gasté 2000 en el súper el 15?', 'parse'],
+    ['Spent 2000 at the supermarket on the 15th?', 'parse'],
+    ['Compré una tele de 90000 en 3 cuotas?', 'parse'],
+    ['Bought a TV for 90000 in 3 instalments?', 'parse'],
+    ['Pagué 500, que era lo del gas', 'parse'],
+    ['Pagué 500 en el súper, como siempre?', 'parse'],
+  ];
+  for (const [text, intent] of table) assert.equal(classifyIntent(text), intent, text);
 });
 
 test('autoscroll follows new content only when the reader is already near the end', () => {
@@ -749,20 +783,22 @@ test('on the last days of a month after a shorter one, «this month» ends where
 
 test('the request and the reply agree on what is invisible: a pasted zero-width character never reaches the model, so a copied merchant is never refused for it', async () => {
   // Every BMP character the device would send (after its own cleaning) is one a reply may also hold in a name, apart from
-  // the line breaks and the tab a message may have. A character in the gap would be admitted at the door and refused at
-  // the exit, after the ask was billed.
+  // the line break a message may have (a reply's prose keeps it). A character in the gap would be admitted at the door and
+  // refused at the exit, after the ask was billed: a tab and a CR are no exception, they become a space and a line break.
   const gap: string[] = [];
   for (let code = 0; code <= 0xffff; code++) {
     if (code >= 0xd800 && code <= 0xdfff) continue;
     const sent = withoutInvisibles('a' + String.fromCharCode(code) + 'b');
     if (!isSafeInputText(sent, PROTOCOL_LIMITS.textChars)) continue;
-    for (const char of sent) if (!['\t', '\n', '\r'].includes(char) && !isSafeModelText('a' + char + 'b', PROTOCOL_LIMITS.merchantChars)) gap.push(code.toString(16));
+    for (const char of sent) if (char !== '\n' && !isSafeModelText('a' + char + 'b', PROTOCOL_LIMITS.merchantChars)) gap.push(code.toString(16));
   }
   assert.deepEqual(gap, []);
   // Visible words, and the joiners of emoji and scripts, are untouched; a line separator is a line break.
   const coder = '👩' + String.fromCharCode(0x200d) + '💻';
   assert.equal(withoutInvisibles('Café ' + coder + ' ' + String.fromCharCode(0xfeff) + 'Coto' + String.fromCharCode(0x200b)), 'Café ' + coder + ' Coto');
   assert.equal(withoutInvisibles('uno' + String.fromCharCode(0x2028) + 'dos'), 'uno\ndos');
+  assert.equal(withoutInvisibles('Café\tDelux'), 'Café Delux', 'a pasted tab is a space');
+  assert.equal(withoutInvisibles('uno\r\ndos\rtres\ncuatro'), 'uno\ndos\ntres\ncuatro', 'CRLF and a lone CR are line breaks');
   const bodies: any[] = [];
   const fetcher = (async (_url: string, init: any) => { bodies.push(JSON.parse(init.body)); return { ok: true, status: 200, json: async () => FIXTURE_CLARIFICATION }; }) as unknown as typeof fetch;
   const client = integrationClient('https://finanzapp.example', async () => 'jwt', fetcher);
