@@ -2,14 +2,14 @@ import { useRef, useState } from 'react';
 import { Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
-import * as Haptics from 'expo-haptics';
 import { accountKind, editedDraftFits, keepsHistoricalCardIncome, minorFromEditedDraft, postingAccountsFor, sameRecurringRule, todayKey, validateRecurringRule, type StoredDraft,
   type EntryKind, type RecurringFrequency, type RecurringRule } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
-import { ActionButton, AmountField, AppText, Choices, EmptyState, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
+import { ActionButton, AmountField, AppText, Choices, EmptyState, ErrorMessage, Field, FieldNote, IconButton, Screen, Surface } from './components';
 import { draftFromMinor } from './money-input';
 import { AccountField, CategoryField, DateField } from './form-controls';
 import { accountKindLabel, postingAccounts } from './liability-presentation';
+import { errorHaptic, successHaptic, warningHaptic } from './motion';
 import { initialAccountId } from './presentation';
 import { space } from './theme';
 import { useI18n } from '../i18n/provider';
@@ -19,7 +19,7 @@ import { useI18n } from '../i18n/provider';
  * like a movement's undo or a debt's close live on theirs. */
 export function RecurringForm({ original, accountId: requestedAccount }: { original?: RecurringRule; accountId?: string }) {
   const { snapshot, archive, saveRecurring } = useLedger();
-  const { t } = useI18n();
+  const { t, failureMessage } = useI18n();
   const [before] = useState(original);
   const accounts = postingAccounts(snapshot?.accounts ?? [], archive?.debts, before?.accountId);
   const [operation] = useState(() => ({ id: randomUUID(), createdAt: new Date().toISOString() }));
@@ -32,7 +32,12 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
   });
   const [amount, setAmount] = useState(stored?.draft ?? '');
   const [merchant, setMerchant] = useState(before?.merchant ?? '');
-  const [category, setCategory] = useState(before?.category ?? '');
+  // 25VIS2 (V2, as in EntryForm): one category per kind. A category belongs to a kind, so the one picked for Gasto never
+  // rides along into Ingreso (Save would store it on an income rule and on every movement the rule records); switching
+  // back finds it again.
+  const [categories, setCategories] = useState<Partial<Record<EntryKind, string>>>(() => ({ [before?.kind ?? 'expense']: before?.category ?? '' }));
+  const category = categories[kind] ?? '';
+  const setCategory = (value: string) => setCategories(current => ({ ...current, [kind]: value }));
   const [frequency, setFrequency] = useState<RecurringFrequency>(before?.frequency ?? 'monthly');
   const [date, setDate] = useState(() => new Date((before?.nextDateISO ?? todayKey()) + 'T12:00:00'));
   const [busy, setBusy] = useState(false);
@@ -69,6 +74,8 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
     setBusy(true);
     setError(null);
     Keyboard.dismiss();
+    // 25Q4: true once the write is sent: a failure after it taps Warning (frozen for the retry), before it Error.
+    let sent = false;
     try {
       let submission = pending;
       if (!submission) {
@@ -112,12 +119,14 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
         validateRecurringRule(submission, accounts);
         setPending(submission);
       }
+      sent = true;
       await saveRecurring(submission);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      successHaptic();
       saving.current = false;
       close();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'recurring.form.saveFailed');
+      setError(failureMessage(cause, 'recurring.form.saveFailed'));
+      if (sent) warningHaptic(); else errorHaptic();
     } finally {
       saving.current = false;
       setBusy(false);
@@ -132,11 +141,12 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
       options={[{ value: 'expense', label: t('movement.expense') }, { value: 'income', label: t('movement.income') }]} />}
     {!eligibleAccounts.length ? <EmptyState title={t('recurring.form.noAccountTitle')}
       /* No account at all, or none this kind may use (a card-only ledger asked for a recurring income): the action adds a
-         cash account, pushed over the draft with the carried card's currency prefilled, so the form and its fields come back. */
+         cash account, pushed over the draft with the carried card's currency prefilled, so the form and its fields come back
+         (25O1: with no account at all too; it was replaced). */
       detail={t(accounts.length ? 'recurring.form.noCashAccountDetail' : 'recurring.form.noAccountDetail')}
-      action={<ActionButton label={t('common.addAccount')} onPress={() => accounts.length
-        ? router.push({ pathname: '/new-account', params: { currency: accounts.find(item => item.id === chosenAccountId)?.currency ?? accounts[0].currency } })
-        : router.replace('/new-account')} />} /> : <>
+      action={<ActionButton label={t('common.addAccount')} onPress={() => router.push(accounts.length
+        ? { pathname: '/new-account', params: { currency: accounts.find(item => item.id === chosenAccountId)?.currency ?? accounts[0].currency } }
+        : '/new-account')} />} /> : <>
       {/* The account (and so the currency) before the amount (24B5): the field types with the right decimals from the first key. */}
       <AccountField label={t(kind === 'expense' ? 'entryForm.paidWith' : 'entryForm.receivedIn')} accounts={eligibleAccounts} value={accountId} onChange={setAccountId} disabled={locked} prominent
         kindOf={id => { const found = accounts.find(item => item.id === id); return found ? accountKindLabel(found, archive?.cards, archive?.debts, t) : t('accountKinds.account'); }}
@@ -151,9 +161,9 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
         onChangeText={setMerchant} maxLength={120} autoCapitalize="sentences" editable={!locked} />
       <ViewFrequency value={frequency} onChange={setFrequency} disabled={locked} />
       <Surface grouped><DateField value={date} onChange={setDate} disabled={locked} allowFuture label={t('recurring.form.nextDate')} /></Surface>
-      <AppText secondary style={{ fontSize: 13, textAlign: 'center' }}>
-        {t('recurring.form.todayNote')}
-      </AppText>
+      {/* 25O1: what a rule does, said where it is created (Recurrentes' empty state no longer carries it): one line, the
+          whole story (today's save, the catch-up, never twice, never a payment) behind its information button. */}
+      <FieldNote help={{ title: t('recurring.form.noteHelpTitle'), detail: t('recurring.form.noteHelp') }}>{t('recurring.form.note')}</FieldNote>
       <ErrorMessage message={error} />
       {pending && !busy && error && <AppText secondary style={{ fontSize: 13, textAlign: 'center' }}>
         {t('recurring.form.retryNote')}

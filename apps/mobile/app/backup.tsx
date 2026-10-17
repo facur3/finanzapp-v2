@@ -13,7 +13,7 @@ import { buildBackupFile } from '../src/ui/backup-file';
  * written, named by its date, and a native failure is told in the app's words. */
 export default function BackupScreen() {
   const { archive } = useLedger();
-  const { t } = useI18n();
+  const { t, failureMessage } = useI18n();
   const [busy, setBusy] = useState(false);
   const sharing = useRef(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +36,7 @@ export default function BackupScreen() {
       await Sharing.shareAsync(target.uri, { mimeType: 'application/json', UTI: 'public.json', dialogTitle: t('backup.export.dialogTitle') }).catch(prepareFailed);
       // The sheet can be cancelled. Do not announce a successful export here.
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'backup.export.prepareFailed');
+      setError(failureMessage(cause, 'backup.export.prepareFailed'));
     } finally {
       try { if (file?.exists) file.delete(); } catch { /* Only our temporary export; the OS can clear the cache later. */ }
       sharing.current = false;

@@ -3,12 +3,15 @@ import { AccessibilityInfo, AppState, Appearance, useColorScheme, type TextStyle
 import { todayKey } from '@finanzapp/domain';
 
 import { defaultPreferenceStore } from '../i18n/preference';
-import { subscribeReduceTransparency } from './material-policy';
+import { subscribeIncreaseContrast, subscribeReduceTransparency } from './material-policy';
 import { darkPalette, lightPalette, type PaletteColors } from './palette';
 import { createThemePreferenceStore, effectiveScheme, type ThemePreference, type ThemePreferenceStore } from './theme-preference';
 
 export type Palette = PaletteColors & {
   isDark: boolean;
+  /** 25D1: iOS's Increase Contrast is on: what is drawn quieter for composition (a hero's symbol and cents) is drawn at
+   * full strength. Absent where no provider answers (a test palette), which reads as off. */
+  increaseContrast?: boolean;
   /** Aliases kept for existing call sites: income/expense semantics. */
   positive: string; negative: string; positiveSoft: string; negativeSoft: string;
 };
@@ -34,12 +37,14 @@ export function usePalette(): Palette {
   const preference = useSyncExternalStore(store.subscribe, store.getState, store.getState);
   const isDark = effectiveScheme(preference, useColorScheme()) === 'dark';
   const base = isDark ? darkPalette : lightPalette;
-  return { ...base, isDark, positive: base.income, negative: base.expense, positiveSoft: base.incomeSoft, negativeSoft: base.expenseSoft };
+  return { ...base, isDark, increaseContrast: useContext(IncreaseContrastContext), positive: base.income, negative: base.expense, positiveSoft: base.incomeSoft, negativeSoft: base.expenseSoft };
 }
 
 /** System font (SF Pro on iOS). Numbers are always tabular so amounts align. */
 export const type = {
   hero: { fontSize: 44, lineHeight: 52, fontWeight: '700', letterSpacing: -1.3, fontVariant: ['tabular-nums'] } as TextStyle,
+  /** 25O1: the first opening's story headlines, a step above the Large Title. */
+  display: { fontSize: 40, lineHeight: 46, fontWeight: '700', letterSpacing: -1.1 } as TextStyle,
   largeTitle: { fontSize: 34, lineHeight: 41, fontWeight: '700', letterSpacing: -0.8 } as TextStyle,
   title1: { fontSize: 28, lineHeight: 34, fontWeight: '700', letterSpacing: -0.6 } as TextStyle,
   title2: { fontSize: 22, lineHeight: 28, fontWeight: '700', letterSpacing: -0.4 } as TextStyle,
@@ -58,12 +63,15 @@ export const space = { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 };
 const ReduceMotionContext = createContext(true);
 // Defaults to true: until iOS answers, a control is drawn on its opaque material, never on a missing effect.
 const ReduceTransparencyContext = createContext(true);
+// Defaults to false: the design as drawn until iOS says Increase Contrast is on.
+const IncreaseContrastContext = createContext(false);
 const DayContext = createContext(todayKey());
 
 // One native accessibility subscription per setting, not one request/listener per row.
 export function UIProvider({ children }: { children: ReactNode }) {
   const [reduced, setReduced] = useState(true);
   const [reducedTransparency, setReducedTransparency] = useState(true);
+  const [increaseContrast, setIncreaseContrast] = useState(false);
   const [day, setDay] = useState(todayKey);
   useEffect(() => {
     let mounted = true;
@@ -71,7 +79,8 @@ export function UIProvider({ children }: { children: ReactNode }) {
     const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduced);
     // iOS only, and feature-detected: an older or mismatched runtime without the API, or one that throws, keeps the opaque material.
     const transparency = subscribeReduceTransparency(AccessibilityInfo as Parameters<typeof subscribeReduceTransparency>[0], setReducedTransparency);
-    return () => { mounted = false; subscription.remove(); transparency(); };
+    const contrast = subscribeIncreaseContrast(AccessibilityInfo as Parameters<typeof subscribeIncreaseContrast>[0], setIncreaseContrast);
+    return () => { mounted = false; subscription.remove(); transparency(); contrast(); };
   }, []);
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
@@ -88,7 +97,8 @@ export function UIProvider({ children }: { children: ReactNode }) {
   }, []);
   return createElement(ReduceMotionContext.Provider, { value: reduced },
     createElement(ReduceTransparencyContext.Provider, { value: reducedTransparency },
-      createElement(DayContext.Provider, { value: day }, children)));
+      createElement(IncreaseContrastContext.Provider, { value: increaseContrast },
+        createElement(DayContext.Provider, { value: day }, children))));
 }
 
 export const useReduceMotion = () => useContext(ReduceMotionContext);

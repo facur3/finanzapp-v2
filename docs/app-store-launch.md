@@ -87,7 +87,7 @@ order of the work: "margins calculated from measured costs before any price" and
 | Local reminders (25D) | Always | No | Guideline 4.10 (notifications); they run on the device at no cost. |
 | Assistant, cloud AI (25A) | No permanent free allowance is promised (owner, 2026-10-04); whether acquisition uses no trial, a StoreKit introductory Pro trial or another compliant introductory offer is a 25F **OWNER DECISION** | **Pro candidate** (owner, 2026-10-04) | The one capability with a real marginal cost per request. Pro is **generous fair use** with invisible anti-abuse controls and monetary ceilings: no permanent message counter, and a warning only near a real limit. The limits come from 25A's AI evaluation and the measured-cost report of 25F, never from a guess. Server-side ceilings apply to every request (production-plan.md §6). |
 | Voice input for the Assistant (25A, last slice) | **OWNER DECISION** | Candidate (owner, 2026-10-04: in the Pro candidate bundle) | A transcription provider adds its own cost per request. |
-| Theme packs (25F) | Electric Lime, the default and current identity | **Pre-launch Pro launch candidate** (owner, 2026-10-04) | Additional themes (for example Forest, Sapphire) selectable once the StoreKit entitlement and paywall exist; each passes light, dark, accessibility and semantic-colour QA before launch. Not built; does not block 25A; before the Mercado Pago consumer-sync research if the schedule allows. |
+| Theme packs (25F) | Sapphire + Sand, the default identity (#112, kept by the owner; Electric Lime when this was recorded); experience and gates: roadmap §3 «Proposal — Theme Packs» | **Pre-launch Pro launch candidate** (owner, 2026-10-04) | Additional themes (for example Forest, Sapphire) selectable once the StoreKit entitlement and paywall exist; each passes light, dark, accessibility and semantic-colour QA before launch. Not built; does not block 25A; before the Mercado Pago consumer-sync research if the schedule allows. |
 | Advanced Excel-friendly export and report package | Basic CSV / export, always (data portability is never hostage to Pro) | Candidate (owner, 2026-10-04) | The advanced presentation is the Pro value; the person's data always leaves freely. |
 | Optional cloud backup and multi-device sync (25E) | Export and deletion of cloud data, and restoring a cloud backup that already exists, always | Candidate (new cloud backups and live sync) | Ongoing storage and operations cost; fits Apple's "cloud support" example of an acceptable subscription. Only if 25E is still chosen. |
 | Wallet capture and its Live Activity (25A2) | **OWNER DECISION** | Candidate ("advanced automation") | It runs on the device with no marginal cost, and it is the product's fastest capture. Charging for it trades reach for revenue; decide with usage evidence. |
@@ -1058,7 +1058,8 @@ to publish.
 - **In the app: «Ayuda y comentarios», a pre-launch requirement in Más** (Producto 26). One compact row with three
   choices: «Reportar un problema», «Sugerir una mejora», «Hacer una consulta». The first implementation may open the
   system mail composer to the public support alias. Más also shows a quiet app version and build line, and drops the
-  long explanatory footer copy that is not needed (today the «Datos de la app» footnote, `settings.localNote`).
+  long explanatory footer copy that is not needed (the «Datos de la app» footnote, `settings.localNote`, dropped in
+  Producto 25O1).
 - **What the message may carry automatically:** only non-sensitive technical metadata: app version and build, iOS
   version, device family, app language, configured product region.
 - **What it never carries automatically:** balances, movements, amounts, account or card names, merchants, the

@@ -7,7 +7,7 @@ import { PlanProgressSummary, ScheduleRow } from '../../src/ui/card-rows';
 import { useCategoryLabel } from '../../src/ui/category-hues';
 import { isPlanWriteRefusal, planActions, planOperationRows, planScheduleRows, planStateWord, planSummary, scheduleRowOpens, type PlanClosings } from '../../src/ui/installment-presentation';
 import { numberRanges } from '../../src/ui/operation-presentation';
-import { successHaptic } from '../../src/ui/motion';
+import { errorHaptic, successHaptic, warningHaptic } from '../../src/ui/motion';
 import { withCurrencyCode } from '../../src/i18n/format';
 import { useI18n } from '../../src/i18n/provider';
 import { space, useCurrentDay, usePalette } from '../../src/ui/theme';
@@ -40,7 +40,7 @@ export default function InstallmentPlanScreen() {
   const { archive, snapshot, removeInstallmentPlan, cancelInstallmentPlan, reactivateInstallmentPlan } = useLedger();
   const p = usePalette();
   const day = useCurrentDay();
-  const { t, formatDate, moneyText, spokenMoney } = useI18n();
+  const { t, formatDate, moneyText, spokenMoney, failureMessage } = useI18n();
   const plan = archive?.installmentPlans?.find(item => item.id === id);
   const card = archive?.cards?.find(item => item.id === plan?.cardId);
   const account = snapshot?.accounts.find(item => item.id === card?.accountId);
@@ -91,11 +91,12 @@ export default function InstallmentPlanScreen() {
       // A deleted plan leaves; a stopped or reactivated one stays, its new state said under the hero.
       if (next.action === 'delete') back();
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : failure[next.action];
-      setError(message);
-      // Refused before anything was written (the plan changed, nothing left to stop…): the screen reads the plan again and
-      // the next tap asks again. The deletion keeps its 24T2 rule: frozen until it goes through.
-      if (next.action !== 'delete' && isPlanWriteRefusal(message)) setPending(null);
+      setError(failureMessage(cause, failure[next.action]));
+      // Refused before anything was written (the plan changed, an instalment or an operation was recorded since the screen was
+      // drawn, nothing is left to stop…): the screen has read the plan again and the next tap asks again. 25Q4: a deletion too.
+      // Only an unknown outcome stays frozen; for a deletion Reintentar sends the same deletion (24T2). 25Q4: Error for the
+      // release, Warning for the frozen retry.
+      if (cause instanceof Error && isPlanWriteRefusal(cause.message)) { setPending(null); errorHaptic(); } else warningHaptic();
     } finally { writing.current = false; setBusy(false); }
   }
   const money = (minor: number) => moneyText(minor, plan.currency);

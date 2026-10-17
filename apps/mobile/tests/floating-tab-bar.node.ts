@@ -254,7 +254,7 @@ test('25A-03: Más shows the pending count as a small neutral badge on its glyph
     assert.equal(glyph.type, 'Ionicons');
     assert.equal(badge.type, 'View');
     const style = Object.assign({}, ...[badge.props.style].flat());
-    assert.deepEqual([style.backgroundColor, badge.props.children.props.style[1].color], [palette.dockActiveInk, palette.dock], 'white with graphite: never lime, never red');
+    assert.deepEqual([style.backgroundColor, badge.props.children.props.style[1].color], [palette.dockActiveInk, palette.dock], 'white with graphite: never the brand, never red');
     assert.notEqual(style.backgroundColor, palette.accent);
     assert.equal(badge.props.children.props.children, 3);
     assert.equal(badge.props.children.props.accessibilityLanguage, 'es');

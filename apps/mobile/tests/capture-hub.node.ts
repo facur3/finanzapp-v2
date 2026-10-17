@@ -153,11 +153,11 @@ test('24UX6A: the Assistant first and largest on the brand field, then Gasto, In
   assert.equal(sheet.props.children[0].type.name, 'AssistantTile', 'the Assistant comes first');
   assert.equal(tile.type, 'PressFeedback');
   assert.equal(tile.props.accessibilityRole, 'button');
-  assert.equal(tile.props.accessibilityLabel, 'Asistente, Decilo con tus palabras o preguntá lo que quieras');
+  assert.equal(tile.props.accessibilityLabel, 'Asistente, Registrá un gasto o preguntá por tus gastos');
   assert.equal(tile.props.accessibilityHint, undefined);
   assert.equal(tile.props.style[1].backgroundColor, palette.hero, 'visually primary: the hero\'s field');
-  assert.equal(texts(tile).join(' | '), 'Asistente | Decilo con tus palabras o preguntá lo que quieras');
-  // 25VIS1: the field is lime, so the circle is the field's ink with a lime glyph; an accent circle would vanish on it.
+  assert.equal(texts(tile).join(' | '), 'Asistente | Registrá un gasto o preguntá por tus gastos');
+  // The circle is the field's ink with a field-coloured glyph (white with a sapphire glyph since 25VIS2); an accent circle would vanish on the field.
   const spark = flatten(tile).find(node => node.type === 'View' && node.props.style?.[1]?.backgroundColor === palette.heroInk);
   assert.ok(spark, 'an ink circle on the field');
   assert.deepEqual([spark.props.children.props.name, spark.props.children.props.color], ['sparkles', palette.hero]);
@@ -165,9 +165,9 @@ test('24UX6A: the Assistant first and largest on the brand field, then Gasto, In
   assert.equal(rowsView.props.style[1].backgroundColor, palette.surface);
   assert.equal(rows.length, 3, 'three movement rows');
   assert.equal(rows.map((row: any) => row.rendered.props.accessibilityLabel).join(' | '),
-    'Gasto, Una compra o un pago | Ingreso, Sueldo, cobro u otro ingreso | Transferencia, Entre cuentas o pago de tarjeta');
+    'Gasto, Una compra o un servicio | Ingreso, Sueldo u otro ingreso | Transferencia, Entre tus cuentas');
   assert.equal(rows.map((row: any) => texts(row.rendered).join(' / ')).join(' | '),
-    'Gasto / Una compra o un pago | Ingreso / Sueldo, cobro u otro ingreso | Transferencia / Entre cuentas o pago de tarjeta');
+    'Gasto / Una compra o un servicio | Ingreso / Sueldo u otro ingreso | Transferencia / Entre tus cuentas');
   const looks = rows.map((row: any) => { const tileView = flatten(row.rendered).find(node => node.type === 'View' && node.props.style?.[1]?.backgroundColor);
     const glyph = tileView.props.children; return [glyph.props.name, glyph.props.color, tileView.props.style[1].backgroundColor]; });
   // 24UX6C: a restrained hint of each kind's tone on its tile (the light palette's real tokens, src/ui/palette.ts): an expense
@@ -209,7 +209,7 @@ test('24UX6A: «Continuar» shows the person\'s real last words, only after an a
   assert.equal(texts(chip(render().tile)).join(''), 'Continuar: «Y en transporte»', 'the latest words, even while the answer is on its way');
   session.reset();
   assert.equal(chip(render().tile), undefined, 'New chat clears it');
-  assert.equal(render().tile.props.accessibilityLabel, 'Asistente, Decilo con tus palabras o preguntá lo que quieras');
+  assert.equal(render().tile.props.accessibilityLabel, 'Asistente, Registrá un gasto o preguntá por tus gastos');
   assert.equal(render().tile.props.accessibilityHint, undefined);
   // Words that never left the device go back to the composer: there is no exchange to continue.
   session.dispatch({ type: 'send', text: 'Gasté 1500 en el super' });
@@ -329,12 +329,21 @@ test('24UX6A: the «+», the hub and «Continuar» follow the interface language
     assert.equal(tile.props.accessibilityLabel, 'Assistant, Continue: “How much did I spend on food”', 'the words stay as the person wrote them');
     assert.equal(tile.props.accessibilityHint, undefined);
     assert.equal(rows.map((row: any) => row.rendered.props.accessibilityLabel).join(' | '),
-      'Expense, A purchase or a payment | Income, Salary, a payment received or other income | Transfer, Between accounts or a card payment');
+      'Expense, A purchase or a bill | Income, Salary or other income | Transfer, Between your accounts');
     // Without a conversation the tile says what it does.
     const quiet = harness();
     quiet.render().plus.props.onPress();
     const fresh = quiet.render().tile;
-    assert.equal(fresh.props.accessibilityLabel, 'Assistant, Say it in your own words or ask anything');
+    assert.equal(fresh.props.accessibilityLabel, 'Assistant, Record a purchase or ask about your spending');
     assert.equal(fresh.props.accessibilityHint, undefined);
   } finally { locale = 'es-AR'; }
+});
+
+test('25O1: the hub\'s captions promise only what each form records: no «pago», «cobro» or card on a row (those name transfers the plain form cannot make), and the Assistant\'s scope is the ledger, never «anything»', () => {
+  for (const [language, reserved, open] of [['es-AR', /pago|cobro|tarjeta/i, /lo que quieras|cualquier/i], ['en-US', /payment|collect|card/i, /anything|whatever/i]] as const) {
+    const { t } = bindLocale(language);
+    for (const key of ['home.capture.expenseDetail', 'home.capture.incomeDetail', 'home.capture.transferDetail'] as const)
+      assert.doesNotMatch(t(key), reserved, language + ' ' + key + ': a payment settles a card or a debt from its own screen');
+    assert.doesNotMatch(t('home.capture.assistantDetail'), open, language + ': a constrained financial interface, not a general one');
+  }
 });

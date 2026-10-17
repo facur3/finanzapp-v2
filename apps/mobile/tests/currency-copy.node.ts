@@ -174,7 +174,7 @@ function loadSwitch(tag: AppLocale = 'es-AR', held: readonly Currency[] = []) {
     'react-native': { StyleSheet: { hairlineWidth: 0.5 } },
     '@finanzapp/domain': domain,
     './components': { AppText: 'AppText', Choices: 'Choices', PressFeedback: 'PressFeedback' },
-    './form-controls': { CurrencySheet: 'CurrencySheet' },
+    './form-controls': { CurrencySheet: 'CurrencySheet', DisplaySheet: 'DisplaySheet' },
     './currencies': currencies,
     '../i18n/provider': { useI18n: () => bindLocale(tag, 'none', null, held) },
     './theme': { radius: { button: 14 }, usePalette: () => ({ inset: '#EEEEF3', primary: '#2557D6' }) },
@@ -184,7 +184,8 @@ function loadSwitch(tag: AppLocale = 'es-AR', held: readonly Currency[] = []) {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected currency-switch dependency: ' + name);
     return modules[name];
   } });
-  return { render: (props: any) => { cursor = 0; return module.exports.CurrencySwitch(props); }, SEARCHABLE_FROM: module.exports.SEARCHABLE_FROM as unknown as number };
+  return { render: (props: any) => { cursor = 0; return module.exports.CurrencySwitch(props); }, SEARCHABLE_FROM: module.exports.SEARCHABLE_FROM as unknown as number,
+    display: (props: any) => { cursor = 0; return module.exports.DisplayCurrencyButton(props); } };
 }
 
 test('24B3: with one or two currencies the switch is the segmented control of before; the forms\' segments read exactly as they did', () => {
@@ -241,6 +242,16 @@ test('24B3: with three or more currencies the switch is a row that opens the cur
   assert.deepEqual(manySheet.props.options.map((option: any) => option.name), ['Argentine pesos', 'US dollars', 'Euros', 'Japanese yen', 'Kuwaiti dinars', 'Chilean pesos', 'Canadian dollars']);
   assert.equal(nodes(many).find(node => node.type === 'PressFeedback')!.props.accessibilityLabel, 'Currency: Argentine pesos');
   assert.equal(loadSwitch().SEARCHABLE_FROM, 6);
+  // 25D1: every chip is a 44 pt target without being drawn taller: 36 pt plus 4 above and below (it had no slop), the
+  // compact one 32 plus 6, the field's 40 plus 4. With two currencies these screens draw segments instead (24B3).
+  const target = (view: Node) => { const chip = nodes(view).find(node => node.type === 'PressFeedback')!; return JSON.stringify([chip.props.style.minHeight, chip.props.hitSlop]); };
+  assert.equal(target(row as unknown as Node), JSON.stringify([36, { top: 4, bottom: 4 }]));
+  assert.equal(target(es.render({ value: 'ARS', currencies: ['ARS', 'USD', 'JPY'], onChange: () => {}, compact: true })), JSON.stringify([32, 6]));
+  const scope = { mode: 'single', currency: 'USD', held: ['ARS', 'USD'], gate: { status: 'ready' }, onMode: () => {}, onCurrency: () => {} };
+  assert.equal(target(es.display({ ...scope, compact: false })), JSON.stringify([36, { top: 4, bottom: 4 }]), 'Reportes\' «Solo USD» chip, from two currencies');
+  assert.equal(target(es.display(scope)), JSON.stringify([32, 6]), 'the compact default');
+  const field = nodes(es.display({ ...scope, onField: true })).find(node => node.type === 'PressFeedback')!;
+  assert.deepEqual([field.props.style.minHeight, field.props.hitSlop], [40, 4]);
   const disabled = es.render({ value: 'ARS', currencies: ['ARS', 'USD', 'JPY'], onChange: () => {}, disabled: true });
   assert.deepEqual(plain(nodes(disabled).find(node => node.type === 'PressFeedback')!.props.accessibilityState), { disabled: true });
 });

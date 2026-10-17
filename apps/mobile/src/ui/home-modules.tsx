@@ -6,7 +6,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { type Account, type Currency, type RecurringRule } from '@finanzapp/domain';
 import type { BudgetAttention } from './home-focus';
 import { percentUsed } from './budget-presentation';
-import { AppText, MerchantBadge, Money, PressFeedback, useStacked, type IconName } from './components';
+import { AppText, GlyphTile, MerchantBadge, Money, NavigationRow, PressFeedback, SectionTitle, Surface, useStacked, type IconName } from './components';
 import { useCategoryLabel, useCategoryLook } from './category-hues';
 import { labelAmountStacks } from './geometry';
 import { timing } from './motion';
@@ -23,7 +23,10 @@ export function MetricHelp({ title, detail, color }: { title: string; detail: st
   const p = usePalette();
   const { t } = useI18n();
   // 24UX6A: a 44 pt target (the glyph is 18 pt; the slop makes up the rest), drawn in the field's secondary ink on Inicio.
-  return <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('common.whatIs', { title })} hitSlop={10}
+  // 25D1: the glyph cannot grow with the text, so a long press at the accessibility sizes shows its name large.
+  const name = t('common.whatIs', { title });
+  return <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={name} hitSlop={10}
+    accessibilityShowsLargeContentViewer accessibilityLargeContentTitle={name}
     onPress={() => Alert.alert(title, detail, [{ text: t('common.ok'), style: 'cancel' }])} style={{ minHeight: 24, paddingHorizontal: 4 }}>
     <Ionicons name="information-circle-outline" size={18} color={color ?? p.secondary} accessible={false} />
   </PressFeedback>;
@@ -37,6 +40,53 @@ export function FieldButton({ icon, label, onPress }: { icon: IconName; label: s
     style={{ width: 44, height: 44, minHeight: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: p.heroControl }}>
     <Ionicons name={icon} size={22} color={p.heroInk} accessible={false} />
   </PressFeedback>;
+}
+
+/** 25O1: Primeros pasos, Inicio's start while nothing is recorded yet (Inicio decides when: no movement, no transfer, no
+ * instalment plan), in place of the empty states: what a new person does first, in order, in one grouped surface. A
+ * pending step leads somewhere (`NavigationRow`: the brand tile, a chevron, the row's highlight); a done step says so
+ * quietly (a check on a quiet tile, the title in secondary, what was created) and is no control. No filled button: with
+ * the dock's «+», Inicio keeps one bright object below the field. The first expense is the step that ends the section,
+ * so it is never drawn done. */
+export function FirstSteps({ account, card, currency }: {
+  /** The first account's name once one exists (a live cash account: a card's or a debt's own account is not one). */
+  account: string | null;
+  /** The first card's name once one exists. */
+  card: string | null;
+  /** The currency the expense form preselects: Inicio's, when an account holds it, as the dock's «+» does. */
+  currency?: Currency;
+}) {
+  const { t } = useI18n();
+  return <>
+    <SectionTitle>{t('home.firstSteps.title')}</SectionTitle>
+    <Surface grouped>
+      <FirstStep icon="wallet-outline" title={t('home.firstSteps.account')} detail={account ?? t('home.firstSteps.accountDetail')} done={account !== null}
+        onPress={() => router.push('/new-account')} />
+      <FirstStep icon="receipt-outline" title={t('home.firstSteps.expense')} detail={t('home.firstSteps.expenseDetail')} done={false}
+        onPress={() => router.push({ pathname: '/new-entry', params: currency ? { kind: 'expense', currency } : { kind: 'expense' } })} />
+      <FirstStep icon="card-outline" title={t('home.firstSteps.card')} detail={card ?? t('home.firstSteps.cardDetail')} done={card !== null}
+        onPress={() => router.push('/new-card')} last />
+    </Surface>
+  </>;
+}
+
+/** One step: pending, a `NavigationRow` with its glyph in the brand text on its tint; done, the same geometry as text only
+ * (VoiceOver hears «…, hecho»). */
+function FirstStep({ icon, title, detail, done, onPress, last = false }: {
+  icon: IconName; title: string; detail: string; done: boolean; onPress: () => void; last?: boolean;
+}) {
+  const p = usePalette();
+  const { t, speechLanguage } = useI18n();
+  const lines = useStacked() ? undefined : 2;
+  if (!done) return <NavigationRow title={title} subtitle={detail} leading={<GlyphTile icon={icon} color={p.primary} />} onPress={onPress} last={last} />;
+  return <View accessible accessibilityLabel={t('home.firstSteps.doneLabel', { title, detail })} accessibilityLanguage={speechLanguage}
+    style={[styles.step, { borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, borderBottomColor: p.line }]}>
+    <GlyphTile icon="checkmark" color={p.secondary} />
+    <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+      <AppText secondary numberOfLines={lines}>{title}</AppText>
+      <AppText secondary variant="footnote" numberOfLines={lines}>{detail}</AppText>
+    </View>
+  </View>;
 }
 
 /** Each currency's own figure when a consolidated total cannot be given (24C1): a rate is missing, stale, not
@@ -106,6 +156,8 @@ export function UpcomingRecurringRow({ rule, account, day, last, showAccount = f
 
 const styles = StyleSheet.create({
   agendaRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56 },
+  /** A done first step: the geometry of a `NavigationRow` (60 pt, 16 pt sides), so the three rows keep one rhythm. */
+  step: { minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 11 },
 });
 
 /** Points the budget row spends around its first line on a phone (24UX6D): screen padding (20 + 20), row padding (16 + 16),

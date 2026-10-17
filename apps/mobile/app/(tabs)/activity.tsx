@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, View } from 'react-native';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { ActionButton, AppText, Choices, EmptyState, SearchField } from '../../src/ui/components';
 import { EntryList } from '../../src/ui/entry-list';
@@ -17,6 +17,12 @@ export default function ActivityScreen() {
   const { snapshot } = useLedger();
   const [filter, setFilter] = useState<EntryFilter>('all');
   const [query, setQuery] = useState('');
+  // 25Q4: a link into Movimientos («Ver todos», the Assistant's evidence) carries a fresh `reset`: the whole list, from the
+  // top. The dock re-sends the route's last params, so only a new value resets; a dock arrival keeps the search, the filter
+  // and the scroll. Adjusted while rendering, so no frame shows the old list.
+  const { reset } = useLocalSearchParams<{ reset?: string }>();
+  const [arrival, setArrival] = useState(reset);
+  if (reset !== arrival) { setArrival(reset); setQuery(''); setFilter('all'); }
   const { t } = useI18n();
   // The search also matches the name a category shows, so a built-in category answers to its name in the interface language.
   const expenseLook = useCategoryLookOf('expense'), incomeLook = useCategoryLookOf('income');
@@ -30,7 +36,7 @@ export default function ActivityScreen() {
   // while typing, at once for a filter; never on the first render or when only the ledger changes. The tab stays mounted
   // under other tabs and pushed screens, so a pending announcement is cancelled when Movimientos loses focus (Codex,
   // PR #72): it never speaks over another screen.
-  const asked = useRef({ query, filter });
+  const asked = useRef({ query, filter, arrival });
   const focused = useRef(true);
   const pending = useRef<ReturnType<typeof setTimeout> | null>(null);
   // What the announcement says is read when it fires: the count of that moment, in the language of that moment.
@@ -42,20 +48,23 @@ export default function ActivityScreen() {
     return () => { focused.current = false; cancel(); };
   }, []));
   useEffect(() => {
-    if (asked.current.query === query && asked.current.filter === filter) return;
-    asked.current = { query, filter };
+    // 25Q4: an arrival is not the person's search or filter: nothing is announced.
+    const arrived = asked.current.arrival !== arrival;
+    if (!arrived && asked.current.query === query && asked.current.filter === filter) return;
+    asked.current = { query, filter, arrival };
     cancel();
-    if (!focused.current) return;
+    if (arrived || !focused.current) return;
     pending.current = setTimeout(() => {
       pending.current = null;
       if (focused.current) AccessibilityInfo.announceForAccessibility(latest.current.t('count.movements', { count: latest.current.count }));
     }, query ? 700 : 0);
-  }, [query, filter]);
+  }, [query, filter, arrival]);
   useEffect(() => cancel, []);
   if (!snapshot) return null;
   const hasRecords = snapshot.entries.length + (snapshot.transfers?.length ?? 0) > 0;
   // 25Q1: «Neto del día» only while nothing narrows the list: under Gastos, Ingresos or a search it would be a subset's sum.
-  return <EntryList entries={entries} transfers={transfers} accounts={snapshot.accounts} dayNet={filter === 'all' && !query.trim()}
+  // 25Q4: a new arrival mounts a new list, at its own top.
+  return <EntryList key={arrival} entries={entries} transfers={transfers} accounts={snapshot.accounts} dayNet={filter === 'all' && !query.trim()}
     header={hasRecords ? <View style={{ gap: 14, paddingTop: 4 }}>
       <SearchField label={t('activity.search')} placeholder={t('activity.searchPlaceholder')} value={query} onChangeText={setQuery} />
       <Choices value={filter} onChange={setFilter}
@@ -66,8 +75,10 @@ export default function ActivityScreen() {
     empty={hasRecords ? <EmptyState title={t('activity.noMatchesTitle')} icon="search-outline"
       detail={t('activity.noMatchesDetail')}
       action={<ActionButton label={t('activity.clearFilters')} secondary onPress={() => { setQuery(''); setFilter('all'); }} />} />
+      // 25O1: with an account the dock's «+» is the filled action, so this one is secondary; without one, adding an account
+      // is the only way forward and it stays filled.
       : <EmptyState title={t('activity.emptyTitle')} icon="receipt-outline"
         detail={t('activity.emptyDetail')}
-        action={<ActionButton label={snapshot.accounts.length ? t('nav.recordMovement') : t('common.addAccount')}
+        action={<ActionButton label={snapshot.accounts.length ? t('nav.recordMovement') : t('common.addAccount')} secondary={snapshot.accounts.length > 0}
           onPress={() => router.push(snapshot.accounts.length ? '/new-entry' : '/new-account')} />} />} />;
 }

@@ -9,6 +9,7 @@ import { AccountBadge, AppText, CategoryBadge, DetailRow, Field, GlyphTile, Pres
 import { SEARCHABLE_FROM, currencyChoices, currencyOption, offeredCurrencies, searchChoices, type CurrencyChoice } from './currencies';
 import { useI18n } from '../i18n/provider';
 import { useAccountLookOf, useCategoriesInUse, useCategoryDefinitions, useCategoryLook } from './category-hues';
+import { CurrencyMark } from './marks';
 import { selectionHaptic, sheetTiming } from './motion';
 
 /** The capture hub's corners: the hero's and the hub's 32 pt radius (Forest). */
@@ -22,24 +23,42 @@ import { categoryChoices, categoryKey, customCategory } from './categories';
  * The value and the detail may each take two lines: a long account name or
  * a budget sentence with its amount is shown whole, never cut to fit. A
  * detail that carries an amount comes with `spokenDetail`, the same sentence
- * built with the spoken formatters, which VoiceOver reads instead. */
-export function SelectorCard({ label, value, placeholder, detail, spokenDetail, icon, tone = 'neutral', color, disabled = false, onPress, detailTone }: {
-  label: string; value?: string; placeholder: string; detail?: string; spokenDetail?: string; icon: IconName; tone?: Tone; color?: string; disabled?: boolean; onPress: () => void;
-  detailTone?: 'neutral' | 'warning' | 'expense';
+ * built with the spoken formatters, which VoiceOver reads instead. `fixed` (25VIS2) is a side the screen decides, the
+ * card or debt a payment settles: the same card read as a fact, at full strength, with no chevron, and VoiceOver hears
+ * text, not a dimmed button. */
+export function SelectorCard({ label, value, placeholder, detail, spokenDetail, icon, tone = 'neutral', color, disabled = false, fixed = false, onPress, detailTone }: {
+  label: string; value?: string; placeholder: string; detail?: string; spokenDetail?: string; icon: IconName; tone?: Tone; color?: string; disabled?: boolean;
+  fixed?: boolean; onPress?: () => void; detailTone?: 'neutral' | 'warning' | 'expense';
 }) {
   const p = usePalette();
+  const { speechLanguage } = useI18n();
   const detailColor = detailTone === 'expense' ? p.expense : detailTone === 'warning' ? p.warning : p.secondary;
   const spoken = spokenDetail ?? detail;
-  return <PressFeedback accessibilityRole="button" accessibilityLabel={`${label}: ${value ?? placeholder}${spoken ? ', ' + spoken : ''}`}
-    accessibilityState={{ disabled }} disabled={disabled} onPress={onPress}
-    style={[{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14, borderRadius: radius.group, backgroundColor: p.surface, minHeight: 72, opacity: disabled ? 0.6 : 1 }, surfaceShadow(p)]}>
-    <GlyphTile icon={icon} tone={tone} color={color} size={44} />
-    <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-      <AppText secondary variant="caption" style={{ fontWeight: '500' }}>{label}</AppText>
-      <AppText numberOfLines={2} style={{ fontWeight: '600', color: value ? p.text : p.primary }}>{value ?? placeholder}</AppText>
-      {!!detail && <AppText numberOfLines={2} variant="footnote" style={{ color: detailColor }}>{detail}</AppText>}
-    </View>
-    <Ionicons name="chevron-forward" size={18} color={p.tertiary} accessible={false} />
+  const accessibilityLabel = `${label}: ${value ?? placeholder}${spoken ? ', ' + spoken : ''}`;
+  const style = [{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14, borderRadius: radius.group, backgroundColor: p.surface, minHeight: 72,
+    opacity: disabled && !fixed ? 0.6 : 1 } as const, surfaceShadow(p)];
+  const tile = <GlyphTile icon={icon} tone={tone} color={color} size={44} />;
+  const body = <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+    <AppText secondary variant="caption" style={{ fontWeight: '500' }}>{label}</AppText>
+    <AppText numberOfLines={2} style={{ fontWeight: '600', color: value ? p.text : p.primary }}>{value ?? placeholder}</AppText>
+    {!!detail && <AppText numberOfLines={2} variant="footnote" style={{ color: detailColor }}>{detail}</AppText>}
+  </View>;
+  // A plain View is its own VoiceOver element here, so it carries the language as PressFeedback does for a Pressable.
+  if (fixed) return <View accessible accessibilityLabel={accessibilityLabel} accessibilityLanguage={speechLanguage} style={style}>{tile}{body}</View>;
+  return <PressFeedback accessibilityRole="button" accessibilityLabel={accessibilityLabel} accessibilityState={{ disabled }} disabled={disabled} onPress={onPress}
+    style={style}>{tile}{body}<Ionicons name="chevron-forward" size={18} color={p.tertiary} accessible={false} /></PressFeedback>;
+}
+
+/** 25D1: a sheet's bar (Cancelar | title | Listo) stops growing at 1.2×, as a system bar does, so Listo stays on screen
+ * at the accessibility sizes; its buttons offer the Large Content Viewer instead (a long press shows the word large).
+ * Equal to `ROW_STACK_SCALE`, kept here so the harnesses that load this module need no geometry mock. */
+export const SHEET_BAR_MAX_SCALE = 1.2;
+
+function SheetBarButton({ label, onPress, strong = false }: { label: string; onPress: () => void; strong?: boolean }) {
+  const p = usePalette();
+  return <PressFeedback feedback="opacity" accessibilityRole="button" onPress={onPress} hitSlop={8}
+    accessibilityShowsLargeContentViewer accessibilityLargeContentTitle={label}>
+    <AppText maxFontSizeMultiplier={SHEET_BAR_MAX_SCALE} style={[{ color: p.primary, fontSize: 16 }, strong && { fontWeight: '600' }]}>{label}</AppText>
   </PressFeedback>;
 }
 
@@ -55,9 +74,9 @@ function SelectionSheet({ visible, title, onClose, onDone, children }: {
     allowSwipeDismissal onRequestClose={onClose}>
     <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: p.background }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 }}>
-        <PressFeedback feedback="opacity" accessibilityRole="button" onPress={onClose}><AppText style={{ color: p.primary, fontSize: 16 }}>{t('common.cancel')}</AppText></PressFeedback>
-        <AppText accessibilityRole="header" numberOfLines={2} style={{ flex: 1, textAlign: 'center', fontWeight: '600' }}>{title}</AppText>
-        {onDone && <PressFeedback feedback="opacity" accessibilityRole="button" onPress={onDone}><AppText style={{ color: p.primary, fontSize: 16, fontWeight: '600' }}>{t('common.done')}</AppText></PressFeedback>}
+        <SheetBarButton label={t('common.cancel')} onPress={onClose} />
+        <AppText accessibilityRole="header" numberOfLines={2} maxFontSizeMultiplier={SHEET_BAR_MAX_SCALE} style={{ flex: 1, textAlign: 'center', fontWeight: '600' }}>{title}</AppText>
+        {onDone && <SheetBarButton label={t('common.done')} onPress={onDone} strong />}
       </View>
       {children}
     </SafeAreaView>
@@ -116,7 +135,8 @@ export function AccountField({ accounts, value, onChange, disabled = false, labe
 
 /** The account's currency as one native row: the label "Moneda", the
  * currency's full name as the primary line, its code and symbol as the
- * detail line, a glyph and a chevron, stacked so "Dólares estadounidenses"
+ * detail line, its mark (25O1: the issuer's flag beside the code, the neutral
+ * glyph for a supranational one) and a chevron, stacked so "Dólares estadounidenses"
  * and "USD" each keep a whole line at any width or text size. The sheet is
  * the currency screen of docs/currency.md §7.5 stage 8 (24B5): it lists the
  * currencies the ledger can hold (`currencies`: the build's gate, ARS and USD
@@ -138,14 +158,14 @@ export function CurrencyField({ value, onChange, disabled = false, currencies }:
   return <>
     <Surface grouped>
       <SelectionRow label={t('selection.currency')} value={selected.name} detail={selected.code + ' · ' + selected.symbol}
-        icon="cash-outline" last disabled={disabled} onPress={onChange ? open : undefined} />
+        leading={<CurrencyMark currency={value} size={30} />} last disabled={disabled} onPress={onChange ? open : undefined} />
     </Surface>
     {onChange && <CurrencySheet visible={visible} title={t('selection.chooseCurrency')} options={options} value={value} searchable={options.length >= SEARCHABLE_FROM}
       note={t('selection.currencyNote')} onClose={() => setVisible(false)} onChange={currency => { onChange(currency); setVisible(false); }} />}
   </>;
 }
 
-/** The sheet that lists currencies for a choice: one row per option (the full name, then the
+/** The sheet that lists currencies for a choice: one row per option (its mark, the full name, then the
  * code and symbol), a checkmark on the current one, a selection tick when the choice changes.
  * The new-account form lists the currencies the ledger can hold, with a note under them; the
  * currency switch of Inicio, Reportes and Presupuestos lists the currencies held (24B3). With
@@ -162,7 +182,9 @@ export function CurrencySheet({ visible, title, options, value, note, searchable
   </SelectionSheet>;
 }
 
-/** The currency rows of a sheet: the searchable, windowed list both `CurrencySheet` and the display sheet draw. */
+/** The currency rows of a sheet: the searchable, windowed list both `CurrencySheet` and the display sheet draw. 25O1: a
+ * row leads with its issuer's flag (`CurrencyMark`, beside the code it marks; the neutral glyph for XOF and the other
+ * supranational codes), never a claim about where an account is; VoiceOver still hears the name and the code. */
 function CurrencyList({ options, value, note, searchable, query, onQuery, onChange }: {
   options: readonly CurrencyChoice[]; value: Currency; note?: string; searchable: boolean; query: string; onQuery: (query: string) => void; onChange: (currency: Currency) => void;
 }) {
@@ -182,7 +204,7 @@ function CurrencyList({ options, value, note, searchable, query, onQuery, onChan
       accessibilityLabel={item.name + ', ' + item.code}
       onPress={() => { if (item.code !== value) selectionHaptic(); onChange(item.code); }}
       style={{ flexDirection: 'row', alignItems: 'center', padding: 14, gap: 14, backgroundColor: p.surface, borderRadius: 16, marginBottom: 8, overflow: 'hidden' }}>
-      <GlyphTile icon="cash-outline" />
+      <CurrencyMark currency={item.code} />
       <View style={{ flex: 1, minWidth: 0, gap: 3 }}><AppText style={{ fontWeight: '600' }}>{item.name}</AppText>
         <AppText secondary variant="subhead">{item.code} · {item.symbol}</AppText></View>
       {item.code === value && <Ionicons name="checkmark-circle" color={p.primary} size={24} accessible={false} />}
@@ -224,7 +246,7 @@ export function DisplaySheet({ visible, mode, currency, consolidatedOptions, sin
         {modeRow('single', t('display.single'), t('display.singleDetail'), true)}
       </Surface>
       <Surface grouped>
-        <SelectionRow label={t('display.currency')} value={currencyName(currency) + ' · ' + currency} icon="cash-outline" last
+        <SelectionRow label={t('display.currency')} value={currencyName(currency) + ' · ' + currency} leading={<CurrencyMark currency={currency} size={30} />} last
           onPress={() => setStep('currency')} />
       </Surface>
       <AppText secondary variant="footnote" style={{ paddingHorizontal: 4 }}>{t('display.note')}</AppText>
@@ -344,18 +366,19 @@ export function BottomSheet({ visible, title, onClose, onDone, onDismissed, floa
         {/* The scrim cancels; VoiceOver never lands on it (the card below is modal). */}
         <Pressable accessible={false} importantForAccessibility="no" style={{ flex: 1 }} onPress={onClose} />
       </Animated.View>
-      <Animated.View accessibilityViewIsModal onLayout={event => measuredCard(event.nativeEvent.layout.height)}
+      {/* VoiceOver's escape gesture cancels, as Cancelar does (25VIS2; the hub's card already had it). */}
+      <Animated.View accessibilityViewIsModal onAccessibilityEscape={onClose} onLayout={event => measuredCard(event.nativeEvent.layout.height)}
         style={[{ backgroundColor: p.surface, borderTopLeftRadius: radius.sheet, borderTopRightRadius: radius.sheet, overflow: 'hidden',
-          paddingBottom: Math.max(insets.bottom, space.m) }, cardStyle]}>
-        <View accessible={false} style={{ alignItems: 'center', paddingTop: 8 }}>
-          <View style={{ width: 36, height: 5, borderRadius: 2.5, backgroundColor: p.line }} />
-        </View>
+          paddingTop: 8, paddingBottom: Math.max(insets.bottom, space.m) }, cardStyle]}>
+        {/* 25D1: no grabber. This sheet has no drag (Cancelar, the dimmed backdrop and the escape gesture close it), and a
+            grabber promises one (HIG: only a resizable sheet shows it). */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: space.l, paddingVertical: space.m, minHeight: 52 }}>
-          <PressFeedback feedback="opacity" accessibilityRole="button" onPress={onClose} hitSlop={8}><AppText style={{ color: p.primary, fontSize: 16 }}>{t('common.cancel')}</AppText></PressFeedback>
-          <AppText accessibilityRole="header" numberOfLines={2} style={{ flex: 1, textAlign: 'center', fontWeight: '600' }}>{title}</AppText>
-          {onDone ? <PressFeedback feedback="opacity" accessibilityRole="button" onPress={onDone} hitSlop={8}><AppText style={{ color: p.primary, fontSize: 16, fontWeight: '600' }}>{t('common.done')}</AppText></PressFeedback>
+          <SheetBarButton label={t('common.cancel')} onPress={onClose} />
+          <AppText accessibilityRole="header" numberOfLines={2} maxFontSizeMultiplier={SHEET_BAR_MAX_SCALE} style={{ flex: 1, textAlign: 'center', fontWeight: '600' }}>{title}</AppText>
+          {onDone ? <SheetBarButton label={t('common.done')} onPress={onDone} strong />
             // Without Listo the title stays centred: the right side keeps Cancelar's width, empty.
-            : <View accessible={false} importantForAccessibility="no-hide-descendants" style={{ opacity: 0 }}><AppText style={{ fontSize: 16 }}>{t('common.cancel')}</AppText></View>}
+            : <View accessible={false} importantForAccessibility="no-hide-descendants" style={{ opacity: 0 }}>
+              <AppText maxFontSizeMultiplier={SHEET_BAR_MAX_SCALE} style={{ fontSize: 16 }}>{t('common.cancel')}</AppText></View>}
         </View>
         {/* The wheel sits centred in the card: as wide as the card's content, its columns centred by UIKit. */}
         <View style={{ alignSelf: 'stretch', alignItems: 'center', paddingHorizontal: space.l, paddingBottom: space.s }}>{children}</View>

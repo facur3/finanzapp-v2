@@ -6,11 +6,14 @@ import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import * as SystemUI from 'expo-system-ui';
 import { useFonts } from 'expo-font';
+import { File, Paths } from 'expo-file-system';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { currenciesPresent } from '@finanzapp/domain';
 import { LedgerProvider, useLedger } from '../src/storage/LedgerProvider';
+import { NEWER_SCHEMA_MESSAGE } from '../src/storage/database';
+import { discardBackupLeftovers } from '../src/ui/backup-file';
 import { CategoryHuesProvider } from '../src/ui/category-hues';
 import { DisplayCurrencyProvider } from '../src/ui/display-currency-provider';
 import { RatesProvider } from '../src/fx/rates-provider';
@@ -20,13 +23,15 @@ import { ScreenFailure } from '../src/ui/screen-failure';
 import { UIProvider, themePreferenceStore, usePalette, useReduceMotion } from '../src/ui/theme';
 import { HeldCurrenciesProvider, I18nProvider, useI18n } from '../src/i18n/provider';
 import { defaultPreferenceStore } from '../src/i18n/preference';
-import { markOnboardingDone, onboardingDecision } from '../src/ui/onboarding-flow';
+import { markOnboardingDone, markOnboardingStarted, onboardingDecision } from '../src/ui/onboarding-flow';
 
 void SplashScreen.preventAutoHideAsync().catch(() => {});
 // 24UX6A: the Apariencia choice is read and handed to iOS before the first render, so no frame is drawn in the other scheme.
 themePreferenceStore();
 
 export const unstable_settings = { initialRouteName: '(tabs)' };
+/** 25O1: the longest a new installation's splash waits for the first opening to draw. */
+const SPLASH_NET = 1500;
 
 export default function RootLayout() {
   const p = usePalette();
@@ -64,21 +69,37 @@ function Navigation() {
     if (!snapshot || onboarding !== null) return;
     const decision = onboardingDecision(defaultPreferenceStore, snapshot.accounts.length > 0);
     if (decision === 'existing') markOnboardingDone(defaultPreferenceStore);
+    // 25O1 review: marked before the setup is shown, so a preference saved during it (and a relaunch) keeps it a new installation's.
+    if (decision === 'new') markOnboardingStarted(defaultPreferenceStore);
     setOnboarding(decision);
   }, [snapshot !== null]);
+  // 25Q4: the redirect fires once: when the decision is 'new' and the stack exists (the fonts gate it, below). It never
+  // depends on the ledger's error, so a banner during that first session never replaces the screen on top.
+  useEffect(() => { if (onboarding === 'new' && fontsLoaded) router.replace('/onboarding'); }, [onboarding, fontsLoaded]);
   useEffect(() => {
     // Show a recoverable error as well as the successful app; never hold the
     // native splash forever when font or database initialization fails.
-    if (onboarding === 'new') router.replace('/onboarding');
-    if (error || fontError || (fontsLoaded && snapshot && onboarding !== null)) void SplashScreen.hideAsync().catch(() => {});
+    if (error || fontError || (fontsLoaded && snapshot && onboarding !== null && onboarding !== 'new')) { void SplashScreen.hideAsync().catch(() => {}); return; }
+    // 25O1: a new installation's splash lifts when the first opening has drawn (its first layout, onboarding.tsx), so the
+    // tabs mounted under it are never seen; this timer only catches a setup that never draws.
+    if (onboarding !== 'new' || !fontsLoaded) return;
+    const net = setTimeout(() => void SplashScreen.hideAsync().catch(() => {}), SPLASH_NET);
+    return () => clearTimeout(net);
   }, [error, fontError, fontsLoaded, snapshot !== null, onboarding]);
+  // 25Q4: an export left in the cache by a process iOS ended under the share sheet is deleted once the ledger first opens,
+  // before any screen can start an export. Best effort.
+  useEffect(() => {
+    if (!snapshot) return;
+    try { discardBackupLeftovers(Paths.cache.list().filter((item): item is File => item instanceof File)); } catch { /* iOS clears the cache too. */ }
+  }, [snapshot !== null]);
 
   if (fontError || !snapshot || !fontsLoaded) return <SafeAreaView style={{ flex: 1, backgroundColor: p.background }}>
     <View style={{ flex: 1, padding: 28, justifyContent: 'center', gap: 20 }}>
       {error || fontError ? <>
         <AppText variant="title1">{t('boot.openFailed')}</AppText>
         <ErrorMessage message={error ?? t('boot.resourcesFailed')} />
-        {!fontError && <ActionButton label={t('boot.retry')} onPress={retry} />}
+        {/* 25Q4: a file from a newer build never opens in this one: the sentence says to update; no retry can help. */}
+        {!fontError && error !== NEWER_SCHEMA_MESSAGE && <ActionButton label={t('boot.retry')} onPress={retry} />}
       </> : <ActivityIndicator accessibilityLabel={t('boot.opening')} accessibilityLanguage={speechLanguage} color={p.secondary} />}
     </View>
   </SafeAreaView>;
@@ -97,8 +118,10 @@ function Navigation() {
       headerTitleStyle: { color: p.text }, headerShadowVisible: false,
       contentStyle: { backgroundColor: p.background }, animation: reduced ? 'fade' : 'default',
       headerBackButtonDisplayMode: 'minimal', gestureEnabled: true }}>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false, animation: 'fade' }} />
+      {/* 25O1: the tabs are only ever replaced into (the first opening's close, a form opened without a stack): a fade, never
+          a push from the side as if Inicio were deeper. The first opening arrives under the splash, so its entrance is a cut. */}
+      <Stack.Screen name="(tabs)" options={{ headerShown: false, animation: 'fade' }} />
+      <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false, animation: 'none' }} />
       {/* 24UX6A (decision 005): the Assistant is a screen of this stack, opened from the capture hub, not a tab. */}
       <Stack.Screen name="assistant" options={{ title: t('assistant.title') }} />
       <Stack.Screen name="account/[id]" options={{ title: t('nav.titles.account') }} />

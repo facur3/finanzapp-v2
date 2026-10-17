@@ -74,7 +74,7 @@ function harness(props: Record<string, unknown> = {}, options: Options = {}) {
     'react-native': { View: 'View', Keyboard: { dismiss() {} } },
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, router: { canGoBack: () => true, back: () => { backs++; }, push: (to: unknown) => pushed.push(to), replace: (to: unknown) => pushed.push(to) } },
     'expo-crypto': { randomUUID: () => 'operation-' + (++uuid) },
-    'expo-haptics': { NotificationFeedbackType: { Success: 'Success' }, notificationAsync: async () => {}, selectionAsync: async () => {} },
+    './motion': { successHaptic() {}, errorHaptic() {}, warningHaptic() {} },
     // The real domain, with today read from the fixed clock (the form checks future dates and closed statements with it).
     '@finanzapp/domain': { ...domain, todayKey: (date?: Date) => domain.todayKey(date ?? new FixedDate()) },
     '../storage/LedgerProvider': ledger,

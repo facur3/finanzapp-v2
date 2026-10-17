@@ -12,7 +12,6 @@ export const common = {
     retrySave: 'Reintentar guardado',
     retryChange: 'Reintentar cambio',
     saveChanges: 'Guardar cambios',
-    closeAmountKeyboard: 'Cerrar teclado del monto',
     moreInfoAbout: 'Más información sobre {title}',
     /** VoiceOver name of a metric's help glyph: "Qué significa Disponible". */
     whatIs: 'Qué significa {title}',

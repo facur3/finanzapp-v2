@@ -1774,7 +1774,11 @@ production use of sensitive data. **RESEARCH GATE, DEVICE QA:**
   default class ("complete until first user authentication"), which protects data after a reboot until the first
   unlock and only when the device has a passcode. This is inferred from source and Apple's default, not documented by
   Expo and not checked on a device. First step: read the actual protection class of the database, its WAL and SHM
-  files, the backup's temporary file and any exported file on a real install.
+  files, the backup's temporary file, the import picker's copy and any exported file on a real install. Since 25Q4 the
+  app deletes, once the ledger opens at the next launch, an export left in its cache by a process iOS ended under the
+  share sheet (only its own export names, only in its cache), and the picker's copy right after its text is read
+  (only under the app's own tmp); where iOS places that copy is to be observed on a device, and a copy elsewhere is
+  left alone.
 - **Raising it.** The stricter class ("complete") makes files unreadable while the device is locked. That would break
   any write made while locked: exactly the Wallet capture intent of §7. The decision must be made together with 25A2,
   possibly with different classes for the ledger and the capture spool.

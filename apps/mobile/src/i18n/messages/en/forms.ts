@@ -74,7 +74,7 @@ export const forms: Pick<Messages, 'entryForm' | 'transferForm'> = {
   transferForm: {
     title: 'Between my accounts',
     editTitle: 'Edit transfer',
-    overCardDebt: 'The payment is more than the card’s outstanding balance. If you overpaid, record the actual statement first.',
+    overCardDebt: 'The payment is more than the recorded outstanding balance. If your statement has purchases, interest or fees that are missing, record them first as expenses on the card.',
     overObligation: 'The amount is more than what is still pending on this obligation.',
     futureDate: 'Choose today or an earlier date.',
     saveUnverified: 'We could not confirm the save. Retry this same submission.',
@@ -93,6 +93,12 @@ export const forms: Pick<Messages, 'entryForm' | 'transferForm'> = {
     figureDebt: 'Outstanding balance',
     figurePending: 'Pending',
     figureBalance: 'Recorded balance',
+    figureWithout: {
+      debt: 'Outstanding balance without this payment',
+      credit: 'In credit without this payment',
+      payment: 'Pending without this payment',
+      collection: 'Pending without this collection',
+    },
     figure: '{label}: {currency} {amount}',
     needAccountOut: 'You need an account in {currency} to pay from.',
     needAccountIn: 'You need an account in {currency} to receive the money.',

@@ -41,8 +41,9 @@ const archive: domain.LedgerArchive = { accounts: [cash, cardAccount, usdCardAcc
   transfers: [domain.initialTransferRecord(payment)], cards: [card, usdCard], debts: [debt] };
 const empty: domain.LedgerArchive = { accounts: [cash], records: [] };
 
-// `file` is a route under app/, or a component module under src/ (its exports are returned too).
-function harness(file: string, params: Record<string, unknown> = {}, initial: domain.LedgerArchive | null = archive, gate?: domain.CurrencyGate) {
+// `file` is a route under app/, or a component module under src/ (its exports are returned too). `fail` runs after
+// addDebt records the write (25Q4 review: a storage fault once it was sent).
+function harness(file: string, params: Record<string, unknown> = {}, initial: domain.LedgerArchive | null = archive, gate?: domain.CurrencyGate, fail?: () => void) {
   // null: the ledger has not hydrated yet (LedgerProvider reads SQLite asynchronously); setData moves it on.
   let data = initial as domain.LedgerArchive;
   const source = readFileSync(new URL((file.startsWith('src/') ? '../' : '../app/') + file, import.meta.url), 'utf8');
@@ -56,7 +57,7 @@ function harness(file: string, params: Record<string, unknown> = {}, initial: do
   let backs = 0;
   const ledger = { useLedger: () => ({ archive: data, snapshot: data ? domain.snapshotFromArchive(data) : null, ...(gate ? { gate } : {}),
     addCard: async (account: domain.Account, card: domain.CreditCardProfile) => { cards.push({ account, card }); }, saveCard: async () => {},
-    addDebt: async (account: domain.Account, debt: domain.PersonalDebtProfile) => { debts.push({ account, debt }); },
+    addDebt: async (account: domain.Account, debt: domain.PersonalDebtProfile) => { debts.push({ account, debt }); fail?.(); },
     saveDebt: async (debt: domain.PersonalDebtProfile) => { savedDebts.push(debt); },
     // 25B2 close: what storage's `deletePersonalDebt` writes (the rule checked again, then the deletion record).
     removeDebt: async (id: string) => {
@@ -73,8 +74,11 @@ function harness(file: string, params: Record<string, unknown> = {}, initial: do
   const cardVisual = { CardDeck: 'CardDeck', CardFace: 'CardFace', cardFaceWidth: (windowWidth: number) => Math.min(windowWidth - 40, 420), cardFaceHeight: (width: number) => Math.round(width / 1.586) };
   const GATE = (typeof gate !== 'undefined' && gate) || domain.LEDGER_CURRENCIES;
   const defaults = { useDefaultCurrency: ({ accountCurrency, requested }: { accountCurrency?: string | null; requested?: unknown } = {}) => accountCurrency ?? (domain.isLedgerCurrency(requested, GATE) ? requested : 'ARS') };
+  // 25Q4 review: each notification haptic by its helper's name (tests/motion.node.ts pins the type each one sends).
+  const haptics: string[] = [];
+  const motion = { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, successHaptic: () => { haptics.push('Success'); },
+    errorHaptic: () => { haptics.push('Error'); }, warningHaptic: () => { haptics.push('Warning'); }, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) };
   const modules: Record<string, unknown> = {
-    'expo-haptics': { NotificationFeedbackType: { Success: 'Success' }, notificationAsync: async () => {}, selectionAsync: async () => {} },
     'expo-crypto': { randomUUID: () => 'id-' + Math.random().toString(36).slice(2, 8) },
     '../i18n/messages': {},
     './form-controls': { DateField: 'DateField' },
@@ -107,7 +111,7 @@ function harness(file: string, params: Record<string, unknown> = {}, initial: do
     '../src/ui/liability-rows': { DebtRow: 'DebtRow' }, '../../src/ui/liability-rows': { DebtRow: 'DebtRow' },
     './swipe-actions': swipeActionsMock,
     '../src/ui/quick-actions': { QuickActions: 'QuickActions', AssistantEntry: 'AssistantEntry' }, '../../src/ui/quick-actions': { QuickActions: 'QuickActions', AssistantEntry: 'AssistantEntry' },
-    '../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) }, '../../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
+    '../src/ui/motion': motion, '../../src/ui/motion': motion,
     // 24T2 (stream B): the card form's statement dates (real) and its «Usar estos días todos los meses» switch (a descriptor).
     './card-cycle-form': cardCycleForm, './switch-row': { SwitchRow: 'SwitchRow' },
   };
@@ -129,7 +133,7 @@ function harness(file: string, params: Record<string, unknown> = {}, initial: do
   const module = { exports: {} as { default?: () => Node } & Record<string, (props: any) => Node> };
   runInNewContext(code, { module, exports: module.exports, require, Error });
   return { render: () => { cursor = 0; return module.exports.default!(); }, renderExport: (name: string, props: any = {}) => { cursor = 0; return module.exports[name](props); },
-    pushed, cards, debts, savedDebts, removedDebts, alerts, backs: () => backs, exports: module.exports,
+    pushed, cards, debts, savedDebts, removedDebts, alerts, haptics, backs: () => backs, exports: module.exports,
     setData: (next: domain.LedgerArchive | null) => { data = next as domain.LedgerArchive; } };
 }
 
@@ -163,7 +167,7 @@ function textOf(node: any): string {
 
 test('Tarjetas shows an honest empty state and a debts invitation without any card', () => {
   const root = harness('cards.tsx', {}, empty).render();
-  assert.equal(find(root, 'EmptyState').props.title, 'Tus tarjetas, como en la billetera');
+  assert.equal(find(root, 'EmptyState').props.title, 'Tus tarjetas de crédito');
   assert.equal(nodes(root).some(node => node.type === 'CardDeck'), false);
   find(root, 'EmptyState').props.action.props.onPress();
   assert.equal(nodes(root).some(node => node.type === 'DebtRow'), false);
@@ -295,7 +299,7 @@ test('debts screen separates what I owe from what they owe me and never mixes cu
   assert.deepEqual(rows.map(row => row.props.debt.id), ['debt', 'receivable']);
   const totals = nodes(root).filter(node => node.type === 'Money').map(node => [node.props.currency, node.props.minor]);
   assert.deepEqual(totals, [['ARS', 30000], ['ARS', 0], ['USD', 0], ['USD', 4000]]);
-  assert.equal(find(harness('debts.tsx', {}, empty).render(), 'EmptyState').props.title, 'Lo que debés y lo que te deben');
+  assert.equal(find(harness('debts.tsx', {}, empty).render(), 'EmptyState').props.title, 'Sin deudas ni cobros');
 });
 
 test('debt detail offers a capped payment into the debt and lists its settlements with debt context', () => {
@@ -540,7 +544,7 @@ test('24UX4: deleting a debt asks first, names the payments that stay, writes on
   const deletedData = { ...settledData, debts: [view.savedDebts[0]] };
   const list = harness('debts.tsx', {}, deletedData).render();
   assert.equal(rowsOf(list).length, 0);
-  assert.equal(find(list, 'EmptyState').props.title, 'Lo que debés y lo que te deben');
+  assert.equal(find(list, 'EmptyState').props.title, 'Sin deudas ni cobros');
   assert.equal(find(harness('debt/[id].tsx', { id: 'debt' }, deletedData).render(), 'EmptyState').props.title, 'No encontramos esta deuda');
   assert.equal(domain.snapshotFromArchive(deletedData).transfers!.some(transfer => transfer.id === 'settle-juan'), true);
   // A receivable with no collection yet: its own wording.
@@ -778,4 +782,46 @@ test('24UX6E: the edit form summarises what cannot change (the kind and the curr
     const english = harness('src/ui/debt-form.tsx', {}, data).renderExport('DebtForm', { original: receivable6E });
     assert.equal(nodes(english).filter(node => node.type === 'DetailRow').map(node => [node.props.label, node.props.value].join('=')).join(','), 'Type=Owed to me,Currency=ARS');
   } finally { activeLocale = 'es-AR'; }
+});
+
+test('25Q4 review: a new debt taps Error for an amount refused before anything is sent, Warning while the same debt stays frozen for «Reintentar guardado», then Success', async () => {
+  let attempts = 0;
+  const view = harness('src/ui/debt-form.tsx', {}, empty, undefined, () => { if (++attempts === 1) throw new Error('Refresh failed'); });
+  const render = () => view.renderExport('DebtForm', {});
+  find(render(), 'Field', 'Persona o entidad').props.onChangeText('Ana');
+  find(render(), 'AmountField').props.onChangeText('0');
+  await find(render(), 'ActionButton', 'Crear deuda').props.onPress();
+  assert.deepEqual([view.haptics.splice(0).join(','), view.debts.length, find(render(), 'Field', 'Persona o entidad').props.editable], ['Error', 0, true],
+    'refused before anything is sent, still editable');
+  find(render(), 'AmountField').props.onChangeText('100');
+  await find(render(), 'ActionButton', 'Crear deuda').props.onPress();
+  assert.deepEqual([view.haptics.splice(0).join(','), find(render(), 'Field', 'Persona o entidad').props.editable], ['Warning', false], 'sent with an unknown outcome: frozen for the exact retry');
+  await find(render(), 'ActionButton', 'Reintentar guardado').props.onPress();
+  assert.equal(JSON.stringify(view.debts[1]), JSON.stringify(view.debts[0]), 'the retry resends the same debt and account');
+  assert.deepEqual([view.haptics.join(','), view.backs()], ['Success', 1]);
+});
+
+test('25O1: the empty states of Tarjetas, Deudas y cobros and Recurrentes are a title of five words at most and one line of twelve; the rules they used to carry are said where each is recorded', () => {
+  const words = (text: string) => text.split(/\s+/).filter(word => /[\p{L}\p{N}]/u.test(word)).length;
+  const pairs = [['cards.list.emptyTitle', 'cards.list.emptyDetail'], ['cards.list.noActiveTitle', 'cards.list.noActiveDetail'], ['debts.list.emptyTitle', 'debts.list.emptyDetail'],
+    ['recurring.list.emptyTitle', 'recurring.list.emptyDetail'], ['recurring.list.emptyTitle', 'recurring.list.emptyDetailAccount']] as const;
+  for (const language of ['es-AR', 'en-US'] as const) {
+    const { t } = bindLocale(language);
+    for (const [title, detail] of pairs) {
+      assert.ok(words(t(title)) <= 5, language + ' ' + title + ': «' + t(title) + '»');
+      assert.ok(words(t(detail)) <= 12, language + ' ' + detail + ': «' + t(detail) + '»');
+      assert.ok((t(detail).match(/[.!?](\s|$)/g) ?? []).length <= 1, language + ' ' + detail + ': one sentence, no paragraph');
+    }
+    // «Saldo pendiente», never «deuda», in card copy (decision 003).
+    assert.doesNotMatch(t('cards.list.emptyTitle') + ' ' + t('cards.list.emptyDetail'), /deuda|\bdebt/i);
+  }
+  // Each rule now lives where the person records what it is about: a card purchase and its instalments in the composer, a
+  // card payment in its form, a debt's payment or collection in the debt form, a recurring rule in its form.
+  const { t } = bindLocale('es-AR');
+  assert.match(t('entryForm.cardNote'), /una sola vez/);
+  assert.match(t('entryForm.plan.note'), /cada cuota cuenta como gasto cuando cierra su resumen/);
+  assert.match(t('transferForm.explainCard'), /no lo duplica/);
+  for (const key of ['debts.form.explainOwed', 'debts.form.explainReceivable'] as const) assert.match(t(key), /No se crean gastos ni ingresos/);
+  assert.match(t('recurring.form.note'), /no paga ni cobra nada/);
+  assert.match(t('recurring.form.noteHelp'), /al guardar.*una sola vez.*no paga ni cobra nada/);
 });

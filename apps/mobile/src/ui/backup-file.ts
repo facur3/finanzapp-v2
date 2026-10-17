@@ -1,6 +1,8 @@
-import { BACKUP_MAX_BYTES, createRecoveryBackup, parsePilotBackup, todayKey, type LedgerArchive } from '@finanzapp/domain';
+import { BACKUP_MAX_BYTES, assertOpenAccount, createRecoveryBackup, materializeRecurringRule, parsePilotBackup, planCatchUpInserts, todayKey, type ImportPreview,
+  type LedgerArchive } from '@finanzapp/domain';
 
-/** Producto 25Q2: the backup file a person shares. Pure, so the name, the size check and the round trip are tested
+/** Producto 25Q2: the backup file a person shares, and (25Q4) what the import's review counts and which temporary copies
+ * are the app's to delete. Pure, so the name, the size check, the round trip, the count and the deletions are tested
  * without React Native. */
 
 /** The one place the working name reaches a file name (the naming workflow renames it, brand-brief.md §3). The format's
@@ -35,4 +37,55 @@ export function buildBackupFile(archive: LedgerArchive, now = new Date(), maxByt
   if (bytes > maxBytes) throw new Error('backup.export.tooLarge');
   parsePilotBackup(json);
   return { name: backupFileName(now), json, bytes };
+}
+
+/** 25Q4: the plaintext exports an ended process left in the cache (backup.tsx deletes its file in `finally`, which never
+ * runs when iOS ends the app under the share sheet): today's name and the pilot builds' «finanzapp-piloto-<ms>.json».
+ * Nothing else in the cache is touched. */
+export function discardBackupLeftovers(files: readonly { name: string; delete(): void }[]): void {
+  for (const file of files) {
+    const ours = file.name.endsWith('.json') && (file.name.startsWith(BACKUP_FILE_PREFIX + '-') || file.name.startsWith('finanzapp-piloto-'));
+    if (!ours) continue;
+    try { file.delete(); } catch { /* The OS clears the cache too. */ }
+  }
+}
+
+/** 25Q4: iOS hands a picked file as its own copy inside this app's container (the picker opens asCopy, expo-file-system 57:
+ * tmp/<bundle id>-Inbox). Only such a copy is the app's to delete: never the original, an Android provider file
+ * (content://), Documents or the cache. iOS spells the same folder through /private/var or /var. */
+export function isPickerCopy(uri: unknown, containerUri: string): boolean {
+  if (typeof uri !== 'string' || !uri.startsWith('file://')) return false;
+  const path = (value: string) => { const bare = value.slice('file://'.length); return bare.startsWith('/private/') ? bare.slice('/private'.length) : bare; };
+  const root = path(containerUri).endsWith('/') ? path(containerUri) : path(containerUri) + '/';
+  return path(uri).startsWith(root + 'tmp/');
+}
+
+/** 25Q4: the movements a restore's catch-ups also record (what fell due since the copy was made), counted for the review
+ * by storage's own rules: database.ts `catchUpStep` and `catchUpRecurring` (nothing on a deleted account, card or debt; an
+ * id already in the ledger is never recorded again; at most 64 steps a pass) and `catchUpInstallments`. Only the copy's
+ * new rules and plans: the device's own were caught up by the foreground pass. */
+export function restoreCatchUp(current: LedgerArchive, preview: ImportPreview, todayISO: string, nowISO = new Date().toISOString()): number {
+  const accounts = [...current.accounts, ...preview.accounts];
+  const cards = [...current.cards ?? [], ...preview.cards];
+  const debts = [...current.debts ?? [], ...preview.debts];
+  const records = [...current.records, ...preview.records];
+  const known = new Set(records.map(record => record.entry.id));
+  let count = 0;
+  for (let rule of preview.recurring) {
+    try {
+      assertOpenAccount(rule.accountId, accounts, cards, debts);
+      for (let step = 0; step < 64; step++) {
+        const batch = materializeRecurringRule(rule, accounts, todayISO, nowISO);
+        count += batch.entries.filter(entry => !known.has(entry.id)).length;
+        if (batch.complete) break;
+        rule = batch.rule;
+      }
+    } catch { /* Storage leaves such a rule for review. */ }
+  }
+  const plans = { records, cards, installmentPlans: [...current.installmentPlans ?? [], ...preview.installmentPlans],
+    purchaseOperations: [...current.purchaseOperations ?? [], ...preview.purchaseOperations] };
+  for (const plan of preview.installmentPlans) {
+    try { count += planCatchUpInserts(plans, plan.id, todayISO).length; } catch { /* The pass reports it in the banner. */ }
+  }
+  return count;
 }

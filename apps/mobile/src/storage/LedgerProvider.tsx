@@ -6,12 +6,12 @@ import { OPERATION_STATE_MESSAGE, PLAN_CALENDAR_MESSAGE, snapshotFromArchive, to
   type CardCycleDates, type CardCycleIntent, type EntryRefund, type OperationChange, type PlanPayoff, type PlanRefund } from '@finanzapp/domain';
 import type { CurrencyGate } from '@finanzapp/domain';
 import { currencyGateForBuild } from './currency-gate';
-import { changeEntry, createAccount, createEntry, deleteAccount, deleteCreditCard, importArchive, readArchive, changeAccount,
+import { changeEntry, createAccount, createEntry, deleteAccount, deleteCreditCard, readArchive, changeAccount,
   createTransfer, changeTransfer, saveRecurringRule, processRecurring, saveMonthlyBudget,
   createCreditCard, saveCreditCard, createPersonalDebt, savePersonalDebt, deletePersonalDebt, saveAccountAppearance, saveCategoryDefinition,
   cancelInstallmentPlan, deleteInstallmentPlan, catchUpInstallments, changePurchaseOperation, reactivateInstallmentPlan,
   type LedgerDatabase } from './database';
-import { openLedger, refreshLedger, savePurchaseOperation, savePurchasePlan, sessionWarning } from './ledger-session';
+import { openFailureMessage, openLedger, refreshLedger, restoreFromBackup, savePurchaseOperation, savePurchasePlan, sessionWarning, type CatchUps } from './ledger-session';
 import { openLedgerDatabase, openReviewDatabase } from './nativeDatabase';
 import { loadReviewTray, openReviewStore, type ReviewCapture, type ReviewDatabase, type ReviewItem, type ReviewStore, type ReviewTray } from './review-database';
 
@@ -108,8 +108,9 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
   // Serializing client writes and reads avoids stale snapshots replacing a
   // newer balance. SQLite exclusive transactions provide durable atomicity.
   const queue = useRef<Promise<void>>(Promise.resolve());
-  /** 24T1: a warning a write left behind (its instalment recognition failed after the save): shown instead of clearing the banner. */
-  const pendingWarning = useRef<string | null>(null);
+  /** 25Q4: which catch-up last failed, as the open or foreground pass left it and as a write that ran a pass updated it. The
+   * banner after a write is built from it, so a failure stays said, with its retry, until its own pass succeeds. */
+  const catchUps = useRef<CatchUps>({ recurringError: false, installmentError: false });
   const reviewStore = useRef<ReviewStore | null>(null);
   const reviewDatabase = useRef<ReviewDatabase | null>(null);
   const [review, setReview] = useState<ReviewTray | 'unavailable' | null>(null);
@@ -133,11 +134,12 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
       // same for the instalment catch-up, on its own flag (the retry reopens and runs both passes again).
       const session = await openLedger(db, todayKey());
       if (cancelled) return;
+      catchUps.current = { recurringError: session.recurringError, installmentError: session.installmentError };
       setArchive(session.archive);
       setError(sessionWarning(session));
       await loadReview(db);
-    }).catch(() => {
-      if (!cancelled) setError('No pudimos abrir tus datos. No se borró ni reemplazó nada. Probá nuevamente o conservá la app para recuperar la base.');
+    }).catch(cause => {
+      if (!cancelled) setError(openFailureMessage(cause));
     });
     return () => { cancelled = true; mounted.current = false; };
   }, [attempt, enqueue]);
@@ -148,11 +150,14 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
       void enqueue(async () => {
         const session = await refreshLedger(database.current!, todayKey());
         if (!mounted.current) return;
+        catchUps.current = { recurringError: session.recurringError, installmentError: session.installmentError };
         setArchive(session.archive);
         setError(sessionWarning(session)); // A successful pass clears its warning; a failing one keeps it.
         await loadReview(database.current!);
       }).catch(() => {
-        if (mounted.current) setError('No pudimos verificar tus datos locales ni los vencimientos recurrentes. No se modificó nada fuera de una transacción completa.');
+        // The pass could not be read back: nothing says it completed.
+        catchUps.current = { ...catchUps.current, recurringError: true };
+        if (mounted.current) setError(sessionWarning(catchUps.current));
       });
     });
     return () => subscription.remove();
@@ -174,13 +179,14 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
 
   const mutate = useCallback((operation: (db: LedgerDatabase) => Promise<void>) => enqueue(async () => {
     if (!database.current) throw new Error('Todavía estamos abriendo tus datos.');
-    pendingWarning.current = null;
     await operation(database.current);
     // If this read fails after commit, the form keeps the same operation ID;
     // retrying cannot post a duplicate entry.
     try {
       const next = await readArchive(database.current);
-      if (mounted.current) { setArchive(next); setError(pendingWarning.current); }
+      // 25Q4: a write never clears a catch-up banner it did not earn: one that ran no pass leaves a failed pass said; a pass
+      // it ran updated its own half.
+      if (mounted.current) { setArchive(next); setError(sessionWarning(catchUps.current)); }
     } catch {
       if (mounted.current) setError(VIEW_REFRESH_MESSAGE);
       throw new Error(VIEW_REFRESH_MESSAGE);
@@ -236,7 +242,10 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     updateTransfer: change => mutate(db => changeTransfer(db, change)),
     saveRecurring: rule => mutate(async db => {
       await saveRecurringRule(db, rule);
-      await processRecurring(db, todayKey());
+      // 25Q4: the rule is durable here: a catch-up that fails after it is said in the banner (its retry runs it again), never
+      // as a failed save, as a plan's recognition (24T2).
+      try { await processRecurring(db, todayKey()); catchUps.current = { ...catchUps.current, recurringError: false }; }
+      catch { catchUps.current = { ...catchUps.current, recurringError: true }; }
     }),
     saveBudget: budget => mutate(db => saveMonthlyBudget(db, budget, BUILD_CURRENCY_GATE)),
     addCard: (account, card, cycleDates = []) => mutate(db => createCreditCard(db, account, card, BUILD_CURRENCY_GATE, cycleDates)),
@@ -248,7 +257,10 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     addInstallmentPlan: plan => mutate(async db => {
       // A first instalment on a statement already closed is recognised at once. The plan is saved either way: a failing
       // recognition is reported in the banner (never as a failed save that would invite a duplicate) and retried.
-      try { pendingWarning.current = await savePurchasePlan(db, plan, todayKey()); } catch (cause) {
+      try {
+        const warning = await savePurchasePlan(db, plan, todayKey());
+        catchUps.current = { ...catchUps.current, installmentError: warning !== null };
+      } catch (cause) {
         // 24T2: a plan built from a calendar this view no longer holds (a card change whose refresh failed) is refused before
         // anything is written; the view is read again so the form rebuilds the plan from the card's current statements.
         if (cause instanceof Error && cause.message === PLAN_CALENDAR_MESSAGE) {
@@ -260,20 +272,20 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     // 24T3 (A14): the catch-up runs through the device's day (`todayKey()`), never a UTC timestamp's date.
     cancelInstallmentPlan: (planId, expectedRevision) => rereadOnRefusal(db => cancelInstallmentPlan(db, planId, expectedRevision, todayKey(), new Date().toISOString())),
     reactivateInstallmentPlan: (planId, expectedRevision) => rereadOnRefusal(db => reactivateInstallmentPlan(db, planId, expectedRevision, todayKey(), new Date().toISOString())),
-    removeInstallmentPlan: planId => mutate(db => deleteInstallmentPlan(db, planId, new Date().toISOString())),
+    // 25Q4: a refused deletion (an instalment or an operation recorded since the screen was drawn) re-reads the plan too.
+    removeInstallmentPlan: planId => rereadOnRefusal(db => deleteInstallmentPlan(db, planId, new Date().toISOString())),
     addRefund: refund => rereadOnRefusal(db => savePurchaseOperation(db, refund, todayKey())),
     addPayoff: payoff => rereadOnRefusal(db => savePurchaseOperation(db, payoff, todayKey())),
     voidOperation: change => changeOperation(change, 'void'),
     restoreOperation: change => changeOperation(change, 'restore'),
-    restoreBackup: (incoming, baseline) => mutate(async db => {
-      await importArchive(db, incoming, baseline);
-      await processRecurring(db, todayKey());
-      try { await catchUpInstallments(db, todayKey()); } catch { pendingWarning.current = sessionWarning({ recurringError: false, installmentError: true }); }
-    }),
+    // 25Q4: a refused import re-reads the archive before the error reaches the review, so «Volver a revisar» previews from the
+    // stored ledger; a committed one adopts both catch-ups' outcome, whatever the banner said before.
+    restoreBackup: (incoming, baseline) => rereadOnRefusal(async db => { catchUps.current = await restoreFromBackup(db, incoming, baseline, todayKey()); }),
     confirmReview: (id, expectedRevision) => reviewOperation(async store => {
       const result = await store.confirm(id, { expectedRevision, todayISO: todayKey(), at: new Date().toISOString() });
-      // A plan whose first instalments could not be recognised right away is saved: its catch-up banner, as for the form.
-      pendingWarning.current = result.warning;
+      // A plan whose first instalments could not be recognised right away is saved: its catch-up banner, as for the form. A null
+      // warning does not say a pass ran (an entry runs none), so it leaves the half as it was.
+      if (result.warning) catchUps.current = { ...catchUps.current, installmentError: true };
       return { recorded: result.recorded };
     }),
     updateReview: (id, expectedRevision, draft) => reviewOperation(store => store.updateDraft(id, expectedRevision, draft, new Date().toISOString())),

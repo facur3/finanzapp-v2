@@ -83,7 +83,8 @@ function ColorOption({ item, name, selected, disabled, onPress, p }: { item: Col
     disabled={disabled} onPress={onPress} hitSlop={2} style={styles.option}>
     <Animated.View style={[styles.ring, { borderColor: selected ? hex : 'transparent', transitionProperty: 'borderColor', transitionDuration: reduced ? 0 : duration.state }]}>
       <View style={[styles.dot, { backgroundColor: hex }]}>
-        {selected && <Ionicons name="checkmark" size={16} color="#FFFFFF" accessible={false} />}
+        {/* 25D1: the check takes onSemantic, white in light and ink in dark, where white fell to 2:1 on the brighter dots. */}
+        {selected && <Ionicons name="checkmark" size={16} color={p.onSemantic} accessible={false} />}
       </View>
     </Animated.View>
   </PressFeedback>;

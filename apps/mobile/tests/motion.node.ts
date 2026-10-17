@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
@@ -239,7 +239,7 @@ test('form selectors keep the category hue and give the account the interaction 
     '@react-native-community/datetimepicker': 'DateTimePicker',
     '@expo/vector-icons/Ionicons': 'Ionicons',
     './components': { useStacked: () => false, AccountBadge: 'AccountBadge', AppText: 'AppText', CategoryBadge: 'CategoryBadge', DetailRow: 'DetailRow', SelectionRow: 'SelectionRow', Field: 'Field', GlyphTile: 'GlyphTile', PressFeedback: 'PressFeedback', Surface: 'Surface', surfaceShadow: () => ({}) },
-    './currencies': currencies,
+    './currencies': currencies, './marks': { CurrencyMark: 'CurrencyMark' },
     '@finanzapp/domain': { todayKey: (d: Date) => d.toISOString().slice(0, 10) },
     './category-hues': { useCategoryColor: (label: string) => label ? '#B0507A' : '#000', useCategoriesInUse: () => [], useCategoryDefinitions: () => [], useCategoryLook: (label: string) => ({ label, hex: label ? '#B0507A' : '#000', glyph: 'paw-outline' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ glyph: 'wallet-outline', hex: '#2557D6' }) },
     './motion': { selectionHaptic: () => {}, timing: () => ({ duration: 0 }) },
@@ -269,4 +269,50 @@ test('form selectors keep the category hue and give the account the interaction 
   const none = selector(render('AccountField', { accounts, value: '', onChange: () => {}, prominent: true }));
   assert.equal(tileOf(none).props.color, undefined);
   assert.equal(tileOf(none).props.tone, 'neutral');
+});
+
+test('25Q4: every haptic comes from motion.tsx, and a write that taps Success also taps Error or Warning when it fails', () => {
+  const root = new URL('../', import.meta.url);
+  const files = ['app/', 'src/'].flatMap(dir => readdirSync(new URL(dir, root), { recursive: true, encoding: 'utf8' })
+    .filter(name => /\.tsx?$/.test(name)).map(name => dir + name));
+  const read = (file: string) => readFileSync(new URL(file, root), 'utf8');
+  assert.deepEqual(files.filter(file => read(file).includes("from 'expo-haptics'")), ['src/ui/motion.tsx'], 'no screen calls expo-haptics directly');
+  const silent = files.filter(file => file !== 'src/ui/motion.tsx' && read(file).includes('successHaptic()')
+    && !read(file).includes('errorHaptic()') && !read(file).includes('warningHaptic()'));
+  assert.deepEqual(silent, [], 'a write that taps Success taps Error or Warning in its catch');
+  // 25Q4 review: per catch, not per file. Every try that taps Success catches its failure with exactly one Error or Warning
+  // tap on every path: one call, or an if/else whose branches tap once each.
+  const failures = ['errorHaptic', 'warningHaptic'];
+  const calls = (node: ts.Node, names: string[]) => ts.isCallExpression(node) && ts.isIdentifier(node.expression) && names.includes(node.expression.text);
+  const contains = (node: ts.Node, names: string[]): boolean => calls(node, names) || !!ts.forEachChild(node, child => contains(child, names) || undefined);
+  /** The failure taps on every path through `node`; null when two paths differ or a tap is anywhere else. */
+  const taps = (node: ts.Node): number | null => {
+    if (ts.isExpressionStatement(node) && calls(node.expression, failures)) return 1;
+    if (ts.isBlock(node)) return node.statements.reduce<number | null>((sum, statement) => { const own = taps(statement); return sum === null || own === null ? null : sum + own; }, 0);
+    if (ts.isIfStatement(node)) { const then = taps(node.thenStatement), other = node.elseStatement ? taps(node.elseStatement) : 0; return then === other ? then : null; }
+    return contains(node, failures) ? null : 0;
+  };
+  const unpaired: string[] = [];
+  for (const file of files.filter(file => file !== 'src/ui/motion.tsx' && read(file).includes('successHaptic()'))) {
+    const source = ts.createSourceFile(file, read(file), ts.ScriptTarget.Latest, true, file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+    const visit = (node: ts.Node): void => {
+      if (ts.isTryStatement(node) && node.catchClause && contains(node.tryBlock, ['successHaptic']) && taps(node.catchClause.block) !== 1) {
+        unpaired.push(file + ':' + (source.getLineAndCharacterOfPosition(node.catchClause.getStart()).line + 1));
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(source);
+  }
+  assert.deepEqual(unpaired, [], 'each catch of a write that taps Success taps Error or Warning exactly once');
+  // The helpers exist and say what their names say.
+  const motion = read('src/ui/motion.tsx');
+  const body = (name: string) => {
+    const start = motion.indexOf('export function ' + name + '()');
+    assert.ok(start >= 0, name);
+    return motion.slice(start, motion.indexOf('}', start));
+  };
+  assert.ok(body('successHaptic').includes('NotificationFeedbackType.Success)'), '25Q4 review: the harnesses record the helper\'s name, so its type is pinned here');
+  assert.ok(body('errorHaptic').includes('NotificationFeedbackType.Error)'));
+  assert.ok(body('warningHaptic').includes('NotificationFeedbackType.Warning)'));
+  assert.ok(body('selectionHaptic').includes('selectionAsync()'));
 });

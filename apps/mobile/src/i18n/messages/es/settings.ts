@@ -37,13 +37,14 @@ export const settings = {
       undoneNone: 'Ninguno',
       undoneCount: { one: '{count} recuperable', other: '{count} recuperables' },
     },
-    localNote: 'Tus registros se guardan solo en este dispositivo y funcionan sin conexión. No se sincronizan con otros dispositivos.',
     /** The version line at the end of Más; `release` is the internal delivery name ("24UX5") and is not translated. */
     version: 'FinanzApp {version} ({release})',
     /** 24UX5: only in a development build, under the version: the control material and where the languages were read. */
     diagnostics: '{material} · {source}',
     /** Under the footer of a development bundle started with EXPO_PUBLIC_CURRENCY_PREVIEW=1: the extra currencies its forms offer. Never in a release. */
     currencyPreview: 'Monedas de prueba activas: {codes}. Solo en esta compilación de desarrollo.',
+    /** Under the footer of a development bundle started with EXPO_PUBLIC_QA_PROFILE=<name>: the separate test profile in use. Never in a release. */
+    qaProfile: 'Perfil de prueba «{name}»: tus datos no se abren. Reiniciá Metro sin la variable para volver a ellos.',
     /** Which control material this session draws, for a tester. */
     material: {
       disabled: 'Material opaco (desactivado)',

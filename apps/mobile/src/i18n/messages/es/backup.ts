@@ -21,8 +21,10 @@ export const backup = {
       readFailed: 'No pudimos leer la copia. Tus datos y el archivo siguen intactos.',
       reviewFailed: 'No pudimos revisar la copia.',
       verifyFailed: 'No pudimos verificar la importación. Reintentá con la misma copia para comprobarla sin duplicar datos.',
-      confirmTitle: '¿Importar esta copia?',
-      confirmMessage: 'Se agregarán únicamente los registros que faltan. No se reemplazan tus datos actuales.',
+      /** 25Q4: {date} is the export date and time from the file's header, as «Copia del {date}» shows it. */
+      confirmTitle: '¿Importar la copia del {date}?',
+      /** 25Q4: what is added, and the one consequence the review cannot show: there is no undo of the whole import. */
+      confirmMessage: 'Se agregan solo los registros que faltan; no se reemplaza nada. Lo importado no se puede quitar de una sola vez: se deshace o se elimina de a uno.',
       /** Alert button. */
       confirmButton: 'Importar',
       doneTitle: 'Copia incorporada',
@@ -32,6 +34,10 @@ export const backup = {
       emptyDetail: 'Elegí una copia de FinanzApp. Vas a revisar los cambios antes de guardarlos. El archivo no se envía a ningún servidor.',
       choose: 'Elegir copia',
       reviewTitle: 'Revisar copia',
+      /** 25Q4: under the file name. {date}: the export date and time from the file's header. */
+      exportedAt: 'Copia del {date}',
+      /** 25Q4: {date}: the newest live movement or transfer inside the copy; omitted when it has none. */
+      latestMovement: 'Último movimiento: {date}',
       /** Review rows: what the backup would add; the value is a count. */
       rows: {
         accounts: 'Cuentas nuevas',
@@ -57,6 +63,13 @@ export const backup = {
       availableCaption: 'Solo cuentas de dinero. Tarjetas y deudas no se suman.',
       /** Label above the current balance, under the balance after import. */
       now: 'Ahora',
+      /** 25Q4: the movements the restore's catch-up also records for the copy's rules and plans (what fell due since the copy
+       * was made); they are not in «Disponible después». `one` is singular, `other` plural. 25Q4 review: it counts movements,
+       * never due dates (a financed instalment records one per part). */
+      catchUp: {
+        one: 'Al importar también se registra {count} movimiento de un recurrente o una cuota que venció después de la copia, así que tus saldos pueden diferir de esta revisión.',
+        other: 'Al importar también se registran {count} movimientos de recurrentes o cuotas que vencieron después de la copia, así que tus saldos pueden diferir de esta revisión.',
+      },
       noAccounts: 'No contiene cuentas.',
       onlyMissing: 'Solo se agrega lo que falta. No se reemplaza ni se borra nada.',
       nothingNew: 'Esta copia ya está incorporada. No hay nada nuevo para agregar.',

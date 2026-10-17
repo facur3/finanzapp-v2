@@ -1,4 +1,4 @@
-import { accountKind, cardAvailableLimitMinor, cardCommittedFinancingMinor, cardCommittedMinor, cardCreditMinor, cardCycleDatesOf, cardCycleView, cardDebtMinor, installmentPlanFigures, pendingInstallmentPlans,
+import { accountKind, cardAvailableLimitMinor, cardCommittedFinancingMinor, cardCommittedMinor, cardCreditMinor, cardCycleDatesOf, cardCycleView, cardDebtMinor, debtOutstandingMinor, installmentPlanFigures, pendingInstallmentPlans,
   type Account, type AccountAppearance, type CardCycleDates, type CardStatement, type CreditCardProfile, type InstallmentPlan, type LedgerSnapshot, type PersonalDebtProfile,
   type PurchaseOperation, type RecordedEntry, isLiveAccount } from '@finanzapp/domain';
 import { formatDate, relativeDate } from '../i18n/format.ts';
@@ -187,4 +187,24 @@ export function accountDisplayName(account: Account, debts: PersonalDebtProfile[
   const key = debt.direction === 'owed_by_me' ? 'debts.accountName.owedByMe' : 'debts.accountName.owedToMe';
   const prefix = translator('es')(key, { name: '' });
   return account.name.startsWith(prefix) ? t(key, { name: account.name.slice(prefix.length) }) : account.name;
+}
+
+/** 25Q4: how a card or a debt reads after an undo or a restore, for its confirmation, in its own words. A card owes a saldo
+ * pendiente, holds an amount a favor or has nothing pending (the entry form's words, never «deuda»). A debt has an amount
+ * pending by its direction, or is saldada once nothing is (debtOutstandingMinor's clamp, as every debt screen reads it);
+ * 25Q4 review: a receivable is never «la deuda con», which is money the person owes (the glossary, the debt screens).
+ * `after` is the ledger with the change applied. Null for a cash account; throws as a balance out of range does. */
+export function balanceAfterSentence(account: Account, after: LedgerSnapshot, cards: readonly CreditCardProfile[], debts: readonly PersonalDebtProfile[],
+  money: (minor: number) => string, t: Translate): string | null {
+  const card = cards.find(item => item.accountId === account.id);
+  if (card) {
+    const owed = cardDebtMinor(card, after), credit = cardCreditMinor(card, after);
+    return owed > 0 ? t('entryDetail.cardAfterDebt', { account: account.name, amount: money(owed) })
+      : credit > 0 ? t('entryDetail.cardAfterCredit', { account: account.name, amount: money(credit) }) : t('entryDetail.cardAfterClear', { account: account.name });
+  }
+  const debt = debts.find(item => item.accountId === account.id);
+  if (!debt) return null;
+  const outstanding = debtOutstandingMinor(debt, after), owed = debt.direction === 'owed_by_me';
+  return outstanding === 0 ? t(owed ? 'transferDetail.debtAfterSettled' : 'transferDetail.debtAfterReceivableSettled', { name: debt.counterparty })
+    : t(owed ? 'transferDetail.debtAfterOwed' : 'transferDetail.debtAfterReceivable', { name: debt.counterparty, amount: money(outstanding) });
 }

@@ -84,27 +84,36 @@ export const MATERIAL_LABELS: Record<MaterialReason, MessageKey> = {
 /** The shape of React Native's AccessibilityInfo this code relies on; every member is optional because an older or mismatched runtime may lack it. */
 export type ReduceTransparencyAPI = {
   isReduceTransparencyEnabled?(): Promise<boolean>;
-  addEventListener?: (event: 'reduceTransparencyChanged', handler: (value: boolean) => void) => { remove: () => void };
+  /** iOS's Increase Contrast («darker system colours»). */
+  isDarkerSystemColorsEnabled?(): Promise<boolean>;
+  addEventListener?: (event: 'reduceTransparencyChanged' | 'darkerSystemColorsChanged', handler: (value: boolean) => void) => { remove: () => void };
 };
 
-/** Read and follow the Reduce Transparency setting without ever throwing.
- * A missing or failing API leaves the value at `true` (opaque). Returns the
- * unsubscribe; `set` is never called after it. */
-export function subscribeReduceTransparency(api: ReduceTransparencyAPI | undefined, set: (value: boolean) => void): () => void {
+/** Read and follow one boolean accessibility setting without ever throwing. A missing or failing API never calls `set`
+ * (the caller's default stands). Returns the unsubscribe; `set` is never called after it. */
+function subscribeSetting(api: ReduceTransparencyAPI | undefined, query: 'isReduceTransparencyEnabled' | 'isDarkerSystemColorsEnabled',
+  event: 'reduceTransparencyChanged' | 'darkerSystemColorsChanged', set: (value: boolean) => void): () => void {
   let live = true;
   const apply = (value: unknown) => { if (live && typeof value === 'boolean') set(value); };
   try {
-    if (typeof api?.isReduceTransparencyEnabled === 'function') {
-      const answer = api.isReduceTransparencyEnabled();
+    if (typeof api?.[query] === 'function') {
+      const answer = api[query]!();
       if (answer && typeof answer.then === 'function') void answer.then(apply, () => {});
     }
-  } catch { /* An absent or broken native query keeps the opaque material. */ }
+  } catch { /* An absent or broken native query keeps the default. */ }
   let subscription: { remove: () => void } | null = null;
   try {
-    if (typeof api?.addEventListener === 'function') subscription = api.addEventListener('reduceTransparencyChanged', apply) ?? null;
+    if (typeof api?.addEventListener === 'function') subscription = api.addEventListener(event, apply) ?? null;
   } catch { subscription = null; }
   return () => { live = false; try { subscription?.remove(); } catch { /* nothing to undo */ } };
 }
+
+/** The Reduce Transparency setting; a missing or failing API leaves the value at `true` (opaque). */
+export const subscribeReduceTransparency = (api: ReduceTransparencyAPI | undefined, set: (value: boolean) => void) =>
+  subscribeSetting(api, 'isReduceTransparencyEnabled', 'reduceTransparencyChanged', set);
+/** 25D1: iOS's Increase Contrast; a missing or failing API (Android, an older runtime) leaves it off. */
+export const subscribeIncreaseContrast = (api: ReduceTransparencyAPI | undefined, set: (value: boolean) => void) =>
+  subscribeSetting(api, 'isDarkerSystemColorsEnabled', 'darkerSystemColorsChanged', set);
 
 /** Bottom padding under the composer. `keyboardHeight` is the keyboard's
  * height over the window (0 when closed), `bottomInset` the safe-area inset

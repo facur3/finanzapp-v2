@@ -36,7 +36,7 @@ export function CurrencySwitch({ value, currencies, onChange, disabled = false, 
   return <>
     <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={t('currency.switchLabel', { name: currencyName(value) })}
       accessibilityHint={t('currency.switchHint')} accessibilityState={{ disabled }} disabled={disabled} onPress={() => setVisible(true)}
-      hitSlop={compact ? 6 : undefined}
+      hitSlop={compact ? 6 : { top: 4, bottom: 4 }}
       style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: compact ? 32 : 36, paddingVertical: compact ? 4 : 6, paddingHorizontal: 12,
         borderRadius: compact ? 16 : radius.button, backgroundColor: compact && p.isDark ? p.surface : p.inset, alignSelf: 'flex-start', maxWidth: '100%',
         ...(compact ? { borderWidth: StyleSheet.hairlineWidth, borderColor: p.isDark ? 'rgba(255,255,255,0.12)' : 'rgba(10,10,12,0.10)' } : {}) }}>
@@ -67,7 +67,7 @@ export function DisplayCurrencyButton({ mode, currency, held, gate, onMode, onCu
   // What the number covers, in two words: "Total · USD" (every account, converted) or "Solo USD" (that currency alone).
   const label = mode === 'consolidated' ? t('display.total', { code: currency }) : t('display.only', { code: currency });
   return <>
-    <PressFeedback feedback={onField ? 'scale' : 'highlight'} accessibilityRole="button" onPress={() => setVisible(true)} hitSlop={onField ? 4 : compact ? 6 : undefined}
+    <PressFeedback feedback={onField ? 'scale' : 'highlight'} accessibilityRole="button" onPress={() => setVisible(true)} hitSlop={onField ? 4 : compact ? 6 : { top: 4, bottom: 4 }}
       accessibilityLabel={t(mode === 'consolidated' ? 'display.chipConsolidated' : 'display.chipSingle', { name: currencyName(currency) })}
       accessibilityHint={t('display.chipHint')}
       style={onField

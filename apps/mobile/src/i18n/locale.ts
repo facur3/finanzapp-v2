@@ -34,7 +34,9 @@ export type LanguageCode = keyof typeof LANGUAGES;
  * (written for a voice of the interface language: "1234,56 pesos" in Spanish,
  * "1234.56 dollars" in English, never grouped, whatever region the screen
  * writes numbers in) and the region of the date wheel's locale ("es_AR",
- * "en_US"), whose month names and column order follow the language. A new
+ * "en_US"), whose month names and column order follow the language. It is
+ * also the variety the catalogue is written in (rioplatense Spanish, with
+ * voseo; American English), so it is the flag Idioma shows (`flags.ts`). A new
  * language names its region here. */
 export const SPEECH_REGIONS: Record<LanguageCode, RegionCode> = { es: 'AR', en: 'US' };
 
