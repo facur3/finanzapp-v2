@@ -5,6 +5,7 @@ import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import * as domain from '@finanzapp/domain';
 import * as presentation from '../src/ui/presentation.ts';
+import { accountDisplayName } from '../src/ui/liability-presentation.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 
 // Producto 24UX6C: Movimientos over the actual route, host components as descriptors, effects run in place and a fake
@@ -12,7 +13,7 @@ import { bindLocale } from '../src/i18n/bind.ts';
 // count: after a filter change, after a pause while typing, never on the first render, and never once Movimientos has
 // lost focus (Codex, PR #72: the tab stays mounted under other tabs and pushed screens). How VoiceOver actually speaks
 // it on an iPhone is a device item.
-type Node = { type: string; props: Record<string, any> };
+type Node = { type: string; props: Record<string, any>; key?: string };
 const createdAt = '2026-09-12T12:00:00Z';
 const snapshot: domain.LedgerSnapshot = {
   accounts: [{ id: 'a', name: 'Banco', currency: 'ARS', openingMinor: 0, createdAt }],
@@ -23,15 +24,19 @@ const snapshot: domain.LedgerSnapshot = {
   transfers: [],
 };
 
-function harness() {
+function harness(data: domain.LedgerSnapshot = snapshot, archive?: domain.LedgerArchive) {
   const source = readFileSync(new URL('../app/(tabs)/activity.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
-  const jsx = (type: string, props: Record<string, unknown>) => ({ type, props });
+  // The automatic runtime passes an element's key as the third argument.
+  const jsx = (type: string, props: Record<string, unknown>, key?: string) => ({ type, props, key });
+  // 25Q4: the route's params, as a link or the dock last sent them.
+  const params: { reset?: string } = {};
   const state: unknown[] = [];
   const deps: (unknown[] | undefined)[] = [];
   const cleanups: (void | (() => void))[] = [];
   let cursor = 0, effectCursor = 0;
   const announced: string[] = [];
+  const pushed: unknown[] = [];
   // A fake clock: timers run when the test advances time.
   let now = 0;
   const timers = new Map<number, { at: number; fn: () => void }>();
@@ -59,12 +64,13 @@ function harness() {
     },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': { View: 'View', AccessibilityInfo: { announceForAccessibility: (text: string) => announced.push(text) } },
-    'expo-router': { router: { push: () => {} }, useFocusEffect: (effect: () => void | (() => void)) => { if (!focusEffect) { focusEffect = effect; blur = effect(); } } },
-    '../../src/storage/LedgerProvider': { useLedger: () => ({ snapshot }) },
-    '../../src/ui/components': { ActionButton: 'ActionButton', AppText: 'AppText', Choices: 'Choices', EmptyState: 'EmptyState', SearchField: 'SearchField' },
+    'expo-router': { Tabs: { Screen: 'Tabs.Screen' }, router: { push: (to: unknown) => { pushed.push(to); } }, useLocalSearchParams: () => params,
+      useFocusEffect: (effect: () => void | (() => void)) => { if (!focusEffect) { focusEffect = effect; blur = effect(); } } },
+    '../../src/storage/LedgerProvider': { useLedger: () => ({ snapshot: data, archive }) },
+    '../../src/ui/components': { ActionButton: 'ActionButton', AppText: 'AppText', Choices: 'Choices', EmptyState: 'EmptyState', IconButton: 'IconButton', SearchField: 'SearchField' },
     '../../src/ui/entry-list': { EntryList: 'EntryList' },
     '../../src/ui/presentation': presentation,
-    '../../src/ui/category-hues': { useCategoryLookOf: () => (stored: string) => ({ label: stored }) },
+    '../../src/ui/category-hues': { useCategoryLookOf: () => (stored: string) => ({ label: stored }), useAccountNameOf: () => (account: domain.Account) => accountDisplayName(account, archive?.debts ?? []) },
     '../../src/i18n/provider': { useI18n: () => bindLocale('es-AR') },
   };
   const module = { exports: {} as { default?: () => Node } };
@@ -72,8 +78,15 @@ function harness() {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected activity dependency: ' + name);
     return modules[name];
   } });
-  const render = () => { cursor = 0; effectCursor = 0; return module.exports.default!(); };
-  return { render, announced, clock, blurNow: () => { if (typeof blur === 'function') blur(); }, focusAgain: () => { blur = focusEffect?.(); } };
+  // 25N1: the screen is its bar options (Tabs.Screen) beside the list; `render` hands back the list, `options` the bar's.
+  let screen: Node | null = null;
+  const render = () => {
+    cursor = 0; effectCursor = 0;
+    screen = module.exports.default!();
+    return screen?.type === 'Fragment' ? (screen.props.children as Node[]).find(child => child?.type === 'EntryList')! : screen;
+  };
+  const options = () => (screen!.props.children as Node[]).find(child => child?.type === 'Tabs.Screen')!.props.options;
+  return { render, options, announced, pushed, clock, params, blurNow: () => { if (typeof blur === 'function') blur(); }, focusAgain: () => { blur = focusEffect?.(); } };
 }
 const flat = (value: any): any[] => !value || typeof value !== 'object' ? [] : Array.isArray(value) ? value.flatMap(flat) : [value, ...flat(value.props?.children)];
 const header = (root: Node) => flat(root.props.header);
@@ -86,6 +99,8 @@ test('24UX6C: Movimientos composes the search pill, the kind filter and the coun
   assert.deepEqual([search.props.label, search.props.placeholder], ['Buscar movimientos', 'Comercio, categoría o cuenta']);
   const choices = nodes.find(node => node.type === 'Choices')!;
   assert.equal(choices.props.options.map((option: { label: string }) => option.label).join(','), 'Todos,Gastos,Ingresos,Transf.');
+  // 25D2: VoiceOver hears the abbreviated segment whole; the others read as shown.
+  assert.equal(JSON.stringify(choices.props.options.map((option: { spokenLabel?: string }) => option.spokenLabel ?? null)), JSON.stringify([null, null, null, 'Transferencias']));
   assert.ok(nodes.some(node => node.type === 'AppText' && [node.props.children].flat().join('') === '2 movimientos'));
   assert.equal(JSON.stringify(root).includes('new-entry') && JSON.stringify(root).includes('headerRight'), false);
 });
@@ -143,4 +158,79 @@ test('Codex (PR #72): a pending count announcement is cancelled when Movimientos
   view.render();
   view.clock.advance(800); // the search still holds «coto», so the announcement waits for the typing pause
   assert.deepEqual(view.announced, ['1 movimiento'], 'back in focus, a change is announced again');
+});
+
+test('25Q4: a link into Movimientos (a new `reset`) shows the whole list from the top without announcing it; the dock\'s repeat of the same params keeps what the person does next', () => {
+  const view = harness();
+  const search = (root: Node) => header(root).find(node => node.type === 'SearchField')!;
+  const choices = (root: Node) => header(root).find(node => node.type === 'Choices')!;
+  let root = view.render();
+  choices(root).props.onChange('expense');
+  root = view.render();
+  search(root).props.onChangeText('coto');
+  root = view.render();
+  view.clock.advance(1000);
+  const heard = view.announced.length;
+  // «Ver todos» or the Assistant's evidence: a fresh value, applied while rendering.
+  view.params.reset = '1700000000000';
+  view.render();
+  root = view.render();
+  assert.deepEqual([search(root).props.value, choices(root).props.value, root.props.dayNet], ['', 'all', true], 'the whole list');
+  assert.equal(root.key, '1700000000000', 'a new list, at its own top');
+  view.clock.advance(1000);
+  assert.equal(view.announced.length, heard, 'an arrival is not the person\'s search: nothing is announced');
+  // The dock re-sends the same params: what the person does next stays, in the same list.
+  search(root).props.onChangeText('sueldo');
+  view.render();
+  root = view.render();
+  assert.deepEqual([search(root).props.value, root.key], ['sueldo', '1700000000000']);
+  // Another link resets again.
+  view.params.reset = '1700000000001';
+  view.render();
+  root = view.render();
+  assert.deepEqual([search(root).props.value, root.key], ['', '1700000000001']);
+});
+
+test('25O1: an empty Movimientos leaves the filled action to the dock\'s «+» once an account exists; without one, adding an account stays the filled way forward', () => {
+  const empty = (accounts: domain.Account[]) => { const view = harness({ accounts, entries: [], transfers: [] }); return { view, state: view.render().props.empty }; };
+  const withAccount = empty(snapshot.accounts);
+  assert.equal(withAccount.state.type, 'EmptyState');
+  const record = withAccount.state.props.action;
+  assert.deepEqual([record.props.label, record.props.secondary], ['Registrar movimiento', true], 'secondary: the dock\'s «+» is the one filled action');
+  record.props.onPress();
+  const none = empty([]);
+  const add = none.state.props.action;
+  assert.deepEqual([add.props.label, add.props.secondary], ['Agregar cuenta', false], 'the only way forward stays filled');
+  add.props.onPress();
+  assert.deepEqual([...withAccount.view.pushed, ...none.view.pushed], ['/new-entry', '/new-account']);
+});
+
+test('25N1: Movimientos deshechos is a button of Movimientos\' bar while a movement, a transfer or an operation is undone; none otherwise', () => {
+  const records = snapshot.entries.map(domain.initialRecord);
+  const base: domain.LedgerArchive = { accounts: snapshot.accounts, records };
+  const buttonOf = (archive?: domain.LedgerArchive) => { const view = harness(snapshot, archive); view.render(); return { view, right: view.options().headerRight }; };
+  assert.equal(buttonOf().right, undefined, 'the ledger not read yet: no button');
+  assert.equal(buttonOf(base).right, undefined, 'nothing undone: nothing to open');
+  const withEntry = buttonOf({ ...base, records: [{ ...records[0], voided: true }, records[1]] });
+  const button = withEntry.right();
+  assert.deepEqual([button.type, button.props.name, button.props.label], ['IconButton', 'arrow-undo-outline', 'Movimientos deshechos']);
+  button.props.onPress();
+  assert.deepEqual(withEntry.view.pushed, ['/undone-entries']);
+  const transfer: domain.Transfer = { id: 't1', fromAccountId: 'a', toAccountId: 'a', amountMinor: 100, note: '', dateISO: '2026-09-11', createdAt };
+  assert.equal(typeof buttonOf({ ...base, transfers: [{ transfer, revision: 1, voided: true, updatedAt: createdAt }] }).right, 'function', 'an undone transfer');
+  const refund = domain.newEntryRefund(base, { id: 'r1', entryId: 'e1', amountMinor: 500, dateISO: '2026-09-11', todayISO: '2026-09-12', createdAt });
+  assert.equal(buttonOf({ ...base, purchaseOperations: [refund] }).right, undefined, 'a live devolución is not undone');
+  const undoneRefund = domain.makeOperationChange('undo', refund, 'void', createdAt).after;
+  assert.equal(typeof buttonOf({ ...base, purchaseOperations: [undoneRefund] }).right, 'function', 'an undone devolución is listed there too');
+});
+
+test('25T review: the search finds a debt\'s payment by the counterparty its row shows («Juan Pérez»), not only by the stored «Debo · Juan»', () => {
+  const owed: domain.Account = { id: 'owed', name: 'Debo · Juan', currency: 'ARS', openingMinor: 0, createdAt, hidden: true } as domain.Account;
+  const debt: domain.PersonalDebtProfile = { id: 'debt', accountId: owed.id, direction: 'owed_by_me', counterparty: 'Juan Pérez', dueDateISO: null,
+    note: '', active: true, deleted: false, createdAt, revision: 1, updatedAt: createdAt };
+  const payment: domain.Transfer = { id: 'pay', fromAccountId: 'a', toAccountId: owed.id, amountMinor: 2000, note: '', dateISO: '2026-09-11', createdAt };
+  const data = { ...snapshot, accounts: [...snapshot.accounts, owed], transfers: [payment] };
+  const view = harness(data, { accounts: data.accounts, records: [], transfers: [payment], debts: [debt] } as unknown as domain.LedgerArchive);
+  header(view.render()).find(node => node.type === 'SearchField')!.props.onChangeText('pérez');
+  assert.deepEqual(view.render().props.transfers.map((transfer: domain.Transfer) => transfer.id), ['pay']);
 });

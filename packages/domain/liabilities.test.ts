@@ -110,8 +110,8 @@ describe('liability validation', () => {
   });
 
   it('one internal account cannot represent two obligations and IDs stay unique', () => {
-    expect(() => validateLiabilityProfiles([card, { ...card, id: 'other' }], [], accounts)).toThrow(/dos obligaciones/);
-    expect(() => validateLiabilityProfiles([card], [{ ...debt, accountId: card.accountId }], accounts)).toThrow(/dos obligaciones/);
+    expect(() => validateLiabilityProfiles([card, { ...card, id: 'other' }], [], accounts)).toThrow(/dos tarjetas o deudas/);
+    expect(() => validateLiabilityProfiles([card], [{ ...debt, accountId: card.accountId }], accounts)).toThrow(/dos tarjetas o deudas/);
     expect(() => validateLiabilityProfiles([card], [{ ...debt, id: card.id }], accounts)).toThrow(/repite/);
   });
 });
@@ -184,8 +184,8 @@ describe('card flows (24B6)', () => {
     expect(sides(cardAccount.id, cash.id)).toThrow('Una tarjeta se paga desde una cuenta; no puede ser el origen de una transferencia.');
     expect(sides(cardAccount.id, cardAccount.id)).toThrow('no puede ser el origen');
     expect(sides(cardAccount.id, debtAccount.id)).toThrow('no puede ser el origen');
-    expect(sides(debtAccount.id, cardAccount.id)).toThrow('Una transferencia entre dos obligaciones no se puede registrar.');
-    expect(sides(receivableAccount.id, debtAccount.id)).toThrow('entre dos obligaciones');
+    expect(sides(debtAccount.id, cardAccount.id)).toThrow('Una transferencia entre dos tarjetas o deudas no se puede registrar.');
+    expect(sides(receivableAccount.id, debtAccount.id)).toThrow('entre dos tarjetas o deudas');
     expect(sides(cardAccount.id, cash.id, )).toThrow();
     expect(() => assertTransferSides({ fromAccountId: cardAccount.id, toAccountId: cash.id })).not.toThrow('without profiles nothing is a card');
     expect(sameTransferSides(payment, payment)).toBe(true);

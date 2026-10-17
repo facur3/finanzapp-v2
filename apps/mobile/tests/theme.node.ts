@@ -1,13 +1,12 @@
 import assert from 'node:assert/strict';
+import { readdirSync, readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { darkPalette, lightPalette } from '../src/ui/palette.ts';
+import { INCREASED_CONTRAST, darkPalette, lightPalette } from '../src/ui/palette.ts';
+import { radius, space, type } from '../src/ui/tokens.ts';
+import { contrast, deltaE, lab, luminance } from './contrast.ts';
 
 // WCAG 2 contrast over the actual palette. A pure check of the numbers: the
 // rendered look, blending on device and Dynamic Type still need the iPhone.
-function luminance(hex: string): number {
-  const channel = (value: number) => { const c = value / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
-  return 0.2126 * channel(parseInt(hex.slice(1, 3), 16)) + 0.7152 * channel(parseInt(hex.slice(3, 5), 16)) + 0.0722 * channel(parseInt(hex.slice(5, 7), 16));
-}
 /** Hue angle in degrees, to tell pine apart from teal, cyan or blue where a contrast ratio cannot. */
 function hue(hex: string): number {
   const [r, g, b] = [1, 3, 5].map(index => parseInt(hex.slice(index, index + 2), 16) / 255);
@@ -21,10 +20,7 @@ function saturationLightness(hex: string): { s: number; l: number } {
   const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2;
   return { s: max === min ? 0 : (max - min) / (1 - Math.abs(2 * l - 1)), l };
 }
-export function contrast(a: string, b: string): number {
-  const [light, dark] = [luminance(a), luminance(b)].sort((x, y) => y - x);
-  return (light + 0.05) / (dark + 0.05);
-}
+const chroma = (hex: string) => { const [, a, b] = lab(hex); return Math.hypot(a, b); };
 const ratio = (a: string, b: string) => contrast(a, b).toFixed(2);
 
 for (const [name, p] of [['light', lightPalette], ['dark', darkPalette]] as const) {
@@ -32,6 +28,8 @@ for (const [name, p] of [['light', lightPalette], ['dark', darkPalette]] as cons
     // Background (section links, "Ver todos"), surface (selector cards, picker checks) and the elevated segmented thumb (the selected label).
     // Primary text never sits directly on the inset track.
     for (const ground of [p.background, p.surface, p.elevated]) assert.ok(contrast(p.primary, ground) >= 4.5, `primary on ${ground}: ${ratio(p.primary, ground)}`);
+    // 25VIS2: the currency switch's chosen code sits on the inset.
+    assert.ok(contrast(p.primary, p.inset) >= 4.5, `primary on the inset: ${ratio(p.primary, p.inset)}`);
     assert.ok(contrast(p.onPrimary, p.primaryFill) >= 4.5, `button text on the filled call to action: ${ratio(p.onPrimary, p.primaryFill)}`);
     assert.ok(contrast(p.primary, p.primarySoft) >= 4.5, `primary text on its own soft tint: ${ratio(p.primary, p.primarySoft)}`);
     // The compact segment's thumb: ink stays AAA on it, and in dark it is a visible step above the surface track.
@@ -47,13 +45,13 @@ for (const [name, p] of [['light', lightPalette], ['dark', darkPalette]] as cons
     // Inicio's «Ver todos» sits on the background; the token also holds on a surface should a link ever sit on a card.
     for (const ground of [p.background, p.surface]) assert.ok(contrast(p.link, ground) >= 4.5, `link on ${ground}: ${ratio(p.link, ground)}`);
   });
-  test(`${name}: semantic colours stay readable, and a transfer is a neutral slate apart from the brand (24UX6C, slate since 25VIS1)`, () => {
+  test(`${name}: semantic colours stay readable, and a transfer is a neutral slate (24UX6C, slate since 25VIS1)`, () => {
     for (const semantic of [p.expense, p.income, p.transfer, p.warning]) {
       assert.ok(contrast(semantic, p.surface) >= 4.5, `${semantic} on surface: ${ratio(semantic, p.surface)}`);
       assert.notEqual(semantic, p.primary, 'meaning and interaction never share one colour');
     }
     // A transfer moves money between the person's own accounts: neither spending nor income. 24UX6C gave it its own
-    // restrained tone; 25VIS1 makes it a neutral slate (blue-grey, low saturation), far from the lime brand.
+    // restrained tone; 25VIS1 made it a neutral slate (blue-grey, low saturation), kept apart from the brand below.
     const [r, g, b] = [1, 3, 5].map(index => parseInt(p.transfer.slice(index, index + 2), 16) / 255);
     const max = Math.max(r, g, b), min = Math.min(r, g, b), light = (max + min) / 2, d = max - min;
     const sat = d === 0 ? 0 : d / (1 - Math.abs(2 * light - 1));
@@ -62,11 +60,17 @@ for (const [name, p] of [['light', lightPalette], ['dark', darkPalette]] as cons
     assert.ok(sat <= 0.3, `restrained, not saturated: ${sat.toFixed(2)}`);
     assert.notEqual(p.transfer, p.secondary, 'its own tone, not body text');
     assert.ok(contrast(p.transfer, p.transferSoft) >= 4.5, `transfer text on its soft tile: ${ratio(p.transfer, p.transferSoft)}`);
+    // The error message, a toned secondary button and the fixture banner draw the tone on its own soft tint: light is
+    // the closest to the floor (4.62, 4.55, 4.64; dark 6.23, 7.65, 7.38).
+    for (const [tone, ink, soft] of [['expense', p.expense, p.expenseSoft], ['income', p.income, p.incomeSoft], ['warning', p.warning, p.warningSoft]] as const) {
+      assert.ok(contrast(ink, soft) >= 4.5, `${tone} text on its soft tint: ${ratio(ink, soft)}`);
+    }
     // Red never means "spent": the negative tone and the positive tone are apart from each other and from the brand.
     assert.notEqual(p.expense, p.income);
     assert.ok(contrast(p.text, p.surface) >= 12, 'normal text stays high-contrast neutral');
-    // 24UX4: white labels on the trailing swipe actions.
-    for (const fill of [p.swipeDestructive, p.swipeNeutral, p.swipeAccent]) assert.ok(contrast('#FFFFFF', fill) >= 4.5, `white on swipe action ${fill}: ${ratio('#FFFFFF', fill)}`);
+    // 24UX4: white labels on the trailing swipe actions (drawn in onPrimary, the label of every filled action).
+    assert.equal(p.onPrimary, '#FFFFFF');
+    for (const fill of [p.swipeDestructive, p.swipeNeutral, p.swipeAccent]) assert.ok(contrast(p.onPrimary, fill) >= 4.5, `onPrimary on swipe action ${fill}: ${ratio(p.onPrimary, fill)}`);
     assert.ok(contrast(p.secondary, p.surface) >= 4.5);
   });
   test(`${name}: secondary text and tertiary glyphs read on every ground (24UX1)`, () => {
@@ -85,27 +89,34 @@ for (const [name, p] of [['light', lightPalette], ['dark', darkPalette]] as cons
     assert.ok(contrast(p.heroSecondary, p.heroControl) >= 4.5, `heroSecondary on heroControl: ${ratio(p.heroSecondary, p.heroControl)}`);
     // The scope chip and the accounts button: ink on the control fill.
     assert.ok(contrast(p.heroInk, p.heroControl) >= 4.5, `heroInk on heroControl: ${ratio(p.heroInk, p.heroControl)}`);
-    // The chosen segment (25VIS1 final): ink on the light surface's white thumb, the same in dark (the field stays light).
-    assert.equal(p.heroThumb, lightPalette.surface, 'the thumb is the existing white surface, not a new white');
-    assert.equal(p.heroThumbInk, p.heroInk, 'the chosen label is the field\'s ink');
+    // The chosen segment (25VIS1 final, kept in 25VIS2): the light ink on the light surface's thumb, the same in dark.
+    assert.equal(p.heroThumb, lightPalette.surface, 'the thumb is the existing light surface, not a new white');
+    assert.equal(p.heroThumbInk, lightPalette.text, 'the chosen label is the light ink: the field\'s own ink is white');
     assert.ok(contrast(p.heroThumbInk, p.heroThumb) >= 7, `heroThumbInk on heroThumb: ${ratio(p.heroThumbInk, p.heroThumb)}`);
-    // The thumb stands out from the lime track it slides on and from the field around it.
+    // The thumb stands out from the control track it slides on and from the field around it.
     assert.ok(contrast(p.heroThumb, p.heroControl) >= 1.5, `the thumb separates from the track: ${ratio(p.heroThumb, p.heroControl)}`);
     assert.ok(luminance(p.heroThumb) > luminance(p.hero) && luminance(p.hero) > luminance(p.heroControl), 'the thumb is brighter than the field, the track darker');
+    // 25VIS2: the hub's resume line sits on the control fill in the field's ink.
+    assert.ok(contrast(p.heroInk, p.heroControl) >= 7, `heroInk on heroControl: ${ratio(p.heroInk, p.heroControl)}`);
   });
-  test(`${name}: the hero amount's symbol and cents are neutral graphite on the field, quieter than the ink (25A-03)`, () => {
+  test(`${name}: the hero amount's symbol and cents are solid neutral tones on the field, quieter than the units (25A-03)`, () => {
     for (const [token, hex] of [['heroMoneySymbol', p.heroMoneySymbol], ['heroMoneyCents', p.heroMoneyCents]] as const) {
-      assert.match(hex, /^#[0-9A-F]{6}$/, `${token} is a solid colour, never an alpha over the lime`);
+      assert.match(hex, /^#[0-9A-F]{6}$/, `${token} is a solid colour, never an alpha over the field`);
       const [r, g, b] = [1, 3, 5].map(index => parseInt(hex.slice(index, index + 2), 16));
-      // Neutral: the channels within 8 of each other, and green never the highest (that would read olive on the lime).
-      assert.ok(Math.max(r, g, b) - Math.min(r, g, b) <= 8 && g <= b, `${token} ${hex} is a neutral graphite, not olive`);
+      // Neutral: the channels within 8 of each other, and green never the highest (it would tint against the field).
+      assert.ok(Math.max(r, g, b) - Math.min(r, g, b) <= 8 && g <= b, `${token} ${hex} is a neutral tone`);
       // Readable over both fields (AA for text, though the hero is large), and still clearly below the ink.
       for (const field of [lightPalette.hero, darkPalette.hero]) assert.ok(contrast(hex, field) >= 4.5, `${token} on ${field}: ${ratio(hex, field)}`);
       assert.ok(contrast(p.heroInk, p.hero) > contrast(hex, p.hero), `${token} is quieter than the whole units`);
     }
-    // The hierarchy: whole units (heroInk) > symbol > cents.
-    assert.ok(luminance(p.heroInk) < luminance(p.heroMoneySymbol) && luminance(p.heroMoneySymbol) < luminance(p.heroMoneyCents), 'the symbol is darker than the cents');
+    // The hierarchy, by contrast against the field whichever its lightness: whole units (heroInk) > symbol > cents.
+    assert.ok(contrast(p.heroInk, p.hero) > contrast(p.heroMoneySymbol, p.hero) && contrast(p.heroMoneySymbol, p.hero) > contrast(p.heroMoneyCents, p.hero),
+      'the symbol is quieter than the units, the cents quieter still');
     assert.ok(contrast(p.heroMoneySymbol, p.heroMoneyCents) >= 1.25, 'the two quiet steps are distinguishable');
+    // 25N1: the zero month's units (heroSecondary) sit under the symbol's grey (light 0.717 against 0.762, dark 0.661), so a
+    // quiet hero is drawn in heroSecondary throughout (Money onField), and that one tone still reads on the field.
+    assert.ok(luminance(p.heroSecondary) < luminance(p.heroMoneySymbol), 'why the quiet hero cannot keep the grey symbol');
+    assert.ok(contrast(p.heroSecondary, p.hero) >= 4.5, `the quiet hero on the field: ${ratio(p.heroSecondary, p.hero)}`);
   });
   test(`${name}: the dock and its «+» read in both themes; the selected capsule separates from the pill (24UX6A)`, () => {
     assert.ok(contrast(p.onAccent, p.accent) >= 4.5, `the «+» glyph on the accent: ${ratio(p.onAccent, p.accent)}`);
@@ -114,58 +125,148 @@ for (const [name, p] of [['light', lightPalette], ['dark', darkPalette]] as cons
     // The capsule (with the filled glyph) marks the selection, never colour alone, but it must still be visible on the pill.
     assert.ok(contrast(p.dockActive, p.dock) > 1.5, `the capsule separates from the pill: ${ratio(p.dockActive, p.dock)}`);
   });
-  test(`${name}: the brand is Electric Lime, a yellow-chartreuse kept apart from a bright green and from every meaning (25VIS1)`, () => {
-    // The lime fields and their text tone sit in 68–82°, on the yellow side of a conventional bright green (#9FE870 is ≈97°).
+  test(`${name}: the brand is a true sapphire, kept apart from every meaning (25VIS2)`, () => {
+    // The fields and the brand's text tones sit in 218–232°: a sapphire, never toward violet (≈250°+) or a cyan blue (≈200°).
     const fields = [['primaryFill', p.primaryFill], ['hero', p.hero], ['accent', p.accent]] as const;
     const brandText = [['primary', p.primary], ['link', p.link], ['toggle', p.toggle], ['swipeAccent', p.swipeAccent]] as const;
     for (const [token, hex] of [...fields, ...brandText]) {
       const angle = hue(hex);
-      assert.ok(angle >= 68 && angle <= 82, `${token} ${hex} is ${angle.toFixed(1)}°, outside the 68–82° chartreuse window`);
-    }
-    for (const [token, hex] of fields) {
+      assert.ok(angle >= 218 && angle <= 232, `${token} ${hex} is ${angle.toFixed(1)}°, outside the 218–232° sapphire window`);
       const { s, l } = saturationLightness(hex);
-      assert.ok(s >= 0.7 && l >= 0.45, `${token} ${hex} is a vivid field (S ${s.toFixed(2)}, L ${l.toFixed(2)})`);
-      // Ink, never white, on the lime: AAA wherever a word or glyph sits on it.
-      assert.ok(contrast(p.heroInk, hex) >= 7, `ink on ${token}: ${ratio(p.heroInk, hex)}`);
+      assert.ok(s >= 0.55, `${token} ${hex} is saturated, not a grey-blue (S ${s.toFixed(2)})`);
+      assert.ok(l >= 0.4, `${token} ${hex} is a sapphire, not a navy (L ${l.toFixed(2)})`);
     }
-    assert.ok(contrast(p.onPrimary, p.primaryFill) >= 7 && contrast(p.onAccent, p.accent) >= 7, 'ink on the call to action and the «+»');
-    // Lime never means success, income, warning or alert: every semantic tone stays far from the brand's hue.
+    // What sits on each field: the hero's units AAA, the call to action and the «+» at least AA.
+    assert.ok(contrast(p.heroInk, p.hero) >= 7, `the field's ink on the hero: ${ratio(p.heroInk, p.hero)}`);
+    assert.ok(contrast(p.onPrimary, p.primaryFill) >= 4.5 && contrast(p.onAccent, p.accent) >= 4.5, 'text on the call to action and the «+»');
+    // Sapphire never means success, income, warning or alert: those tones stay far from the brand's hue.
     const distance = (a: string, b: string) => { const d = Math.abs(hue(a) - hue(b)) % 360; return Math.min(d, 360 - d); };
     for (const [token, hex] of [...fields, ...brandText]) {
       assert.ok(distance(p.income, hex) >= 60, `income ${p.income} is ${distance(p.income, hex).toFixed(0)}° from ${token}`);
       assert.ok(distance(p.warning, hex) >= 30, `warning ${p.warning} is ${distance(p.warning, hex).toFixed(0)}° from ${token}`);
       assert.ok(distance(p.expense, hex) >= 50, `expense ${p.expense} is ${distance(p.expense, hex).toFixed(0)}° from ${token}`);
-      assert.ok(distance(p.transfer, hex) >= 90, `transfer ${p.transfer} is ${distance(p.transfer, hex).toFixed(0)}° from ${token}`);
+      // The slate transfer is near the sapphire's hue (brand-brief.md §4.9, item 2): a grey-blue, apart by colourfulness.
+      assert.ok(deltaE(p.transfer, hex) >= 40, `transfer ${p.transfer} is ΔE ${deltaE(p.transfer, hex).toFixed(0)} from ${token}`);
       for (const semantic of [p.income, p.incomeSoft, p.warning, p.expense, p.transfer]) assert.notEqual(semantic, hex);
     }
+    assert.ok(chroma(p.transfer) <= 15, `transfer ${p.transfer} is a grey-blue (chroma ${chroma(p.transfer).toFixed(0)})`);
+    for (const [token, hex] of [...fields, ...brandText]) assert.ok(chroma(hex) >= 40, `${token} ${hex} is a saturated blue (chroma ${chroma(hex).toFixed(0)})`);
   });
-  test(`${name}: everything but the brand is neutral: grounds, ink and the graphite dock with its capsule (25VIS1)`, () => {
-    // No forest-green second brand: grounds, ink and the dock carry almost no chroma.
-    for (const [token, hex] of [['background', p.background], ['inset', p.inset], ['line', p.line], ['text', p.text], ['secondary', p.secondary],
-      ['tertiary', p.tertiary], ['dock', p.dock], ['dockActive', p.dockActive], ['dockInk', p.dockInk], ['heroThumb', p.heroThumb]] as const) {
+  test(`${name}: everything but the brand is a warm neutral: grounds, ink and the graphite dock with its capsule (25VIS2)`, () => {
+    // Sand, stone and graphite: little chroma, and where there is some it is warm (30–60°), never green or blue.
+    for (const [token, hex] of [['background', p.background], ['surface', p.surface], ['inset', p.inset], ['line', p.line], ['text', p.text],
+      ['secondary', p.secondary], ['tertiary', p.tertiary], ['dock', p.dock], ['dockActive', p.dockActive], ['dockInk', p.dockInk], ['heroThumb', p.heroThumb]] as const) {
       // Chroma (max − min channel), not HSL saturation, which inflates near white and black.
       const channels = [1, 3, 5].map(index => parseInt(hex.slice(index, index + 2), 16));
-      assert.ok(Math.max(...channels) - Math.min(...channels) <= 10, `${token} ${hex} is neutral`);
+      const spread = Math.max(...channels) - Math.min(...channels);
+      assert.ok(spread <= 22, `${token} ${hex} is a neutral`);
+      if (spread > 4) assert.ok(hue(hex) >= 30 && hue(hex) <= 60, `${token} ${hex} is warm (${hue(hex).toFixed(0)}°)`);
     }
-    // The dock stays dark in both themes, so the lime «+» beside it is the one bright object.
+    // The dock stays dark in both themes; the «+» beside it floats on the canvas, where it must stand out (brand-brief.md
+    // §4.9, item 3: a sapphire «+» cannot hold Lime's 7:1 against the pill).
     assert.ok(luminance(p.dock) < 0.03, `the dock is graphite: ${p.dock}`);
-    assert.ok(contrast(p.accent, p.dock) >= 7, `the «+» stands apart from the pill: ${ratio(p.accent, p.dock)}`);
+    assert.ok(contrast(p.accent, p.background) >= 3, `the «+» stands apart from the canvas: ${ratio(p.accent, p.background)}`);
   });
-  test(`${name}: a switch that is on keeps its white knob visible and differs from the off track (25VIS1)`, () => {
+  test(`${name}: a switch's tracks are measured on the surface it sits on, on and off; the white knob reads on both (25VIS1)`, () => {
+    // SwitchRow lives in a grouped surface. On: 7.45 light, 3.52 dark. Off: 1.41 light, 1.53 dark (the inset it used was
+    // 1.25 and 1.11, and on iOS `trackColor.false` alone is only the tint: ios_backgroundColor draws the off track).
     assert.ok(contrast('#FFFFFF', p.toggle) >= 4.5, `white knob on the on track: ${ratio('#FFFFFF', p.toggle)}`);
-    assert.ok(contrast(p.toggle, p.inset) >= 3, `on track against the off track: ${ratio(p.toggle, p.inset)}`);
+    assert.ok(contrast(p.toggle, p.surface) >= 3, `on track on the surface: ${ratio(p.toggle, p.surface)}`);
+    assert.ok(contrast(p.switchTrack, p.surface) >= 1.4, `off track on the surface: ${ratio(p.switchTrack, p.surface)}`);
+    assert.ok(contrast('#FFFFFF', p.switchTrack) >= 1.4, `white knob on the off track: ${ratio('#FFFFFF', p.switchTrack)}`);
+    // The knob's side carries the state; the two fills still differ (5.28 light, 2.30 dark).
+    assert.ok(contrast(p.toggle, p.switchTrack) >= 2, `on track against the off track: ${ratio(p.toggle, p.switchTrack)}`);
+    assert.equal(p.switchTrack, p === lightPalette ? p.line : p.thumb, 'an existing step, not a new colour');
   });
-  test(`${name}: Inicio's lime field is light, so the status bar over it is dark, and its controls separate from it (25VIS1)`, () => {
+  test(`${name}: every hairline edge, press wash and shadow is one token, an alpha of the ink in light and of white in dark`, () => {
+    const alpha = (value: string, base: string) => {
+      const match = /^rgba\((\d+), (\d+), (\d+), (0\.\d+)\)$/.exec(value);
+      assert.ok(match, `${value} is an rgba token`);
+      assert.equal(match.slice(1, 4).map(Number).map(c => c.toString(16).padStart(2, '0')).join('').toUpperCase(), base.slice(1).toUpperCase(), value);
+      return Number(match[4]);
+    };
+    const base = p === lightPalette ? p.text : '#FFFFFF';
+    assert.ok(alpha(p.edge, base) <= 0.12, `edge ${p.edge}`);
+    assert.ok(alpha(p.pressWash, base) < alpha(p.edge, base), 'a press wash is quieter than an edge');
+    assert.match(p.shadow, /^#[0-9A-F]{6}$/, 'shadowColor is solid: each site sets its own shadowOpacity');
+    // The dock's rim is solid so it can be measured. In dark it is what separates the pill from a surface: the fills
+    // differ by 1.06:1 (pinned below), the rim 1.53 on the surface and 1.73 on the canvas.
+    assert.match(p.dockEdge, /^#[0-9A-F]{6}$/);
+    assert.ok(contrast(p.dockEdge, p.dock) >= 1.3, `the rim on the pill: ${ratio(p.dockEdge, p.dock)}`);
+    if (p === darkPalette) for (const ground of [p.surface, p.background]) assert.ok(contrast(p.dockEdge, ground) >= 1.5, `the dark rim on ${ground}: ${ratio(p.dockEdge, ground)}`);
+  });
+  test(`${name}: the status bar over Inicio's field follows the field's lightness, and its controls separate from it (25VIS1, 25VIS2)`, () => {
     assert.equal(p.heroStatusBar, luminance(p.hero) > 0.4 ? 'dark' : 'light');
     assert.ok(contrast(p.heroControl, p.hero) >= 1.25, `the scope chip and the accounts button read as controls: ${ratio(p.heroControl, p.hero)}`);
   });
 }
 
-test('the dark canvas is a neutral near-black, not crushed #000, with surfaces in visible steps; the light canvas a mineral off-white (25VIS1)', () => {
+test('the dark canvas is a warm near-black, not crushed #000, with surfaces in visible steps; the light canvas a sand off-white (25VIS2)', () => {
   assert.notEqual(darkPalette.background, '#000000');
   assert.ok(luminance(darkPalette.background) < 0.01, `near-black: ${darkPalette.background}`);
   assert.ok(contrast(darkPalette.surface, darkPalette.background) >= 1.1, 'a surface is a visible step above the canvas');
   assert.ok(contrast(darkPalette.elevated, darkPalette.surface) >= 1.3, 'elevated is a step above the surface');
-  assert.ok(contrast(darkPalette.dock, darkPalette.background) >= 1.15, 'the dock separates from the canvas (a hairline helps too)');
+  assert.ok(contrast(darkPalette.dock, darkPalette.background) >= 1.15, `the dock separates from the canvas (its rim helps too): ${ratio(darkPalette.dock, darkPalette.background)}`);
+  // Over a surface the dark pill's fill is all but the same grey (1.06:1): the rim (dockEdge, pinned above) separates it.
+  assert.ok(contrast(darkPalette.dock, darkPalette.surface) >= 1.05, `the dark dock over a surface: ${ratio(darkPalette.dock, darkPalette.surface)}`);
   assert.ok(luminance(lightPalette.background) > 0.85 && lightPalette.background !== lightPalette.surface, 'off-white, a step under the white surfaces');
+});
+
+test('hairlines and shadows are drawn from palette tokens: no edge, shadow or wash literal in a screen or a component', () => {
+  const roots = ['../src/ui/', '../app/'];
+  const files: string[] = [];
+  const walk = (dir: URL) => { for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory()) walk(new URL(entry.name + '/', dir)); else if (/\.tsx?$/.test(entry.name)) files.push(new URL(entry.name, dir).pathname);
+  } };
+  for (const root of roots) walk(new URL(root, import.meta.url));
+  assert.ok(files.length > 50, 'the scan reaches the screens and the components');
+  for (const file of files) {
+    const source = readFileSync(file, 'utf8');
+    assert.equal(/(border\w*Color|shadowColor): (p\.isDark \? )?'/.test(source), false, `${file}: an edge or shadow colour literal`);
+    // rgba lives in the palette, and on a card face (its rim and its white text, card-faces.ts and card-visual.tsx).
+    if (!/\/(palette|card-faces)\.ts$|\/card-visual\.tsx$/.test(file)) assert.equal(source.includes('rgba('), false, `${file}: an rgba literal`);
+  }
+  const switchRow = readFileSync(new URL('../src/ui/switch-row.tsx', import.meta.url), 'utf8');
+  assert.match(switchRow, /trackColor=\{\{ false: p\.switchTrack, true: p\.toggle \}\} ios_backgroundColor=\{p\.switchTrack\}/,
+    'the off track is drawn explicitly on iOS (trackColor.false is only the tint there)');
+});
+
+test('the type scale, radii and spacing are pure tokens, pinned: the scale descends and every line holds its size', () => {
+  const order = ['hero', 'display', 'largeTitle', 'title1', 'title2', 'title3', 'body', 'subhead', 'footnote', 'caption'] as const;
+  for (let index = 1; index < order.length; index++) assert.ok(type[order[index]].fontSize! <= type[order[index - 1]].fontSize!, order[index]);
+  for (const [name, style] of Object.entries(type)) assert.ok(style.lineHeight! >= style.fontSize! * 1.15, `${name}: ${style.fontSize}/${style.lineHeight}`);
+  assert.deepEqual([type.footnote.fontSize, type.footnote.lineHeight], [13, 18], 'the caption and note size every field shares');
+  assert.deepEqual(radius, { chip: 14, tile: 12, group: 16, card: 20, sheet: 24, creditCard: 18, button: 14 });
+  assert.deepEqual(space, { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 });
+});
+
+test('the account, debt and recurring screens draw the scale and the radii from tokens, and DebtRow shares the list row', () => {
+  const read = (path: string) => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
+  for (const file of ['app/accounts.tsx', 'src/ui/entry-list.tsx']) {
+    assert.equal(/Radius: [^,}]*\? 16 :/.test(read(file)), false, `${file}: a grouped corner is radius.group`);
+    assert.equal((read(file).match(/\? radius\.group : 0/g) ?? []).length, 4, `${file}: the four corners of a grouped section`);
+  }
+  // A note under a form is a footnote (13/18), the same as the debt form's; a caption over a control is footnote at 500, as Field's.
+  for (const file of ['app/new-account.tsx', 'app/edit-account/[id].tsx', 'src/ui/recurring-form.tsx']) {
+    assert.equal(/fontSize: 1[34]\b/.test(read(file)), false, `${file}: no raw 13 or 14 pt beside the type scale`);
+  }
+  assert.match(read('src/ui/recurring-form.tsx'), /<AppText secondary variant="footnote" style=\{\{ fontWeight: '500' \}\}>\{t\('recurring\.form\.frequency'\)\}/);
+  assert.match(read('src/ui/liability-rows.tsx'), /style=\{\[rowStyle, \{ borderBottomWidth/, 'DebtRow reuses the list row geometry');
+  assert.equal(/paddingVertical: 12, paddingHorizontal: 16, minHeight: 64/.test(read('src/ui/liability-rows.tsx')), false, 'no copied row geometry');
+});
+
+test('25T: Increase Contrast strengthens only what separates (edges, separators, the off switch) and the quietest text, each to 3:1 or more on every ground', () => {
+  for (const [base, patch] of [[lightPalette, INCREASED_CONTRAST.light], [darkPalette, INCREASED_CONTRAST.dark]] as const) {
+    assert.deepEqual(Object.keys(patch).sort(), ['dockEdge', 'edge', 'line', 'switchTrack', 'tertiary'], 'fills, the brand and the semantic tones never change');
+    for (const ground of [base.background, base.surface, base.inset, base.elevated]) {
+      assert.ok(contrast(patch.line!, ground) >= 3, `line ${patch.line} on ${ground}: ${contrast(patch.line!, ground).toFixed(2)}`);
+      assert.ok(contrast(patch.edge!, ground) >= 3, `edge ${patch.edge} on ${ground}`);
+      assert.ok(contrast(patch.tertiary!, ground) >= Math.max(4.5, contrast(base.tertiary, ground)), `tertiary ${patch.tertiary} on ${ground}`);
+    }
+    assert.ok(contrast(base.line, base.surface) < 3, 'the drawn separator is a composition value: the setting is what lifts it');
+    for (const ground of [base.dock, base.background]) assert.ok(contrast(patch.dockEdge!, ground) >= 3, `dock rim on ${ground}`);
+    for (const ground of [base.surface, base.background]) assert.ok(contrast(patch.switchTrack!, ground) >= 3, `off track on ${ground}`);
+  }
+  // The theme hands these values out exactly when iOS says the setting is on.
+  assert.match(readFileSync(new URL('../src/ui/theme.ts', import.meta.url), 'utf8'), /\.\.\.INCREASED_CONTRAST\[isDark \? 'dark' : 'light'\], isDark, increaseContrast: true/);
 });

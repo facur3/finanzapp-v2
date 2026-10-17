@@ -1,18 +1,18 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { todayKey, type ReviewArchive } from '@finanzapp/domain';
-import type { AnswerContent, ClarificationOption, Message, ProposalContent } from '../assistant/conversation';
+import type { AnswerContent, AssistantReason, ClarificationOption, Message, ProposalContent } from '../assistant/conversation';
 import { evidenceLabel, optionText } from '../assistant/conversation';
 import type { ReviewItem } from '../storage/review-database';
 import type { LanguageCode } from '../i18n/locale';
 import { useI18n } from '../i18n/provider';
 import { useCategoryLook, useCategoryLookOf } from './category-hues';
-import { AccountBadge, ActionButton, AppText, CategoryBadge, Money, PressFeedback, Surface, type IconName } from './components';
-import { Appear, Reflow, selectionHaptic } from './motion';
+import { AccountBadge, ActionButton, AppText, CategoryBadge, Money, PressFeedback, Surface, useStacked, type IconName } from './components';
+import { Appear, Reflow, WAIT_REVEAL_MS, pulseTiming, selectionHaptic } from './motion';
 import { activityDateLabel } from './presentation';
-import { reviewFacts } from './review-presentation';
+import { reviewFacts, staleValueKey } from './review-presentation';
 import { radius, space, useCurrentDay, usePalette, useReduceMotion } from './theme';
 
 /** The conversation, visually quiet. A user message is a compact grey pill on
@@ -36,7 +36,8 @@ export function UserMessage({ text }: { text: string }) {
 }
 
 /** Streaming shows the words as they arrive, or "Pensando…" with a pulse
- * before the first one; a stopped answer says so under its partial text.
+ * before the first one (shown once the wait has lasted `WAIT_REVEAL_MS`, so a fast reply never flashes it); a stopped
+ * answer says so under its partial text.
  * The model's words are content in the language they were asked in: protocol v3
  * sends the interface language with each ask (docs/i18n.md §11) and the message
  * keeps it as `language`, so VoiceOver reads a reply with the voice of that language
@@ -60,12 +61,19 @@ function Thinking() {
   const reduced = useReduceMotion();
   const { t, speechLanguage } = useI18n();
   const pulse = useSharedValue(1);
+  const [shown, setShown] = useState(false);
   useEffect(() => {
+    const timer = setTimeout(() => setShown(true), WAIT_REVEAL_MS);
+    return () => clearTimeout(timer);
+  }, []);
+  useEffect(() => {
+    if (!shown) return;
     if (reduced) { pulse.value = 1; return; }
-    pulse.value = withRepeat(withSequence(withTiming(0.3, { duration: 600, easing: Easing.inOut(Easing.quad) }), withTiming(1, { duration: 600, easing: Easing.inOut(Easing.quad) })), -1, false);
+    pulse.value = withRepeat(withSequence(withTiming(0.3, pulseTiming), withTiming(1, pulseTiming)), -1, false);
     return () => { pulse.value = 1; };
-  }, [reduced, pulse]);
+  }, [shown, reduced, pulse]);
   const style = useAnimatedStyle(() => ({ opacity: pulse.value }));
+  if (!shown) return null;
   return <View accessible accessibilityLabel={t('assistant.message.thinkingLabel')} accessibilityLanguage={speechLanguage} accessibilityState={{ busy: true }} style={[styles.assistantRow, { flexDirection: 'row', alignItems: 'center', gap: 8 }]}>
     <Animated.View style={[{ width: 8, height: 8, borderRadius: 4, backgroundColor: p.primary }, style]} />
     <AppText secondary>{t('assistant.message.thinking')}</AppText>
@@ -77,30 +85,43 @@ function Cursor() {
   return <AppText style={{ color: p.primary }}>▍</AppText>;
 }
 
-/** One calm line for a state the Assistant cannot get past: not connected,
+/** One calm line for a state the Assistant cannot get past: not available,
  * offline, a limit, a failure. It names the state and, when the message did
- * leave the device, offers to send it again. The stored text is a catalogue
+ * leave the device, offers to send it again; when the Assistant cannot help now (not available in this version, a limit)
+ * it offers the next step, «Registrar a mano» (`onRecord`). The stored text is a catalogue
  * key or a caught message; `errorText` shows either in the interface language. */
-export function SystemNote({ message, onRetry }: { message: Message & { role: 'system' }; onRetry?: (text: string) => void }) {
+export function SystemNote({ message, onRetry, onRecord }: { message: Message & { role: 'system' }; onRetry?: (text: string) => void; onRecord?: () => void }) {
   const p = usePalette();
   const { t, errorText, speechLanguage } = useI18n();
   const text = errorText(message.text);
   const icon: IconName = message.reason === 'offline' ? 'cloud-offline-outline' : message.reason === 'limit' ? 'time-outline' : 'information-circle-outline';
-  return <View accessible accessibilityRole="text" accessibilityLabel={text} accessibilityLanguage={speechLanguage} style={styles.systemRow}>
-    <Ionicons name={icon} size={16} color={p.tertiary} accessible={false} />
-    <AppText secondary variant="footnote" style={{ flex: 1 }}>{text}</AppText>
-    {message.retryText !== null && onRetry && <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('assistant.message.retry')} onPress={() => onRetry(message.retryText!)} style={{ minHeight: 36, paddingLeft: 8 }}>
+  // 25D2: the note and «Reintentar» are two VoiceOver stops, siblings: inside one accessible element the button would never
+  // be reached on its own. The row's 4 pt of padding is the button's vertical slop, so its 36 pt reach 44 pt.
+  return <View style={styles.systemRow}>
+    <View accessible accessibilityRole="text" accessibilityLabel={text} accessibilityLanguage={speechLanguage} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+      <Ionicons name={icon} size={16} color={p.tertiary} accessible={false} />
+      <AppText secondary variant="footnote" style={{ flex: 1 }}>{text}</AppText>
+    </View>
+    {message.retryText !== null && onRetry && <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('assistant.message.retry')} onPress={() => onRetry(message.retryText!)}
+      hitSlop={{ top: 4, bottom: 4 }} style={{ minHeight: 36, paddingLeft: 8, justifyContent: 'center' }}>
       <AppText variant="footnote" style={{ color: p.primary, fontWeight: '600' }}>{t('assistant.message.retry')}</AppText>
+    </PressFeedback>}
+    {onRecord && MANUAL_REASONS.has(message.reason) && <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('assistant.message.recordManually')} onPress={onRecord}
+      hitSlop={{ top: 4, bottom: 4 }} style={{ minHeight: 36, paddingLeft: 8, justifyContent: 'center' }}>
+      <AppText variant="footnote" style={{ color: p.primary, fontWeight: '600' }}>{t('assistant.message.recordManually')}</AppText>
     </PressFeedback>}
   </View>;
 }
+
+/** The notes whose next step is the manual form: the Assistant cannot answer now, whatever is retried. */
+const MANUAL_REASONS: ReadonlySet<AssistantReason> = new Set(['unavailable', 'session', 'limit']);
 
 /** The empty conversation: one question and at most four prompts (already in the interface language). */
 export function Suggestions({ items, onPick, disabled = false }: { items: readonly string[]; onPick: (text: string) => void; disabled?: boolean }) {
   const p = usePalette();
   const { t } = useI18n();
   return <View style={styles.empty}>
-    {/* 24UX6C: the Assistant's mark is the lime accent circle with an ink glyph (14.1:1; the hub's lime tile uses an ink circle instead): it reads on both grounds. */}
+    {/* 24UX6C: the Assistant's mark is the accent circle with its `onAccent` glyph (the hub's brand tile uses a `heroInk` circle instead): it reads on both grounds. */}
     <View style={[styles.emptyGlyph, { backgroundColor: p.accent }]}><Ionicons name="sparkles" size={22} color={p.onAccent} accessible={false} /></View>
     <AppText accessibilityRole="header" variant="title2" style={{ textAlign: 'center' }}>{t('assistant.emptyTitle')}</AppText>
     <View style={styles.chips}>
@@ -146,8 +167,13 @@ export function AnswerEvidence({ content, onOpen }: { content: AnswerContent; on
   const p = usePalette();
   const { t, spokenMoney, speechLanguage } = useI18n();
   const categoryLook = useCategoryLookOf('expense');
+  // 25D1: above the shared stacking threshold each figure goes under its label, as on every other row.
+  const stacked = useStacked();
   if (!content.rows.length && !content.links.length) return null;
   const currency = content.currency;
+  // What the rows cover, said under them when it is not the obvious whole: days 1 to N of a capped month, one currency's accounts.
+  const scope = [content.untilISO ? t('reports.period.untilDay', { day: Number(content.untilISO.slice(8)) }) : null,
+    content.scoped ? t('assistant.evidence.scope', { currency }) : null].filter(Boolean).join(' · ');
   // A difference that grew is said as such ("42500,00 pesos más"); a lower one already starts with "Menos".
   const spoken = (row: AnswerContent['rows'][number]) => row.signed && row.amountMinor > 0
     ? t('assistant.evidence.spokenIncrease', { amount: spokenMoney(row.amountMinor, currency) }) : spokenMoney(row.amountMinor, currency);
@@ -155,12 +181,14 @@ export function AnswerEvidence({ content, onOpen }: { content: AnswerContent; on
     {content.rows.length > 0 && <View style={[styles.evidence, { borderColor: p.line }]}>
       {content.rows.map(row => {
         const label = evidenceLabel(row, t, stored => categoryLook(stored).label);
-        return <View key={row.id} accessible accessibilityLabel={label + ', ' + spoken(row)} accessibilityLanguage={speechLanguage} style={styles.evidenceRow}>
-          <AppText secondary variant="subhead" numberOfLines={2} style={{ flex: 1, minWidth: 0 }}>{label}</AppText>
+        return <View key={row.id} accessible accessibilityLabel={label + ', ' + spoken(row)} accessibilityLanguage={speechLanguage}
+          style={[styles.evidenceRow, stacked && styles.evidenceStacked]}>
+          <AppText secondary variant="subhead" numberOfLines={stacked ? undefined : 2} style={!stacked && { flex: 1, minWidth: 0 }}>{label}</AppText>
           <Money minor={row.amountMinor} currency={currency} signed={row.signed} size={15} weight="600" />
         </View>;
       })}
     </View>}
+    {scope !== '' && content.rows.length > 0 && <AppText secondary variant="footnote" accessibilityLanguage={speechLanguage}>{scope}</AppText>}
     {content.links.length > 0 && <View style={styles.links}>
       {content.links.map(link => <PressFeedback key={link.id} feedback="opacity" accessibilityRole="link" accessibilityLabel={t(`assistant.links.${link.id}`)} onPress={() => onOpen(link.href)} style={styles.link}>
         <AppText variant="subhead" style={{ color: p.primary, fontWeight: '600' }}>{t(`assistant.links.${link.id}`)}</AppText>
@@ -215,6 +243,9 @@ export function ProposalCard({ content, state, archive, onReview, onRetry, onOpe
     : draft.purchase.count === null ? t('review.purchase.installmentsOpen') : t('review.purchase.installments', { count: draft.purchase.count });
   const facts = state.kind === 'pending' && archive ? reviewFacts(state.item, archive, { todayISO: todayKey(), writable: state.writable, conflicts: state.conflict ? [state.item.id] : [] }) : null;
   const statusKey = state.kind === 'pending' ? 'pending' : state.kind;
+  // While pending, a destination or category that stopped being valid is drawn as such (secondary, with why), never as current.
+  const accountStale = facts ? staleValueKey(facts.destinationState) : null;
+  const categoryStale = facts ? staleValueKey(facts.categoryState) : null;
   const kind = t(draft.kind === null ? 'review.kind.unknown' : draft.kind === 'expense' ? 'movement.expense' : 'movement.income');
   // What the proposal needs, in the review's own words: neutral when merely incomplete, never an error.
   const line = state.kind === 'preview' ? t('assistant.proposal.preview') : state.kind === 'capturing' ? t('assistant.proposal.capturing')
@@ -236,9 +267,9 @@ export function ProposalCard({ content, state, archive, onReview, onRetry, onOpe
       </View>
       <View style={{ gap: 0 }}>
         <ProposalRow label={t(expense ? 'assistant.proposal.merchant' : 'assistant.proposal.source')} value={draft.merchant ?? missing} missing={draft.merchant === null} />
-        <ProposalRow label={t('selection.category')} value={draft.category ? categoryName : missing} missing={!draft.category}
+        <ProposalRow label={t('selection.category')} value={draft.category ? (categoryStale ? t(categoryStale, { value: categoryName }) : categoryName) : missing} missing={!draft.category || !!categoryStale}
           leading={draft.category ? <CategoryBadge category={draft.category} kind={draft.kind ?? 'expense'} size={28} /> : undefined} />
-        <ProposalRow label={t('assistant.proposal.destination')} value={account?.name ?? missing} missing={!account}
+        <ProposalRow label={t('assistant.proposal.destination')} value={account ? (accountStale ? t(accountStale, { value: account.name }) : account.name) : missing} missing={!account || !!accountStale}
           leading={account && !card ? <AccountBadge accountId={account.id} size={28} /> : undefined} />
         {purchase !== null && <ProposalRow label={t('assistant.proposal.payment')} value={purchase} missing={draft.purchase === null} />}
         <ProposalRow label={t('selection.date')} value={draft.dateISO ? activityDateLabel(draft.dateISO, day, locale) : missing} missing={!draft.dateISO}
@@ -257,11 +288,15 @@ export function ProposalCard({ content, state, archive, onReview, onRetry, onOpe
 function ProposalRow({ label, value, spoken, leading, missing = false, last = false }: { label: string; value: string; spoken?: string; leading?: ReactNode; missing?: boolean; last?: boolean }) {
   const p = usePalette();
   const { t, speechLanguage } = useI18n();
-  return <View accessible accessibilityLabel={t('assistant.proposal.row', { label, value: spoken ?? value })} accessibilityLanguage={speechLanguage} style={[styles.draftRow, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
-    <AppText secondary variant="subhead" style={{ minWidth: 96, flexShrink: 1 }}>{label}</AppText>
-    <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'flex-end' }}>
+  // 25T: above the shared threshold the value goes under its label, whole, as DetailRow does: beside a label at AX3 a
+  // merchant or a category had about five characters a line.
+  const stacked = useStacked();
+  return <View accessible accessibilityLabel={t('assistant.proposal.row', { label, value: spoken ?? value })} accessibilityLanguage={speechLanguage}
+    style={[styles.draftRow, stacked && styles.draftStacked, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
+    <AppText secondary variant="subhead" style={stacked ? undefined : { minWidth: 96, flexShrink: 1 }}>{label}</AppText>
+    <View style={{ flex: stacked ? undefined : 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: stacked ? 'flex-start' : 'flex-end' }}>
       {leading}
-      <AppText numberOfLines={2} style={{ flexShrink: 1, textAlign: 'right', fontWeight: '500', color: missing ? p.secondary : p.text }}>{value}</AppText>
+      <AppText numberOfLines={stacked ? undefined : 2} style={{ flexShrink: 1, textAlign: stacked ? 'left' : 'right', fontWeight: '500', color: missing ? p.secondary : p.text }}>{value}</AppText>
     </View>
   </View>;
 }
@@ -278,8 +313,10 @@ const styles = StyleSheet.create({
   chip: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: radius.chip + 6, borderWidth: StyleSheet.hairlineWidth, minHeight: 44, justifyContent: 'center' },
   evidence: { borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth },
   evidenceRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8, minHeight: 40 },
+  evidenceStacked: { flexDirection: 'column', alignItems: 'flex-start', gap: 2 },
   links: { flexDirection: 'row', flexWrap: 'wrap', gap: space.m },
   link: { flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: 44 },
   collapsed: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4 },
   draftRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, minHeight: 44 },
+  draftStacked: { flexDirection: 'column', alignItems: 'flex-start', gap: 4 },
 });

@@ -497,7 +497,7 @@ describe('D. stop, reactivate, delete; deleting a card', () => {
     expect(inserts.map(record => record.entry.dateISO)).toEqual(['2026-05-20', '2026-06-20', '2026-07-20']);
     expect(() => reactivateInstallmentPlan(back, at('2026-07-26'))).toThrow(PLAN_NOT_CANCELLED_MESSAGE);
     expect(() => reactivateInstallmentPlan({ ...tv, deleted: true, revision: 1 }, at('2026-07-26'))).toThrow(PLAN_DELETED_MESSAGE);
-    expect(() => planCatchUpInserts(april, 'nope', '2026-07-25')).toThrow('No encontramos este plan de cuotas.');
+    expect(() => planCatchUpInserts(april, 'nope', '2026-07-25')).toThrow('No se encontró este plan de cuotas.');
     // A14: the catch-up reads a local date key; on the eve of a closing (21:30 in UTC−3 is already the next UTC day) storage
     // passes todayKey(), so the share of the next day is not recorded early.
     expect(planCatchUpInserts(plain(), 'tv', '2026-01-19')).toEqual([]);

@@ -6,8 +6,8 @@ import { useLedger } from '../../src/storage/LedgerProvider';
 import type { ReviewItem } from '../../src/storage/review-database';
 import { ActionButton, AppText, DetailRow, EmptyState, ErrorMessage, LifecycleNote, Money, Screen, SectionTitle, Surface } from '../../src/ui/components';
 import { useAccountNameOf, useCategoryLabel } from '../../src/ui/category-hues';
-import { reviewFacts, stateTone, type ReviewFacts } from '../../src/ui/review-presentation';
-import { useReviewActions } from '../../src/ui/review-actions';
+import { gapText, reviewFacts, staleValueKey, stateTone, type ReviewFacts } from '../../src/ui/review-presentation';
+import { usePushOnce, useReviewActions } from '../../src/ui/review-actions';
 import { useReviewItem } from '../../src/ui/use-review-item';
 import { space, usePalette } from '../../src/ui/theme';
 import { useI18n } from '../../src/i18n/provider';
@@ -41,13 +41,16 @@ function ReviewDetail({ item, leaving, reload, refreshing }: { item: ReviewItem;
   // Opened from a link with nothing under it, the tray replaces it instead.
   const leave = () => { if (router.canGoBack()) router.back(); else router.replace('/review'); };
   // 25A-04: the same Confirmar and Descartar as the review sheet (src/ui/review-actions.ts).
-  const { busy, error, confirm, dismiss } = useReviewActions(item, { leaving, reload, leave });
+  const { busy, error, confirm, dismiss, clearError } = useReviewActions(item, { leaving, reload, leave });
+  const push = usePushOnce();
   const tray = review && review !== 'unavailable' ? review : null;
   const facts: ReviewFacts | null = archive && tray ? reviewFacts(item, archive as ReviewArchive, { todayISO: todayKey(), writable: tray.writable, conflicts: tray.conflicts }) : null;
   const categoryLabel = useCategoryLabel(item.draft.category ?? '', item.draft.kind ?? 'expense');
   if (!facts || !tray) return <Screen>{null}</Screen>;
   const missing = t('review.missing');
   const conflict = facts.state === 'conflict';
+  // A name that is no longer valid is drawn with why, never as the current value.
+  const named = (name: string, key: ReturnType<typeof staleValueKey>) => key ? t(key, { value: name }) : name;
 
   const kindTitle = t(facts.kind === null ? 'review.kind.unknown' : `review.kind.${facts.kind}`);
   const plan = facts.purchase?.mode === 'installments' ? facts.purchase : null;
@@ -79,9 +82,9 @@ function ReviewDetail({ item, leaving, reload, refreshing }: { item: ReviewItem;
         value={facts.amount ? moneyText(facts.amount.minor, facts.amount.currency) : missing}
         spokenValue={facts.amount ? spokenMoney(facts.amount.minor, facts.amount.currency) : undefined} />
       <DetailRow label={t('review.fields.merchant')} value={facts.merchant ?? missing} icon="storefront-outline" />
-      <DetailRow label={t('review.fields.category')} value={facts.category ? categoryLabel : missing} icon="pricetag-outline" />
+      <DetailRow label={t('review.fields.category')} value={facts.category ? named(categoryLabel, staleValueKey(facts.categoryState)) : missing} icon="pricetag-outline" />
       <DetailRow label={t(facts.card ? 'review.fields.card' : facts.destination ? 'review.fields.account' : 'review.fields.destination')}
-        value={facts.destination ? nameOf(facts.destination) : missing} icon={facts.card ? 'card-outline' : 'wallet-outline'} />
+        value={facts.destination ? named(nameOf(facts.destination), staleValueKey(facts.destinationState)) : missing} icon={facts.card ? 'card-outline' : 'wallet-outline'} />
       {purchase !== null && <DetailRow label={t('review.fields.purchase')} value={purchase} icon="layers-outline" />}
       <DetailRow label={t('review.fields.date')} icon="calendar-outline" value={facts.dateISO ? formatDate(facts.dateISO, 'dayYear') : missing}
         spokenValue={facts.dateISO ? formatDate(facts.dateISO, 'long') : undefined} />
@@ -91,7 +94,7 @@ function ReviewDetail({ item, leaving, reload, refreshing }: { item: ReviewItem;
       <SectionTitle>{t('review.detail.missingTitle')}</SectionTitle>
       {/* Neutral, never an error: a draft that lacks a fact is waiting for the person, not failing. */}
       <View style={{ gap: 10, paddingTop: 4 }}>
-        {facts.gaps.map(gap => <LifecycleNote key={gap} icon="ellipse-outline" detail={t(`review.gaps.${gap}`)} />)}
+        {facts.gaps.map(gap => <LifecycleNote key={gap} icon="ellipse-outline" detail={t(gapText(gap, facts))} />)}
       </View>
     </View>}
     {facts.state === 'conflict' && <LifecycleNote icon="alert-circle-outline" tone="warning" detail={t('review.detail.conflictNote')} />}
@@ -103,7 +106,7 @@ function ReviewDetail({ item, leaving, reload, refreshing }: { item: ReviewItem;
     {tray.writable && <View style={{ gap: 10 }}>
       {!conflict && <ActionButton label={confirmText.text} spokenLabel={confirmText.spoken} icon="checkmark" onPress={confirm} busy={busy} disabled={!facts.canConfirm || refreshing} />}
       {!conflict && <ActionButton label={t('review.detail.edit')} icon="create-outline" secondary disabled={busy || refreshing}
-        onPress={() => router.push({ pathname: '/edit-review/[id]', params: { id: item.id } })} />}
+        onPress={() => { clearError(); push({ pathname: '/edit-review/[id]', params: { id: item.id } }); }} />}
       {(!conflict || item.attempt === null) && <ActionButton label={t('review.detail.dismiss')} icon="close" secondary disabled={busy || refreshing} onPress={dismiss} />}
     </View>}
   </Screen>;

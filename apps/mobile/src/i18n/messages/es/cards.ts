@@ -3,9 +3,10 @@ export const cards = {
   cards: {
     list: {
       add: 'Agregar tarjeta',
-      emptyTitle: 'Tus tarjetas, como en la billetera',
-      /** 24T2: a purchase without instalments counts once; in instalments, each instalment counts when its statement closes. */
-      emptyDetail: 'Una compra sin cuotas cuenta como gasto una sola vez; en cuotas, cada cuota cuenta cuando cierra su resumen. Cuando pagás la tarjeta, el dinero sale de tu cuenta y baja el saldo pendiente, sin volver a contar el consumo.',
+      /** 25O1: what a card here gives, in one line; how a purchase, its instalments and a payment count is said where they are
+       * recorded (entryForm.cardNote, entryForm.plan.note, transferForm.explainCard). «Saldo pendiente», never «deuda». */
+      emptyTitle: 'Tus tarjetas de crédito',
+      emptyDetail: 'Agregá una para ver su saldo pendiente, cierres y cuotas.',
       /** VoiceOver hint of the card in front of the deck (and of a row that opens a card). */
       openHint: 'Abre el detalle de la tarjeta',
       /** VoiceOver hint of a card stacked in the deck: tapping it brings it to the front. */
@@ -13,7 +14,7 @@ export const cards = {
       chooseCaption: 'Tocá una tarjeta para ver su saldo y sus movimientos.',
       /** Only archived cards: shown in place of the deck, above the Archivadas section. */
       noActiveTitle: 'Ninguna tarjeta activa',
-      noActiveDetail: 'Tus tarjetas archivadas están abajo. Agregá una tarjeta para registrar compras nuevas.',
+      noActiveDetail: 'Agregá una tarjeta para registrar compras nuevas.',
     },
     panel: {
       /** The card's balance due (purchases minus payments). Always «saldo pendiente», never «deuda»: that word is the Deudas y cobros section. */
@@ -27,12 +28,12 @@ export const cards = {
       noDebt: 'Sin saldo pendiente en esta tarjeta.',
       /** Card balance in the user's favour: "Saldo a favor · $ 1.000,00". */
       credit: 'Saldo a favor · {amount}',
-      available: 'Disponible',
+      available: 'Crédito disponible',
       noLimitLoaded: 'Sin límite cargado',
       /** 24T2: a card with pending instalments. How an issuer reserves credit for them is not assumed: never zero, never a guess. */
       availableUnknown: 'No calculado con cuotas',
-      availableInfoTitle: 'Disponible con cuotas',
-      availableInfoDetail: 'Cada emisor reserva el límite de las compras en cuotas a su manera: algunos descuentan el total de la compra y otros solo las cuotas ya facturadas. FinanzApp no lo supone: mientras la tarjeta tenga cuotas pendientes, no calcula su disponible.',
+      availableInfoTitle: 'Crédito disponible con cuotas',
+      availableInfoDetail: 'Cada emisor reserva el límite de las compras en cuotas a su manera: algunos descuentan el total de la compra y otros solo las cuotas ya facturadas. FinanzApp no lo supone: mientras la tarjeta tenga cuotas pendientes, no calcula su crédito disponible.',
       /** Caption under Disponible: "de $ 5.000,00" (of the credit limit). */
       ofLimit: 'de {amount}',
       /** 24T2: the next closing and the next due date, two separate facts (the due may belong to the statement that already closed). */
@@ -58,7 +59,7 @@ export const cards = {
       /** Appended to the statement caption: " · devoluciones $ 1.000,00". */
       refunds: ' · devoluciones {amount}',
       editCard: 'Editar tarjeta',
-      notFoundTitle: 'No encontramos esta tarjeta',
+      notFoundTitle: 'No se encontró esta tarjeta',
       notFoundDetail: 'Volvé a Tarjetas para elegir una tarjeta guardada en este dispositivo.',
     },
     /** 24T2: the open cycle's activity («Este ciclo», the brief's word), one caption line under Recientes and Movimientos:
@@ -119,8 +120,11 @@ export const cards = {
       usualDays: 'Los meses siguientes: cierre el día {closing} y vencimiento el día {due}.',
       /** Off: the dates correct this statement only. On: their days become the card's usual days. */
       everyMonth: 'Usar estos días todos los meses',
-      frozenNote: 'El envío quedó congelado para que Reintentar no cree otra tarjeta ni aplique cambios dos veces.',
-      create: 'Crear tarjeta',
+      create: 'Guardar tarjeta',
+      /** A new card's disclosure row for issuer, last four digits and limit. */
+      more: 'Más datos (opcional)',
+      /** Above «Crear tarjeta» while a statement date is still to choose. */
+      datesMissing: 'Elegí el próximo cierre y su vencimiento.',
       retry: 'Reintentar',
       archive: 'Archivar tarjeta',
       reactivate: 'Reactivar tarjeta',
@@ -129,8 +133,8 @@ export const cards = {
       archiveDetail: 'Las compras y pagos anteriores siguen en tus registros y reportes. La tarjeta pasa a Archivadas en Tarjetas: podés pagarla y reactivarla.',
       archiveConfirm: 'Archivar',
       negativeDebt: 'El saldo pendiente no puede ser negativo. Si la tarjeta tiene saldo a favor, registralo después como devolución.',
-      saveFailed: 'No pudimos guardar la tarjeta. Reintentá el mismo envío.',
-      archiveFailed: 'No pudimos archivar la tarjeta. Reintentá el mismo cambio.',
+      saveFailed: 'No se pudo guardar la tarjeta.',
+      archiveFailed: 'No se pudo archivar la tarjeta. Reintentá el mismo cambio.',
       /** Producto 25B2: deleting a card keeps its purchases, payments and internal account; only the card leaves. */
       delete: 'Eliminar tarjeta',
       deleteTitle: '¿Eliminar esta tarjeta?',
@@ -153,7 +157,7 @@ export const cards = {
       blockedPayNote: 'Podés pagarla cuando quieras.',
       blockedPay: 'Pagar',
       deleteConfirm: 'Eliminar',
-      deleteFailed: 'No pudimos eliminar la tarjeta. Sigue como estaba; probá nuevamente.',
+      deleteFailed: 'No se pudo eliminar la tarjeta. Sigue como estaba; probá nuevamente.',
     },
   },
 } as const;

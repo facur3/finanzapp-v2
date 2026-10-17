@@ -21,7 +21,7 @@ const i18nProvider = { useI18n: () => bindLocale(current) };
 // the bar's motion and the row at the largest text sizes remain device acceptance items. Since the 24UX6D refinement the
 // same row draws a category budget, named by its localized category (`useCategoryLabel`), never in the category's hue.
 const palette = {
-  line: '#ddd', isDark: true, secondary: '#A0A0A8', tertiary: '#7C7C84', expense: '#FF6B5E', warning: '#F5B342', inset: '#171E1B',
+  line: '#ddd', isDark: true, primary: '#7E9BF7', secondary: '#A0A0A8', tertiary: '#7C7C84', expense: '#FF6B5E', warning: '#F5B342', inset: '#171E1B',
   hero: '#14362D', heroInk: '#EEF5F1', heroSecondary: '#A8C4B9', heroControl: '#26493F',
 };
 
@@ -34,7 +34,8 @@ function harness() {
   const jsx = (type: any, props: any) => ({ type, props });
   // 24UX6D: the window the budget row measures (`useWindowDimensions`), the Reduce Motion setting its bar reads, and every
   // `withTiming` the bar asks for, so a test can drive the row at large text and check the motion without React.
-  const env = { alerts: [] as unknown[][], pushed: [] as unknown[], required: new Set<string>(), window: { width: 393, height: 852, fontScale: 1 }, reduced: false,
+  // 25O1: `stacked` is what the shared `useStacked` answers (large text): Primeros pasos lifts its line limits then.
+  const env = { alerts: [] as unknown[][], pushed: [] as unknown[], required: new Set<string>(), window: { width: 393, height: 852, fontScale: 1 }, reduced: false, stacked: false,
     timings: [] as { to: number; config: any }[],
     /** Every stored category the row asked `useCategoryLabel` to localize, in order. */
     labels: [] as string[],
@@ -56,7 +57,8 @@ function harness() {
     'expo-router': { router: { push: (to: unknown) => { env.pushed.push(to); } } },
     '@expo/vector-icons/Ionicons': 'Ionicons',
     './budget-presentation': budgetPresentation,
-    './components': { AppText: 'AppText', MerchantBadge: 'MerchantBadge', Money: 'Money', PressFeedback: 'PressFeedback', useStacked: () => false },
+    './components': { AppText: 'AppText', GlyphTile: 'GlyphTile', MerchantBadge: 'MerchantBadge', Money: 'Money', NavigationRow: 'NavigationRow', PressFeedback: 'PressFeedback',
+      SectionTitle: 'SectionTitle', Surface: 'Surface', useStacked: () => env.stacked },
     './category-hues': { useCategoryLook: (label: string) => ({ label, hex: '#' + label.length.toString().padStart(6, 'A'), glyph: 'restaurant-outline' }),
       // Localizes like the real hook: a stored default category reads in the interface language («Supermercado» → «Groceries»).
       useCategoryLabel: (stored: string) => { env.labels.push(stored); return current === 'en-US' ? CATEGORY_EN[stored] ?? stored : stored; } },
@@ -91,6 +93,8 @@ test('the metric help opens a native alert whose button is named in the interfac
       const help = exports.MetricHelp({ title: 'Disponible', detail: 'Es el dinero registrado.' });
       assert.equal(help.props.accessibilityLabel, locale === 'es-AR' ? 'Qué significa Disponible' : 'What Disponible means');
       assert.equal(help.props.accessibilityRole, 'button');
+      // 25D1: the 18 pt glyph cannot grow with the text; a long press at the accessibility sizes shows its name large.
+      assert.deepEqual([help.props.accessibilityShowsLargeContentViewer, help.props.accessibilityLargeContentTitle], [true, help.props.accessibilityLabel], locale);
       assert.deepEqual([help.props.children.type, help.props.children.props.color, help.props.children.props.size], ['Ionicons', '#A0A0A8', 18], '24UX1: the glyph is a control drawn in secondary ink, never tertiary');
       help.props.onPress();
       assert.equal(JSON.stringify(env.alerts), JSON.stringify([['Disponible', 'Es el dinero registrado.', [{ text: 'OK', style: 'cancel' }]]]), locale + ': one explicit button from the catalogue, still the cancel action (Esc and the escape gesture close it)');
@@ -181,8 +185,8 @@ test('24UX6A: home-modules imports exactly what the harness mocks, and the insig
   assert.equal(env.required.has('./home-focus'), false, '24UX6C2: only the BudgetAttention type comes from home-focus; nothing at runtime');
   assert.equal(env.required.has('./category-color'), false);
   assert.equal('HomeInsightRow' in exports, false, 'owner decision: Inicio carries no insight line');
-  assert.equal(JSON.stringify(Object.keys(exports).sort()), JSON.stringify(['BudgetAttentionRow', 'CurrencyParts', 'FieldButton', 'MetricHelp', 'UpcomingRecurringRow']),
-    '24UX6C2: the one budget row joins the modules; still no insight row');
+  assert.equal(JSON.stringify(Object.keys(exports).sort()), JSON.stringify(['BudgetAttentionRow', 'CurrencyParts', 'FieldButton', 'FirstSteps', 'MetricHelp', 'UpcomingRecurringRow']),
+    '24UX6C2: the one budget row joins the modules; 25O1: Primeros pasos; still no insight row');
 });
 
 test('24UX6A: the metric help takes the pine field\'s colour and keeps its «Qué significa» name and 44 pt target', () => {
@@ -234,6 +238,11 @@ test('24C1/24UX6A: each currency\'s own figure stands in for a missing total; on
   const help = nodes.find(node => node.type === exports.MetricHelp);
   assert.ok(help, 'the reason sits behind the info button');
   assert.deepEqual([help.props.title, help.props.detail, help.props.color], ['Cotizaciones', 'Sin cotización del día.', palette.heroSecondary]);
+
+  // 25D2: with a metric's name, VoiceOver hears it before the first figure (never a bare amount); the others read as before.
+  const named = flatten(exports.CurrencyParts({ ...props, onField: true, spokenPrefix: 'Gastado' })).filter(node => node.type === 'Money');
+  assert.deepEqual(named.map(node => node.props.spokenLabel), ['Gastado, 1500,00 pesos', undefined]);
+  assert.equal(money.every(node => node.props.spokenLabel === undefined), true, 'without a name, the amount alone');
 
   const canvas = flatten(exports.CurrencyParts(props));
   assert.equal(canvas.filter(node => node.type === 'Money').every(node => node.props.color === undefined), true, 'off the field: the canvas\'s own ink');
@@ -300,7 +309,8 @@ test('24UX6D: a general budget at 87 % is a warning progress row: «Presupuesto�
 
 test('24UX6C2 review, 24UX6D: the row shows the whole percent Presupuestos and Reportes show (percentUsed), never a decimal', () => {
   const { exports } = harness();
-  for (const [spent, whole] of [[8_750_000, 88], [8_740_000, 87], [8_500_000, 85], [9_949_000, 99], [10_049_000, 100], [12_345_678, 123]] as const) {
+  // 25D2 (a recorded golden change): the whole percent not above what was spent; 87,5 % reads «87 %», never a rounded «88 %».
+  for (const [spent, whole] of [[8_750_000, 87], [8_740_000, 87], [8_500_000, 85], [9_949_000, 99], [10_049_000, 100], [12_345_678, 123]] as const) {
     const attention = attentionFor(spent);
     const row = exports.BudgetAttentionRow({ attention, currency: 'ARS', labelsCurrency: false, onPress: () => {} });
     assert.equal(textOf(budgetParts(row).percent), whole + NBSP + '%', String(spent));
@@ -607,4 +617,71 @@ test('24UX6D refinement: a 60-character category with a 13-digit ARS amount stac
       }
     }
   } finally { env.window = { width: 393, height: 852, fontScale: 1 }; }
+});
+
+// ---- 25O1: Primeros pasos -----------------------------------------------------------------------------------------
+
+/** Every node of a module's tree with its private components rendered (FirstStep), as React would. */
+function rendered(value: any): any[] {
+  if (!value || typeof value !== 'object') return [];
+  if (Array.isArray(value)) return value.flatMap(rendered);
+  if (typeof value.type === 'function') return rendered(value.type(value.props));
+  if (!value.props) return [];
+  return [value, ...rendered(value.props.children)];
+}
+/** The three steps, in order: a pending one is a NavigationRow, a done one an accessible View. */
+const stepsOf = (section: any) => rendered(section).filter(node => node.type === 'NavigationRow' || (node.type === 'View' && node.props.accessible === true));
+
+test('25O1: Primeros pasos for a new person: «Primeros pasos», three pending steps that lead somewhere, the brand tile, no filled button', () => {
+  const { exports, env } = harness();
+  const section = exports.FirstSteps({ account: null, card: null });
+  const all = rendered(section);
+  assert.equal(all.filter(node => node.type === 'SectionTitle').map(node => node.props.children).join(), 'Primeros pasos', 'a section title, a VoiceOver header');
+  assert.equal(all.find(node => node.type === 'Surface').props.grouped, true, 'one grouped surface');
+  assert.equal(all.some(node => node.type === 'ActionButton' || node.type === 'PressFeedback'), false, 'no filled button: the dock\'s «+» is Inicio\'s bright object');
+  const steps = stepsOf(section);
+  assert.equal(JSON.stringify(steps.map(step => [step.type, step.props.title, step.props.subtitle, step.props.leading.props.icon, step.props.leading.props.color, !!step.props.last])),
+    JSON.stringify([['NavigationRow', 'Agregá tu primera cuenta', 'Efectivo, banco o billetera', 'wallet-outline', palette.primary, false],
+      ['NavigationRow', 'Anotá tu primer gasto', 'Un café, el súper, lo que sea', 'receipt-outline', palette.primary, false],
+      ['NavigationRow', 'Sumá tu tarjeta', 'Opcional · para seguir sus cuotas', 'card-outline', palette.primary, true]]),
+    'the glyph in the brand text on its tint (GlyphTile), the hairline under all but the last');
+  assert.equal(steps[0].props.leading.type, 'GlyphTile');
+  assert.equal(steps[0].props.leading.props.size, undefined, 'the 40 pt tile of the ledger rows');
+  for (const step of steps) step.props.onPress();
+  assert.equal(JSON.stringify(env.pushed), JSON.stringify(['/new-account', { pathname: '/new-entry', params: { kind: 'expense' } }, '/new-card']),
+    'Nueva cuenta, the expense form (the dock\'s «+» Gasto), Nueva tarjeta');
+  env.pushed.length = 0;
+  stepsOf(exports.FirstSteps({ account: 'Efectivo', card: null, currency: 'USD' }))[1].props.onPress();
+  assert.equal(JSON.stringify(env.pushed), JSON.stringify([{ pathname: '/new-entry', params: { kind: 'expense', currency: 'USD' } }]), 'in the currency Inicio shows');
+});
+
+test('25O1: a done step is quiet text, not a control: a check on a quiet tile, the title in secondary at regular weight, what was created, and VoiceOver «…, hecho»', () => {
+  const { exports, env } = harness();
+  try {
+    const steps = stepsOf(exports.FirstSteps({ account: 'Caja de ahorro', card: 'Visa Galicia' }));
+    assert.deepEqual(steps.map(step => step.type), ['View', 'NavigationRow', 'View'], 'the account and the card done; the first expense is never drawn done');
+    const [account, , card] = steps;
+    assert.equal(account.props.accessibilityLabel, 'Agregá tu primera cuenta, Caja de ahorro, hecho');
+    assert.equal(card.props.accessibilityLabel, 'Sumá tu tarjeta, Visa Galicia, hecho');
+    assert.equal(account.props.accessibilityLanguage, undefined, 'the interface language (es-AR here is the device\'s)');
+    for (const done of [account, card]) {
+      assert.equal(done.props.onPress, undefined, 'nothing to press');
+      assert.equal(rendered(done).some(node => node.type === 'Ionicons' && node.props.name === 'chevron-forward'), false, 'no chevron');
+      const tile = rendered(done).find(node => node.type === 'GlyphTile');
+      assert.deepEqual([tile.props.icon, tile.props.color], ['checkmark', palette.secondary], 'the check in secondary ink: the shape and the words say done, not a colour');
+      const texts = rendered(done).filter(node => node.type === 'AppText');
+      assert.deepEqual(texts.map(node => [node.props.secondary, node.props.variant ?? 'body', node.props.style?.fontWeight]), [[true, 'body', undefined], [true, 'footnote', undefined]]);
+      assert.deepEqual(texts.map(node => node.props.numberOfLines), [2, 2]);
+    }
+    // The pending step keeps its row; the geometry of a done one matches it (60 pt, 16 pt sides) and keeps the hairline rule.
+    assert.deepEqual([account.props.style[0].minHeight, account.props.style[0].paddingHorizontal, account.props.style[1].borderBottomWidth, card.props.style[1].borderBottomWidth], [60, 16, 0.5, 0]);
+    // Large text: no line limit, nothing cut.
+    env.stacked = true;
+    assert.deepEqual(rendered(stepsOf(exports.FirstSteps({ account: 'Caja de ahorro', card: null }))[0]).filter(node => node.type === 'AppText').map(node => node.props.numberOfLines), [undefined, undefined]);
+    current = 'en-US';
+    const english = stepsOf(exports.FirstSteps({ account: 'Cash', card: null }));
+    assert.equal(english[0].props.accessibilityLabel, 'Add your first account, Cash, done');
+    assert.deepEqual(english.slice(1).map(step => step.props.title + ' / ' + step.props.subtitle), ['Log your first purchase / A coffee, groceries, anything',
+      'Add your credit card / Optional · to follow its installments']);
+  } finally { current = 'es-AR'; env.stacked = false; }
 });

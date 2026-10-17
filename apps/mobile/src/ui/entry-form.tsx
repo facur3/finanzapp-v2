@@ -2,7 +2,6 @@ import { useMemo, useRef, useState } from 'react';
 import { Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
-import * as Haptics from 'expo-haptics';
 import { accountBalanceMinor, accountKind, categoryKey, editedDraftFits, entryRefundSummary, installmentOccurrenceOf, interestCategoryLabel, keepsHistoricalCardIncome, makeEntryChange, minorFromEditedDraft, postingAccountsFor, sameEntry, summarizeMonthlyBudgets, todayKey, validateEntry, validateEntryChange, type Account, type Entry, type EntryChange, type EntryKind, type EntryRecord, type InstallmentPlan, type StoredDraft } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { budgetTone } from './budget-presentation';
@@ -13,6 +12,8 @@ export type { EntryPrefill } from './entry-prefill';
 import { AccountField, CategoryField, DateField } from './form-controls';
 import { InstallmentPurchase } from './installment-purchase';
 import { accountKindLabel, postingAccounts } from './liability-presentation';
+import { announce, errorHaptic, successHaptic, warningHaptic } from './motion';
+import { readLastAccount, writeLastAccount } from './last-account';
 import { initialAccountId, releasesDraft } from './presentation';
 import { installmentOfEntry } from './installment-presentation';
 import { INITIAL_PURCHASE, buildPurchasePlan, purchaseState, type PurchaseDraft } from './purchase-plan';
@@ -33,15 +34,17 @@ type FormKind = EntryKind | 'transfer';
  * adds the «Pago» section (`InstallmentPurchase`): «En cuotas» saves one plan
  * and no movement. The movement of an instalment is corrected in its merchant
  * and category only; its amount, date and card are the plan's. */
-export function EntryForm({ original, accountId: requestedAccount, currency, kind: requestedKind, onKindChange, onAccountChange, prefill }: {
+export function EntryForm({ original, accountId: requestedAccount, currency, kind: requestedKind, onKindChange, onAccountChange, onLockedChange, prefill }: {
   original?: EntryRecord; accountId?: string; currency?: string; kind?: string; prefill?: EntryPrefill;
   /** When a host owns the Gasto / Ingreso / Transferencia switch it passes `kind` and this callback; the form then renders no switch of its own. */
   onKindChange?: (kind: FormKind) => void;
   /** Lets the host carry the chosen account over when the mode changes. */
   onAccountChange?: (accountId: string) => void;
+  /** 25VIS2: tells the host when a save is in flight or frozen for retry (exactly `busy || pending !== null`), so its switch locks. */
+  onLockedChange?: (locked: boolean) => void;
 }) {
   const { snapshot, archive, addEntry, updateEntry, addInstallmentPlan } = useLedger();
-  const { t, moneyText, formatMoneyAmount, spokenMoney, formatDate } = useI18n();
+  const { t, moneyText, formatMoneyAmount, spokenMoney, formatDate, failureMessage } = useI18n();
   // Cash accounts and cards can carry an expense or income; a personal debt only changes through payments.
   const [before] = useState(original);
   // 24T2: an instalment's movement (its id names the plan): the plan fixes its amount, date, card and kind.
@@ -56,7 +59,15 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
   const [operation] = useState(() => ({ id: randomUUID(), createdAt: new Date().toISOString() }));
   const [ownKind, setKind] = useState<EntryKind>(before?.entry.kind ?? (requestedKind === 'income' ? 'income' : 'expense'));
   const kind: EntryKind = onKindChange ? (requestedKind === 'income' ? 'income' : 'expense') : ownKind;
-  const [chosenAccountId, setAccountId] = useState(() => before?.entry.accountId ?? initialAccountId(accounts, requestedAccount, currency));
+  // 25N1: a new Gasto or Ingreso opens on the account last saved with that kind (`last-account.ts`) when the form offers it
+  // (and, for a prefilled amount, in its currency); an account asked for by the screen still wins, and without either the rule is today's.
+  const [chosenAccountId, setAccountId] = useState(() => {
+    if (before) return before.entry.accountId;
+    const opening: EntryKind = requestedKind === 'income' ? 'income' : 'expense';
+    const remembered = requestedAccount ? undefined : readLastAccount(opening, postingAccountsFor(opening, accounts, archive?.cards ?? [], archive?.debts ?? [])
+      .filter(item => !prefill?.currency || item.currency === prefill.currency));
+    return initialAccountId(accounts, requestedAccount ?? remembered, currency);
+  });
   // An edit is prefilled in the movement's own currency (its account's); a prefill in another currency is never reinterpreted.
   // While the text stays exactly that prefill (same currency), saving keeps the stored minor units themselves: a stored amount
   // may exceed the entry bound (a restored backup), and re-reading it would lock every other correction.
@@ -66,7 +77,12 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
   });
   const [amount, setAmount] = useState(() => before ? stored?.draft ?? '' : prefillDraft(prefill));
   const [merchant, setMerchant] = useState(before?.entry.merchant ?? prefill?.merchant ?? '');
-  const [category, setCategory] = useState(before?.entry.category ?? prefill?.category ?? '');
+  // 25VIS2: one category per kind. Categories belong to a kind, so the one picked for Gasto never rides along into Ingreso
+  // (where it could be saved on an income); switching back to Gasto finds it again.
+  const [categories, setCategories] = useState<Partial<Record<EntryKind, string>>>(() => ({ [before?.entry.kind ?? (requestedKind === 'income' ? 'income' : 'expense')]:
+    before?.entry.category ?? prefill?.category ?? '' }));
+  const category = categories[kind] ?? '';
+  const setCategory = (value: string) => setCategories(current => ({ ...current, [kind]: value }));
   const [date, setDate] = useState(() => before ? new Date(before.entry.dateISO + 'T12:00:00') : prefill?.dateISO ? new Date(prefill.dateISO + 'T12:00:00') : new Date());
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<Submission | null>(null);
@@ -149,6 +165,9 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
     if (saving.current) return;
     saving.current = true;
     setBusy(true);
+    onLockedChange?.(true);
+    // Whether a submission stays frozen once this attempt ends: the host's switch stays locked exactly as long (25VIS2).
+    let frozen = pending !== null;
     setError(null);
     Keyboard.dismiss();
     try {
@@ -190,23 +209,38 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
           }
         }
         setPending(submission);
+        frozen = true;
       }
       if (submission.plan) await addInstallmentPlan(submission.plan);
       else if (submission.change) await updateEntry(submission.change);
       else await addEntry(submission.entry);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      // Saved: remember where a new one went, for the next form of that kind (a device preference, never the ledger).
+      if (!before) {
+        const where = submission.plan ? cards.find(card => card.id === submission.plan!.cardId)?.accountId : submission.entry.accountId;
+        if (where) writeLastAccount(submission.plan ? 'expense' : submission.entry.kind, where);
+      }
+      successHaptic();
       saving.current = false;
       close();
+      // 25D2: the form closes with the save; VoiceOver hears what was saved once the screen under it is up (a new movement
+      // with its amount in words, the way Save echoed it; an edit, that the changes were saved).
+      const saved = submission.plan ? { minor: submission.plan.principalMinor, currency: submission.plan.currency }
+        : submission.change ? null : { minor: submission.entry.amountMinor, currency: accounts.find(item => item.id === submission!.entry.accountId)?.currency ?? 'ARS' };
+      announce(saved ? t('common.saved', { amount: spokenMoney(saved.minor, saved.currency) }) : t('common.changesSaved'), 'leave');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'entryForm.saveUnverified');
+      setError(failureMessage(cause, 'entryForm.saveUnverified'));
       // A plan built from a calendar the card no longer has is refused before anything is written: the submission is released
       // so the section shows the card's current statements again, and saving builds the plan anew (with the same id). 24T3
       // (A13): the same for every refusal storage decides before writing (a purchase with devoluciones edited below them, a
       // deleted account…): the fields unlock for review. An unknown outcome keeps the submission frozen for an exact retry.
-      if (cause instanceof Error && releasesDraft(cause.message)) setPending(null);
+      if (cause instanceof Error && releasesDraft(cause.message)) { setPending(null); frozen = false; }
+      // 25VIS2 (V4): a refusal (before the submission froze, or one storage decided before writing) taps Error; an outcome
+      // that may have been written taps Warning, while the frozen draft waits for the exact retry.
+      if (frozen) warningHaptic(); else errorHaptic();
     } finally {
       saving.current = false;
       setBusy(false);
+      onLockedChange?.(frozen);
     }
   }
 
@@ -247,7 +281,7 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
       <Field label={t('entryForm.merchantExpense')} value={merchant} placeholder={t('entryForm.merchantExpensePlaceholder')}
         onChangeText={setMerchant} maxLength={120} autoCapitalize="sentences" editable={!locked} />
       <ErrorMessage message={error} />
-      {pending && !busy && error && <AppText secondary variant="footnote">{t('entryForm.retryNote')}</AppText>}
+      {pending && !busy && error && <AppText secondary variant="footnote">{t('common.retryNote', { where: t('common.retryWhere.movements') })}</AppText>}
       <ActionButton label={pending && error ? t('common.retrySave') : t('common.saveChanges')} onPress={save} busy={busy}
         disabled={!merchant.trim() || !category.trim()} />
     </Screen>;
@@ -260,11 +294,14 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
       options={[{ value: 'expense', label: t('movement.expense') }, { value: 'income', label: t('movement.income') }]} />}
     {!eligibleAccounts.length ? <EmptyState title={t('entryForm.noAccountTitle')}
       /* No account at all, or none this kind may post to (a card-only ledger asked for an income): the action adds a cash
-         account, pushed over the draft (the carried card's currency prefilled) so the modal and its fields come back. */
+         account, pushed over the draft (the carried card's currency prefilled) so the modal and its fields come back. 25O1:
+         with no account at all too (it was replaced): the person who skipped the first opening returns to the expense they
+         started, on the new account, in the draft's currency when it has one. */
       detail={t(accounts.length ? 'entryForm.noCashAccountDetail' : 'entryForm.noAccountDetail')}
-      action={<ActionButton label={t('common.addAccount')} onPress={() => accounts.length
-        ? router.push({ pathname: '/new-account', params: { currency: accounts.find(item => item.id === chosenAccountId)?.currency ?? currency ?? accounts[0].currency } })
-        : router.replace('/new-account')} />} /> : <>
+      action={<ActionButton label={t('common.addAccount')} onPress={() => {
+        const preferred = accounts.find(item => item.id === chosenAccountId)?.currency ?? currency ?? accounts[0]?.currency;
+        router.push(preferred ? { pathname: '/new-account', params: { currency: preferred } } : '/new-account');
+      }} />} /> : <>
       <AmountField currency={account?.currency ?? 'ARS'} value={amount} onChangeText={value => { setAmount(value); setError(null); }} editable={!locked} stored={stored ?? undefined}
         tone={kind === 'income' ? 'income' : 'neutral'} label={t(kind === 'expense' ? 'movement.expense' : 'movement.income')} />
       <View style={{ gap: space.m }}>
@@ -291,7 +328,7 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
         {t('operations.edit.refundedNote', { amount: moneyText(refunds.refundedMinor, account.currency) })}
       </AppText>}
       <ErrorMessage message={error} />
-      {pending && !busy && error && <AppText secondary variant="footnote">{t(pending?.plan ? 'entryForm.plan.retryNote' : 'entryForm.retryNote')}</AppText>}
+      {pending && !busy && error && <AppText secondary variant="footnote">{t('common.retryNote', { where: t(pending?.plan ? 'common.retryWhere.cardInstallments' : 'common.retryWhere.movements') })}</AppText>}
       <ActionButton label={submit.text} spokenLabel={submit.spoken}
         onPress={save} busy={busy} disabled={!amount.trim() || !merchant.trim() || !category.trim() || !account || !fit.ok || (inInstallments && planState.blocked)} />
     </>}

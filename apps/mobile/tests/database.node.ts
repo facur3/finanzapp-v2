@@ -12,7 +12,8 @@ import { accountBalanceMinor, archiveKey, createRecoveryBackup, initialRecord, m
   DEBT_DELETE_PATH_MESSAGE, DEBT_OUTSTANDING_MESSAGE, closePersonalDebt, deletePersonalDebt, deleteRecurringRule, pauseRecurringRule, reopenPersonalDebt, resumeRecurringRule, recurringHistory } from '@finanzapp/domain';
 import { changeEntry, createAccount, createEntry, importArchive, initializeDatabase, readArchive, readSnapshot, changeAccount,
   createTransfer, changeTransfer, saveRecurringRule, processRecurring, saveMonthlyBudget,
-  createCreditCard, saveCreditCard, createPersonalDebt, savePersonalDebt, deletePersonalDebt as removePersonalDebt, saveAccountAppearance, saveCategoryDefinition, DATABASE_VERSION, SCHEMA_SCRIPTS, type LedgerDatabase } from '../src/storage/database.ts';
+  createCreditCard, saveCreditCard, createPersonalDebt, savePersonalDebt, deletePersonalDebt as removePersonalDebt, saveAccountAppearance, saveCategoryDefinition, DATABASE_VERSION, NEWER_SCHEMA_MESSAGE, SCHEMA_SCRIPTS, type LedgerDatabase } from '../src/storage/database.ts';
+import { openFailureMessage } from '../src/storage/ledger-session.ts';
 import { MIGRATION_REFERENCES_MESSAGE, runExclusiveTransaction, runSchemaMigration, type TransactionConnection } from '../src/storage/transaction.ts';
 
 // Synthetic records in disposable databases only. Nothing seeds a user's app.
@@ -150,7 +151,9 @@ test('newer database schema is refused intact instead of reset or downgraded', a
   await initializeDatabase(db);
   await createAccount(db, account);
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION + 1}`);
-  await assert.rejects(initializeDatabase(db), /versión más nueva/);
+  const refused = await initializeDatabase(db).then(() => null, (cause: Error) => cause);
+  assert.equal(refused?.message, NEWER_SCHEMA_MESSAGE);
+  assert.equal(openFailureMessage(refused), NEWER_SCHEMA_MESSAGE, '25Q4: said as itself at launch');
   assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, DATABASE_VERSION + 1);
   assert.deepEqual((await readSnapshot(db)).accounts, [account]);
 });
@@ -879,7 +882,7 @@ test('editing and archiving a card is retry-safe, keeps its account and never ch
   await saveCreditCard(db, edited);
   await assert.rejects(saveCreditCard(db, { ...edited, accountId: account.id }), /no puede representar dos|cambió/);
   await assert.rejects(saveCreditCard(db, { ...card, dueDay: 12, revision: 5, updatedAt: changedAt }), /cambió/);
-  await assert.rejects(saveCreditCard(db, { ...edited, id: 'missing' }), /No encontramos/);
+  await assert.rejects(saveCreditCard(db, { ...edited, id: 'missing' }), /No se encontró/);
   const archived: CreditCardProfile = { ...edited, active: false, revision: 2, updatedAt: '2026-09-14T12:00:00.000Z' };
   await saveCreditCard(db, archived);
   const archive = await readArchive(db);
@@ -1635,8 +1638,8 @@ test('24B6: a new transfer never leaves a card or joins two obligations; card an
   const transfer = (id: string, fromAccountId: string, toAccountId: string, amountMinor = 1000): Transfer => ({ id, fromAccountId, toAccountId, amountMinor, note: id, dateISO: '2026-09-15', createdAt: account.createdAt });
   await assert.rejects(createTransfer(db, transfer('cash-advance', cardAccount.id, account.id)), /Una tarjeta se paga desde una cuenta; no puede ser el origen de una transferencia\./);
   await assert.rejects(createTransfer(db, transfer('card-to-debt', cardAccount.id, debtAccount.id)), /no puede ser el origen/);
-  await assert.rejects(createTransfer(db, transfer('debt-to-card', debtAccount.id, cardAccount.id)), /Una transferencia entre dos obligaciones no se puede registrar\./);
-  await assert.rejects(createTransfer(db, transfer('receivable-to-debt', receivableAccount.id, debtAccount.id)), /entre dos obligaciones/);
+  await assert.rejects(createTransfer(db, transfer('debt-to-card', debtAccount.id, cardAccount.id)), /Una transferencia entre dos tarjetas o deudas no se puede registrar\./);
+  await assert.rejects(createTransfer(db, transfer('receivable-to-debt', receivableAccount.id, debtAccount.id)), /entre dos tarjetas o deudas/);
   await createTransfer(db, transfer('card-payment', account.id, cardAccount.id, 15000));
   await createTransfer(db, transfer('debt-payment', account.id, debtAccount.id, 10000));
   await createTransfer(db, transfer('collection', receivableAccount.id, account.id, 5000));
@@ -1838,7 +1841,7 @@ test('25B2 close: deleting a debt or receivable, in storage: blocked with a bala
     assert.deepEqual(await rows(), before, 'no payment or collection is invented');
     assert.equal(debtOutstandingMinor(fresh, await readSnapshot(db)), 7000);
   }
-  await assert.rejects(removePersonalDebt(db, 'missing', now), /No encontramos esta deuda/);
+  await assert.rejects(removePersonalDebt(db, 'missing', now), /No se encontró esta deuda/);
   // The deletion records travel in the backup.
   const backup = createRecoveryBackup(await readArchive(db));
   assert.equal(parsePilotBackup(JSON.stringify(backup)).archive.debts!.filter(item => item.deleted).length, 4);

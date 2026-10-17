@@ -2,7 +2,6 @@ import { useMemo, useRef, useState } from 'react';
 import { Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
-import * as Haptics from 'expo-haptics';
 import { draftFitsCurrency, minorFromLedgerDraft, samePersonalDebtProfile, todayKey, validateAccount, validatePersonalDebtProfile,
   type Account, type Currency, type DebtDirection, type PersonalDebtProfile, LEDGER_CURRENCIES } from '@finanzapp/domain';
 import { useI18n } from '../i18n/provider';
@@ -12,6 +11,7 @@ import { CurrencySwitch } from './currency-switch';
 import { useDefaultCurrency } from './use-default-currency';
 import { offeredCurrencies } from './currencies';
 import { DateField } from './form-controls';
+import { errorHaptic, successHaptic, warningHaptic } from './motion';
 import { space } from './theme';
 
 type DueMode = 'none' | 'dated';
@@ -22,7 +22,7 @@ type PendingCreate = { account: Account; debt: PersonalDebtProfile };
  * Closing, reopening and deleting live on the debt's detail and its row (24UX4). */
 export function DebtForm({ original }: { original?: PersonalDebtProfile }) {
   const { snapshot, addDebt, saveDebt, gate = LEDGER_CURRENCIES } = useLedger();
-  const { t, locale } = useI18n();
+  const { t, locale, failureMessage } = useI18n();
   // 146 currencies since 24M: ordered and named once per gate and language, not on every keystroke.
   const offered = useMemo(() => offeredCurrencies(gate, locale), [gate, locale]);
   const account = snapshot?.accounts.find(item => item.id === original?.accountId);
@@ -61,6 +61,8 @@ export function DebtForm({ original }: { original?: PersonalDebtProfile }) {
   async function save() {
     if (saving.current || !snapshot) return;
     saving.current = true; setBusy(true); setError(null); Keyboard.dismiss();
+    // 25Q4: true once the write is sent: a failure after it taps Warning (frozen for the retry), before it Error.
+    let sent = false;
     try {
       if (before) {
         let submission = pendingEdit;
@@ -72,6 +74,7 @@ export function DebtForm({ original }: { original?: PersonalDebtProfile }) {
           validatePersonalDebtProfile(submission, snapshot.accounts);
           setPendingEdit(submission);
         }
+        sent = true;
         await saveDebt(submission);
       } else {
         let submission = pendingCreate;
@@ -92,12 +95,14 @@ export function DebtForm({ original }: { original?: PersonalDebtProfile }) {
           submission = { account: newAccount, debt };
           setPendingCreate(submission);
         }
+        sent = true;
         await addDebt(submission.account, submission.debt);
       }
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      successHaptic();
       saving.current = false; close();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'debts.form.saveFailed');
+      setError(failureMessage(cause, 'debts.form.saveFailed'));
+      if (sent) warningHaptic(); else errorHaptic();
     } finally { saving.current = false; setBusy(false); }
   }
 
@@ -128,17 +133,14 @@ export function DebtForm({ original }: { original?: PersonalDebtProfile }) {
         options={[{ value: 'none', label: t('debts.form.noDate') }, { value: 'dated', label: t('debts.form.dated') }]} />
     </View>
     {dueMode === 'dated' && <Surface grouped>
-      <DateField value={dueDate} onChange={setDueDate} disabled={locked} allowFuture label={t('debts.form.dueDate')} />
+      <DateField value={dueDate} onChange={setDueDate} disabled={locked} allowFuture label={t('debts.form.due')} />
     </Surface>}
 
     <Field label={t('debts.form.note')} value={note} onChangeText={setNote} maxLength={120} autoCapitalize="sentences" editable={!locked} />
 
-    <AppText secondary variant="footnote">
-      {t(owed ? 'debts.form.explainOwed' : 'debts.form.explainReceivable')}
-    </AppText>
     <ErrorMessage message={error} />
     {(pendingCreate || pendingEdit) && error && <AppText secondary variant="footnote">
-      {t('debts.form.frozenNote')}
+      {t('common.retryNote', { where: t('common.retryWhere.debts') })}
     </AppText>}
     <ActionButton label={error && (pendingCreate || pendingEdit) ? t('common.retrySave') : before ? t('common.saveChanges') : t('debts.form.create')}
       onPress={save} busy={busy} disabled={(before ? !counterparty.trim() : !counterparty.trim() || !amount.trim()) || !draftFitsCurrency(amount, currency).ok} />

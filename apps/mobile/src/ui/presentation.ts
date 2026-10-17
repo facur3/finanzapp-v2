@@ -4,6 +4,7 @@ import { CARD_DELETED_MESSAGE, OPERATION_ACCOUNT_DELETED_MESSAGE, OPERATION_CHAN
   type Transfer } from '@finanzapp/domain';
 import { dateFromISO, daysAgo, formatDate, relativeDayName } from '../i18n/format.ts';
 import { DEFAULT_LOCALE, type AppLocale } from '../i18n/locale.ts';
+import { VIEW_REFRESH_MESSAGE } from '../storage/ledger-session.ts';
 
 export type EntryFilter = 'all' | EntryKind | 'transfer';
 
@@ -126,9 +127,11 @@ export function historyCurrencies(accounts: Account[]): Currency[] {
 }
 
 export type ActivityItem = { type: 'entry'; key: string; value: Entry } | { type: 'transfer'; key: string; value: Transfer };
-/** `transferWord` is the word a transfer answers to in the interface language, besides the Spanish one. */
-export function selectTransfers(transfers: Transfer[], accounts: Account[], query = '', accountId?: string, transferWord = ''): Transfer[] {
-  const names = new Map(accounts.map(a => [a.id, a.name]));
+/** `transferWord` is the word a transfer answers to in the interface language, besides the Spanish one. `nameOf` is the
+ * name a row shows for each side (25T review: a debt's live counterparty, `useAccountNameOf`), so the search finds what is on screen. */
+export function selectTransfers(transfers: Transfer[], accounts: Account[], query = '', accountId?: string, transferWord = '',
+  nameOf: (account: Account) => string = account => account.name): Transfer[] {
+  const names = new Map(accounts.map(a => [a.id, nameOf(a)]));
   const terms = searchable(query).trim().split(/\s+/).filter(Boolean);
   return transfers.filter(t => (!accountId || t.fromAccountId === accountId || t.toAccountId === accountId)
     && terms.every(term => searchable(['transferencia', transferWord, t.note, names.get(t.fromAccountId), names.get(t.toAccountId)].join(' ')).includes(term)));
@@ -219,4 +222,11 @@ const DETERMINISTIC_REFUSALS = new Set<string>([PLAN_CALENDAR_MESSAGE, OPERATION
   ...operationGuardMessages()]);
 export function releasesDraft(message: string): boolean {
   return DETERMINISTIC_REFUSALS.has(message);
+}
+
+/** 25R1: the write committed and only the view could not be read again (the banner already says to verify before doing it
+ * again). An action that keeps nothing frozen for an exact retry (pause, delete, archive, a restore) is done: it never says
+ * it failed nor offers the same write again over a stale view. */
+export function committedBeforeRefresh(cause: unknown): boolean {
+  return cause instanceof Error && cause.message === VIEW_REFRESH_MESSAGE;
 }

@@ -79,7 +79,7 @@ export default function DebtDetailScreen() {
             icon="calendar-outline" last={!debt.note} />}
           {!!debt.note && <DetailRow label={t('debts.detail.note')} value={debt.note} last />}
         </Surface>}
-        <SectionTitle caption={t('debts.detail.explain')}>
+        <SectionTitle>
           {t(owed ? 'debts.detail.payments' : 'debts.detail.collections')}
         </SectionTitle>
       </View>}

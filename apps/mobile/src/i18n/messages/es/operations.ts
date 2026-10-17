@@ -43,8 +43,8 @@ export const operations = {
       helpDetail: 'Usá esta opción cuando un comercio te devuelve total o parcialmente una compra. Si recibiste un reintegro, cashback o promoción bancaria en una cuenta, registralo como ingreso en esa cuenta.',
       amount: 'Devolución',
       /** The shortcut that fills what can still be returned. */
-      available: 'Total disponible',
-      availableCaption: 'Disponible para devolver: {currency} {amount}',
+      available: 'Devolver todo',
+      availableCaption: 'Por devolver: {currency} {amount}',
       /** A plan returns its price only (A17). */
       availablePlanCaption: 'Hasta {currency} {amount}: el precio; el interés no se devuelve desde acá',
       account: 'Cuenta',
@@ -61,14 +61,13 @@ export const operations = {
       previewInterest: 'El interés de esas cuotas sigue como estaba.',
       /** A17: the price is all returned and financing is still scheduled. */
       previewFinancingStays: 'No queda precio por registrar, pero el interés y los cargos siguen. Si el emisor no los cobra, dejá de seguir el plan desde su detalle.',
-      save: 'Registrar devolución',
-      retryNote: 'Reintentá: se envía la misma devolución y no se registra dos veces.',
-      saveUnverified: 'No pudimos verificar la devolución. Reintentá: no se registra dos veces.',
+      save: 'Guardar devolución',
+      saveUnverified: 'No se pudo verificar la devolución.',
       nothingTitle: 'No queda nada por devolver',
       nothingEntry: 'Esta compra ya se devolvió entera. Sus devoluciones están en su detalle.',
       nothingPlan: 'El precio de este plan ya se devolvió o no tiene cuotas registradas ni por registrar.',
       blockedTitle: 'No se puede registrar una devolución',
-      notFoundTitle: 'No encontramos esta compra',
+      notFoundTitle: 'No se encontró esta compra',
       notFoundDetail: 'Volvé a Movimientos para ver lo que guardaste en este dispositivo.',
     },
     /** The read-only detail of a devolución or an adelanto (`/operation/[id]`). */
@@ -115,7 +114,7 @@ export const operations = {
       /** Why the action is not offered (the domain's reason follows). */
       blockedTitle: 'No se puede deshacer ahora',
       blockedRestoreTitle: 'No se puede restaurar ahora',
-      notFoundTitle: 'No encontramos esta operación',
+      notFoundTitle: 'No se encontró esta operación',
       notFoundDetail: 'Volvé a Movimientos para ver lo que guardaste en este dispositivo.',
     },
     /** The confirmation of an undo or a restore (named from the dry run's outcome). */
@@ -140,11 +139,11 @@ export const operations = {
       restoreEntryRefund: 'Vuelve a acreditar {amount} en {account} con fecha {date}.',
       restorePlanRefund: 'Vuelve a devolver {amount} del precio con fecha {date}, como cuando se registró.',
       restorePayoff: 'Las cuotas vuelven a contar con fecha {date} ({amount} de precio).',
-      voidEffect: 'Podés restaurarla después desde Movimientos deshechos.',
-      voidPayoffEffect: 'Podés restaurarlo después desde Movimientos deshechos mientras ninguna cuota se registre.',
+      voidEffect: 'Podés restaurarla después desde Movimientos deshechos, en Movimientos.',
+      voidPayoffEffect: 'Podés restaurarlo después desde Movimientos deshechos, en Movimientos, mientras ninguna cuota se registre.',
       void: 'Deshacer',
       restore: 'Restaurar',
-      failed: 'No pudimos verificar el cambio. Reintentá: no se aplica dos veces.',
+      failed: 'No se pudo verificar el cambio. Reintentá: no se aplica dos veces.',
     },
     /** The movement detail of an ordinary purchase. */
     entry: {

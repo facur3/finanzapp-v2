@@ -12,7 +12,7 @@ import { bindLocale } from '../src/i18n/bind.ts';
 import { REGIONS, composeLocale, type RegionCode } from '../src/i18n/locale.ts';
 import { changeEntry, createAccount, createCreditCard, createEntry, createPersonalDebt, createTransfer, importArchive, initializeDatabase, processRecurring, readArchive,
   readSnapshot, saveMonthlyBudget, saveRecurringRule, type LedgerDatabase } from '../src/storage/database.ts';
-import { PREVIEW_CURRENCIES } from '../src/storage/currency-gate.ts';
+import { PREVIEW_CURRENCIES, currencyGateForBuild } from '../src/storage/currency-gate.ts';
 import { runExclusiveTransaction, runSchemaMigration, type TransactionConnection } from '../src/storage/transaction.ts';
 import { AmountInput, readPastedAmount } from '../src/ui/money-input.ts';
 import { offeredCurrencies } from '../src/ui/currencies.ts';
@@ -210,4 +210,13 @@ test('the chooser order: ARS and USD first, then by the name in the interface la
   assert.equal(es.indexOf('EUR') < es.indexOf('GBP'), true, 'Euros before Libras esterlinas');
   assert.equal(en.indexOf('GBP') < en.indexOf('EUR'), true, 'British Pound before Euro');
   assert.equal(offeredCurrencies(PREVIEW_CURRENCIES, 'es-AR').length, 153);
+});
+
+test('25R1: while the three-decimal gate is held, no form of a release build offers KWD or any other held currency, whatever the flag says', () => {
+  for (const [flag, development] of [[undefined, false], ['1', false], [undefined, true]] as const) {
+    const offered = offeredCurrencies(currencyGateForBuild(flag, development), 'es-AR');
+    assert.equal(offered.includes('KWD' as never), false, JSON.stringify([flag, development]));
+    assert.deepEqual(offered.filter(code => Object.hasOwn(HELD_CURRENCIES, code)), [], 'no held currency offered');
+  }
+  assert.ok(offeredCurrencies(currencyGateForBuild('1', true), 'es-AR').includes('KWD' as never), 'only a development bundle started with the flag previews it');
 });

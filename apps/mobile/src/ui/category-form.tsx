@@ -1,13 +1,13 @@
 import { useRef, useState } from 'react';
 import { Alert, Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import { assertCategoryName, categoryNameTaken, editedCategoryDefinition, newCategoryDefinition, sameCategoryDefinition, validateCategoryDefinition,
   validateCategoryDefinitions, type CategoryDefinition, type CategoryIdentity, type EntryKind } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { CATEGORY_ICON_CHOICES, COLOR_CHOICES, identityGlyph, localizedCategoryLabel } from './appearance';
 import { IconColorPicker } from './appearance-picker';
 import { ActionButton, AppText, Choices, ErrorMessage, Field, FieldNote, IconButton, LifecycleNote, Screen } from './components';
+import { errorHaptic, successHaptic, warningHaptic } from './motion';
 import { space } from './theme';
 import { useI18n } from '../i18n/provider';
 
@@ -33,7 +33,7 @@ function prefillIcon(identity: CategoryIdentity | undefined): CategoryDefinition
  * a name the person actually typed becomes one. */
 export function CategoryForm({ original, kind: requestedKind }: { original?: CategoryIdentity; kind?: string }) {
   const { archive, saveCategory } = useLedger();
-  const { t, language } = useI18n();
+  const { t, language, failureMessage } = useI18n();
   const definitions = archive?.categories ?? [];
   const [before] = useState(original);
   // The name this identity shows now, and the one the field was prefilled with (the language may change while the form is open).
@@ -61,10 +61,12 @@ export function CategoryForm({ original, kind: requestedKind }: { original?: Cat
     Keyboard.dismiss();
     try {
       await saveCategory(definition);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      successHaptic();
       saving.current = false; close();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'categoryManager.form.saveUnverified');
+      setError(failureMessage(cause, 'categoryManager.form.saveUnverified'));
+      // 25Q4: the definition was sent and stays frozen for the exact retry (the name rules were checked before it froze).
+      warningHaptic();
     } finally { saving.current = false; setBusy(false); }
   }
   /** 24UX6E: the two name rules storage applies (saveCategoryDefinition), checked here first so a clash is an editable
@@ -94,7 +96,11 @@ export function CategoryForm({ original, kind: requestedKind }: { original?: Cat
       validateCategoryDefinition(definition);
       checkStorageRules(definition);
       void apply(definition);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'categoryManager.form.checkName'); }
+    } catch (cause) {
+      setError(failureMessage(cause, 'categoryManager.form.checkName'));
+      // 25Q4: refused before anything was sent.
+      errorHaptic();
+    }
   }
   function toggleArchive() {
     if (!before || saving.current || confirming.current) return;
@@ -105,13 +111,14 @@ export function CategoryForm({ original, kind: requestedKind }: { original?: Cat
     setError(null);
     try { checkStorageRules(definition); } catch (cause) {
       confirming.current = false;
-      setError(cause instanceof Error ? cause.message : 'categoryManager.form.checkName');
+      setError(failureMessage(cause, 'categoryManager.form.checkName'));
+      errorHaptic();
       return;
     }
     Alert.alert(t(archiving ? 'categoryManager.form.archiveTitle' : 'categoryManager.form.unarchiveTitle'),
       t(archiving ? 'categoryManager.form.archiveMessage' : 'categoryManager.form.unarchiveMessage', { name: shown }), [
       { text: t('common.cancel'), style: 'cancel', onPress: () => { confirming.current = false; } },
-      { text: t(archiving ? 'categoryManager.form.archiveConfirm' : 'categoryManager.form.unarchiveConfirm'), style: archiving ? 'destructive' : 'default', onPress: () => { confirming.current = false; void apply(definition); } },
+      { text: t(archiving ? 'categoryManager.form.archiveConfirm' : 'categoryManager.form.unarchiveConfirm'), style: 'default', onPress: () => { confirming.current = false; void apply(definition); } }, // reversible: never red
     ], { cancelable: true, onDismiss: () => { confirming.current = false; } });
   }
   const renamed = !!before && storedName(label.trim()) !== before.storedLabel;
@@ -128,10 +135,9 @@ export function CategoryForm({ original, kind: requestedKind }: { original?: Cat
     {renamed && <FieldNote>{t('categoryManager.form.renamedNote', { stored: before.storedLabel, shown: label.trim() || before.storedLabel })}</FieldNote>}
     <IconColorPicker icons={CATEGORY_ICON_CHOICES} colors={COLOR_CHOICES} icon={icon} color={color}
       onIconChange={setIcon} onColorChange={setColor} disabled={locked} previewLabel={label} />
-    {before && <AppText secondary variant="footnote">{t('categoryManager.form.editNote')}</AppText>}
     {!before && <AppText secondary variant="footnote">{t(kind === 'expense' ? 'categoryManager.form.availableExpense' : 'categoryManager.form.availableIncome')}</AppText>}
     <ErrorMessage message={error} />
-    {pending && error && <AppText secondary variant="footnote">{t('categoryManager.form.retryNote')}</AppText>}
+    {pending && error && <AppText secondary variant="footnote">{t('common.retryNote', { where: t('common.retryWhere.categories') })}</AppText>}
     <View style={{ gap: 10 }}>
       <ActionButton label={t(pending && error ? 'common.retrySave' : before ? 'common.saveChanges' : 'categoryManager.form.create')} onPress={save} busy={busy} disabled={!label.trim()} />
       {before && <ActionButton label={t(before.archived ? 'categoryManager.form.unarchive' : 'categoryManager.form.archive')} icon={before.archived ? 'arrow-redo-outline' : 'archive-outline'}

@@ -2,8 +2,11 @@ import { FlatList, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo } from 'react';
 import { isStorableCurrency, shiftMonthISO, spendingComparison, type CategoryChange, type ReportPeriod } from '@finanzapp/domain';
+import { useLedger } from '../src/storage/LedgerProvider';
 import { useFinanceView } from '../src/fx/rates-provider';
-import { AppText, DetailRow, EmptyState, Money, Screen, SectionTitle, Surface } from '../src/ui/components';
+import { spendingFigure } from '../src/fx/finance-view';
+import { shortfallDetail } from '../src/fx/fx-copy';
+import { AppText, DetailRow, EmptyState, InfoButton, Money, Screen, SectionTitle, Surface } from '../src/ui/components';
 import { useCategoryLookOf } from '../src/ui/category-hues';
 import { changePercent, dateRangeLabel, requestedReportMonth, strictReportSelection } from '../src/ui/report-presentation';
 import { useI18n } from '../src/i18n/provider';
@@ -11,20 +14,29 @@ import { useCurrentDay, usePalette } from '../src/ui/theme';
 
 export default function ReportComparisonScreen() {
   const params = useLocalSearchParams<{ currency?: string; month?: string }>();
+  const { snapshot: real } = useLedger();
   const lookOf = useCategoryLookOf('expense');
   const today = useCurrentDay(), p = usePalette();
-  const { t, locale, codedAmount, spokenAmount } = useI18n();
+  const { t, locale, codedAmount, spokenAmount, formatNumericDate, currencyName } = useI18n();
   // 24C1: both months as Reportes counts them (converted in consolidated mode, each movement at its own day's rate).
   const month = requestedReportMonth(params.month, today);
   const months = useMemo(() => [shiftMonthISO(month, -1), month], [month]);
   const view = useFinanceView(months, isStorableCurrency(params.currency) ? params.currency : undefined);
   const snapshot = view?.snapshot;
-  if (!snapshot || !view) return null;
+  if (!snapshot || !view || !real) return null;
   // A drill-down never falls back to another currency: an unknown or unheld code is an invalid link.
   const selection = strictReportSelection(snapshot, params.currency, params.month, today);
   if (!selection) return <Screen><EmptyState title={t('reports.comparison.invalidTitle')} detail={t('reports.comparison.invalidDetail')} /></Screen>;
-  // Two months compared only when every expense in both had a rate; otherwise no difference is claimed.
-  if (!view.complete(months[0] + '-01', month === today.slice(0, 7) ? today : month + '-31', 'expense')) return <Screen><EmptyState title={t('fx.infoTitle')} detail={t('fx.unavailable', { currency: selection.currency })} /></Screen>;
+  // Two months compared only when every expense in both had a rate; otherwise no difference is claimed. 25R1: and the screen
+  // says why, as Reportes does: still arriving, offline, the provider, or no rate published.
+  const span = { startISO: months[0] + '-01', endISO: month === today.slice(0, 7) ? today : month + '-31' };
+  if (!view.complete(span.startISO, span.endISO, 'expense')) {
+    const figure = spendingFigure(real, view, span, view.activity, view.loaded);
+    const reason = figure.status === 'unavailable' ? figure.reason : 'missing';
+    return <Screen><EmptyState title={t('fx.infoTitle')} icon={reason === 'offline' ? 'cloud-offline-outline' : undefined}
+      detail={reason === 'fetching' ? t('fx.fetching') : figure.status === 'unavailable' ? shortfallDetail(figure, { t, date: formatNumericDate, currencyName })
+        : t('fx.unavailable', { currency: selection.currency })} /></Screen>;
+  }
   const comparison = spendingComparison(snapshot, selection.currency, selection.monthISO, today);
   const { current, previous, deltaMinor } = comparison;
   const amount = (minor: number) => codedAmount(minor, selection.currency);
@@ -36,7 +48,11 @@ export default function ReportComparisonScreen() {
     style={{ flex: 1, backgroundColor: p.background }} contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: 40 }}
     contentInsetAdjustmentBehavior="automatic" removeClippedSubviews={false}
     ListHeaderComponent={<View style={{ gap: 20 }}>
-      <AppText secondary>{t(comparison.mode === 'matching-days' ? 'reports.comparison.matchingDays' : 'reports.comparison.fullMonths')}</AppText>
+      {/* What the comparison counts sits behind ⓘ, as on Reportes («Menos texto»), never as a standing footer. */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+        <AppText secondary style={{ flexShrink: 1 }}>{t(comparison.mode === 'matching-days' ? 'reports.comparison.matchingDays' : 'reports.comparison.fullMonths')}</AppText>
+        <InfoButton title={t('reports.method.title')} detail={t(view.mode === 'consolidated' ? 'fx.comparisonFooter' : 'reports.comparison.footer', { currency: selection.currency })} />
+      </View>
       {comparison.capped && <AppText secondary>{t('reports.comparison.capped', { day: Number(current.endISO.slice(-2)) })}</AppText>}
       {comparison.status === 'out-of-range' ? <EmptyState title={t('reports.outOfRangeTitle')} detail={t('reports.comparison.outOfRangeDetail')} /> : <>
         {comparison.status === 'ready' && deltaMinor !== null && previous?.status === 'ready' && <View style={{ gap: 10 }}>
@@ -58,12 +74,15 @@ export default function ReportComparisonScreen() {
     // 24T3 (A23): a side opens its drill-down when it has lines: purchases, or devoluciones alone (a count of 0 with a net).
     renderItem={({ item }) => <Surface grouped>
       <View style={{ padding: 16, gap: 6 }}>
-        <AppText style={{ fontWeight: '600', fontSize: 17 }}>{lookOf(item.category).label}</AppText>
+        <AppText style={{ fontWeight: '600' }}>{lookOf(item.category).label}</AppText>
         <AppText secondary>{item.deltaMinor === 0 ? t('reports.comparison.noChange')
           : t(item.deltaMinor > 0 ? 'reports.comparison.amountMore' : 'reports.comparison.amountLess', { amount: amount(Math.abs(item.deltaMinor)) })}</AppText>
       </View>
-      <DetailRow label={t('reports.comparison.thisPeriod')} value={amount(item.currentMinor)} spokenValue={spoken(item.currentMinor)} onPress={item.currentCount || item.currentMinor ? () => openCategory(current, item.key) : undefined} />
-      <DetailRow label={t('reports.comparison.previous')} value={amount(item.previousMinor)} spokenValue={spoken(item.previousMinor)} last onPress={(item.previousCount || item.previousMinor) && previous ? () => openCategory(previous, item.key) : undefined} />
-    </Surface>}
-    ListFooterComponent={<AppText secondary style={{ fontSize: 12, lineHeight: 18 }}>{t(view.mode === 'consolidated' ? 'fx.comparisonFooter' : 'reports.comparison.footer', { currency: selection.currency })}</AppText>} />;
+      {/* 25D2: out of reading order (the rotor's Buttons, Voice Control) «Este período» alone was a dozen identical names:
+          each row says its category and where it leads. */}
+      <DetailRow label={t('reports.comparison.thisPeriod')} spokenLabel={t('reports.comparison.rowSpoken', { category: lookOf(item.category).label, period: t('reports.comparison.thisPeriod') })}
+        hint={t('reports.comparison.openHint')} value={amount(item.currentMinor)} spokenValue={spoken(item.currentMinor)} onPress={item.currentCount || item.currentMinor ? () => openCategory(current, item.key) : undefined} />
+      <DetailRow label={t('reports.comparison.previous')} spokenLabel={t('reports.comparison.rowSpoken', { category: lookOf(item.category).label, period: t('reports.comparison.previous') })}
+        hint={t('reports.comparison.openHint')} value={amount(item.previousMinor)} spokenValue={spoken(item.previousMinor)} last onPress={(item.previousCount || item.previousMinor) && previous ? () => openCategory(previous, item.key) : undefined} />
+    </Surface>} />;
 }

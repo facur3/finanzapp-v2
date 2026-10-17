@@ -116,7 +116,7 @@ export const PLAN_HISTORY_MESSAGE = 'Este plan ya registró cuotas. Dejá de seg
 /** 24T3 (A27): no «ajuste» exists; what changes a plan's money is a devolución or an adelanto, each an operation of its own. */
 export const PLAN_CHANGE_MESSAGE = 'Un plan de cuotas no cambia su precio, sus cuotas ni sus fechas. Una devolución o un adelanto de cuotas se registra desde el plan.';
 export const PLAN_EXISTS_MESSAGE = 'Este plan de cuotas ya existe con otros datos. Volvé a abrir el formulario.';
-export const PLAN_MISSING_MESSAGE = 'No encontramos este plan de cuotas.';
+export const PLAN_MISSING_MESSAGE = 'No se encontró este plan de cuotas.';
 export const PLAN_DELETE_PATH_MESSAGE = 'Un plan de cuotas deja de seguirse o se elimina con su propia acción, no con un cambio de datos.';
 export const INSTALLMENT_ENTRY_MESSAGE = 'El importe, la fecha y la tarjeta de una cuota no se editan. Una devolución o un adelanto de cuotas se registra desde su plan.';
 export const INSTALLMENT_ID_MESSAGE = 'Un movimiento nuevo no puede usar el identificador de una cuota.';

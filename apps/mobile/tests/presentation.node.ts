@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { Account, Entry, Transfer } from '@finanzapp/domain';
 import { availableCurrencies, historyCurrencies, groupEntries, initialAccountId, selectEntries, selectTransfers, mergeActivity, groupActivity, activityDateLabel, dayNetMinor, homeNamesCategory, sharedGlyphs, visibleNamesAccount } from '../src/ui/presentation.ts';
+import { accountDisplayName } from '../src/ui/liability-presentation.ts';
 
 // Synthetic fixtures only; never loaded by the app or stored in a user database.
 const accounts: Account[] = [
@@ -25,6 +26,17 @@ test('transfers match both account sides and all search terms without modifying 
   assert.equal(mixed[0].value.dateISO, '2026-09-12');
   assert.deepEqual(groupActivity(mixed).flatMap(s => s.data), mixed);
   assert.equal(entries[0], base);
+});
+
+test('25T review: a transfer is searched by the name its row shows: a renamed debt\'s counterparty («Pérez»), through `nameOf`', () => {
+  const owed: Account = { id: 'owed', name: 'Debo · Juan', currency: 'ARS', openingMinor: 0, createdAt: base.createdAt };
+  const debts = [{ id: 'd', accountId: owed.id, direction: 'owed_by_me', counterparty: 'Juan Pérez', dueDateISO: null, note: '', active: true, deleted: false,
+    createdAt: base.createdAt, revision: 1, updatedAt: base.createdAt }] as Parameters<typeof accountDisplayName>[1];
+  const payment: Transfer = { id: 'p', fromAccountId: 'ars', toAccountId: owed.id, amountMinor: 1, note: '', dateISO: base.dateISO, createdAt: base.createdAt };
+  const all = [...accounts, owed];
+  assert.deepEqual(selectTransfers([payment], all, 'pérez', undefined, '', account => accountDisplayName(account, debts)), [payment]);
+  assert.deepEqual(selectTransfers([payment], all, 'debo juan', undefined, '', account => accountDisplayName(account, debts)), [payment], 'the prefix still answers');
+  assert.deepEqual(selectTransfers([payment], all, 'pérez'), [], 'without `nameOf`, the stored names');
 });
 
 test('activity is newest first without changing the stored entries', () => {

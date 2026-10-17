@@ -6,7 +6,7 @@ export const navigation = {
       home: 'Inicio',
       activity: 'Movimientos',
       reports: 'Reportes',
-      more: 'Más',
+      finances: 'Finanzas',
     },
     /** What VoiceOver hears for a tab of the floating bar (24UX6A): its name, that it is a tab, and where it sits («Inicio, pestaña, 1 de 4»; the «+» beside the tabs is not one). */
     tabPosition: '{name}, pestaña, {index} de {count}',
@@ -20,6 +20,10 @@ export const navigation = {
       accounts: 'Cuentas',
       entry: 'Movimiento',
       undoneEntries: 'Movimientos deshechos',
+      settings: 'Ajustes',
+      licenses: 'Licencias',
+      /** 25N1: one notice; the screen replaces it with the notice's name. */
+      license: 'Licencia',
       language: 'Idioma',
       region: 'Región',
       appearance: 'Apariencia',
@@ -46,7 +50,7 @@ export const navigation = {
       newEntry: 'Nuevo movimiento',
       editEntry: 'Editar movimiento',
       editAccount: 'Editar cuenta',
-      newTransfer: 'Entre mis cuentas',
+      newTransfer: 'Registrar transferencia',
       newRecurring: 'Nuevo recurrente',
       editRecurring: 'Editar recurrente',
       newBudget: 'Nuevo presupuesto',
@@ -62,19 +66,19 @@ export const navigation = {
     },
     /** 25Q3: an unknown link: never Expo's English developer screen. */
     notFound: {
-      title: 'No encontramos esa pantalla',
+      title: 'No se encontró esa pantalla',
       detail: 'El enlace no lleva a ninguna pantalla de FinanzApp.',
       action: 'Ir a Inicio',
     },
     /** 25Q3: a screen that failed to draw. It promises only what a drawing error cannot touch: what was already saved. */
     screenFailure: {
-      title: 'No pudimos mostrar esta pantalla',
+      title: 'No se pudo mostrar esta pantalla',
       detail: 'Lo que ya guardaste sigue ahí. Podés volver atrás o abrir otra pestaña.',
     },
   },
   /** The screen shown while the ledger and the fonts open, or when they cannot. */
   boot: {
-    openFailed: 'No pudimos abrir FinanzApp',
+    openFailed: 'No se pudo abrir FinanzApp',
     resourcesFailed: 'No se pudieron cargar los recursos. Cerrá y abrí la app. Tus datos siguen guardados.',
     retry: 'Volver a intentar',
     opening: 'Abriendo tus datos',

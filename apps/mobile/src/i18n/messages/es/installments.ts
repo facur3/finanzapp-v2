@@ -100,7 +100,7 @@ export const installments = {
       /** Before the stop, storage records the instalments whose statement already closed (24T3, M3); the alert names them. */
       stopCatchUp: { one: 'Antes se registra la cuota {numbers}, que ya cerró ({amount}).', other: 'Antes se registran las cuotas {numbers}, que ya cerraron ({amount}).' },
       stopConfirm: 'Dejar de seguir',
-      stopFailed: 'No pudimos dejar de seguir el plan. Sigue como estaba; reintentá.',
+      stopFailed: 'No se pudo dejar de seguir el plan. Sigue como estaba; reintentá.',
       reactivate: 'Reactivar plan',
       reactivateTitle: '¿Reactivar este plan?',
       reactivateDetail: 'Sus cuotas vuelven a registrarse cuando cierra cada resumen.',
@@ -108,7 +108,7 @@ export const installments = {
       reactivateCatchUp: { one: 'La cuota {numbers} cerró mientras no se seguía: se registra ahora por {amount}, con la fecha de su cierre ({dates}).',
         other: 'Las cuotas {numbers} cerraron mientras no se seguía: se registran ahora por {amount}, con la fecha de sus cierres ({dates}).' },
       reactivateConfirm: 'Reactivar',
-      reactivateFailed: 'No pudimos reactivar el plan. Sigue como estaba; reintentá.',
+      reactivateFailed: 'No se pudo reactivar el plan. Sigue como estaba; reintentá.',
       /** A span of closing dates: «28 oct 2026 a 28 dic 2026». Instalment numbers are written as runs («7–9», `numberRanges`). */
       datesRange: '{from} a {to}',
       /** The one lifecycle action of 24T2: a plan that recorded nothing yet (created by mistake). */
@@ -116,8 +116,8 @@ export const installments = {
       deleteTitle: '¿Eliminar este plan de cuotas?',
       deleteDetail: 'Todavía no registró ninguna cuota. Se elimina el plan y ningún saldo cambia.',
       deleteConfirm: 'Eliminar',
-      deleteFailed: 'No pudimos eliminar el plan. Sigue como estaba; reintentá.',
-      notFoundTitle: 'No encontramos este plan de cuotas',
+      deleteFailed: 'No se pudo eliminar el plan. Sigue como estaba; reintentá.',
+      notFoundTitle: 'No se encontró este plan de cuotas',
       notFoundDetail: 'Volvé a la tarjeta para ver sus planes guardados en este dispositivo.',
     },
     /** One instalment of the plan detail's Calendario. */
@@ -179,9 +179,8 @@ export const installments = {
       sentence: 'FinanzApp registra con fecha {date} las cuotas que faltaban ({amount}) en el saldo pendiente de la tarjeta. El pago a la tarjeta se registra aparte, con Pagar tarjeta.',
       undone: { one: 'La cuota {numbers} está deshecha: no se adelanta y sigue pendiente en el plan.',
         other: 'Las cuotas {numbers} están deshechas: no se adelantan y siguen pendientes en el plan.' },
-      save: 'Registrar adelanto',
-      retryNote: 'Conservamos el envío: Reintentar nunca registra el adelanto dos veces. Para cambiarlo, cerrá y revisá primero el plan.',
-      saveFailed: 'No pudimos confirmar el adelanto. Reintentá; nunca se registra dos veces.',
+      save: 'Guardar adelanto',
+      saveFailed: 'No se pudo confirmar el adelanto.',
       unavailableTitle: 'No hay cuotas para adelantar',
       doneTitle: 'Adelanto registrado',
       doneDetail: 'Las cuotas que faltaban ya están en el saldo pendiente de {card}. Cuando pagues la tarjeta, registralo con Pagar tarjeta.',

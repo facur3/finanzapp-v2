@@ -14,8 +14,8 @@ export const budgets = {
       backToCurrent: 'Volver al mes actual',
       thisMonth: 'Este mes',
       emptyTitle: 'Dale un límite a tu mes',
-      emptyDetail: 'Un techo para todos tus gastos del mes y, si querés, límites por categoría dentro de él. Se comparan con los gastos que registrás.',
-      create: 'Crear presupuesto',
+      emptyDetail: 'Un techo para todos tus gastos del mes y, si querés, límites por categoría dentro de él.',
+      create: 'Agregar presupuesto',
       general: 'Presupuesto general',
       /** Section action beside "Presupuesto general". */
       edit: 'Editar',
@@ -26,7 +26,7 @@ export const budgets = {
       noSublimits: 'Sin límites por categoría este mes.',
       unbudgeted: 'Además gastaste {amount} en categorías sin límite propio.',
       /** 24UX6E: the month's summary could not be computed (its recorded spending leaves the safe range). */
-      unavailableTitle: 'No pudimos calcular este mes',
+      unavailableTitle: 'No se pudo calcular este mes',
       unavailableDetail: 'Tus presupuestos y movimientos siguen guardados.',
       /** 25Q1: a budget in a currency no account ever held: its spent figure is no data. «{currency}» is the plural unit («euros»). */
       noAccountsInCurrency: 'Todavía no tenés cuentas en {currency}, así que no hay gastos para comparar con este presupuesto.',
@@ -43,12 +43,14 @@ export const budgets = {
       label: 'Presupuesto general: {spent} de {limit}, {percent} por ciento usado. {status}',
       exceededBy: 'Excedido por {amount}',
       reached: 'Límite alcanzado',
-      availableAmount: 'Disponible {amount}',
+      availableAmount: 'Quedan {amount}',
+      /** 25D2: VoiceOver's status of the general budget in the amber state (85 % or more, not yet reached). */
+      nearAvailable: 'Cerca del límite. Quedan {amount}',
       /** 24T3 (A24): the month nets below zero (devoluciones): what is left is shown at the limit, never above it. */
-      refundsAvailable: 'Disponible {amount}. Las devoluciones superan lo gastado',
+      refundsAvailable: 'Quedan {amount}. Las devoluciones superan lo gastado',
       refundsExceed: 'Las devoluciones superan lo gastado',
       exceeded: 'Excedido',
-      available: 'Disponible',
+      available: 'Queda',
       spent: 'Gastado',
       limit: 'Límite',
       /** {percent} is already formatted («60 %», 24UX6E: the string Inicio shows). */
@@ -64,6 +66,8 @@ export const budgets = {
       exceededBy: 'Excedido por {amount}',
       reached: 'Límite alcanzado',
       left: 'Quedan {amount}',
+      /** 25D2: VoiceOver's status of a sublimit in the amber state (85 % or more, not yet reached). */
+      nearLeft: 'Cerca del límite. Quedan {amount}',
       /** 24UX6E: the row's one quiet line under its bar. */
       leftOf: 'Quedan {amount} de {limit}',
       overOf: '{amount} por encima de {limit}',
@@ -80,20 +84,25 @@ export const budgets = {
       scopeGeneral: 'General',
       scopeCategory: 'Por categoría',
       amount: 'Presupuesto',
-      generalNote: 'Es el techo de todos los gastos registrados del mes en esta moneda. No cuenta ingresos, transferencias ni pagos de tarjeta; una compra con tarjeta cuenta una sola vez. Las devoluciones restan en su mes.',
-      categoryNote: 'Se compara con los gastos registrados en esta categoría durante ese mes. Es un sublímite: no se suma al presupuesto general. Las devoluciones restan en su mes y su categoría.',
-      retryNote: 'El envío quedó congelado para que Reintentar no cree otro presupuesto.',
-      create: 'Crear presupuesto',
+      generalNote: 'Techo de todos los gastos del mes en esta moneda.',
+      categoryNote: 'Un límite dentro del presupuesto general.',
+      /** The help behind the note's information button: what the budget counts. */
+      noteHelpTitle: 'Qué se compara',
+      generalHelp: 'Es el techo de todos los gastos registrados del mes en esta moneda. No cuenta ingresos, transferencias ni pagos de tarjeta; una compra con tarjeta cuenta una sola vez. Las devoluciones restan en su mes.',
+      categoryHelp: 'Se compara con los gastos registrados en esta categoría durante ese mes. Es un sublímite: no se suma al presupuesto general. Las devoluciones restan en su mes y su categoría.',
+      create: 'Guardar presupuesto',
+      /** Under the refusal of a budget that already exists: where to change it. */
+      takenHint: 'Para cambiarlo, tocalo en Presupuestos.',
       delete: 'Eliminar presupuesto',
       retryDelete: 'Reintentar eliminación',
       deleteTitle: '¿Eliminar este presupuesto?',
       deleteMessage: 'Se deja de usar para este mes. Tus gastos y movimientos no se modifican.',
       deleteConfirm: 'Eliminar',
-      saveFailed: 'No pudimos guardar el presupuesto. Reintentá con el mismo envío.',
-      deleteFailed: 'No pudimos eliminar el presupuesto. Reintentá el mismo cambio.',
+      saveFailed: 'No se pudo guardar el presupuesto.',
+      deleteFailed: 'No se pudo eliminar el presupuesto. Reintentá el mismo cambio.',
     },
     edit: {
-      notFoundTitle: 'No encontramos este presupuesto',
+      notFoundTitle: 'No se encontró este presupuesto',
       notFoundDetail: 'Volvé a Presupuestos para elegir uno activo guardado en este dispositivo.',
     },
   },

@@ -5,11 +5,11 @@ import type { Account, Entry } from '@finanzapp/domain';
 import { REASON_TEXT, SUGGESTIONS, answerContent, categoryOptions, classifyIntent, completeDraft, contentFromResult, conversationReducer,
   emptyConversation, evidenceLabel, optionText, ownsPending, resolveDraft, shouldAutoscroll, type ConversationState } from '../src/assistant/conversation.ts';
 import { FACT_LABELS, monthlyEvidence } from '../src/integrations/evidence.ts';
-import { integrationClient } from '../src/integrations/client.ts';
+import { integrationClient, withoutInvisibles } from '../src/integrations/client.ts';
 import { translator } from '../src/i18n/messages.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 import { assistantForEnvironment, disconnectedAssistant, failureMessage, failureReason, remoteAssistant, type AssistantEvent } from '../src/assistant/client.ts';
-import { PROTOCOL_LIMITS, validateAssistantRequest, validateAssistantResultV2, type AssistantRequestV3 } from '../../../packages/integrations/assistant-protocol.js';
+import { PROTOCOL_LIMITS, isSafeInputText, isSafeModelText, validateAssistantRequest, validateAssistantResultV2, type AssistantRequestV3 } from '../../../packages/integrations/assistant-protocol.js';
 import type { DraftInput } from '../src/assistant/conversation.ts';
 import { assistantForBuild } from '../src/assistant/runtime.ts';
 import { FIXTURE_ANSWER, FIXTURE_CATEGORY_ANSWER, FIXTURE_CLARIFICATION, FIXTURE_DRAFT, FIXTURE_DRAFT_DROPPED, FIXTURE_DRAFT_NO_ACCOUNT, FIXTURE_FACTS, FIXTURE_OUT_OF_SCOPE,
@@ -50,8 +50,10 @@ test('send adds the user message, clears the composer and enters thinking; a bla
   const composed = run([{ type: 'compose', text: '  ' }, { type: 'send', text: '  ' }]);
   assert.equal(composed.messages.length, 0);
   const sent = run([{ type: 'compose', text: 'Gasté 18.500 en Carrefour' }, { type: 'send', text: 'Gasté 18.500 en Carrefour' }]);
-  assert.equal(sent.messages.length, 1);
+  assert.equal(sent.messages.length, 2);
   assert.equal(sent.messages[0].role, 'user');
+  // The reply's place is taken at once: an empty streaming message the screen draws as «Pensando…».
+  assert.deepEqual(sent.messages[1], { id: 'a-2', role: 'assistant', status: 'streaming', text: '', content: null });
   assert.equal(sent.composer, '');
   assert.equal(sent.phase, 'thinking');
   // A second send while the first is in flight does nothing.
@@ -74,9 +76,21 @@ test('streaming grows one assistant message in place, the answer finalizes it an
   assert.equal(stopped.phase, 'idle');
   assert.equal(stopped.messages[1].role === 'assistant' && stopped.messages[1].status, 'stopped');
   assert.equal(stopped.messages[1].text, 'Gastaste $84.300 más');
-  // Stopping before any token arrived leaves no empty bubble behind.
+  // A reply in English stopped mid-stream keeps its language (the place `send` took has none; the first word gives it), so
+  // VoiceOver reads it in English, never with the interface voice.
+  const english = run([{ type: 'send', text: 'Why did I spend more?' }, { type: 'delta', text: 'You spent', language: 'en' }, { type: 'delta', text: ' more', language: 'en' }, { type: 'stop' }]);
+  assert.deepEqual([english.messages[1].role === 'assistant' && english.messages[1].status, english.messages[1].role === 'assistant' && english.messages[1].language], ['stopped', 'en']);
+  // Stopping before any token arrived leaves no empty bubble and no orphaned question: the words go back to the composer.
   const early = run([{ type: 'send', text: 'hola' }, { type: 'stop' }]);
-  assert.equal(early.messages.length, 1);
+  assert.equal(early.messages.length, 0);
+  assert.equal(early.composer, 'hola');
+  assert.equal(early.phase, 'idle');
+  const thread = run([{ type: 'send', text: 'primera' }, { type: 'answer', text: 'ok', content: null }, { type: 'send', text: 'segunda' }, { type: 'stop' }]);
+  assert.deepEqual(thread.messages.map(message => message.text), ['primera', 'ok'], 'only the stopped question leaves');
+  assert.equal(thread.composer, 'segunda');
+  // Typed since: the new words are never overwritten; the question stays in the thread.
+  const typed = run([{ type: 'send', text: 'hola' }, { type: 'compose', text: 'otra cosa' }, { type: 'stop' }]);
+  assert.deepEqual([typed.messages.map(message => message.role).join(), typed.composer], ['user', 'otra cosa']);
 });
 
 test('a disconnected build keeps the exact text in the composer and shows one calm note; a remote failure keeps the message and offers retry', () => {
@@ -105,11 +119,49 @@ test('questions are explained against evidence; sentences are parsed as actions'
     for (const question of suggestions.filter(s => s.includes('?'))) assert.equal(classifyIntent(question), 'explain', question);
     assert.equal(classifyIntent(t('assistant.suggestions.recordExpense')), 'parse');
   }
-  assert.equal(classifyIntent('how much did I spend on food'), 'explain');
-  assert.equal(classifyIntent('cuánto gasté en comida'), 'explain');
-  assert.equal(classifyIntent('Cómo voy con el presupuesto'), 'explain');
-  assert.equal(classifyIntent('Registrar un gasto'), 'parse');
-  assert.equal(classifyIntent('Gasté 18.500 en Carrefour con la Visa'), 'parse');
+  // [text, intent]: a question opening the text, after a «¿» or after a clause, or a «?» sentence that states no amount
+  // (a day, a count or a bound is not one) is explained; a sentence that states an amount is a movement, «?» or not.
+  const table: [string, 'explain' | 'parse'][] = [
+    ['how much did I spend on food', 'explain'],
+    ['cuánto gasté en comida', 'explain'],
+    ['Cómo voy con el presupuesto', 'explain'],
+    ['¿Cuánto gasté en comida?', 'explain'],
+    ['¿Gasté más de 50000 en comida?', 'explain'],
+    ['Did I spend more on food?', 'explain'],
+    ['En comida gasté más que en agosto?', 'explain'],
+    ['What did I spend in 2026?', 'explain'],
+    ['¿Por qué gasté más este mes?', 'explain'],
+    // A mid-sentence opener, or numbers that are a day, a count or a bound, never make a question a movement.
+    ['Este mes, ¿cuánto gasté en las 2 tarjetas?', 'explain'],
+    ['This month, how much did I spend on the 2 cards?', 'explain'],
+    ['Did I spend more than 500 on food?', 'explain'],
+    ['Gasté más de 500 en comida?', 'explain'],
+    ['En qué gasté el 15?', 'explain'],
+    ['What did I spend on the 15th?', 'explain'],
+    ['Gasté más de 50000 en comida este mes?', 'explain'],
+    ['I spent more than $50000 on food this month?', 'explain'],
+    ['Me alcanza para las 3 cuotas?', 'explain'],
+    ['Can I afford the 3 instalments?', 'explain'],
+    ['Gasté mucho el 15/9?', 'explain'],
+    ['Spent a lot on 15/9?', 'explain'],
+    ['Registrar un gasto', 'parse'],
+    ['Record an expense', 'parse'],
+    ['Gasté 18.500 en Carrefour con la Visa', 'parse'],
+    ['Spent 18500 at Carrefour with the Visa', 'parse'],
+    // A question mark alone does not make a question: a movement with an amount stays a movement (and sends no facts).
+    ['Gasté 3.000 en Carrefour con la Visa, ¿está bien?', 'parse'],
+    ['Spent 3000 at Carrefour, right?', 'parse'],
+    ['Spent 3000 at Carrefour, is that right?', 'parse'],
+    ['Gasté 2000 en el súper?', 'parse'],
+    ['Spent 2000 at the supermarket?', 'parse'],
+    ['Gasté 2000 en el súper el 15?', 'parse'],
+    ['Spent 2000 at the supermarket on the 15th?', 'parse'],
+    ['Compré una tele de 90000 en 3 cuotas?', 'parse'],
+    ['Bought a TV for 90000 in 3 instalments?', 'parse'],
+    ['Pagué 500, que era lo del gas', 'parse'],
+    ['Pagué 500 en el súper, como siempre?', 'parse'],
+  ];
+  for (const [text, intent] of table) assert.equal(classifyIntent(text), intent, text);
 });
 
 test('autoscroll follows new content only when the reader is already near the end', () => {
@@ -710,4 +762,54 @@ test('25A-06: facts travel as exact major-unit decimals in the request currency 
   // A held currency never reaches the wire: the request is refused before any call.
   await assert.rejects(client.assistant({ action: 'explain', text: '¿Cuánto gasté?', todayISO: today, currency: 'KWD' as any, region: 'KW', language: 'es', facts: yen }));
   assert.equal(bodies.length, 2);
+});
+
+test('on the last days of a month after a shorter one, «this month» ends where the comparison does, and the answer says until when', () => {
+  const opened = '2026-01-01T12:00:00.000Z';
+  const account: Account = { id: 'cash', name: 'Efectivo', currency: 'ARS', openingMinor: 0, createdAt: opened };
+  const spent = (id: string, dateISO: string): Entry => ({ id, accountId: 'cash', kind: 'expense', amountMinor: 1000, merchant: 'Kiosco', category: 'Comida', dateISO, createdAt: opened });
+  const snapshot = { accounts: [account], entries: [spent('a', '2026-09-10'), spent('b', '2026-10-05'), spent('c', '2026-10-31'), spent('d', '2026-02-10'), spent('e', '2026-03-05'), spent('f', '2026-03-31')], transfers: [] };
+  for (const [today, end] of [['2026-10-31', '2026-10-30'], ['2026-03-31', '2026-03-28']] as const) {
+    const facts = monthlyEvidence(snapshot, 'ARS', today);
+    const current = facts.find(fact => fact.id === 'current.expenses')!;
+    assert.equal(current.endISO, end, 'the like-for-like window of the comparison');
+    const content = answerContent({ evidenceIds: ['current.expenses'] }, facts, 'ARS', today);
+    assert.equal(content.untilISO, end, 'the rows say they stop before today');
+  }
+  const midMonth = monthlyEvidence(snapshot, 'ARS', '2026-10-12');
+  assert.equal(answerContent({ evidenceIds: ['current.expenses'] }, midMonth, 'ARS', '2026-10-12').untilISO, undefined, 'a window that reaches today needs no caption');
+  assert.equal(answerContent({ evidenceIds: [] }, midMonth, 'ARS', '2026-10-31').untilISO, undefined, 'no rows, no caption');
+});
+
+test('the request and the reply agree on what is invisible: a pasted zero-width character never reaches the model, so a copied merchant is never refused for it', async () => {
+  // Every BMP character the device would send (after its own cleaning) is one a reply may also hold in a name, apart from
+  // the line break a message may have (a reply's prose keeps it). A character in the gap would be admitted at the door and
+  // refused at the exit, after the ask was billed: a tab and a CR are no exception, they become a space and a line break.
+  const gap: string[] = [];
+  for (let code = 0; code <= 0xffff; code++) {
+    if (code >= 0xd800 && code <= 0xdfff) continue;
+    const sent = withoutInvisibles('a' + String.fromCharCode(code) + 'b');
+    if (!isSafeInputText(sent, PROTOCOL_LIMITS.textChars)) continue;
+    for (const char of sent) if (char !== '\n' && !isSafeModelText('a' + char + 'b', PROTOCOL_LIMITS.merchantChars)) gap.push(code.toString(16));
+  }
+  assert.deepEqual(gap, []);
+  // Visible words, and the joiners of emoji and scripts, are untouched; a line separator is a line break.
+  const coder = '👩' + String.fromCharCode(0x200d) + '💻';
+  assert.equal(withoutInvisibles('Café ' + coder + ' ' + String.fromCharCode(0xfeff) + 'Coto' + String.fromCharCode(0x200b)), 'Café ' + coder + ' Coto');
+  assert.equal(withoutInvisibles('uno' + String.fromCharCode(0x2028) + 'dos'), 'uno\ndos');
+  assert.equal(withoutInvisibles('Café\tDelux'), 'Café Delux', 'a pasted tab is a space');
+  assert.equal(withoutInvisibles('uno\r\ndos\rtres\ncuatro'), 'uno\ndos\ntres\ncuatro', 'CRLF and a lone CR are line breaks');
+  const bodies: any[] = [];
+  const fetcher = (async (_url: string, init: any) => { bodies.push(JSON.parse(init.body)); return { ok: true, status: 200, json: async () => FIXTURE_CLARIFICATION }; }) as unknown as typeof fetch;
+  const client = integrationClient('https://finanzapp.example', async () => 'jwt', fetcher);
+  await client.assistant({ action: 'parse', text: 'Gasté 3 mil en Ca' + String.fromCharCode(0x200b) + 'rrefour', todayISO: today, currency: 'ARS', region: 'AR', language: 'es', facts: [] });
+  assert.equal(bodies[0].text, 'Gasté 3 mil en Carrefour');
+  // A stored category name with such a character is left out of the facts (the model would quote it), the rest travel.
+  const opened = '2026-01-01T12:00:00.000Z';
+  const account: Account = { id: 'cash', name: 'Efectivo', currency: 'ARS', openingMinor: 0, createdAt: opened };
+  const hidden = 'Ki' + String.fromCharCode(0x200b) + 'osco';
+  const snapshot = { accounts: [account], transfers: [], entries: [hidden, 'Comida'].map((category, index): Entry => ({ id: 'z' + index, accountId: 'cash', kind: 'expense', amountMinor: 1000, merchant: 'M', category, dateISO: '2026-09-02', createdAt: opened })) };
+  const labels = monthlyEvidence(snapshot, 'ARS', today).map(fact => fact.label);
+  assert.ok(labels.includes(FACT_LABELS.categoryPrefix + 'Comida'));
+  assert.ok(!labels.some(label => label.includes(hidden)));
 });

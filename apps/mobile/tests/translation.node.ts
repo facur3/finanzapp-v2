@@ -7,7 +7,7 @@ import { CATEGORY_PRESETS, categoryKey, labelFromISO, newCategoryDefinition, edi
 import { es } from '../src/i18n/messages/es/index.ts';
 import { en } from '../src/i18n/messages/en/index.ts';
 import { messageKeys, translate } from '../src/i18n/messages.ts';
-import { localizeError } from '../src/i18n/errors.ts';
+import { failureMessage, localizeError } from '../src/i18n/errors.ts';
 import { relativeDate } from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 import { RELEASED_LANGUAGES } from '../src/i18n/locale.ts';
@@ -81,7 +81,9 @@ test('both catalogues are complete: no empty text, and English is really English
     // 24C1: "Total · USD", a code with the same word in both languages.
     'display.total',
     // 24UX6D: Día a día's short «Total» label, the same word in both languages.
-    'reports.dayTotal']);
+    'reports.dayTotal',
+    // 25N1: Licencias' «Software» group, the same word in both languages.
+    'licenses.software']);
   for (const key of keys) {
     for (const catalogue of [es, en]) {
       const value = leaf(catalogue, key);
@@ -145,6 +147,37 @@ test('every catalogued error is still thrown verbatim by the domain, the storage
   }
   assert.equal(localizeError('en', 'Ya existe una categoría llamada «Gym (2)».'), 'A category named “Gym (2)” already exists.', 'a template keeps its value');
   assert.equal(localizeError('es', '«Kiosco» ya es el nombre de otra categoría.'), '«Kiosco» ya es el nombre de otra categoría.');
+});
+
+test('25Q4: every sentence the domain and the storage layer throw is catalogued, so a failure\'s own sentence never hides a specific refusal', () => {
+  for (const [name, value] of Object.entries(domain)) {
+    if (name.endsWith('_MESSAGE') && typeof value === 'string') assert.notEqual(localizeError('en', value), value, name + ' is not catalogued');
+  }
+  assert.equal(localizeError('en', domain.REVIEW_STALE_MESSAGE), 'The account, card or category changed since the proposal. Review it again.');
+  // Internal guards no person reaches: rate parsing (the rates layer turns it into a status), a batch-limit guard and the provider's own check.
+  const internal = new Set(['Cotización inválida.', 'Denominador inválido.', 'Límite de vencimientos inválido.', 'LedgerProvider is required']);
+  const files = [...readdirSync(join(root, '../../packages/domain')).filter(name => name.endsWith('.ts') && !name.endsWith('.test.ts')).map(name => '../../packages/domain/' + name),
+    ...sourceFiles('src/storage')];
+  let scanned = 0;
+  for (const file of files) for (const [, thrown, constant] of read(file).matchAll(/new Error\('([^']+)'\)|_MESSAGE = '([^']+)'/g)) {
+    const text = thrown ?? constant;
+    scanned++;
+    if (!internal.has(text)) assert.notEqual(localizeError('en', text), text, `${file} throws a sentence the catalogue lacks: ${text}`);
+  }
+  assert.ok(scanned > 300, 'the scan found the thrown sentences (' + scanned + ')');
+});
+
+test('25Q4: a failed action keeps a catalogued message as itself and anything else as the action\'s own sentence, never an engine\'s text', () => {
+  for (const message of ['Elegí dos cuentas distintas.', 'entryForm.futureDate', 'Ya existe una categoría llamada «Gym (2)».']) {
+    assert.equal(failureMessage(new Error(message), 'entryForm.saveUnverified'), message, 'kept: ' + message);
+  }
+  for (const cause of [new Error("Call to function 'NativeDatabase.execAsync' has been rejected"), new Error('database is locked'), new Error(''), new Error('no.such.key'),
+    'offline', undefined, null, { message: 42 }]) {
+    const stored = failureMessage(cause, 'entryForm.saveUnverified');
+    assert.equal(stored, 'entryForm.saveUnverified', 'the action\'s own sentence for ' + String((cause as { message?: unknown } | null)?.message ?? cause));
+    assert.equal(localizeError('en', stored), en.entryForm.saveUnverified);
+  }
+  assert.equal(bindLocale('es-AR').failureMessage, failureMessage);
 });
 
 test('built-in categories: localized names, unchanged identities, stored strings, budgets and history', () => {
@@ -225,18 +258,18 @@ test('account kinds are named in the interface language; the Spanish default is 
 });
 
 test('English fits where Spanish fits: segment, tab, quick-action, button and header labels stay within their room', () => {
-  // Segments share a row (Choices' default asks for an 80 % shrink floor, but iOS's new architecture ignores
-  // `minimumFontScale` and floors at 4 pt, so a segment label must fit its room; 24T3); quick-action captions sit under a glyph, and the dock's
+  // Segments share a row (25T: Choices fits a label in JavaScript down to 11 pt and no further, so a segment label must fit
+  // its room; 24T3); quick-action captions sit under a glyph, and the dock's
   // icon-only tabs show their names in the Large Content Viewer; buttons, the capture hub's titles and rows, and
   // headers are one line on a 320 pt iPhone SE at the default text size.
   const budgets: [string[], number][] = [
     [['activity.all', 'activity.expenses', 'activity.incomes', 'activity.transfers', 'movement.expense', 'movement.income', 'movement.transfer',
       'home.spending', 'home.available'], 13],
-    [['nav.tabs.home', 'nav.tabs.activity', 'nav.tabs.reports', 'nav.tabs.more',
+    [['nav.tabs.home', 'nav.tabs.activity', 'nav.tabs.reports', 'nav.tabs.finances',
       'quickActions.expense', 'quickActions.income', 'quickActions.transfer'], 11],
     [['common.addAccount', 'common.retrySave', 'common.retryChange', 'common.saveChanges', 'entryForm.saveExpense', 'entryForm.saveIncome',
       'transferForm.recordPayment', 'transferForm.recordCollection', 'transferForm.recordTransfer', 'entryDetail.edit', 'entryDetail.restoreAction',
-      'entryDetail.voidAction', 'transferDetail.edit', 'transferDetail.restoreAction', 'transferDetail.voidAction', 'activity.clearFilters', 'home.start',
+      'entryDetail.voidAction', 'transferDetail.edit', 'transferDetail.restoreAction', 'transferDetail.voidAction', 'activity.clearFilters',
       'transferForm.payTotal', 'transferForm.settleTotal', 'transferForm.collectTotal', 'transferForm.useAll', 'home.capture.label', 'home.capture.title',
       'home.capture.close', 'home.capture.assistant', 'home.capture.expense', 'home.capture.income', 'home.capture.transfer'], 24],
     [Object.keys(es.nav.titles).map(key => 'nav.titles.' + key).concat(['entryForm.editTitle', 'entryForm.cardPurchaseTitle', 'entryForm.expenseTitle',
@@ -308,11 +341,71 @@ test('a debt’s hidden account is named from the debt in the interface language
   assert.equal(accountDisplayName(account, [debt], translator('en')), 'I owe · Juan', 'the person’s name is kept');
   assert.equal(accountDisplayName({ ...account, name: 'Me deben · Ana' }, [{ ...debt, direction: 'owed_to_me', counterparty: 'Ana' }], translator('en')), 'Owed to me · Ana');
   assert.equal(accountDisplayName({ ...account, id: 'cash', name: 'Caja' }, [debt], translator('en')), 'Caja', 'a cash account keeps its own name');
-  // Editing the counterparty does not rename the hidden account: the stored name is what shows, in Spanish byte for byte.
+  // Editing the counterparty never rewrites the stored hidden account, but what shows follows the debt (golden changed
+  // deliberately in Producto 25T: a renamed «Juan Pérez» no longer reads «Debo · Juan» on its payment rows).
   const edited = { ...debt, counterparty: 'Juan Pérez' };
-  assert.equal(accountDisplayName(account, [edited]), 'Debo · Juan');
-  assert.equal(accountDisplayName(account, [edited], translator('en')), 'I owe · Juan');
+  assert.equal(accountDisplayName(account, [edited]), 'Debo · Juan Pérez');
+  assert.equal(accountDisplayName(account, [edited], translator('en')), 'I owe · Juan Pérez');
+  assert.equal(account.name, 'Debo · Juan', 'the stored name is untouched');
   assert.equal(accountDisplayName({ ...account, name: 'Préstamo Juan' }, [debt], translator('en')), 'Préstamo Juan', 'a name without the prefix is shown as stored');
   // The debt form stores the hidden account with the Spanish formula the catalogue reproduces.
   assert.match(read('src/ui/debt-form.tsx'), /'Debo · ' : 'Me deben · '\) \+ counterparty\.trim\(\)/);
+});
+
+/** Every text of a catalogue with its key (both forms of a plural). */
+const textsOf = (catalogue: object) => messageKeys(es).flatMap(key => {
+  const value = leaf(catalogue, key);
+  return (isPlural(value) ? [value.one, value.other] : [value as string]).map(text => ({ key, text }));
+});
+
+test('25T: system messages are impersonal and never speak in the implementation\'s words (envío, congelado, submission, frozen)', () => {
+  const spanish = textsOf(es), english = textsOf(en);
+  const we = spanish.filter(({ text }) => /\b(No pudimos|No encontramos|[Cc]onservamos|[Mm]ostramos|[Ee]stamos|[Pp]odemos|[Ii]ntentaremos)\b/.test(text));
+  assert.deepEqual(we.map(item => item.key), [], 'Spanish system messages say «No se pudo…», never «No pudimos…»');
+  const weEn = english.filter(({ text }) => /\b[Ww]e\b|\bwe’|\bWe’/.test(text));
+  assert.deepEqual(weEn.map(item => item.key), [], 'English system messages never say «we»');
+  assert.deepEqual(spanish.filter(({ text }) => /\benv[ií]o\b|congelad[oa]|quedó fijo/i.test(text)).map(item => item.key), []);
+  assert.deepEqual(english.filter(({ text }) => /\bsubmission\b|\bfrozen\b|\bis locked\b/i.test(text)).map(item => item.key), []);
+  // One sentence for every failed save that keeps its draft for «Reintentar»; only the place to check differs.
+  assert.deepEqual(messageKeys(es).filter(key => /\.(retryNote|frozenNote)$/.test(key)), ['common.retryNote']);
+  // A debt or a card is named as such, never «obligación»; a proposal's record is never an «identificador».
+  assert.deepEqual(spanish.filter(({ text }) => /obligaci[oó]n/i.test(text)).map(item => item.key), []);
+  assert.deepEqual(spanish.filter(({ key, text }) => key.startsWith('review.') && /identificador/.test(text)).map(item => item.key), []);
+  // No roadmap promise and no file-format vocabulary on screen (a refusal that needs a version or a format still names it).
+  assert.deepEqual(spanish.filter(({ key, text }) => !key.startsWith('errors.') && /otra etapa|v1 a v\d+|[Ee]scalas de moneda/.test(text)).map(item => item.key), []);
+});
+
+test('25T, «Menos texto»: that something is not an expense or an income is said only where a record is made or explained', () => {
+  const allowed = ['transferForm.explainDebt', 'reports.method.detail', 'accounts.form.openingHelp', 'accounts.edit.balanceHelp', 'accounts.edit.correctMessage',
+    'operations.refund.previewEntry', 'operations.refund.previewCredit', 'operations.detail.statusRefund', 'operations.detail.effectEntry',
+    'operations.detail.effectCredit', 'operations.refundHint', 'accounts.form.openingNote', 'transferForm.explainTransfer', 'budgets.form.generalHelp',
+    'reports.comparison.footer', 'fx.comparisonFooter', 'fx.reportInfo', 'recurring.form.note', 'recurring.form.noteHelp', 'entryForm.correctionNote',
+    'cards.form.openingDebtNote', 'transferForm.explainCard', 'installments.payoff.financingCaption', 'operations.detail.payoffNote', 'entryForm.cardNote',
+    'entryForm.plan.note'];
+  const said = textsOf(es).filter(({ text }) => /no es (un )?(gasto|ingreso)|ni (un )?(gasto|ingreso)|no (se )?cuenta como (gasto|ingreso)|no crea (un )?gasto/i.test(text));
+  assert.deepEqual([...new Set(said.map(item => item.key))].filter(key => !allowed.includes(key)), [], 'a standing legend that repeats what the app already does');
+});
+
+test('25T glossary: «Disponible» is Inicio\'s recorded money only; «Pago» settles a card or a debt; a form saves with «Guardar», a list adds with «Agregar»', () => {
+  const spanish = textsOf(es);
+  // The term (capitalised, as a label) names Inicio's figure, or that figure where another screen speaks of it.
+  const disponible = spanish.filter(({ text }) => /\bDisponible\b/.test(text)).map(item => item.key);
+  assert.deepEqual(disponible.filter(key => !/^(home\.|accounts\.manage\.|backup\.import\.availableAfter$)/.test(key)), []);
+  assert.equal(translate('es', 'budgets.total.available'), 'Queda');
+  assert.equal(translate('es', 'cards.panel.available'), 'Crédito disponible');
+  assert.equal(translate('es', 'operations.refund.available'), 'Devolver todo');
+  // The card-purchase mode is how it is paid, not a «Pago» (a payment settles a card or a debt).
+  for (const key of ['entryForm.plan.payment', 'review.fields.purchase', 'assistant.proposal.payment'] as const) assert.equal(translate('es', key), 'Cómo se paga');
+  // The button that saves what a form holds; the action that opens a form to add to a list.
+  const saves = ['entryForm.saveExpense', 'entryForm.saveIncome', 'entryForm.plan.save', 'transferForm.recordPayment', 'transferForm.recordCollection',
+    'transferForm.recordTransfer', 'cards.form.create', 'debts.form.create', 'accounts.form.save', 'onboarding.account.create', 'budgets.form.create',
+    'recurring.form.create', 'categoryManager.form.create', 'operations.refund.save', 'installments.payoff.save', 'common.saveChanges'] as const;
+  for (const key of saves) for (const language of ['es', 'en'] as const) assert.match(translate(language, key), language === 'es' ? /^Guardar / : /^Save /, key);
+  const adds = ['common.addAccount', 'cards.list.add', 'debts.list.add', 'budgets.screen.add', 'budgets.screen.create', 'recurring.list.add', 'recurring.list.create'] as const;
+  for (const key of adds) for (const language of ['es', 'en'] as const) assert.match(translate(language, key), language === 'es' ? /^Agregar / : /^Add /, key);
+  assert.deepEqual(spanish.filter(({ text }) => /^Crear /.test(text)).map(item => item.key), [], 'no button says «Crear»: a form saves, a list adds');
+  // 25T review: nor does a sentence ask for it (Inicio's first steps, an empty list, an error): «Agregá…», "Add…", never «Creá…», "Create…".
+  assert.deepEqual(spanish.filter(({ text }) => /(^|[\s¿¡«(])creá(?!\p{L})/iu.test(text)).map(item => item.key), [], 'no «Creá»');
+  assert.deepEqual(textsOf(en).filter(({ text }) => /(^|[.!?,;:]\s+)create\b/i.test(text)).map(item => item.key), [], 'no "Create"');
+  for (const language of ['es', 'en'] as const) assert.equal(translate(language, 'home.firstSteps.account'), language === 'es' ? 'Agregá tu primera cuenta' : 'Add your first account');
 });

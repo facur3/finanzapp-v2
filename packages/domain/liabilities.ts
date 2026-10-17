@@ -99,14 +99,14 @@ function validTimestamp(value: string): boolean {
 }
 function accountFor(accountId: string, accounts: Account[]): Account {
   const account = accounts.find(item => item.id === accountId);
-  if (!account) throw new Error('La obligación debe usar una cuenta interna existente.');
+  if (!account) throw new Error('La tarjeta o la deuda debe usar una cuenta interna existente.');
   return account;
 }
 function validateVersion(createdAt: string, revision: number, updatedAt: string): void {
   if (!validTimestamp(createdAt) || !validTimestamp(updatedAt) || !Number.isSafeInteger(revision) || revision < 0) {
-    throw new Error('Estado de obligación inválido.');
+    throw new Error('Estado de tarjeta o deuda inválido.');
   }
-  if (revision === 0 && createdAt !== updatedAt) throw new Error('Estado inicial de obligación inválido.');
+  if (revision === 0 && createdAt !== updatedAt) throw new Error('Estado inicial de tarjeta o deuda inválido.');
 }
 
 export function validateCreditCardProfile(card: CreditCardProfile, accounts: Account[]): void {
@@ -148,13 +148,13 @@ export function validateLiabilityProfiles(cards: CreditCardProfile[], debts: Per
   for (const card of cards) {
     validateCreditCardProfile(card, accounts);
     if (ids.has(card.id)) throw new Error('La copia repite una tarjeta.');
-    if (accountIds.has(card.accountId)) throw new Error('Una cuenta interna no puede representar dos obligaciones.');
+    if (accountIds.has(card.accountId)) throw new Error('Una cuenta interna no puede representar dos tarjetas o deudas.');
     ids.add(card.id); accountIds.add(card.accountId);
   }
   for (const debt of debts) {
     validatePersonalDebtProfile(debt, accounts);
-    if (ids.has(debt.id)) throw new Error('La copia repite una obligación.');
-    if (accountIds.has(debt.accountId)) throw new Error('Una cuenta interna no puede representar dos obligaciones.');
+    if (ids.has(debt.id)) throw new Error('La copia repite una tarjeta o una deuda.');
+    if (accountIds.has(debt.accountId)) throw new Error('Una cuenta interna no puede representar dos tarjetas o deudas.');
     ids.add(debt.id); accountIds.add(debt.accountId);
   }
 }
@@ -281,7 +281,7 @@ export function assertTransferSides(transfer: Pick<Transfer, 'fromAccountId' | '
   assertOpenAccount(transfer.fromAccountId, accounts, cards, debts);
   assertOpenAccount(transfer.toAccountId, accounts, cards, debts);
   if (from === 'card') throw new Error('Una tarjeta se paga desde una cuenta; no puede ser el origen de una transferencia.');
-  if (from !== 'cash' && to !== 'cash') throw new Error('Una transferencia entre dos obligaciones no se puede registrar.');
+  if (from !== 'cash' && to !== 'cash') throw new Error('Una transferencia entre dos tarjetas o deudas no se puede registrar.');
 }
 export function sameTransferSides(a: Pick<Transfer, 'fromAccountId' | 'toAccountId'>, b: Pick<Transfer, 'fromAccountId' | 'toAccountId'>): boolean {
   return a.fromAccountId === b.fromAccountId && a.toAccountId === b.toAccountId;
@@ -496,6 +496,6 @@ export function deletePersonalDebt(debt: PersonalDebtProfile, nowISO: string): P
 }
 function debtStateChange(debt: PersonalDebtProfile, change: Partial<Pick<PersonalDebtProfile, 'active' | 'deleted'>>, nowISO: string): PersonalDebtProfile {
   if (debt.deleted) throw new Error(DEBT_DELETED_MESSAGE);
-  if (!validTimestamp(nowISO)) throw new Error('Estado de obligación inválido.');
+  if (!validTimestamp(nowISO)) throw new Error('Estado de tarjeta o deuda inválido.');
   return { ...debt, ...change, revision: debt.revision + 1, updatedAt: nowISO };
 }

@@ -1,11 +1,11 @@
 import { useRef, useState } from 'react';
 import { Alert } from 'react-native';
 import { randomUUID } from 'expo-crypto';
-import * as Haptics from 'expo-haptics';
 import { entryRefundSummary, isEntryRefund, isPlanPayoff, isPlanRefund, makeOperationChange, todayKey, type EntryRecord, type OperationChange, type PurchaseOperation } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { useI18n } from '../i18n/provider';
 import { useAccountNameOf, useCategoryLookOf } from './category-hues';
+import { announce, errorHaptic, successHaptic, warningHaptic } from './motion';
 import { checkOperationChange, numberRanges, recordedShares, type OperationCheck } from './operation-presentation';
 import { releasesDraft } from './presentation';
 
@@ -20,7 +20,7 @@ import { releasesDraft } from './presentation';
  * writing (the dry run passed on a stale view) releases it; the screen then shows the reason the next dry run gives. */
 export function useOperationChange() {
   const { archive, voidOperation, restoreOperation } = useLedger();
-  const { t, moneyText, formatDate } = useI18n();
+  const { t, moneyText, formatDate, failureMessage } = useI18n();
   const accountName = useAccountNameOf();
   const categoryLook = useCategoryLookOf('expense');
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -28,6 +28,18 @@ export function useOperationChange() {
   const [pending, setPending] = useState<OperationChange | null>(null);
   const writing = useRef(false);
   const confirming = useRef(false);
+
+  // 25R1: the ledger already shows the change sent with an unknown outcome (it committed; a later read brought it): nothing is
+  // left to retry, so «Reintentar cambio» gives way. Set during render.
+  const applied = pending && !busyId && archive?.purchaseOperations?.find(item => item.id === pending.after.id);
+  if (pending && applied && applied.revision === pending.after.revision && applied.voided === pending.after.voided) {
+    setPending(null);
+    if (error?.id === pending.after.id) setError(null);
+  }
+
+  /** The status line of an operation's detail, as it reads in this state. */
+  const statusOf = (operation: PurchaseOperation) => t(operation.voided ? (operation.kind === 'refund' ? 'operations.detail.statusVoidedRefund' : 'operations.detail.statusVoidedPayoff')
+    : operation.kind === 'refund' ? 'operations.detail.statusRefund' : 'operations.detail.statusPayoff');
 
   const check = (operation: PurchaseOperation): OperationCheck => archive
     ? checkOperationChange(archive, operation, todayKey(), new Date().toISOString()) : { ok: false, reason: '' };
@@ -75,12 +87,15 @@ export function useOperationChange() {
     try {
       await (change.action === 'void' ? voidOperation(change) : restoreOperation(change));
       setPending(null);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      successHaptic();
+      // 25D2: the operation's new status line (its detail shows it; Movimientos deshechos drops the row), told to VoiceOver.
+      announce(statusOf(change.after));
     } catch (cause) {
-      const message = cause instanceof Error && cause.message ? cause.message : 'operations.change.failed';
+      const message = failureMessage(cause, 'operations.change.failed');
       setError({ id: change.after.id, message });
-      // Storage refused before writing (the view was stale): nothing to resend; the next dry run says why.
-      if (cause instanceof Error && releasesDraft(cause.message)) setPending(null);
+      // Storage refused before writing (the view was stale): nothing to resend; the next dry run says why. 25Q4: Error for
+      // that release, Warning while the change stays frozen for «Reintentar cambio».
+      if (cause instanceof Error && releasesDraft(cause.message)) { setPending(null); errorHaptic(); } else warningHaptic();
     } finally { writing.current = false; setBusyId(null); }
   }
 
@@ -89,7 +104,12 @@ export function useOperationChange() {
     if (writing.current || confirming.current) return;
     if (pending && pending.after.id === operation.id) { void apply(pending); return; }
     const result = check(operation);
-    if (!result.ok) { setError({ id: operation.id, message: result.reason }); return; }
+    if (!result.ok) {
+      setError({ id: operation.id, message: result.reason });
+      // 25Q4: the dry run refused it on the tap (the view changed since the action was offered): nothing was sent.
+      errorHaptic();
+      return;
+    }
     const restore = operation.voided;
     const payoff = isPlanPayoff(operation);
     const change = makeOperationChange(randomUUID(), operation, restore ? 'restore' : 'void', new Date().toISOString());
@@ -97,10 +117,11 @@ export function useOperationChange() {
     Alert.alert(t(restore ? (payoff ? 'operations.change.restorePayoffQuestion' : 'operations.change.restoreRefundQuestion')
       : payoff ? 'operations.change.voidPayoffQuestion' : 'operations.change.voidRefundQuestion'), outcome(operation, result.inserts), [
       { text: t('common.cancel'), style: 'cancel', onPress: () => { confirming.current = false; } },
-      { text: t(restore ? 'operations.change.restore' : 'operations.change.void'), style: restore ? 'default' : 'destructive',
+      // Red only when the undo cannot be restored (an adelanto whose catch-up records instalments); any other is reversible.
+      { text: t(restore ? 'operations.change.restore' : 'operations.change.void'), style: !restore && payoff && result.inserts.length ? 'destructive' : 'default',
         onPress: () => { confirming.current = false; void apply(change); } },
     ], { cancelable: true, onDismiss: () => { confirming.current = false; } });
   }
 
-  return { busyId, error, pending, check, ask };
+  return { busyId, error, pending, statusOf, check, ask };
 }

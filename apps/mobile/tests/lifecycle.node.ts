@@ -120,7 +120,7 @@ test('deleting an account with movements, transfers and an active rule: the row 
   assert.deepEqual((await readArchive(db)).accounts.find(item => item.id === 'cash'), gone);
   // A card's or a debt's internal account is never deleted here; an unknown id is said.
   await assert.rejects(deleteAccount(db, 'card-account', now), new RegExp(OBLIGATION_ACCOUNT_MESSAGE));
-  await assert.rejects(deleteAccount(db, 'nope', now), /No encontramos esta cuenta/);
+  await assert.rejects(deleteAccount(db, 'nope', now), /No se encontró esta cuenta/);
 });
 
 test('a deleted account survives a restart, an export and a restore into a fresh device; an older copy never brings it back', async () => {
@@ -169,7 +169,7 @@ test('deleting a card with purchases and payments keeps them and its internal ac
   await saveCreditCard(db, gone); // A retry of the same record is silent.
   await deleteCreditCard(db, 'card', '2026-09-28T10:00:00.000Z'); // Deleting again (a retry after a failed refresh) is silent too.
   assert.equal((await readArchive(db)).cards?.[0].revision, 1);
-  await assert.rejects(deleteCreditCard(db, 'nope', now), /No encontramos esta tarjeta/);
+  await assert.rejects(deleteCreditCard(db, 'nope', now), /No se encontró esta tarjeta/);
   const backup = createRecoveryBackup(await readArchive(db), new Date(now));
   assert.equal(backup.schema, 'finanzapp.native-pilot.v11');
   assert.equal(parsePilotBackup(JSON.stringify(backup)).archive.cards?.[0].deleted, true);

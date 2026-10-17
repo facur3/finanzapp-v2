@@ -22,8 +22,11 @@ import { space, useCurrentDay, usePalette } from '../src/ui/theme';
  * deleted rule leaves the list while the movements it recorded stay in Movimientos. */
 export default function RecurringScreen() {
   const { accountId } = useLocalSearchParams<{ accountId?: string }>();
-  const { archive, snapshot } = useLedger();
+  const { archive, snapshot, asOfISO } = useLedger();
   const day = useCurrentDay();
+  // 25R1: «Revisar» means a rule still behind after a catch-up that ran for this day; between a change of day and that pass,
+  // a rule that fell due meanwhile is not behind yet.
+  const asOf = asOfISO ?? day;
   const { t } = useI18n();
   const manage = useRecurringManagement();
   const accounts = snapshot?.accounts ?? [];
@@ -48,7 +51,6 @@ export default function RecurringScreen() {
       title: account ? account.name : t('nav.titles.recurring'),
       headerRight: () => <IconButton name="add" label={t('recurring.list.add')} onPress={() => router.push({ pathname: '/new-recurring', params: newParams })} />,
     }} />
-    <ErrorMessage message={manage.error} />
     {!rules.length ? <EmptyState title={t('recurring.list.emptyTitle')}
       detail={t(account ? 'recurring.list.emptyDetailAccount' : 'recurring.list.emptyDetail')}
       icon="repeat-outline"
@@ -63,9 +65,9 @@ export default function RecurringScreen() {
           <SectionTitle>{t('recurring.list.next30')}</SectionTitle>
           <View style={{ gap: space.xl }}>
             {forecast.map(item => item.status === 'ready' ? <View key={item.currency} style={{ gap: 14 }}>
-              <Stat label={withCurrencyCode(t('recurring.list.payments'), item.currency)}><Money minor={item.expenseMinor} currency={item.currency} size={22} weight="700" /></Stat>
+              <Stat label={withCurrencyCode(t('recurring.list.payments'), item.currency)}><Money minor={item.expenseMinor} currency={item.currency} size={22} weight="700" fit="content" /></Stat>
               <StatRow>
-                {item.incomeMinor > 0 && <Stat label={t('recurring.list.income')}><Money minor={item.incomeMinor} currency={item.currency} size={17} tone="income" signed /></Stat>}
+                {item.incomeMinor > 0 && <Stat label={t('recurring.list.income')}><Money minor={item.incomeMinor} currency={item.currency} size={17} tone="income" signed fit="content" /></Stat>}
                 <Stat label={t('recurring.list.dueCount')}><AppText style={{ fontWeight: '600', fontVariant: ['tabular-nums'] }}>{item.count}</AppText></Stat>
               </StatRow>
             </View>
@@ -73,15 +75,19 @@ export default function RecurringScreen() {
           </View>
         </View>}
 
+        {/* 25D2: a row action's failure sits next to the rows it is about, not above the 30-day block, out of sight of a
+            person who scrolled down to the row (VoiceOver hears it through ErrorMessage either way). */}
+        <ErrorMessage message={manage.error} />
+
         {!!active.length && <View>
           <SectionTitle>{t('recurring.list.active')}</SectionTitle>
-          <Surface grouped>{active.map((rule, index) => <RecurringRow key={rule.id} rule={rule} accounts={accounts} day={day} showAccount={!account}
+          <Surface grouped>{active.map((rule, index) => <RecurringRow key={rule.id} rule={rule} accounts={accounts} day={day} asOf={asOf} showAccount={!account}
             closed={closedState(rule)} last={index === active.length - 1} actions={manage.actions(rule)} />)}</Surface>
         </View>}
 
         {!!paused.length && <View>
           <SectionTitle caption={t('recurring.list.pausedCaption')}>{t('recurring.list.paused')}</SectionTitle>
-          <Surface grouped>{paused.map((rule, index) => <RecurringRow key={rule.id} rule={rule} accounts={accounts} day={day} showAccount={!account}
+          <Surface grouped>{paused.map((rule, index) => <RecurringRow key={rule.id} rule={rule} accounts={accounts} day={day} asOf={asOf} showAccount={!account}
             closed={closedState(rule)} last={index === paused.length - 1} actions={manage.actions(rule)} />)}</Surface>
         </View>}
       </>}
@@ -103,8 +109,8 @@ type ClosedState = 'account' | 'card' | null;
  * «Pausado» (its swipe offers Eliminar only), calm, never amber. Amber «Hoy» / «Mañana» marks an expense only: an
  * income due tomorrow is not an obligation. Opened for one account (the header names it), the caption leaves the
  * account out. */
-function RecurringRow({ rule, accounts, day, last, actions, closed = null, showAccount = true }: {
-  rule: RecurringRule; accounts: { id: string; name: string; currency: Currency }[]; day: string; last: boolean; actions: SwipeAction[];
+function RecurringRow({ rule, accounts, day, asOf = day, last, actions, closed = null, showAccount = true }: {
+  rule: RecurringRule; accounts: { id: string; name: string; currency: Currency }[]; day: string; asOf?: string; last: boolean; actions: SwipeAction[];
   closed?: ClosedState; showAccount?: boolean;
 }) {
   const p = usePalette();
@@ -112,7 +118,7 @@ function RecurringRow({ rule, accounts, day, last, actions, closed = null, showA
   const account = accounts.find(item => item.id === rule.accountId);
   const category = useCategoryLook(rule.category, rule.kind).label;
   const due = dueWhen(rule.nextDateISO, day);
-  const review = !closed && recurringNeedsReview(rule, day);
+  const review = !closed && recurringNeedsReview(rule, asOf);
   const when = closed ? t(closed === 'card' ? 'recurring.row.closedCard' : 'recurring.row.closed')
     : !rule.active ? t('recurring.row.paused') : review ? t('recurring.row.review') : due.kind === 'today' ? t('home.upcomingRow.today')
       : due.kind === 'tomorrow' ? t('home.upcomingRow.tomorrow') : due.kind === 'soon' ? t('home.upcomingRow.inDays', { count: due.days })

@@ -62,7 +62,7 @@ export interface ReviewItem {
   revision: number;
 }
 
-export const REVIEW_ITEM_MISSING_MESSAGE = 'No encontramos esta propuesta.';
+export const REVIEW_ITEM_MISSING_MESSAGE = 'No se encontró esta propuesta.';
 export const REVIEW_ITEM_UNREADABLE_MESSAGE = 'Esta propuesta no se puede leer. No se registró nada.';
 export const REVIEW_ITEM_CHANGED_MESSAGE = 'Esta propuesta cambió desde que la abriste. Volvé a abrirla.';
 export const REVIEW_ITEM_CLOSED_MESSAGE = 'Esta propuesta ya se confirmó o se descartó.';

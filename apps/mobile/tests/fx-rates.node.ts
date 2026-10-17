@@ -5,9 +5,9 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { liquidTotalsByCurrency, rateBook, type Account, type Currency, type Entry, type ExchangeRate, type LedgerSnapshot, type Transfer } from '@finanzapp/domain';
-import { FRANKFURTER_SOURCE, RateFetchError, fetchFrankfurter, frankfurterUrl, parseRates, rateText, type FetchLike, type RateRequest } from '../src/fx/frankfurter.ts';
-import { REFRESH_MS, RETRY_MS, createRatesStore, monthRequest, monthsEnding, needsFetch, type RateCache } from '../src/fx/rates-store.ts';
-import { availableFigure, financeView, listingSnapshot, spendingFigure } from '../src/fx/finance-view.ts';
+import { FRANKFURTER_SOURCE, RETRY_AFTER_CAP_MS, RateFetchError, fetchFrankfurter, frankfurterUrl, parseRates, rateText, retryAfterMs, type FetchLike, type RateRequest } from '../src/fx/frankfurter.ts';
+import { REFRESH_MS, RESEAL_MS, RETRY_MS, RETRY_STEPS_MS, UNSUPPORTED_MS, createRatesStore, monthRequest, monthsEnding, needsFetch, type RateCache } from '../src/fx/rates-store.ts';
+import { availableFigure, financeView, listingSnapshot, resolveFinanceTarget, spendingFigure } from '../src/fx/finance-view.ts';
 import { figureInfo, reportInfo, shortfallDetail } from '../src/fx/fx-copy.ts';
 import { RATES_DATABASE_VERSION, initializeRatesDatabase, readRates, saveRates, type RateCoverage, type RatesDatabase } from '../src/storage/rates-database.ts';
 import { runExclusiveTransaction, type TransactionConnection } from '../src/storage/transaction.ts';
@@ -226,6 +226,32 @@ function retryHarness(clock: { now: Date }) {
   const fire = () => { const timer = timers.shift()!; assert.ok(timer && !timer.cancelled, 'a live retry timer'); clock.now = new Date(clock.now.getTime() + timer.ms); timer.run(); };
   return { timers, provider, store, fire };
 }
+
+test('25R1 review: a short back-off of one quote never strands a longer one of another quote in the same month', async () => {
+  const clock = { now: new Date('2026-09-25T12:00:00.000Z') };
+  const { timers, provider, store } = retryHarness(clock);
+  const live = () => { timers.splice(0, timers.length, ...timers.filter(timer => !timer.cancelled)); return timers; };
+  const fire = () => { const timer = live().shift()!; clock.now = new Date(clock.now.getTime() + timer.ms); timer.run(); };
+  provider.fail('offline');
+  const euro = store.watch(['2026-09'], ['EUR'], '2026-09-25');
+  await store.settled();
+  fire(); await store.settled();
+  fire(); await store.settled();
+  const euroAsks = provider.requests.length;
+  assert.equal(euroAsks, 3, 'EUR failed three times: its back-off has grown');
+  // The display currency changes: ARS is asked, fails once (the shortest back-off) while EUR still waits its longer one.
+  const pesos = store.watch(['2026-09'], ['ARS'], '2026-09-25');
+  await store.settled();
+  assert.equal(live().length, 1, 'one timer for the month, at the earliest back-off');
+  provider.fail(null);
+  fire(); await store.settled();
+  assert.equal(store.activity(['2026-09'], ['ARS']), 'idle', 'ARS came back');
+  assert.equal(live().length, 1, 'EUR, still waiting, keeps a timer');
+  fire(); await store.settled();
+  assert.equal(store.activity(['2026-09'], ['EUR']), 'idle', 'and EUR is asked again without leaving the screen');
+  assert.equal(live().length, 0);
+  euro(); pesos();
+});
 
 test('after a failure the store retries by itself once the back-off has passed, while the view that asked is still active', async () => {
   const clock = { now: new Date('2026-09-25T12:00:00.000Z') };
@@ -452,8 +478,8 @@ test('a missing rate gives per-currency subtotals and its reason (fetching, offl
   assert.deepEqual(figure.status === 'unavailable' && figure.parts, [{ currency: 'ARS', minor: 360000 }, { currency: 'USD', minor: 1234 }, { currency: 'EUR', minor: 999 }, { currency: 'JPY', minor: 1500 }]);
   const es = bindLocale('es-AR'), en = bindLocale('en-US');
   if (figure.status !== 'unavailable') return;
-  assert.match(shortfallDetail(figure, { t: es.t, date: es.formatNumericDate, currencyName: es.currencyName }), /^Sin conexión: no pudimos obtener la cotización USD → ARS del 5\/9\/2026/);
-  assert.match(shortfallDetail(figure, { t: en.t, date: en.formatNumericDate, currencyName: en.currencyName }), /^No connection: we could not get the USD → ARS rate for 9\/5\/2026/);
+  assert.match(shortfallDetail(figure, { t: es.t, date: es.formatNumericDate, currencyName: es.currencyName }), /^Sin conexión: no se pudo obtener la cotización USD → ARS del 5\/9\/2026/);
+  assert.match(shortfallDetail(figure, { t: en.t, date: en.formatNumericDate, currencyName: en.currencyName }), /^No connection: the USD → ARS rate for 9\/5\/2026 couldn’t be fetched/);
 });
 
 test('the info texts name the source and the rate dates; nothing is said when nothing was converted', () => {
@@ -463,6 +489,12 @@ test('the info texts name the source and the rate dates; nothing is said when no
   const view = financeView(ledger, 'consolidated', 'USD', book);
   const figure = spendingFigure(ledger, view, september, 'idle', true);
   assert.match(figureInfo(figure, 'spending', words)!, /^Gastos de todas tus cuentas en Dólares estadounidenses\. .*Frankfurter.*11\/9\/2026/);
+  // 25T: rates of several days are named as the range they span (as Reportes does), never as the newest day alone.
+  assert.match(figureInfo(figure, 'spending', words)!, /se usaron cotizaciones del 4\/9\/2026 al 11\/9\/2026\./);
+  const ready = (oldest: string, newest: string) => ({ status: 'ready', currency: 'USD', minor: 100, converted: true,
+    provenance: { converted: 2, oldest, newest, sources: ['Frankfurter'] } }) as Parameters<typeof figureInfo>[0];
+  assert.match(figureInfo(ready('2026-09-04', '2026-09-11'), 'available', words)!, /con la última cotización de referencia de cada moneda \(Frankfurter, bancos centrales\), del 4\/9\/2026 al 11\/9\/2026\./);
+  assert.match(figureInfo(ready('2026-09-11', '2026-09-11'), 'available', words)!, /con la cotización de referencia del 11\/9\/2026 \(Frankfurter/, 'one day: one date');
   assert.match(reportInfo('USD', view.provenance('2026-09-01', '2026-09-30', 'expense'), words)!, /del 4\/9\/2026 al 11\/9\/2026, nunca la de hoy para un mes pasado/);
   const onlyUsd: LedgerSnapshot = { accounts: [account('usd', 'USD')], entries: [spend('u', 'usd', 100, '2026-09-10')] };
   const plain = spendingFigure(onlyUsd, financeView(onlyUsd, 'consolidated', 'USD', rateBook([])), september, 'idle', true);
@@ -495,4 +527,181 @@ test('24C1 review: an empty account in another currency never hides Disponible w
   assert.equal(availableFigure(spent, financeView(spent, 'consolidated', 'USD', noRates), noRates, '2026-09-25', 'offline', true).status, 'unavailable');
   // Single mode is untouched: the USD accounts alone.
   assert.equal(availableFigure(two, financeView(two, 'single', 'USD', noRates), noRates, '2026-09-25', 'offline', true).status, 'ready');
+});
+
+// ---- robustness: status handling, back-off, refused codes, sealing, refresh, the first frame, malformed months -----
+
+test('a 408, 429 or 5xx is a passing failure (with the provider\'s Retry-After); any other 4xx is a refusal; the request keeps no cookie', async () => {
+  const request: RateRequest = { from: '2026-09-01', to: '2026-09-05', quotes: ['ARS'] };
+  const now = new Date('2026-09-25T12:00:00.000Z');
+  const answer = (status: number, retryAfter: string | null = null): FetchLike => async () =>
+    ({ ok: false, status, headers: { get: (name: string) => name === 'Retry-After' ? retryAfter : null }, json: async () => ({}) });
+  const failure = async (impl: FetchLike) => { try { await fetchFrankfurter(request, impl, () => now); } catch (error) { return error as RateFetchError; } assert.fail('resolved'); };
+  assert.deepEqual(await failure(answer(429, '120')).then(error => [error.kind, error.rejected, error.retryAfterMs]), ['provider', false, 120000]);
+  assert.deepEqual(await failure(answer(503, 'Thu, 25 Sep 2026 12:10:00 GMT')).then(error => [error.rejected, error.retryAfterMs]), [false, 600000], 'an HTTP date');
+  assert.deepEqual(await failure(answer(408)).then(error => [error.rejected, error.retryAfterMs]), [false, null]);
+  for (const status of [400, 404, 422]) assert.equal((await failure(answer(status, '60'))).rejected, true, String(status));
+  assert.deepEqual([retryAfterMs('soon', now), retryAfterMs('0', now), retryAfterMs('999999', now), retryAfterMs(null, now)], [null, null, RETRY_AFTER_CAP_MS, null]);
+  let init: Parameters<FetchLike>[1];
+  await fetchFrankfurter(request, async (_url, options) => { init = options; return { ok: true, status: 200, json: async () => [] }; });
+  assert.equal(init?.credentials, 'omit', 'no cookie jar: nothing the provider sets can become an identifier');
+});
+
+test('an answer whose rows are all unreadable is a provider failure, never an empty success; an empty answer is still a success', async () => {
+  const request: RateRequest = { from: '2026-09-01', to: '2026-09-05', quotes: ['ARS'] };
+  const body = (rows: unknown[]): FetchLike => async () => ({ ok: true, status: 200, json: async () => rows });
+  await assert.rejects(fetchFrankfurter(request, body([{ date: '2026-09-01', base: 'USD', currency: 'ARS', value: 1500 }])),
+    (error: unknown) => error instanceof RateFetchError && error.kind === 'provider' && !error.rejected);
+  assert.deepEqual(await fetchFrankfurter(request, body([])), []);
+});
+
+test('only calendar dates become a request, and a malformed month never reaches the provider nor throws in a screen', async () => {
+  for (const bad of [{ from: '2026-00-25', to: '2026-01-31' }, { from: '2026-01-01', to: 'NaN-aN-aN' }, { from: '2026-01-01&x=1', to: '2026-01-31' }]) {
+    assert.throws(() => frankfurterUrl({ ...bad, quotes: ['ARS'] }), /Período de cotizaciones inválido/);
+  }
+  const clock = { now: new Date('2026-09-25T12:00:00.000Z') };
+  const { provider, store, timers } = retryHarness(clock);
+  await store.settled();
+  const release = store.watch(['2026-00', '2026-0x', '2026-13', 'abcd'], ['EUR'], '2026-09-25');
+  await store.settled();
+  assert.deepEqual([provider.requests.length, timers.length], [0, 0]);
+  assert.equal(store.activity(['2026-00'], ['EUR'], '2026-09-25'), 'idle');
+  assert.equal(needsFetch(undefined, '2026-00', '2026-09-25', clock.now), false);
+  release();
+});
+
+test('consecutive failures back off 1, 2, 5, 15, then every 30 minutes; Retry-After waits longer; a success starts again at one minute', async () => {
+  const clock = { now: new Date('2026-09-25T12:00:00.000Z') };
+  const { timers, provider, store, fire } = retryHarness(clock);
+  provider.fail('provider');
+  const release = store.watch(['2026-09'], ['EUR'], '2026-09-25');
+  await store.settled();
+  const waits = [timers[0].ms];
+  for (let attempt = 0; attempt < 5; attempt++) { fire(); await store.settled(); waits.push(timers[0].ms); }
+  assert.deepEqual(waits, [60000, 120000, 300000, 900000, 1800000, 1800000]);
+  assert.deepEqual([...RETRY_STEPS_MS], [60000, 120000, 300000, 900000, 1800000]);
+  // Inside a back-off a screen asking again sends nothing.
+  clock.now = new Date(clock.now.getTime() + RETRY_MS);
+  store.ensure(['2026-09'], ['EUR'], '2026-09-25');
+  await store.settled();
+  assert.equal(provider.requests.length, 6);
+  provider.fail(null);
+  fire();
+  await store.settled();
+  assert.equal(store.activity(['2026-09'], ['EUR']), 'idle');
+  clock.now = new Date(clock.now.getTime() + REFRESH_MS);
+  provider.fail('offline');
+  store.ensure(['2026-09'], ['EUR'], '2026-09-25');
+  await store.settled();
+  assert.deepEqual(timers.filter(timer => !timer.cancelled).map(timer => timer.ms), [RETRY_MS], 'reset by the success');
+  release();
+  // The provider's Retry-After, when longer than the step, is the wait.
+  const later = retryHarness({ now: new Date('2026-09-25T12:00:00.000Z') });
+  const limited = createRatesStore({ cache: memoryCache().cache, now: () => new Date('2026-09-25T12:00:00.000Z'),
+    fetchRates: async () => { throw new RateFetchError('provider', { retryAfterMs: 600000 }); },
+    schedule: (run, ms) => { later.timers.push({ run, ms, cancelled: false }); return () => {}; } });
+  const stop = limited.watch(['2026-09'], ['EUR'], '2026-09-25');
+  await limited.settled();
+  assert.deepEqual(later.timers.map(timer => timer.ms), [600000]);
+  stop();
+});
+
+test('a request refused for one code is split once: the valid quotes recover, the refused one reads as missing and is left alone for a day', async () => {
+  let clock = new Date('2026-09-25T12:00:00.000Z');
+  const requests: string[] = [];
+  const timers: number[] = [];
+  const store = createRatesStore({ cache: memoryCache().cache, now: () => clock, schedule: (_run, ms) => { timers.push(ms); return () => {}; },
+    fetchRates: async request => {
+      requests.push(request.quotes.join());
+      if (request.quotes.includes('VES')) throw new RateFetchError('provider', { rejected: true });
+      return request.quotes.map(quote => rate(quote, request.to, '2'));
+    } });
+  const release = store.watch(['2026-09'], ['EUR', 'VES'], '2026-09-25');
+  await store.settled();
+  assert.deepEqual(requests, ['EUR,VES', 'EUR', 'VES']);
+  assert.equal(store.getState().book.lookup('EUR', '2026-09-25').status, 'ok', 'the valid quote recovered');
+  assert.equal(store.activity(['2026-09'], ['EUR', 'VES']), 'idle', 'not an outage: the figure says the rate is missing');
+  assert.deepEqual(timers, [], 'nothing is retried');
+  store.ensure(['2026-09'], ['VES'], '2026-09-25');
+  await store.settled();
+  assert.equal(requests.length, 3, 'left alone');
+  clock = new Date(clock.getTime() + UNSUPPORTED_MS);
+  store.ensure(['2026-09'], ['VES'], '2026-09-25');
+  await store.settled();
+  assert.deepEqual(requests.slice(3), ['VES'], 'asked again a day later');
+  release();
+});
+
+test('a past month sealed without rates near its end is asked again once a day; one whose rates reach its end stays final', async () => {
+  const august = { quote: 'EUR' as Currency, monthISO: '2026-08', throughISO: '2026-08-31', fetchedAt: '2026-09-02T00:00:00.000Z' };
+  const now = new Date('2026-09-25T12:00:00.000Z');
+  assert.equal(needsFetch(august, '2026-08', '2026-09-25', now, true), false, 'final');
+  assert.equal(needsFetch(august, '2026-08', '2026-09-25', now, false), true, 'short: due again');
+  assert.equal(needsFetch(august, '2026-08', '2026-09-25', new Date(Date.parse(august.fetchedAt) + RESEAL_MS - 1000), false), false, 'at most once a day');
+  assert.equal(needsFetch({ ...august, fetchedAt: '2026-09-26T00:00:00.000Z' }, '2026-08', '2026-09-25', now), true, 'a fetchedAt after now is due');
+  for (const [held, expected] of [[[], 1], [[rate('EUR', '2026-08-28', '0.9')], 0], [[rate('EUR', '2026-08-10', '0.9')], 1]] as const) {
+    const provider = stubProvider(() => []);
+    const store = createRatesStore({ cache: memoryCache({ rates: [...held], coverage: [august] }).cache, fetchRates: provider.fetchRates, now: () => now });
+    store.ensure(['2026-08'], ['EUR'], '2026-09-25');
+    await store.settled();
+    assert.equal(provider.requests.length, expected, JSON.stringify(held));
+  }
+});
+
+test('a return to the foreground asks what the watched months are due for, once: refresh relies on the refresh interval', async () => {
+  const clock = { now: new Date('2026-09-25T12:00:00.000Z') };
+  const { provider, store } = retryHarness(clock);
+  const release = store.watch(['2026-08', '2026-09'], ['EUR'], '2026-09-25');
+  await store.settled();
+  assert.equal(provider.requests.length, 2);
+  store.refresh('2026-09-25');
+  await store.settled();
+  assert.equal(provider.requests.length, 2, 'a quick return (Control Center) costs nothing');
+  clock.now = new Date(clock.now.getTime() + REFRESH_MS);
+  store.refresh('2026-09-25');
+  await store.settled();
+  assert.deepEqual(provider.requests.slice(2).map(request => request.to), ['2026-09-25'], 'the running month only; August is final');
+  store.refresh('2026-09-25');
+  await store.settled();
+  assert.equal(provider.requests.length, 3);
+  release();
+  clock.now = new Date(clock.now.getTime() + REFRESH_MS);
+  store.refresh('2026-09-25');
+  await store.settled();
+  assert.equal(provider.requests.length, 3, 'nothing watched, nothing asked');
+});
+
+test('the first frame of a month the cache does not cover reads fetching, before any watch; covered, failed and single read as themselves', async () => {
+  const clock = { now: new Date('2026-09-25T12:00:00.000Z') };
+  const { cache } = memoryCache({ rates: [rate('EUR', '2026-08-31', '0.9')], coverage: [{ quote: 'EUR', monthISO: '2026-08', throughISO: '2026-08-31', fetchedAt: '2026-09-02T00:00:00.000Z' }] });
+  const provider = stubProvider();
+  provider.fail('offline');
+  const store = createRatesStore({ cache, fetchRates: provider.fetchRates, now: () => clock.now, schedule: () => () => {} });
+  await store.settled();
+  assert.equal(store.activity(['2026-09'], ['EUR'], '2026-09-25'), 'fetching', 'not «Sin cotización» before the watch effect');
+  assert.equal(store.activity(['2026-09'], ['EUR']), 'idle', 'without the day, as before');
+  assert.equal(store.activity(['2026-08'], ['EUR'], '2026-09-25'), 'idle', 'sealed');
+  assert.equal(store.activity(['2026-10'], ['EUR'], '2026-09-25'), 'idle', 'the future is never asked');
+  assert.equal(store.activity(['2026-09'], [], '2026-09-25'), 'idle', 'single mode');
+  store.ensure(['2026-09'], ['EUR'], '2026-09-25');
+  await store.settled();
+  assert.equal(store.activity(['2026-09'], ['EUR'], '2026-09-25'), 'offline');
+  clock.now = new Date(clock.now.getTime() + RETRY_MS);
+  assert.equal(store.activity(['2026-09'], ['EUR'], '2026-09-25'), 'offline', 'a failure stays said until a success');
+});
+
+test('a day earlier than every rate held has no rate yet: missing, never stale with a later date', () => {
+  const book = rateBook([rate('EUR', '2026-09-20', '0.9')]);
+  const two: LedgerSnapshot = { accounts: [account('usd', 'USD'), account('eur', 'EUR')], entries: [spend('e', 'eur', 100, '2026-09-05')] };
+  const figure = spendingFigure(two, financeView(two, 'consolidated', 'USD', book), september, 'idle', true);
+  assert.deepEqual(figure.status === 'unavailable' && [figure.reason, figure.missing], ['missing', { currency: 'EUR', date: '2026-09-05' }]);
+});
+
+test('the view\'s mode and currency: one held currency is its own ledger whatever the preference; a route\'s currency wins', () => {
+  const shared = { mode: 'consolidated' as const, currency: 'EUR' as Currency };
+  assert.deepEqual(resolveFinanceTarget(['ARS'], shared), { mode: 'single', currency: 'ARS' });
+  assert.deepEqual(resolveFinanceTarget([], shared), { mode: 'single', currency: 'EUR' });
+  assert.deepEqual(resolveFinanceTarget(['ARS', 'USD'], shared), { mode: 'consolidated', currency: 'EUR' });
+  assert.deepEqual(resolveFinanceTarget(['ARS', 'USD'], shared, 'USD'), { mode: 'consolidated', currency: 'USD' });
+  assert.deepEqual(resolveFinanceTarget(['ARS'], { mode: 'single', currency: 'ARS' }, 'JPY'), { mode: 'single', currency: 'JPY' });
 });

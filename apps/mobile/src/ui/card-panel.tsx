@@ -58,7 +58,7 @@ export function CardFacts({ summary, day, limitCaption = false }: { summary: Car
     <View style={{ gap: 8 }}>
       <Stat label={t('cards.panel.available')}>
         {availability === 'known' && availableMinor !== null
-          ? <Money minor={availableMinor} currency={account.currency} size={17} color={availableMinor < 0 ? p.expense : tone === 'warning' ? p.warning : undefined} />
+          ? <Money minor={availableMinor} currency={account.currency} size={17} fit="content" color={availableMinor < 0 ? p.expense : tone === 'warning' ? p.warning : undefined} />
           : availability === 'unknownWithPlans' ? <UnknownAvailable />
           : <AppText secondary variant="subhead">{t('cards.panel.noLimitLoaded')}</AppText>}
         {limitCaption && card.creditLimitMinor !== null && <AppText tertiary variant="caption"

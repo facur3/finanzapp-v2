@@ -1,6 +1,7 @@
-import { isStaleReviewDraft, parseReviewDraft, reviewBasis, reviewDestinations, reviewGaps, type Account, type CreditCardProfile, type Currency,
+import { isStaleReviewDraft, parseReviewDraft, resolveCategory, reviewBasis, reviewDestinations, reviewGaps, type Account, type CreditCardProfile, type Currency,
   type ReviewArchive, type ReviewDraft, type ReviewGap, type ReviewKind, type ReviewPurchase } from '@finanzapp/domain';
 import type { ReviewItem } from '../storage/review-database.ts';
+import type { MessageKey } from '../i18n/messages.ts';
 
 /** Producto 25A-03: «Para revisar» as data, so the tray, the detail, the editor and the tests read one derivation. Every
  * judgement is the domain's (25A-01: `reviewGaps`, `isStaleReviewDraft`) or the store's (25A-02: the frozen write, a
@@ -27,6 +28,13 @@ export interface ReviewFacts {
   /** The card behind that account, when it is a card's. */
   card: CreditCardProfile | null;
   purchase: ReviewPurchase | null;
+  /** Whether the destination the draft names can still take it: `unavailable` when the account was deleted, the card
+   * archived or deleted, or it is not one this kind may post to. Such a name is drawn as no longer valid, never as current. */
+  destinationState: 'none' | 'unavailable' | 'ok';
+  /** `archived`: archived since the proposal (or copied from an archived one); `new`: a name the person has never used. */
+  categoryState: 'none' | 'archived' | 'new' | 'ok';
+  /** A chosen instalment count larger than the amount's minor units (cuotas of less than one cent). */
+  countTooMany: boolean;
   gaps: ReviewGap[];
   stale: boolean;
   state: ReviewState;
@@ -46,17 +54,38 @@ export function reviewFacts(item: ReviewItem, archive: ReviewArchive, context: R
   const destination = draft.destinationId === null ? null : archive.accounts.find(account => account.id === draft.destinationId) ?? null;
   const card = destination ? (archive.cards ?? []).find(row => row.accountId === destination.id) ?? null : null;
   const state: ReviewState = conflict ? 'conflict' : interrupted ? 'interrupted' : gaps.length ? 'incomplete' : stale ? 'stale' : 'ready';
+  const kind = draft.kind ?? 'expense';
+  const destinationState = destination === null ? 'none' : reviewDestinations(kind, archive).some(account => account.id === destination.id) ? 'ok' : 'unavailable';
+  const categoryState = draft.category === null ? 'none' : resolveCategory(kind, draft.category, archive.categories ?? []).archived ? 'archived'
+    : gaps.includes('category') && draft.kind !== null ? 'new' : 'ok';
+  const count = draft.purchase?.mode === 'installments' ? draft.purchase.count : null;
   return {
     kind: draft.kind,
     amount: draft.amountMinor !== null && draft.currency !== null ? { minor: draft.amountMinor, currency: draft.currency } : null,
     merchant: draft.merchant, category: draft.category, dateISO: draft.dateISO, destination, card, purchase: draft.purchase,
+    destinationState, categoryState, countTooMany: count !== null && draft.amountMinor !== null && draft.amountMinor < count,
     gaps, stale, state,
     canConfirm: context.writable && !conflict && (interrupted || (!gaps.length && !stale)),
   };
 }
 
+/** The sentence for one gap, specific when the draft names something that stopped being valid (a deleted account, an
+ * archived card or category, a count the amount cannot hold), so the person knows what changed; the plain one otherwise. */
+export function gapText(gap: ReviewGap, facts: Pick<ReviewFacts, 'destinationState' | 'categoryState' | 'countTooMany'>): MessageKey {
+  if (gap === 'destination' && facts.destinationState === 'unavailable') return 'review.gaps.destinationUnavailable';
+  if (gap === 'category' && facts.categoryState === 'archived') return 'review.gaps.categoryArchived';
+  if (gap === 'installmentCount' && facts.countTooMany) return 'review.gaps.installmentCountTooMany';
+  return `review.gaps.${gap}`;
+}
+
+/** The words beside a destination or category the draft names that is no longer valid («Banco Nación (ya no disponible)»),
+ * so it is never drawn as a current value; null when it is valid or there is none. */
+export function staleValueKey(state: ReviewFacts['destinationState'] | ReviewFacts['categoryState']): MessageKey | null {
+  return state === 'unavailable' ? 'review.value.unavailable' : state === 'archived' ? 'review.value.archived' : null;
+}
+
 /** The tone of a state's line: neutral while something is merely missing (an incomplete draft is not an error), amber when
- * the person must look again, the negative tone only for a conflict the ledger reports. Never lime: lime is Confirmar. */
+ * the person must look again, the negative tone only for a conflict the ledger reports. Never the brand: the brand fill is Confirmar. */
 export function stateTone(state: ReviewState): 'neutral' | 'warning' | 'expense' {
   return state === 'conflict' ? 'expense' : state === 'stale' || state === 'interrupted' ? 'warning' : 'neutral';
 }

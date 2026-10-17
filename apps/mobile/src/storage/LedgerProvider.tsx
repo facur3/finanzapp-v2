@@ -6,12 +6,14 @@ import { OPERATION_STATE_MESSAGE, PLAN_CALENDAR_MESSAGE, snapshotFromArchive, to
   type CardCycleDates, type CardCycleIntent, type EntryRefund, type OperationChange, type PlanPayoff, type PlanRefund } from '@finanzapp/domain';
 import type { CurrencyGate } from '@finanzapp/domain';
 import { currencyGateForBuild } from './currency-gate';
-import { changeEntry, createAccount, createEntry, deleteAccount, deleteCreditCard, importArchive, readArchive, changeAccount,
-  createTransfer, changeTransfer, saveRecurringRule, processRecurring, saveMonthlyBudget,
+import { changeEntry, createAccount, createEntry, deleteAccount, deleteCreditCard, readArchive, changeAccount,
+  createTransfer, changeTransfer, saveMonthlyBudget,
   createCreditCard, saveCreditCard, createPersonalDebt, savePersonalDebt, deletePersonalDebt, saveAccountAppearance, saveCategoryDefinition,
   cancelInstallmentPlan, deleteInstallmentPlan, catchUpInstallments, changePurchaseOperation, reactivateInstallmentPlan,
   type LedgerDatabase } from './database';
-import { openLedger, refreshLedger, savePurchaseOperation, savePurchasePlan, sessionWarning } from './ledger-session';
+import { VIEW_REFRESH_MESSAGE, openFailureMessage, openLedger, refreshLedger, restoreFromBackup, saveRecurring, savePurchaseOperation, savePurchasePlan, sessionWarning,
+  shouldRefreshOnActive, type CatchUps, type LastPass, type LedgerSession } from './ledger-session';
+import { useCurrentDay } from '../ui/theme';
 import { openLedgerDatabase, openReviewDatabase } from './nativeDatabase';
 import { loadReviewTray, openReviewStore, type ReviewCapture, type ReviewDatabase, type ReviewItem, type ReviewStore, type ReviewTray } from './review-database';
 
@@ -20,14 +22,14 @@ declare const __DEV__: boolean | undefined;
  * development bundle started with the flag, read by its literal name so a release bundle inlines the constant. */
 export const BUILD_CURRENCY_GATE: CurrencyGate = currencyGateForBuild(process.env.EXPO_PUBLIC_CURRENCY_PREVIEW, typeof __DEV__ !== 'undefined' && __DEV__);
 
-/** A write committed but the view could not be read again: said in the banner, never as a failed write. */
-const VIEW_REFRESH_MESSAGE = 'El guardado terminó, pero no pudimos actualizar la vista. Verificá de nuevo antes de registrar otro movimiento; no lo cargues otra vez.';
-
 type LedgerContextValue = {
   /** The currencies a new account, card, debt or budget may take in this build. Reads never consult it. */
   gate: CurrencyGate;
   snapshot: LedgerSnapshot | null;
   archive: LedgerArchive | null;
+  /** The device's day the archive's catch-ups last ran through (open, foreground, a change of day), or null before the open.
+   * Recurrentes asks for review only against it: a rule due since then is not «behind» until a pass for today ran. */
+  asOfISO: string | null;
   error: string | null;
   retry: () => void;
   addAccount: (account: Account, appearance?: AccountAppearance) => Promise<void>;
@@ -108,12 +110,21 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
   // Serializing client writes and reads avoids stale snapshots replacing a
   // newer balance. SQLite exclusive transactions provide durable atomicity.
   const queue = useRef<Promise<void>>(Promise.resolve());
-  /** 24T1: a warning a write left behind (its instalment recognition failed after the save): shown instead of clearing the banner. */
-  const pendingWarning = useRef<string | null>(null);
+  /** 25Q4: which catch-up last failed, as the open or foreground pass left it and as a write that ran a pass updated it. The
+   * banner after a write is built from it, so a failure stays said, with its retry, until its own pass succeeds. */
+  const catchUps = useRef<CatchUps>({ recurringError: false, installmentError: false });
   const reviewStore = useRef<ReviewStore | null>(null);
   const reviewDatabase = useRef<ReviewDatabase | null>(null);
   const [review, setReview] = useState<ReviewTray | 'unavailable' | null>(null);
   const [reviewVersion, setReviewVersion] = useState(0);
+  const [asOfISO, setAsOfISO] = useState<string | null>(null);
+  // 25R1: the pass bookkeeping. `lastPass`: the day and outcome of the last pass run; `passFor`: the day of the pass last
+  // started, so a day change and a foreground on the same new day run it once; `pending`: one is queued or running.
+  const lastPass = useRef<LastPass | null>(null);
+  const passFor = useRef<string | null>(null);
+  const pending = useRef(false);
+  const previousState = useRef<string | null>(AppState.currentState ?? null);
+  const day = useCurrentDay();
 
   const enqueue = useCallback((work: () => Promise<void>) => {
     const next = queue.current.then(work);
@@ -131,32 +142,67 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
       // 24UX5: the recurring catch-up never keeps the data closed. A rule it cannot record waits in Recurrentes for
       // review; a catch-up that failed as a whole is said in the banner, over the open app, with its retry. 24T1: the
       // same for the instalment catch-up, on its own flag (the retry reopens and runs both passes again).
-      const session = await openLedger(db, todayKey());
+      const today = todayKey();
+      passFor.current = today;
+      const session = await openLedger(db, today);
       if (cancelled) return;
-      setArchive(session.archive);
-      setError(sessionWarning(session));
+      adopt(session, today);
       await loadReview(db);
-    }).catch(() => {
-      if (!cancelled) setError('No pudimos abrir tus datos. No se borró ni reemplazó nada. Probá nuevamente o conservá la app para recuperar la base.');
+    }).catch(cause => {
+      if (!cancelled) setError(openFailureMessage(cause));
     });
     return () => { cancelled = true; mounted.current = false; };
   }, [attempt, enqueue]);
 
+  /** A pass's outcome becomes the view: the archive, the day it is current to, the banner (a success clears its warning). */
+  function adopt(session: LedgerSession, today: string) {
+    catchUps.current = { recurringError: session.recurringError, installmentError: session.installmentError };
+    lastPass.current = { day: today, failed: session.recurringError || session.installmentError };
+    setArchive(session.archive);
+    setAsOfISO(today);
+    setError(sessionWarning(session));
+  }
+  /** One catch-up pass in the queue, for the day it runs on. Coalesced: while one is queued or running, another request adds
+   * nothing (several quick returns, or a return and the change of day it brings). */
+  const runPass = () => {
+    if (!database.current || pending.current) return;
+    pending.current = true;
+    passFor.current = todayKey();
+    void enqueue(async () => {
+      const today = todayKey();
+      passFor.current = today;
+      const session = await refreshLedger(database.current!, today);
+      if (!mounted.current) return;
+      adopt(session, today);
+      await loadReview(database.current!);
+    }).catch(() => {
+      // The pass could not be read back: nothing says it completed.
+      lastPass.current = { day: passFor.current ?? '', failed: true };
+      catchUps.current = { ...catchUps.current, recurringError: true };
+      if (mounted.current) setError(sessionWarning(catchUps.current));
+    }).finally(() => {
+      pending.current = false;
+      // A midnight that passed while this pass ran was coalesced into it: run once more for the new day.
+      if (mounted.current && database.current && passFor.current !== todayKey()) runPass();
+    });
+  };
+
   useEffect(() => {
     const subscription = AppState.addEventListener('change', state => {
+      const previous = previousState.current;
+      previousState.current = state;
       if (state !== 'active' || !database.current || !snapshot) return;
-      void enqueue(async () => {
-        const session = await refreshLedger(database.current!, todayKey());
-        if (!mounted.current) return;
-        setArchive(session.archive);
-        setError(sessionWarning(session)); // A successful pass clears its warning; a failing one keeps it.
-        await loadReview(database.current!);
-      }).catch(() => {
-        if (mounted.current) setError('No pudimos verificar tus datos locales ni los vencimientos recurrentes. No se modificó nada fuera de una transacción completa.');
-      });
+      // 25R1: a pull of Control Center on a day already caught up costs nothing; a return from the background always runs.
+      if (shouldRefreshOnActive({ previous, today: todayKey(), lastPass: lastPass.current, queued: pending.current })) runPass();
     });
     return () => subscription.remove();
   }, [enqueue, snapshot !== null]);
+
+  // 25R1: midnight with the app open (the UI's day changes on its own timer) runs the pass once for the new day; a day change
+  // that a foreground return already queued or ran a pass for adds nothing.
+  useEffect(() => {
+    if (snapshot && passFor.current !== null && passFor.current !== day) runPass();
+  }, [day, snapshot !== null]);
 
   /** 25A-03: opens the review file once (again after a failure) and reads the tray, reconciling first. Never throws: a review
    * file that cannot be opened or read leaves the ledger as it is; a tray already shown stays until a read succeeds. */
@@ -173,14 +219,15 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
   };
 
   const mutate = useCallback((operation: (db: LedgerDatabase) => Promise<void>) => enqueue(async () => {
-    if (!database.current) throw new Error('Todavía estamos abriendo tus datos.');
-    pendingWarning.current = null;
+    if (!database.current) throw new Error('Tus datos todavía se están abriendo.');
     await operation(database.current);
     // If this read fails after commit, the form keeps the same operation ID;
     // retrying cannot post a duplicate entry.
     try {
       const next = await readArchive(database.current);
-      if (mounted.current) { setArchive(next); setError(pendingWarning.current); }
+      // 25Q4: a write never clears a catch-up banner it did not earn: one that ran no pass leaves a failed pass said; a pass
+      // it ran updated its own half.
+      if (mounted.current) { setArchive(next); setError(sessionWarning(catchUps.current)); }
     } catch {
       if (mounted.current) setError(VIEW_REFRESH_MESSAGE);
       throw new Error(VIEW_REFRESH_MESSAGE);
@@ -223,7 +270,7 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
   };
 
   return <LedgerContext.Provider value={{
-    gate: BUILD_CURRENCY_GATE, snapshot, archive, error, review, reviewVersion,
+    gate: BUILD_CURRENCY_GATE, snapshot, archive, asOfISO, error, review, reviewVersion,
     retry: () => setAttempt(value => value + 1),
     addAccount: (account, appearance) => mutate(db => createAccount(db, account, appearance, BUILD_CURRENCY_GATE)),
     addEntry: entry => mutate(db => createEntry(db, entry)),
@@ -234,9 +281,11 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     saveCategory: definition => mutate(db => saveCategoryDefinition(db, definition)),
     addTransfer: transfer => mutate(db => createTransfer(db, transfer)),
     updateTransfer: change => mutate(db => changeTransfer(db, change)),
+    // 25Q4: the rule is durable before its catch-up: a catch-up that fails after it is said in the banner (its retry runs it
+    // again), never as a failed save, as a plan's recognition (24T2). 25R1: the composite is storage's (`saveRecurring`).
     saveRecurring: rule => mutate(async db => {
-      await saveRecurringRule(db, rule);
-      await processRecurring(db, todayKey());
+      const { recurringError } = await saveRecurring(db, rule, todayKey());
+      catchUps.current = { ...catchUps.current, recurringError };
     }),
     saveBudget: budget => mutate(db => saveMonthlyBudget(db, budget, BUILD_CURRENCY_GATE)),
     addCard: (account, card, cycleDates = []) => mutate(db => createCreditCard(db, account, card, BUILD_CURRENCY_GATE, cycleDates)),
@@ -248,7 +297,10 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     addInstallmentPlan: plan => mutate(async db => {
       // A first instalment on a statement already closed is recognised at once. The plan is saved either way: a failing
       // recognition is reported in the banner (never as a failed save that would invite a duplicate) and retried.
-      try { pendingWarning.current = await savePurchasePlan(db, plan, todayKey()); } catch (cause) {
+      try {
+        const warning = await savePurchasePlan(db, plan, todayKey());
+        catchUps.current = { ...catchUps.current, installmentError: warning !== null };
+      } catch (cause) {
         // 24T2: a plan built from a calendar this view no longer holds (a card change whose refresh failed) is refused before
         // anything is written; the view is read again so the form rebuilds the plan from the card's current statements.
         if (cause instanceof Error && cause.message === PLAN_CALENDAR_MESSAGE) {
@@ -260,20 +312,21 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     // 24T3 (A14): the catch-up runs through the device's day (`todayKey()`), never a UTC timestamp's date.
     cancelInstallmentPlan: (planId, expectedRevision) => rereadOnRefusal(db => cancelInstallmentPlan(db, planId, expectedRevision, todayKey(), new Date().toISOString())),
     reactivateInstallmentPlan: (planId, expectedRevision) => rereadOnRefusal(db => reactivateInstallmentPlan(db, planId, expectedRevision, todayKey(), new Date().toISOString())),
-    removeInstallmentPlan: planId => mutate(db => deleteInstallmentPlan(db, planId, new Date().toISOString())),
+    // 25Q4: a refused deletion (an instalment or an operation recorded since the screen was drawn) re-reads the plan too.
+    // 25R1: judged on the plan caught up through the device's day, as the other plan actions.
+    removeInstallmentPlan: planId => rereadOnRefusal(db => deleteInstallmentPlan(db, planId, new Date().toISOString(), todayKey())),
     addRefund: refund => rereadOnRefusal(db => savePurchaseOperation(db, refund, todayKey())),
     addPayoff: payoff => rereadOnRefusal(db => savePurchaseOperation(db, payoff, todayKey())),
     voidOperation: change => changeOperation(change, 'void'),
     restoreOperation: change => changeOperation(change, 'restore'),
-    restoreBackup: (incoming, baseline) => mutate(async db => {
-      await importArchive(db, incoming, baseline);
-      await processRecurring(db, todayKey());
-      try { await catchUpInstallments(db, todayKey()); } catch { pendingWarning.current = sessionWarning({ recurringError: false, installmentError: true }); }
-    }),
+    // 25Q4: a refused import re-reads the archive before the error reaches the review, so «Volver a revisar» previews from the
+    // stored ledger; a committed one adopts both catch-ups' outcome, whatever the banner said before.
+    restoreBackup: (incoming, baseline) => rereadOnRefusal(async db => { catchUps.current = await restoreFromBackup(db, incoming, baseline, todayKey()); }),
     confirmReview: (id, expectedRevision) => reviewOperation(async store => {
       const result = await store.confirm(id, { expectedRevision, todayISO: todayKey(), at: new Date().toISOString() });
-      // A plan whose first instalments could not be recognised right away is saved: its catch-up banner, as for the form.
-      pendingWarning.current = result.warning;
+      // A plan whose first instalments could not be recognised right away is saved: its catch-up banner, as for the form. A null
+      // warning does not say a pass ran (an entry runs none), so it leaves the half as it was.
+      if (result.warning) catchUps.current = { ...catchUps.current, installmentError: true };
       return { recorded: result.recorded };
     }),
     updateReview: (id, expectedRevision, draft) => reviewOperation(store => store.updateDraft(id, expectedRevision, draft, new Date().toISOString())),

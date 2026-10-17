@@ -63,7 +63,7 @@ describe('native edit and recovery domain', () => {
     expect(plan.after).toEqual({ ARS: 100000 - 101 - 1000 });
     expect(previewBackupImport(liabilities, { ...liabilities, cards: [{ ...card, creditLimitMinor: 1, revision: 1, updatedAt: time }] }).conflicts).toBe(1);
     expect(previewBackupImport(liabilities, liabilities)).toMatchObject({ identical: 5, conflicts: 0, cards: [], debts: [] });
-    expect(() => validateArchive({ ...liabilities, debts: [{ ...debt, accountId: cardAccount.id }] })).toThrow(/dos obligaciones/);
+    expect(() => validateArchive({ ...liabilities, debts: [{ ...debt, accountId: cardAccount.id }] })).toThrow(/dos tarjetas o deudas/);
   });
   it('preserves revisions and tombstones in a backup, but excludes undone entries from every balance/report', () => {
     const undo = makeEntryChange('undo', archive.records[0], 'void', time);

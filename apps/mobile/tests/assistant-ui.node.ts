@@ -54,8 +54,9 @@ function load(file: string, { reduced = false, fontScale = 1, dark = false, bott
       withTiming: (value: number) => value, withSequence: (...steps: number[]) => steps[0], withRepeat: (value: number) => value },
     'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 59, bottom: bottomInset, left: 0, right: 0 }) },
     '@expo/vector-icons/Ionicons': 'Ionicons',
-    './components': Object.fromEntries(['AccountBadge', 'ActionButton', 'AppText', 'CategoryBadge', 'Money', 'PressFeedback', 'Surface'].map(name => [name, name])),
-    './motion': { Appear: 'Appear', Reflow: 'Reflow', selectionHaptic: () => haptics.push('selection') },
+    './components': { ...Object.fromEntries(['AccountBadge', 'ActionButton', 'AppText', 'CategoryBadge', 'Money', 'PressFeedback', 'Surface'].map(name => [name, name])),
+      useStacked: () => fontScale > 1.2 },
+    './motion': { Appear: 'Appear', Reflow: 'Reflow', selectionHaptic: () => haptics.push('selection'), WAIT_REVEAL_MS: 400 },
     './presentation': presentation,
     './theme': { radius: { chip: 14, tile: 12, group: 16, card: 20, sheet: 24, creditCard: 18, button: 14 }, space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
       usePalette: () => palette, useReduceMotion: () => reduced, useCurrentDay: () => '2026-09-21' },
@@ -66,11 +67,16 @@ function load(file: string, { reduced = false, fontScale = 1, dark = false, bott
       useCategoryLookOf: (kind?: 'expense' | 'income') => (stored: string) => ({ label: categoryLabel(stored, kind) }) },
   };
   const module = { exports: {} as Record<string, (props: any) => Node> };
-  runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
+  // Timers are the test's: `elapse(ms)` runs every timer due by then (a component's delay is observed, never waited for).
+  const timers: { at: number; fn: () => void; cleared: boolean }[] = [];
+  const setTimeout = (fn: () => void, ms: number) => { timers.push({ at: ms, fn, cleared: false }); return timers.length; };
+  const clearTimeout = (handle: number) => { if (timers[handle - 1]) timers[handle - 1].cleared = true; };
+  const elapse = (ms: number) => { for (const timer of timers.splice(0)) if (!timer.cleared && timer.at <= ms) timer.fn(); else if (!timer.cleared) timers.push(timer); };
+  runInNewContext(code, { module, exports: module.exports, setTimeout, clearTimeout, require: (name: string) => {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected ' + file + ' dependency: ' + name);
     return modules[name];
   } });
-  return { exports: module.exports, render: (component: string, props: any) => { cursor = 0; return module.exports[component](props); }, shared, haptics };
+  return { exports: module.exports, render: (component: string, props: any) => { cursor = 0; return module.exports[component](props); }, shared, haptics, elapse };
 }
 function nodes(value: any): Node[] {
   if (!value || typeof value !== 'object') return [];
@@ -112,10 +118,28 @@ test('the composer labels its field and send (no microphone until dictation exis
   assert.equal(flat(nodes(ready).find(node => node.type === 'View')!.props.style).backgroundColor, '#2557D6', 'the filled cobalt send');
   ready.props.onPress();
   assert.deepEqual(events, ['send']);
+  // The protocol's bound is the field's: a longer paste is cut where the person sees it, never refused as a failure later.
+  assert.equal(input.props.maxLength, 2000);
+  assert.equal(input.props.maxLength, conversation.MESSAGE_MAX_CHARS);
+  // Waiting: for the first WAIT_REVEAL_MS the slot stays a disabled Enviar, so a quick second tap cancels nothing; then Detener.
+  root = ui.render('AssistantComposer', { ...props, value: 'Gasté 500', busy: true });
+  assert.equal(byLabel(root, 'Detener respuesta'), undefined, 'no Detener under a finger that just tapped Enviar');
+  assert.equal(byLabel(root, 'Enviar')!.props.disabled, true);
+  ui.elapse(399);
+  assert.equal(byLabel(ui.render('AssistantComposer', { ...props, value: 'Gasté 500', busy: true }), 'Detener respuesta'), undefined);
+  ui.elapse(400);
   root = ui.render('AssistantComposer', { ...props, value: 'Gasté 500', busy: true });
   assert.equal(byLabel(root, 'Enviar'), undefined);
   byLabel(root, 'Detener respuesta')!.props.onPress();
   assert.deepEqual(events, ['send', 'stop']);
+  // 25D1: Enviar and Detener are 44 pt targets that still take 40 pt of the bar: a −2 pt margin inside its padding, so the
+  // 32 pt disc, the field and the 48 pt bar do not move.
+  for (const control of [ready, byLabel(root, 'Detener respuesta')!]) {
+    const target = flat(control.props.style);
+    assert.deepEqual([target.width, target.height, target.minHeight, flat(control.props.containerStyle).margin], [44, 44, 44, -2]);
+    const disc = flat(nodes(control).find(node => node.type === 'View')!.props.style);
+    assert.deepEqual([disc.width, disc.height], [32, 32]);
+  }
   // No dictation note either, and no line under the bar when no note is passed (the disconnected caption is gone).
   root = ui.render('AssistantComposer', props);
   assert.equal(nodes(root).some(node => node.type === 'AppText'), false);
@@ -179,6 +203,18 @@ const proposal = (draft = reviewDraft(), status: conversation.ProposalContent['s
 const itemOf = (draft: domain.ReviewDraft) => ({ id: 'item-1', source: 'assistant', captureKey: 'assistant:item-1', draft, writeId: 'write-1', status: 'pending',
   attempt: null, receipt: null, createdAt: '2026-09-21T10:00:00.000Z', updatedAt: '2026-09-21T10:00:00.000Z', revision: 0 });
 
+test('25T: the draft card\'s rows put the value under its label above 1.2×, whole and left-aligned, as DetailRow does', () => {
+  const handlers = { archive: proposalArchive, onReview: () => {}, onRetry: () => {}, onOpenRecord: () => {} };
+  for (const [fontScale, stacked] of [[1, false], [1.2, false], [2.643, true]] as const) {
+    const card = nodes(load('assistant-messages.tsx', { fontScale }).render('ProposalCard', { content: proposal(), state: { kind: 'pending', item: itemOf(reviewDraft({ merchant: 'Carrefour Express' })), conflict: false, writable: true }, ...handlers }));
+    const row = card.find(node => node.type === 'View' && /^Comercio: /.test(node.props.accessibilityLabel ?? ''))!;
+    const style = Object.assign({}, ...[row.props.style].flat(Infinity).filter(Boolean));
+    assert.equal(style.flexDirection, stacked ? 'column' : 'row', 'at ' + fontScale);
+    const value = nodes(row).filter(node => node.type === 'AppText')[1];
+    assert.deepEqual([value.props.numberOfLines, value.props.style.textAlign], stacked ? [undefined, 'left'] : [2, 'right'], 'at ' + fontScale);
+  }
+});
+
 test('25A-04: a proposal card shows what the review item holds, says what it needs, and leads to «Para revisar»; it never confirms', () => {
   const ui = load('assistant-messages.tsx');
   const calls: string[] = [];
@@ -195,7 +231,7 @@ test('25A-04: a proposal card shows what the review item holds, says what it nee
   assert.equal(all.some(node => node.type === 'AppText' && textOf(node) === 'Pendiente · Gasto'), true);
   assert.ok(all.some(node => node.type === 'AppText' && textOf(node) === 'Lista para confirmar.'));
   assert.deepEqual(all.filter(node => node.type === 'ActionButton').map(node => [node.props.label, node.props.secondary]), [['Revisar', true]],
-    'one way on: the review sheet; no Confirmar, Editar or Descartar in the chat, and no lime');
+    'one way on: the review sheet; no Confirmar, Editar or Descartar in the chat, and no brand fill');
   all.find(node => node.type === 'ActionButton')!.props.onPress();
   assert.deepEqual(calls, ['review:item-1']);
   assert.equal(pending.type, 'Appear');
@@ -210,7 +246,7 @@ test('25A-04: a proposal card shows what the review item holds, says what it nee
   assert.equal(line.props.style.color, '#6E7078', 'incomplete is neutral, never a warning or an error');
   // A card destination shows the purchase mode the domain chose: «Una vez».
   const onCard = nodes(ui.render('ProposalCard', { content: proposal(), state: { kind: 'pending', item: itemOf(reviewDraft({ destinationId: 'card-acc', purchase: { mode: 'once' } })), conflict: false, writable: true }, ...handlers }));
-  assert.ok(onCard.some(node => node.props.accessibilityLabel === 'Pago: Una vez'));
+  assert.ok(onCard.some(node => node.props.accessibilityLabel === 'Cómo se paga: Una vez'));
   // Capturing, failed, preview: the snapshot, and what is happening; Reintentar only after a failure.
   const capturing = nodes(ui.render('ProposalCard', { content: proposal(reviewDraft(), 'capturing'), state: { kind: 'capturing' }, ...handlers }));
   assert.ok(capturing.some(node => node.type === 'AppText' && textOf(node) === 'Guardando la propuesta…'));
@@ -243,6 +279,16 @@ test('25A-04: a proposal card shows what the review item holds, says what it nee
   assert.ok(income.some(node => node.props.accessibilityLabel === 'Origen: Sueldo'));
   assert.equal(income.find(node => node.type === 'Money')!.props.signed, true);
   assert.ok(income.some(node => node.type === 'AppText' && textOf(node) === 'Revisala de nuevo' && node.props.style.color === '#B45309'));
+});
+
+test('a proposal card draws a destination that stopped being valid with why, in the secondary style, never as the current account', () => {
+  const ui = load('assistant-messages.tsx');
+  const changed = { ...proposalArchive, accounts: proposalArchive.accounts.map(account => account.id === 'visa' ? { ...account, deletedAt: '2026-09-22T10:00:00.000Z' } : account) };
+  const card = ui.render('ProposalCard', { content: proposal(), state: { kind: 'pending', item: itemOf(reviewDraft()), conflict: false, writable: true }, archive: changed,
+    onReview: () => {}, onRetry: () => {}, onOpenRecord: () => {} });
+  const row = nodes(card).find(node => node.props.accessibilityLabel === 'Dónde se registra: Visa Galicia (ya no disponible)');
+  assert.ok(row, 'named with why');
+  assert.equal(flat(nodes(row!).filter(node => node.type === 'AppText').at(-1)!.props.style).color, '#6E7078', 'the secondary (missing) style');
 });
 
 test('suggestions cap at four with VoiceOver names; clarification chips tick once and leave after a choice', () => {
@@ -282,6 +328,9 @@ test('assistant text, thinking and system notes are said in words; the pulse sto
   assert.equal(done.props.accessibilityLabel, 'Asistente: Gastaste más.');
   const stopped = ui.render('AssistantText', { text: 'Gastaste', status: 'stopped' });
   assert.ok(nodes(stopped).some(node => node.type === 'AppText' && node.props.children === 'Respuesta interrumpida.'));
+  // «Pensando…» waits WAIT_REVEAL_MS before it shows, so a reply (or a note) that is already there never flashes it.
+  assert.equal(nodes(ui.render('AssistantText', { text: '', status: 'streaming' })).some(node => node.props.accessibilityLabel === 'Asistente: pensando'), false);
+  ui.elapse(400);
   const thinking = ui.render('AssistantText', { text: '', status: 'streaming' });
   const pulse = nodes(thinking).find(node => node.props.accessibilityLabel === 'Asistente: pensando')!;
   assert.equal(pulse.props.accessibilityState.busy, true);
@@ -289,6 +338,8 @@ test('assistant text, thinking and system notes are said in words; the pulse sto
   assert.equal(ui.shared.at(-1)!.value, 0.3, 'the dot pulses');
   const still = load('assistant-messages.tsx', { reduced: true });
   nodes(still.render('AssistantText', { text: '', status: 'streaming' }));
+  still.elapse(400);
+  assert.ok(nodes(still.render('AssistantText', { text: '', status: 'streaming' })).some(node => node.props.accessibilityLabel === 'Asistente: pensando'), 'the delay is not motion: Reduce Motion keeps it');
   assert.equal(still.shared.at(-1)!.value, 1, 'Reduce Motion: no pulse, the words carry the state');
   const user = ui.render('UserMessage', { text: 'Gasté 500' });
   assert.equal(nodes(user).find(node => node.props.accessibilityLabel)!.props.accessibilityLabel, 'Vos: Gasté 500');
@@ -297,8 +348,27 @@ test('assistant text, thinking and system notes are said in words; the pulse sto
   byLabel(offline, 'Reintentar')!.props.onPress();
   assert.deepEqual(retried, ['hola']);
   assert.equal(nodes(offline).find(node => node.type === 'Ionicons')!.props.name, 'cloud-offline-outline');
-  const unavailable = ui.render('SystemNote', { message: { id: 's', role: 'system', reason: 'unavailable', text: 'No conectado.', retryText: null }, onRetry: () => {} });
+  const recorded: string[] = [];
+  const unavailable = ui.render('SystemNote', { message: { id: 's', role: 'system', reason: 'unavailable', text: 'No conectado.', retryText: null }, onRetry: () => {}, onRecord: () => recorded.push('manual') });
   assert.equal(byLabel(unavailable, 'Reintentar'), undefined, 'nothing was sent, so there is nothing to retry');
+  // The next step instead: «Registrar a mano», a 44 pt target (36 pt drawn, 4 pt of slop above and below).
+  const manual = byLabel(unavailable, 'Registrar a mano')!;
+  manual.props.onPress();
+  assert.deepEqual(recorded, ['manual']);
+  assert.deepEqual([flat(manual.props.style).minHeight, JSON.stringify(manual.props.hitSlop)], [36, JSON.stringify({ top: 4, bottom: 4 })]);
+  const limit = ui.render('SystemNote', { message: { id: 's', role: 'system', reason: 'limit', text: 'assistant.reasons.limit', retryText: 'hola' }, onRetry: () => {}, onRecord: () => {} });
+  assert.ok(byLabel(limit, 'Registrar a mano') && byLabel(limit, 'Reintentar'), 'a limit offers both');
+  assert.equal(byLabel(offline, 'Registrar a mano'), undefined, 'offline is retried, not routed away');
+  assert.doesNotMatch(bindLocale('es-AR').errorText('assistant.reasons.limit'), /de hoy/, 'a limit is never said to be today\'s: the windows are a minute to a month');
+  assert.doesNotMatch(bindLocale('en-US').errorText('assistant.reasons.limit'), /today/);
+  // 25D2: inside one accessible element «Reintentar» was never a VoiceOver stop of its own. The note and the button are
+  // siblings now: the text is one element, the button another, and nothing accessible holds the button.
+  assert.notEqual(offline.props.accessible, true, 'the row itself is not one element');
+  const stops = nodes(offline).filter(node => node.props.accessible || node.props.accessibilityRole === 'button');
+  assert.deepEqual(stops.map(node => node.props.accessibilityLabel), ['Sin conexión.', 'Reintentar']);
+  assert.equal(stops[0].props.accessibilityRole, 'text');
+  assert.ok(!nodes(stops[0]).some(node => node.props.accessibilityRole === 'button'), 'the button is not inside the note\'s element');
+  assert.equal(JSON.stringify(stops[1].props.hitSlop), JSON.stringify({ top: 4, bottom: 4 }), 'the row\'s padding takes the 36 pt button to 44 pt');
 });
 
 test('answer evidence renders rows with the shared Money component and links as text buttons; nothing when there is no evidence', () => {
@@ -320,6 +390,29 @@ test('answer evidence renders rows with the shared Money component and links as 
   links[1].props.onPress();
   assert.equal(JSON.stringify(opened), JSON.stringify([{ pathname: '/activity' }]));
   assert.equal(ui.render('AnswerEvidence', { content: { kind: 'answer', rows: [], links: [] }, currency: 'ARS', onOpen: () => {} }), null);
+  // 25D1: beside its label up to 1.2×; above, the figure goes under the label and the label is whole (an amount that
+  // grows with the text left a label beside it no room).
+  const rowOf = (tree: any) => nodes(tree).find(node => node.type === 'View' && node.props.accessible)!;
+  const labelOf = (tree: any) => nodes(rowOf(tree)).find(node => node.type === 'AppText')!;
+  const flatStyle = (style: any) => Object.assign({}, ...[style].flat(Infinity).filter(Boolean));
+  assert.deepEqual([flatStyle(rowOf(root).props.style).flexDirection, labelOf(root).props.numberOfLines, flatStyle(labelOf(root).props.style).flex], ['row', 2, 1]);
+  const large = load('assistant-messages.tsx', { fontScale: 2.643 }).render('AnswerEvidence', { content, currency: 'ARS', onOpen: () => {} });
+  assert.deepEqual([flatStyle(rowOf(large).props.style).flexDirection, labelOf(large).props.numberOfLines, flatStyle(labelOf(large).props.style).flex], ['column', undefined, undefined]);
+  assert.equal(rowOf(large).props.accessibilityLabel, 'Supermercado, 31200,00 pesos más', 'one VoiceOver element, the same sentence');
+});
+
+test('the evidence says what its rows cover when it is not the obvious whole: days 1 to N of a capped month, one currency\'s accounts', () => {
+  const ui = load('assistant-messages.tsx');
+  const facts = [{ id: 'current.expenses', label: 'Gastos registrados', amountMinor: 120000, count: 3, startISO: '2026-10-01', endISO: '2026-10-30' }];
+  const words = (content: conversation.AnswerContent) => nodes(ui.render('AnswerEvidence', { content, onOpen: () => {} })).filter(node => node.type === 'AppText').map(textOf);
+  const capped = conversation.answerContent({ evidenceIds: ['current.expenses'] }, facts, 'ARS', '2026-10-31');
+  assert.ok(words({ ...capped, scoped: true }).includes('Del 1 al 30 · Solo cuentas en ARS, sin conversiones.'));
+  assert.ok(words(capped).includes('Del 1 al 30'));
+  const whole = conversation.answerContent({ evidenceIds: ['current.expenses'] }, facts, 'ARS', '2026-10-30');
+  assert.ok(!words(whole).some(text => /Del 1|Solo cuentas/.test(text)), 'a single-currency ledger mid-month: no caption');
+  const english = load('assistant-messages.tsx', { locale: 'en-US' });
+  assert.ok(nodes(english.render('AnswerEvidence', { content: { ...capped, scoped: true }, onOpen: () => {} })).filter(node => node.type === 'AppText').map(textOf)
+    .includes('Days 1–30 · Only accounts in ARS, nothing converted.'));
 });
 
 test('English: every word the Assistant UI says is English; account names, merchants, custom categories and the model\'s text are untouched', () => {
@@ -347,14 +440,16 @@ test('English: every word the Assistant UI says is English; account names, merch
   assert.equal(answer.props.accessibilityLabel, 'Assistant: Gastaste más.');
   assert.ok(nodes(answer).some(node => node.type === 'AppText' && node.props.children === 'Response stopped.'));
   assert.equal(nodes(ui.render('UserMessage', { text: 'Gasté 500' })).find(node => node.props.accessibilityLabel)!.props.accessibilityLabel, 'You: Gasté 500');
+  nodes(ui.render('AssistantText', { text: '', status: 'streaming' }));
+  ui.elapse(400);
   const thinking = nodes(ui.render('AssistantText', { text: '', status: 'streaming' }));
   assert.ok(thinking.some(node => node.props.accessibilityLabel === 'Assistant: thinking'));
   assert.ok(thinking.some(node => node.type === 'AppText' && node.props.children === 'Thinking…'));
   // A note stored as a key reads in English; a caught sentence nobody translated is shown as it was thrown.
   const note = ui.render('SystemNote', { message: { id: 's', role: 'system', reason: 'offline', text: 'assistant.reasons.offline', retryText: 'hola' }, onRetry: () => {} });
-  assert.equal(note.props.accessibilityLabel, 'No connection. Your transactions didn’t change; you can retry.');
+  assert.equal(nodes(note).find(node => node.props.accessible)!.props.accessibilityLabel, 'No connection. Your transactions didn’t change; you can retry.');
   assert.ok(byLabel(note, 'Retry'));
-  assert.equal(ui.render('SystemNote', { message: { id: 's', role: 'system', reason: 'failed', text: 'Respuesta inválida del servidor.', retryText: null } }).props.accessibilityLabel, 'Respuesta inválida del servidor.');
+  assert.equal(nodes(ui.render('SystemNote', { message: { id: 's', role: 'system', reason: 'failed', text: 'Respuesta inválida del servidor.', retryText: null } })).find(node => node.props.accessible)!.props.accessibilityLabel, 'Respuesta inválida del servidor.');
   // Clarification chips: the app's words translate, account names do not, a built-in category reads localized and is echoed as shown.
   const chosen: string[] = [];
   const kinds = nodes(ui.render('ClarificationChoices', { options: [{ id: 'expense', labelKey: 'movement.expense' }, { id: 'income', labelKey: 'movement.income' }], chosen: null, onChoose: (_o: unknown, shown: string) => chosen.push(shown) }))
@@ -398,6 +493,8 @@ test('English: every word the Assistant UI says is English; account names, merch
   assert.equal(input.props.accessibilityLabel, 'Message for the Assistant');
   assert.equal(byLabel(bar, 'Dictate'), undefined, 'no microphone in English either');
   assert.ok(byLabel(bar, 'Send'));
+  composer.render('AssistantComposer', { value: 'x', onChange: () => {}, onSend: () => {}, onStop: () => {}, busy: true });
+  composer.elapse(400);
   bar = composer.render('AssistantComposer', { value: 'x', onChange: () => {}, onSend: () => {}, onStop: () => {}, busy: true });
   assert.ok(byLabel(bar, 'Stop response'));
   assert.equal(nodes(bar).some(node => node.type === 'AppText'), false, 'no dictation note');
@@ -410,7 +507,7 @@ test('VoiceOver: with an interface language that differs from the device\'s, eve
   const content = conversation.answerContent({ evidenceIds: ['current.category.1', 'previous.category.1'] },
     [{ id: 'current.category.1', label: 'Categoría de gasto: Supermercado', amountMinor: 12120000, count: 11, startISO: '2026-09-01', endISO: '2026-09-21' },
       { id: 'previous.category.1', label: 'Categoría de gasto: Supermercado', amountMinor: 12200000, count: 10, startISO: '2026-08-01', endISO: '2026-08-21' }], 'ARS');
-  const rendered = (ui: ReturnType<typeof load>) => [
+  const views = (ui: ReturnType<typeof load>) => [
     ui.render('UserMessage', { text: 'Spent 500' }),
     ui.render('AssistantText', { text: 'Gastaste más.', status: 'done', language: 'es' }),
     ui.render('AssistantText', { text: '', status: 'streaming', language: 'en' }),
@@ -418,7 +515,9 @@ test('VoiceOver: with an interface language that differs from the device\'s, eve
     ui.render('AnswerEvidence', { content, currency: 'ARS', onOpen: () => {} }),
     ui.render('ProposalCard', { content: proposal(), state: { kind: 'pending', item: itemOf(reviewDraft()), conflict: false, writable: true }, ...handlers }),
     ui.render('ProposalCard', { content: proposal(), state: { kind: 'dismissed' }, ...handlers }),
-  ].flatMap(nodes).filter(node => node.type === 'View' && node.props.accessible);
+  ];
+  // Drawn once, then again once «Pensando…» has waited its WAIT_REVEAL_MS.
+  const rendered = (ui: ReturnType<typeof load>) => { views(ui).flatMap(nodes); ui.elapse(400); return views(ui).flatMap(nodes).filter(node => node.type === 'View' && node.props.accessible); };
   const elements = rendered(english);
   assert.equal(elements.length, 10, 'user, answer, thinking, note, one evidence row, four proposal rows, the collapsed card');
   const answerLabel = (node: { props: { accessibilityLabel?: string } }) => /^Assistant: /.test(String(node.props.accessibilityLabel));

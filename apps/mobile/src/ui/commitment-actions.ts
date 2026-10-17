@@ -1,36 +1,59 @@
 import { useRef, useState } from 'react';
 import { Alert } from 'react-native';
 import { router } from 'expo-router';
-import * as Haptics from 'expo-haptics';
-import { accountBalanceMinor, assertCardDeletable, assertOpenAccount, cardCreditMinor, cardDebtMinor, cardHasPendingInstallments, closePersonalDebt, debtDeletion, debtOutstandingMinor, deleteRecurringRule, liabilityActivity, pauseRecurringRule, recurringHistory,
+import { accountBalanceMinor, advanceRecurringDate, assertCardDeletable, assertOpenAccount, cardCreditMinor, cardDebtMinor, cardHasPendingInstallments, closePersonalDebt, debtDeletion, debtOutstandingMinor, deleteRecurringRule, liabilityActivity, pauseRecurringRule, recurringHistory,
   reopenPersonalDebt, resumeRecurringRule, todayKey, type Account, type CreditCardProfile, type PersonalDebtProfile, type RecurringRule } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { useI18n } from '../i18n/provider';
+import type { MessageKey } from '../i18n/messages';
+import { announce, errorHaptic, selectionHaptic, successHaptic } from './motion';
+import { committedBeforeRefresh } from './presentation';
 import type { SwipeAction } from './swipe-actions';
 
 /** Producto 24UX4: managing commitments from a list row (trailing swipe) and from the detail screen, with one set of
  * rules. Every change is a revision of the stored row, saved before anything confirms it; a failed save keeps the row
- * as it was and says so (`error`, a catalogue key or the thrown message). Deleting asks first and names what stays:
+ * as it was, says so (`error`, a catalogue key or the thrown message) and taps Error (25Q4: nothing is kept frozen, the
+ * action is offered again). 25R1: a save that committed but whose view could not be read again is done (the banner says
+ * to verify), never a failure. Deleting asks first and names what stays:
  * the movements, payments and collections already recorded are never touched. `done` runs after a durable save
  * (a detail screen closes itself there). */
 export function useRecurringManagement() {
   const { saveRecurring, snapshot, archive } = useLedger();
-  const { t } = useI18n();
+  const { t, formatDate, failureMessage } = useI18n();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const writing = useRef(false);
 
-  async function commit(next: RecurringRule, failure: string, feedback: 'selection' | 'success', done?: () => void) {
+  /** 25D2: the outcome VoiceOver hears, once per action (the row moves between groups or leaves, the detail's state word
+   * changes): the rule's name and what became of it, a resumed one with its next date written out. A deletion is said
+   * once a detail it closes is gone. A resumed date due today is recorded by the save's catch-up (through today), so the
+   * date said is the one the rule shows afterwards: the first after today on its calendar (review). */
+  function shownNext(rule: RecurringRule): string {
+    const today = todayKey();
+    let date = rule.nextDateISO;
+    while (date <= today) date = advanceRecurringDate(date, rule.frequency, rule.anchorDateISO);
+    return date;
+  }
+  function said(next: RecurringRule) {
+    if (next.deleted) announce(t('recurring.manage.deletedSpoken', { merchant: next.merchant }), 'leave');
+    else announce(next.active ? t('recurring.manage.resumedSpoken', { merchant: next.merchant, date: formatDate(shownNext(next), 'long') })
+      : t('recurring.manage.pausedSpoken', { merchant: next.merchant }));
+  }
+  async function commit(next: RecurringRule, failure: MessageKey, feedback: 'selection' | 'success', done?: () => void) {
     if (writing.current) return;
     writing.current = true;
     setBusyId(next.id);
     setError(null);
     try {
       await saveRecurring(next);
-      void (feedback === 'success' ? Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) : Haptics.selectionAsync()).catch(() => {});
+      if (feedback === 'success') successHaptic(); else selectionHaptic();
+      said(next);
       done?.();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : failure);
+      // 25R1: committed, only the view is stale (the banner says so): done, never a failure offered again.
+      if (committedBeforeRefresh(cause)) { said(next); done?.(); return; }
+      setError(failureMessage(cause, failure));
+      errorHaptic();
     } finally {
       writing.current = false;
       setBusyId(null);
@@ -69,23 +92,26 @@ export function useRecurringManagement() {
 
 export function useDebtManagement() {
   const { saveDebt, removeDebt, snapshot } = useLedger();
-  const { t, moneyText } = useI18n();
+  const { t, moneyText, failureMessage } = useI18n();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const writing = useRef(false);
 
   /** `next` is a revision saved as it is; a string is the id of a tracker to delete through its own storage path. */
-  async function commit(next: PersonalDebtProfile | string, failure: string, feedback: 'selection' | 'success', done?: () => void) {
+  async function commit(next: PersonalDebtProfile | string, failure: MessageKey, feedback: 'selection' | 'success', done?: () => void) {
     if (writing.current) return;
     writing.current = true;
     setBusyId(typeof next === 'string' ? next : next.id);
     setError(null);
     try {
       await (typeof next === 'string' ? removeDebt(next) : saveDebt(next));
-      void (feedback === 'success' ? Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) : Haptics.selectionAsync()).catch(() => {});
+      if (feedback === 'success') successHaptic(); else selectionHaptic();
       done?.();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : failure);
+      // 25R1: committed, only the view is stale (the banner says so): done, never a failure offered again.
+      if (committedBeforeRefresh(cause)) { done?.(); return; }
+      setError(failureMessage(cause, failure));
+      errorHaptic();
     } finally {
       writing.current = false;
       setBusyId(null);
@@ -109,7 +135,7 @@ export function useDebtManagement() {
     const outstanding = outstandingOf(debt), account = accountOf(debt);
     const closed = closePersonalDebt(debt, now());
     if (!outstanding || !account) { void commit(closed, 'debts.manage.failed', 'selection', done); return; }
-    Alert.alert(t(debt.direction === 'owed_by_me' ? 'debts.manage.closeTitleOwed' : 'debts.manage.closeTitleReceivable', { name: debt.counterparty }), t('debts.manage.closeDetail', { amount: moneyText(outstanding, account.currency) }), [
+    Alert.alert(t(debt.direction === 'owed_by_me' ? 'debts.manage.closeTitleOwed' : 'debts.manage.closeTitleReceivable', { name: debt.counterparty }), t(debt.direction === 'owed_by_me' ? 'debts.manage.closeDetailOwed' : 'debts.manage.closeDetailReceivable', { amount: moneyText(outstanding, account.currency) }), [
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('debts.manage.closeConfirm'), onPress: () => { void commit(closed, 'debts.manage.failed', 'selection', done); } },
     ]);
@@ -149,7 +175,7 @@ export function useDebtManagement() {
   /** Open with a balance: Saldar. Open and settled: Cerrar. Closed: Reabrir. Then delete, always last. */
   function actions(debt: PersonalDebtProfile, done?: () => void): SwipeAction[] {
     const first: SwipeAction = !debt.active ? { key: 'reopen', label: t('debts.manage.reopen'), icon: 'arrow-undo', tone: 'accent', onPress: () => { void reopen(debt, done); } }
-      : outstandingOf(debt) > 0 ? { key: 'settle', label: t('debts.manage.settle'), icon: 'checkmark-done', tone: 'accent', onPress: () => settle(debt) }
+      : outstandingOf(debt) > 0 ? { key: 'settle', label: t(debt.direction === 'owed_by_me' ? 'debts.manage.settle' : 'debts.manage.collect'), icon: 'checkmark-done', tone: 'accent', onPress: () => settle(debt) }
         : { key: 'close', label: t('debts.manage.close'), icon: 'checkmark', tone: 'neutral', onPress: () => close(debt, done) };
     return [first, { key: 'delete', label: t('debts.manage.delete'), icon: 'trash', tone: 'destructive', onPress: () => remove(debt, done) }];
   }
@@ -162,7 +188,7 @@ export function useDebtManagement() {
  * keeps the account as it was and says so. A card's or a debt's account is never offered here. */
 export function useAccountManagement() {
   const { removeAccount, snapshot, archive } = useLedger();
-  const { t, moneyText } = useI18n();
+  const { t, moneyText, failureMessage } = useI18n();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const writing = useRef(false);
@@ -174,10 +200,14 @@ export function useAccountManagement() {
     setError(null);
     try {
       await removeAccount(account.id);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      successHaptic();
+      // 25D2: the row leaves (or the edit screen closes): VoiceOver hears that the account was deleted.
+      announce(t('accounts.manage.deletedTitle'), 'leave');
       done?.();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'accounts.manage.deleteFailed');
+      if (committedBeforeRefresh(cause)) { announce(t('accounts.manage.deletedTitle'), 'leave'); done?.(); return; }
+      setError(failureMessage(cause, 'accounts.manage.deleteFailed'));
+      errorHaptic();
     } finally {
       writing.current = false;
       setBusyId(null);
@@ -220,22 +250,24 @@ export function useAccountManagement() {
  * also stops the card's active rules, in the same commit). */
 export function useCardManagement() {
   const { saveCard, removeCard, snapshot, archive: ledger } = useLedger();
-  const { t, moneyText, errorText } = useI18n();
+  const { t, moneyText, errorText, failureMessage } = useI18n();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const writing = useRef(false);
 
-  async function commit(id: string, write: () => Promise<void>, failure: string, done?: () => void) { // i18n-ignore: a type, not copy
+  async function commit(id: string, write: () => Promise<void>, failure: MessageKey, done?: () => void) { // i18n-ignore: a type, not copy
     if (writing.current) return;
     writing.current = true;
     setBusyId(id);
     setError(null);
     try {
       await write();
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      successHaptic();
       done?.();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : failure);
+      if (committedBeforeRefresh(cause)) { done?.(); return; }
+      setError(failureMessage(cause, failure));
+      errorHaptic();
     } finally {
       writing.current = false;
       setBusyId(null);
@@ -265,6 +297,8 @@ export function useCardManagement() {
       const buttons: Parameters<typeof Alert.alert>[2] = [{ text: t('common.cancel'), style: 'cancel' }];
       if (debt > 0) buttons.push({ text: t('cards.form.blockedPay'), onPress: () => router.push({ pathname: '/new-transfer', params: { toAccountId: account.id, maxAmountMinor: String(debt) } }) });
       if (card.active) buttons.push({ text: t('cards.form.archive'), isPreferred: true, onPress: () => { void archive(card, done); } });
+      // Nothing to offer (an archived card): the alert only informs, so its one button is «OK», not «Cancelar».
+      if (buttons.length === 1) buttons[0] = { text: t('common.ok'), style: 'cancel' };
       Alert.alert(t('cards.form.blockedTitle'), [t(reason, { amount }), t(keep), extra ? t(extra) : ''].filter(Boolean).join(' '), buttons);
       return;
     }
@@ -272,7 +306,7 @@ export function useCardManagement() {
     // never after it.
     if (snapshot) {
       try { assertCardDeletable(card, snapshot, ledger?.installmentPlans ?? [], ledger?.records ?? [], ledger?.purchaseOperations ?? []); } catch (cause) {
-        Alert.alert(t('cards.form.blockedTitle'), errorText(cause instanceof Error ? cause.message : 'cards.form.deleteFailed'), [{ text: t('common.cancel'), style: 'cancel' }]);
+        Alert.alert(t('cards.form.blockedTitle'), errorText(failureMessage(cause, 'cards.form.deleteFailed')), [{ text: t('common.ok'), style: 'cancel' }]);
         return;
       }
     }

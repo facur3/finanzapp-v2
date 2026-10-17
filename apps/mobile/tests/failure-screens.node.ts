@@ -43,7 +43,7 @@ test('25Q3: a screen that fails to draw shows a calm card in the app\'s words, w
   assert.equal(JSON.stringify([root.type, root.props.edges, root.props.style.backgroundColor]), JSON.stringify(['SafeAreaView', ['top'], '#F3EFE6']),
     'clear of the status bar on a header-less tab, nothing extra under a header');
   const card = find(root, 'EmptyState');
-  assert.deepEqual([card.props.title, card.props.detail], ['No pudimos mostrar esta pantalla', 'Lo que ya guardaste sigue ahí. Podés volver atrás o abrir otra pestaña.']);
+  assert.deepEqual([card.props.title, card.props.detail], ['No se pudo mostrar esta pantalla', 'Lo que ya guardaste sigue ahí. Podés volver atrás o abrir otra pestaña.']);
   const retry = find(root, 'ActionButton');
   assert.equal(retry.props.label, 'Volver a intentar');
   retry.props.onPress();
@@ -51,7 +51,7 @@ test('25Q3: a screen that fails to draw shows a calm card in the app\'s words, w
   assert.equal(JSON.stringify(root).includes('1234'), false, 'the error\'s text never reaches the screen');
   assert.doesNotMatch(readFileSync(new URL('../src/ui/screen-failure.tsx', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, ''), /error\.|\.stack/);
   const english = find(load('src/ui/screen-failure.tsx', 'en-US').exports.ScreenFailure({ retry: async () => {}, error: new Error('x') }), 'EmptyState');
-  assert.equal(english.props.title, 'We couldn’t show this screen');
+  assert.equal(english.props.title, 'This screen couldn’t be shown');
 });
 
 test('25Q3: an unknown link opens a screen in the app\'s language whose one action replaces it with Inicio', () => {
@@ -59,12 +59,12 @@ test('25Q3: an unknown link opens a screen in the app\'s language whose one acti
   const root = exports.default({});
   assert.equal(find(root, 'Stack.Screen').props.options.title, 'Pantalla no encontrada');
   const card = find(root, 'EmptyState');
-  assert.deepEqual([card.props.title, card.props.detail], ['No encontramos esa pantalla', 'El enlace no lleva a ninguna pantalla de FinanzApp.']);
+  assert.deepEqual([card.props.title, card.props.detail], ['No se encontró esa pantalla', 'El enlace no lleva a ninguna pantalla de FinanzApp.']);
   const home = find(root, 'ActionButton');
   assert.equal(home.props.label, 'Ir a Inicio');
   home.props.onPress();
   assert.equal(JSON.stringify(routed), JSON.stringify({ replace: ['/'], push: [] }), 'a cold start has no back stack: replace, never push');
-  assert.equal(find(load('app/+not-found.tsx', 'en-US').exports.default({}), 'EmptyState').props.title, 'We couldn’t find that screen');
+  assert.equal(find(load('app/+not-found.tsx', 'en-US').exports.default({}), 'EmptyState').props.title, 'Screen not found');
 });
 
 test('25Q3: the root stack hands ScreenFailure to every route, through a prop the installed expo-router still reads', () => {

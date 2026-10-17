@@ -5,12 +5,12 @@ export const accounts: Pick<Messages, 'accounts'> = {
   accounts: {
     list: {
       emptyTitle: 'Start with an account',
-      emptyDetail: 'Choose an account to group your transactions. Entering an opening balance is optional.',
+      emptyDetail: 'Add an account to group your transactions. The opening balance is optional.',
       /** 24UX6E: what VoiceOver reads for a currency's section header: its name and its recorded total, spoken. */
       sectionLabel: '{currency}, recorded balance {amount}',
     },
     detail: {
-      notFoundTitle: 'We couldn’t find this account',
+      notFoundTitle: 'Account not found',
       notFoundDetail: 'Go back to your accounts to choose one saved on this device.',
       edit: 'Edit account',
       recordedBalance: 'Recorded balance',
@@ -26,14 +26,14 @@ export const accounts: Pick<Messages, 'accounts'> = {
     },
     form: {
       name: 'Account name',
-      namePlaceholder: 'e.g. Bank, Cash, Brokerage',
+      namePlaceholder: 'e.g. Bank, Cash, Savings',
       openingBalance: 'Opening balance',
       openingHelp: 'You can leave it empty and start from zero. The recorded balance is the result of your transactions; '
         + 'it is not your bank balance. If you enter an opening balance, it is the starting point and does not count as income.',
       openingNote: 'Optional. Doesn’t count as income.',
-      retryNote: 'Retry the same submission to avoid duplicates. To change it, close and check your accounts first.',
       save: 'Save account',
-      saveFailed: 'Couldn’t save. We kept what you entered so you can try again.',
+      saveFailed: 'Couldn’t save. Your entries are still here.',
+      appearance: 'Appearance',
     },
     manage: {
       delete: 'Delete',
@@ -47,7 +47,7 @@ export const accounts: Pick<Messages, 'accounts'> = {
       deleteFinal: ' A deleted account can’t be reactivated.',
       deleteRecurring: { one: ' Its {count} active recurring rule will stop; what was recorded does not change.', other: ' Its {count} active recurring rules will stop; what was recorded does not change.' },
       deleteConfirm: 'Delete',
-      deleteFailed: 'We could not delete the account. It stays as it was; try again.',
+      deleteFailed: 'Couldn’t delete the account. It stays as it was; try again.',
       deletedTitle: 'Deleted account',
       deletedNote: 'Its transactions and transfers stay here and in your reports. It takes no new ones.',
     },
@@ -55,12 +55,11 @@ export const accounts: Pick<Messages, 'accounts'> = {
       notFoundDetail: 'Go back to your accounts to review your saved data.',
       recordedBalance: 'Recorded balance',
       balanceHelp: 'The icon and color only change how the account looks. Use a balance correction only if the balance was entered wrong: '
-        + 'it leaves a correction record, not income or an expense. If you received, spent or moved money, record that transaction instead.',
+        + 'it isn’t income or an expense. If you received, spent or moved money, record that transaction instead.',
       balanceNote: 'Only to fix a balance entered by mistake.',
       currencyHelp: 'The currency can’t be changed, so earlier transactions keep their meaning. Add an account in another currency separately.',
       currencyNote: 'An account’s currency can’t be changed.',
-      retryNote: 'Retry this same change. To edit it, close and check the saved balance first.',
-      saveUnverified: 'We couldn’t confirm the save. Retry the same change.',
+      saveUnverified: 'Couldn’t confirm the save.',
       invalid: 'Check the name and the balance.',
       correctTitle: 'Correct the balance?',
       correctMessage: '{name}: from {from} to {to} {currency}. The opening balance will be adjusted; your transactions don’t change. This is not income or a transfer.',

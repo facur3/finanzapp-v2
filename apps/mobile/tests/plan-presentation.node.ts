@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { OPERATION_CHANGED_MESSAGE, PLAN_NOTHING_TO_STOP_MESSAGE, cancelInstallmentPlan, initialRecord, installmentEntryId, materializeInstallmentPlan, newInstallmentPlan,
+import { OPERATION_CHANGED_MESSAGE, PLAN_HISTORY_MESSAGE, PLAN_NOTHING_TO_STOP_MESSAGE, PLAN_OPERATION_HISTORY_MESSAGE, cancelInstallmentPlan, initialRecord, installmentEntryId, materializeInstallmentPlan, newInstallmentPlan,
   newPlanPayoff, newPlanRefund, type Account, type CreditCardProfile, type Entry, type EntryRecord, type LedgerArchive } from '@finanzapp/domain';
 import { PLAN_SEGMENT_MAX, cardPlanSummaries, isPlanWriteRefusal, payoffPreview, planActions, planOperationDate, planOperationRows, planProgress, planScheduleRows, planStateWord, planSummary, purchasePreview,
   scheduleRowOpens } from '../src/ui/installment-presentation.ts';
@@ -218,8 +218,9 @@ test('24T3: the adelanto preview is what Save sends, on the caught-up plan: per 
 });
 
 test('24T3 (A13): a refusal storage gives before writing releases the draft; a failed or unverified write keeps it frozen', () => {
+  // 25Q4: a deletion's refusals too (an instalment or an operation recorded since the screen was drawn).
   for (const message of [OPERATION_CHANGED_MESSAGE, PLAN_NOTHING_TO_STOP_MESSAGE, 'El plan de cuotas cambió desde que lo abriste. Volvé a revisarlo.',
-    'No quedan cuotas por adelantar.', 'Un adelanto usa esas cuotas. Deshacé el adelanto primero.']) assert.equal(isPlanWriteRefusal(message), true, message);
-  for (const message of ['No pudimos guardar: disco lleno.', 'El guardado terminó, pero no pudimos actualizar la vista. Verificá de nuevo antes de registrar otro movimiento; no lo cargues otra vez.',
+    'No quedan cuotas por adelantar.', 'Un adelanto usa esas cuotas. Deshacé el adelanto primero.', PLAN_HISTORY_MESSAGE, PLAN_OPERATION_HISTORY_MESSAGE]) assert.equal(isPlanWriteRefusal(message), true, message);
+  for (const message of ['No pudimos guardar: disco lleno.', 'El guardado terminó, pero la vista no se pudo actualizar. Verificá de nuevo antes de registrar otro movimiento; no lo cargues otra vez.',
     'installments.payoff.saveFailed']) assert.equal(isPlanWriteRefusal(message), false, message);
 });

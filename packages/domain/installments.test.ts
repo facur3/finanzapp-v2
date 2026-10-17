@@ -418,7 +418,7 @@ describe('what a plan is not', () => {
     const snapshot: LedgerSnapshot = { accounts, entries: recognise(tv, '2026-10-25'), transfers: [] };
     expect(debtTotalsByCurrency([debt], snapshot)).toEqual([{ status: 'ready', currency: 'ARS', owedMinor: 30000, receivableMinor: 0 }]);
     expect(cardDebtMinor(card, snapshot)).toBe(20000);
-    expect(() => validateLiabilityProfiles(cards, [{ ...debt, accountId: 'card-acc' }], accounts)).toThrow('Una cuenta interna no puede representar dos obligaciones.');
+    expect(() => validateLiabilityProfiles(cards, [{ ...debt, accountId: 'card-acc' }], accounts)).toThrow('Una cuenta interna no puede representar dos tarjetas o deudas.');
     expect(() => validateInstallmentPlan({ ...tv, cardId: 'debt' }, cards, accounts)).toThrow('Una compra en cuotas se registra en una tarjeta de crédito existente.');
     // Settling the debt is a transfer into its account; the plan's figures do not move.
     const settled: LedgerSnapshot = { ...snapshot, transfers: [{ id: 'd', fromAccountId: 'bank', toAccountId: 'debt-acc', amountMinor: 30000, note: '', dateISO: '2026-10-26', createdAt }] };

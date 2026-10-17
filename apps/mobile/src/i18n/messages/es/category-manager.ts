@@ -2,7 +2,6 @@
 export const categoryManager = {
   categoryManager: {
     list: {
-      intro: 'Tocá una categoría para cambiar su nombre, ícono o color, o para archivarla. Los movimientos anteriores nunca cambian.',
       expenses: 'Gastos',
       incomes: 'Ingresos',
       archived: 'Archivadas',
@@ -23,7 +22,7 @@ export const categoryManager = {
       rowHintArchived: 'Edita el nombre, el ícono y el color, o la desarchiva',
     },
     notFound: {
-      title: 'No encontramos esta categoría',
+      title: 'No se encontró esta categoría',
       detail: 'Volvé a Categorías para elegir una de la lista.',
     },
     form: {
@@ -32,18 +31,16 @@ export const categoryManager = {
       /** 24UX6E: the lifecycle note at the top of an archived category's editor. */
       archivedTitle: 'Archivada',
       archivedDetail: 'No se ofrece al registrar. Tus movimientos, presupuestos y recurrentes la conservan; desarchivala para volver a ofrecerla.',
-      editNote: 'Cambiar el nombre, el ícono o el color no modifica ningún movimiento, presupuesto ni recurrente.',
       /** `stored` is the spelling movements carry; `shown` the new display name. */
       renamedNote: 'Los movimientos se siguen registrando como «{stored}» y se muestran como «{shown}».',
       availableExpense: 'Quedará disponible enseguida al registrar gastos.',
       availableIncome: 'Quedará disponible enseguida al registrar ingresos.',
-      retryNote: 'Reintentá el mismo guardado. Para cambiarlo, cerrá y revisá primero la lista.',
-      create: 'Crear categoría',
+      create: 'Guardar categoría',
       archive: 'Archivar categoría',
       unarchive: 'Desarchivar categoría',
       nameTaken: 'Ya existe una categoría con ese nombre. Editala desde la lista o elegí otro nombre.',
       checkName: 'Revisá el nombre.',
-      saveUnverified: 'No pudimos verificar el guardado. Reintentá el mismo cambio.',
+      saveUnverified: 'No se pudo verificar el guardado.',
       archiveTitle: '¿Archivar categoría?',
       unarchiveTitle: '¿Desarchivar categoría?',
       archiveMessage: '«{name}» dejará de ofrecerse al registrar. Tus movimientos, presupuestos y recurrentes anteriores la conservan tal cual.',

@@ -7,12 +7,14 @@ export const activity = {
     expenses: 'Gastos',
     incomes: 'Ingresos',
     transfers: 'Transf.',
+    /** 25D2: what VoiceOver says for the short filter segment above. */
+    transfersSpoken: 'Transferencias',
     noMatchesTitle: 'Sin coincidencias',
-    noMatchesDetail: 'Probá con otro concepto, categoría o cuenta.',
+    noMatchesDetail: 'Probá con otro comercio, categoría o cuenta, o limpiá los filtros.',
     clearFilters: 'Limpiar filtros',
     emptyTitle: 'Tu actividad, en un lugar',
     emptyDetail: 'Tus gastos, ingresos y transferencias se ordenan acá por fecha.',
-    /** VoiceOver for a day's net beside its header: "Neto del día 1.234,56 ARS". */
+    /** VoiceOver for a day's net beside its header: "Neto del día 1234,56 pesos" (25D2: the unit in words). */
     dayNet: 'Neto del día {amount}',
     dayNetNegative: 'Neto del día menos {amount}',
     undoneHeader: 'Estos movimientos no cuentan en tus saldos ni reportes. Abrí uno para recuperarlo.',
@@ -28,17 +30,25 @@ export const activity = {
     fromAccount: 'desde {name}',
     toAccount: 'hacia {name}',
     transferLabel: '{title}, de {from} a {to}, {amount}, {date}',
+    /** 25N1: what VoiceOver hears after the kind on a row of Movimientos deshechos (a movement, a transfer). */
+    undone: 'deshecho',
+    undoneTransfer: 'deshecha',
   },
   entryDetail: {
-    notFoundTitle: 'No encontramos este movimiento',
+    notFoundTitle: 'No se encontró este movimiento',
     notFoundDetail: 'Volvé a Movimientos para consultar lo que guardaste en este dispositivo.',
-    changeUnverified: 'No pudimos verificar el cambio. Podés reintentarlo sin duplicar su efecto.',
+    changeUnverified: 'No se pudo verificar el cambio. Reintentá: no se aplica dos veces.',
     restoreQuestion: '¿Recuperar movimiento?',
     voidQuestion: '¿Deshacer movimiento?',
     willAdd: 'Se sumarán {amount} a {account}.',
     willSubtract: 'Se descontarán {amount} de {account}.',
-    restoreEffect: 'Volverá a aparecer en tus movimientos y reportes.',
-    voidEffect: 'Dejará de contar en tus saldos y reportes. Podés recuperarlo después.',
+    /** 25Q4: how a card reads after an undo or a restore, in the card's words (never «deuda»); the transfer detail uses them too. */
+    cardAfterDebt: '{account} quedará con un saldo pendiente de {amount}.',
+    cardAfterCredit: '{account} quedará con {amount} a favor.',
+    cardAfterClear: '{account} quedará sin saldo pendiente.',
+    /** 25Q4 review: these name the movement, so after a card's sentence they never read as the card stopping or coming back. */
+    restoreEffect: 'Este movimiento volverá a contar en tus saldos y reportes.',
+    voidEffect: 'Este movimiento dejará de contar en tus saldos y reportes. Podés recuperarlo después desde Movimientos deshechos, en Movimientos.',
     restore: 'Recuperar',
     void: 'Deshacer',
     statusVoided: 'Deshecho · no cuenta en saldos ni reportes',
@@ -82,20 +92,36 @@ export const activity = {
     installmentShareVoidNote: 'Solo esta parte de la cuota queda deshecha: no se vuelve a registrar sola y sigue pendiente en su plan. La otra parte de la cuota no cambia.',
   },
   transferDetail: {
-    notFoundTitle: 'No encontramos esta transferencia',
+    notFoundTitle: 'No se encontró esta transferencia',
     notFoundDetail: 'Volvé a Movimientos para consultar tus registros.',
     cardPayment: 'Pago de tarjeta',
     debtPayment: 'Pago de deuda',
     collection: 'Cobro',
     transfer: 'Transferencia',
-    changeUnverified: 'No pudimos verificar el cambio. Reintentá sin duplicarlo.',
+    changeUnverified: 'No se pudo verificar el cambio. Reintentá: no se aplica dos veces.',
     restoreQuestion: '¿Recuperar transferencia?',
     voidQuestion: '¿Deshacer transferencia?',
-    effect: '{amount}: se descontarán de {from} y se sumarán a {to}. Solo cambia el registro en esta app, no mueve dinero en el banco.',
+    /** A transfer between two cash accounts (or an older shape between two obligations); a payment or a collection says each side in its own words. */
+    effect: '{amount}: se descontarán de {from} y se sumarán a {to}.',
+    /** 25Q4: how a debt reads after an undo or a restore. «Deuda» is only what the person owes (25Q4 review: a receivable is «lo que te debe»). */
+    debtAfterOwed: 'Le vas a deber {amount} a {name}.',
+    debtAfterReceivable: '{name} te va a deber {amount}.',
+    debtAfterSettled: 'La deuda con {name} quedará saldada.',
+    debtAfterReceivableSettled: 'Lo que te debe {name} quedará saldado.',
+    /** Ends every transfer undo or restore. */
+    recordOnly: 'Solo cambia el registro en esta app, no mueve dinero en el banco.',
+    /** An undo only. 25Q4 review: it names the transfer, so it never reads as the card or debt named before it. */
+    voidRecovery: 'Podés recuperar la transferencia después desde Movimientos deshechos, en Movimientos.',
+    /** 25Q4: a restored debt payment or collection may settle at most what is pending now; said before any confirmation, in
+     * the debt screens' words. */
+    restoreBlockedTitle: 'No se puede recuperar ahora',
+    restoreOverPayment: 'Este pago es mayor que lo que todavía le debés a {name} ({amount}). Recuperarlo pagaría de más.',
+    restoreOverCollection: 'Este cobro es mayor que lo que {name} todavía te debe ({amount}). Recuperarlo cobraría de más.',
+    viewDebt: 'Ver deuda',
     statusVoided: 'Deshecha · no afecta los saldos',
-    statusBetween: 'Entre tus cuentas · no es gasto ni ingreso',
+    statusBetween: 'Entre tus cuentas',
     /** Status of a card payment, a debt payment and a collection: the balance moves either way (a collection brings it into the account). */
-    statusObligation: 'Mueve saldo entre tu cuenta y la obligación · no es gasto ni ingreso',
+    statusObligation: 'Entre tu cuenta y lo pendiente',
     voidedTitle: 'Transferencia deshecha',
     note: 'Nota',
     edit: 'Editar transferencia',
@@ -104,9 +130,9 @@ export const activity = {
   },
   spendingDetail: {
     invalidTitle: 'Período no válido',
-    invalidDetail: 'Volvé a Inicio para elegir las fechas.',
+    invalidDetail: 'El enlace no indica un período que se pueda mostrar. Abrí Reportes para ver tus gastos por mes.',
     allExpenses: 'Gastos registrados',
-    totalUnavailable: 'No podemos mostrar este total con precisión.',
+    totalUnavailable: 'Este total no se puede mostrar con precisión.',
     count: { one: '{count} gasto registrado', other: '{count} gastos registrados' },
     movements: 'Movimientos',
     none: 'No hay gastos registrados para estas fechas y moneda.',

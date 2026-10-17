@@ -2,15 +2,15 @@ import { useMemo, useRef, useState } from 'react';
 import { Alert, Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
-import * as Haptics from 'expo-haptics';
-import { LEDGER_CURRENCIES, editedDraftFits, minorFromEditedDraft, sameMonthlyBudget, validateBudgetCollection, validateMonthlyBudget, type StoredDraft,
+import { LEDGER_CURRENCIES, budgetIdentityKey, editedDraftFits, minorFromEditedDraft, sameMonthlyBudget, validateBudgetCollection, validateMonthlyBudget, type StoredDraft,
   type BudgetScope, type Currency, type MonthlyBudget } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
-import { ActionButton, AmountField, AppText, Choices, ErrorMessage, IconButton, Screen } from './components';
+import { ActionButton, AmountField, AppText, Choices, ErrorMessage, FieldNote, IconButton, Screen } from './components';
 import { CurrencySwitch } from './currency-switch';
 import { useDefaultCurrency } from './use-default-currency';
 import { offeredCurrencies } from './currencies';
 import { draftFromMinor } from './money-input';
+import { errorHaptic, successHaptic, warningHaptic } from './motion';
 import { CategoryField } from './form-controls';
 import { useI18n } from '../i18n/provider';
 
@@ -23,7 +23,7 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency, sc
   original?: MonthlyBudget; monthISO: string; currency?: string; scope?: string;
 }) {
   const { archive: ledgerArchive, snapshot, saveBudget, gate = LEDGER_CURRENCIES } = useLedger();
-  const { t, locale, formatMonthTitle } = useI18n();
+  const { t, locale, formatMonthTitle, failureMessage } = useI18n();
   // 146 currencies since 24M: ordered and named once per gate and language, not on every keystroke.
   const offered = useMemo(() => offeredCurrencies(gate, locale), [gate, locale]);
   const [before] = useState(original);
@@ -44,6 +44,15 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency, sc
   const saving = useRef(false);
   const locked = busy || pending !== null || archivePending !== null;
   const close = () => { if (!saving.current) { if (router.canGoBack()) router.back(); else router.replace('/budgets'); } };
+  // 25N1: the active budgets of this month and currency (the edited one aside, and the one this form is creating: a save
+  // that committed but could not refresh must keep its own scope for «Reintentar guardado»). A general one already there means the
+  // form never offers «General» (it is a category limit); a draft that repeats one says where it is.
+  const month = before?.monthISO ?? monthISO;
+  const others = (ledgerArchive?.budgets ?? []).filter(item => item.active && item.id !== before?.id && item.id !== operation.id && item.monthISO === month && item.currency === currency);
+  const generalTaken = !before && others.some(item => item.scope === 'total');
+  const general = before ? before.scope === 'total' : scope === 'total' && !generalTaken;
+  const draftKey = budgetIdentityKey({ currency, monthISO: month, scope: general ? 'total' : 'category', category: general ? undefined : category.trim() });
+  const taken = others.some(item => budgetIdentityKey(item) === draftKey);
 
   async function save() {
     if (saving.current || !snapshot) return;
@@ -51,6 +60,8 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency, sc
     setBusy(true);
     setError(null);
     Keyboard.dismiss();
+    // 25Q4: true once the write is sent: a failure after it taps Warning (frozen for the retry), before it Error.
+    let sent = false;
     try {
       let submission = pending;
       if (!submission) {
@@ -65,7 +76,7 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency, sc
           submission = { ...candidate, revision: before.revision + 1, updatedAt: now };
         } else {
           const base = { id: operation.id, currency, monthISO, amountMinor, active: true, createdAt: operation.createdAt, revision: 0, updatedAt: operation.createdAt };
-          submission = scope === 'total' ? { ...base, scope: 'total' } : { ...base, scope: 'category', category: category.trim() };
+          submission = general ? { ...base, scope: 'total' } : { ...base, scope: 'category', category: category.trim() };
         }
         validateMonthlyBudget(submission);
         // 24UX6E: the collection rule storage applies before writing (one active general budget per currency and month,
@@ -78,12 +89,14 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency, sc
         }
         setPending(submission);
       }
+      sent = true;
       await saveBudget(submission);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      successHaptic();
       saving.current = false;
       close();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'budgets.form.saveFailed');
+      setError(failureMessage(cause, 'budgets.form.saveFailed'));
+      if (sent) warningHaptic(); else errorHaptic();
     } finally {
       saving.current = false;
       setBusy(false);
@@ -98,11 +111,13 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency, sc
     try {
       setArchivePending(submission);
       await saveBudget(submission);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      successHaptic();
       saving.current = false;
       close();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'budgets.form.deleteFailed');
+      setError(failureMessage(cause, 'budgets.form.deleteFailed'));
+      // 25Q4: only the write fails here, and the deletion stays frozen for the exact retry.
+      warningHaptic();
     } finally {
       saving.current = false;
       setBusy(false);
@@ -124,7 +139,6 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency, sc
     ]);
   }
 
-  const general = scope === 'total';
   return <Screen>
     <Stack.Screen options={{ title: t(before ? 'nav.titles.editBudget' : 'nav.titles.newBudget'), gestureEnabled: !busy,
       headerLeft: () => <IconButton name="close" label={t('common.close')} onPress={close} disabled={busy} /> }} />
@@ -132,18 +146,20 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency, sc
       <AppText secondary variant="subhead">{formatMonthTitle(before?.monthISO ?? monthISO)}</AppText>
       <AppText variant="title2">{t(general ? 'budgets.form.general' : 'budgets.form.perCategory')}</AppText>
     </View>
-    {!before && <Choices<BudgetScope> value={scope} onChange={setScope} disabled={locked}
+    {!before && !generalTaken && <Choices<BudgetScope> value={scope} onChange={setScope} disabled={locked}
       options={[{ value: 'total', label: t('budgets.form.scopeGeneral') }, { value: 'category', label: t('budgets.form.scopeCategory') }]} />}
     {!before && <CurrencySwitch value={currency} currencies={offered} onChange={setCurrency} disabled={locked} />}
     <AmountField label={t('budgets.form.amount')} currency={currency} value={amount} stored={stored ?? undefined}
       onChangeText={value => { setAmount(value); setError(null); }} editable={!locked} />
     {!general && <CategoryField entries={snapshot?.entries ?? []} kind="expense" value={category} onChange={setCategory} disabled={locked} prominent />}
-    <AppText secondary variant="footnote" style={{ textAlign: 'center' }}>
+    {/* One line under the amount; what the budget counts is one tap away («Menos texto»). */}
+    <FieldNote help={{ title: t('budgets.form.noteHelpTitle'), detail: t(general ? 'budgets.form.generalHelp' : 'budgets.form.categoryHelp') }}>
       {t(general ? 'budgets.form.generalNote' : 'budgets.form.categoryNote')}
-    </AppText>
+    </FieldNote>
     <ErrorMessage message={error} />
+    {error && taken && <AppText secondary variant="footnote" style={{ textAlign: 'center' }}>{t('budgets.form.takenHint')}</AppText>}
     {pending && error && <AppText secondary variant="footnote" style={{ textAlign: 'center' }}>
-      {t('budgets.form.retryNote')}
+      {t('common.retryNote', { where: t('common.retryWhere.budgets') })}
     </AppText>}
     <ActionButton label={pending && error ? t('common.retrySave') : before ? t('common.saveChanges') : t('budgets.form.create')}
       onPress={save} busy={busy} disabled={!amount.trim() || (!general && !category.trim()) || !editedDraftFits(amount, currency, stored).ok} />

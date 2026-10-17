@@ -1,10 +1,30 @@
-import { OPERATION_CHANGED_MESSAGE, type InstallmentPlan, type LedgerArchive, type PurchaseOperation } from '@finanzapp/domain';
-import { catchUpInstallments, catchUpRecurring, createInstallmentPlan, createPurchaseOperation, initializeDatabase, readArchive, type CreateGuard, type LedgerDatabase } from './database.ts';
+import { OPERATION_CHANGED_MESSAGE, type InstallmentPlan, type LedgerArchive, type PurchaseOperation, type RecurringRule } from '@finanzapp/domain';
+import { NEWER_SCHEMA_MESSAGE, catchUpInstallments, catchUpRecurring, createInstallmentPlan, createPurchaseOperation, importArchive, initializeDatabase, processRecurring, readArchive,
+  saveRecurringRule, type CreateGuard, type LedgerDatabase } from './database.ts';
+import { MIGRATION_REFERENCES_MESSAGE } from './transaction.ts';
 
 /** What LedgerProvider shows after opening or returning to the foreground: the archive as stored, the recurring rules
  * set aside for review (their ids), and whether each catch-up could not run. `recurringError` and `installmentError`
  * are independent: one pass failing never hides or skips the other. */
 export type LedgerSession = { archive: LedgerArchive; recurringFailures: string[]; recurringError: boolean; installmentError: boolean };
+/** 25Q4: which catch-up pass last failed: the banner's two halves. */
+export type CatchUps = Pick<LedgerSession, 'recurringError' | 'installmentError'>;
+
+/** A write committed but the view could not be read again: said in the banner, never as a failed write. A screen that gets
+ * it back from a write that is not frozen for an exact retry treats the write as done (`committedBeforeRefresh`). */
+export const VIEW_REFRESH_MESSAGE = 'El guardado terminó, pero la vista no se pudo actualizar. Verificá de nuevo antes de registrar otro movimiento; no lo cargues otra vez.';
+
+/** The day and outcome of the last catch-up pass the session ran (open, foreground, a day change), for `shouldRefreshOnActive`. */
+export type LastPass = { day: string; failed: boolean };
+
+/** Whether a return to the foreground runs the catch-up pass again. The pass only has work when the calendar day changed
+ * since the last one or that one failed; a return from `inactive` (Control Center, Notification Center, a system alert)
+ * on the day of a pass that succeeded is skipped, and so is any return while a pass is already queued or running. A return from the
+ * background always runs it (the banner's retry runs it too, apart from this). */
+export function shouldRefreshOnActive({ previous, today, lastPass, queued }: { previous: string | null | undefined; today: string; lastPass: LastPass | null; queued: boolean }): boolean {
+  if (queued) return false;
+  return !(previous === 'inactive' && lastPass !== null && lastPass.day === today && !lastPass.failed);
+}
 
 /** Producto 24UX5: recurring rules are recorded automatically on launch and on every return to the foreground
  * (`todayISO` is the device's day), never while the app is closed; a date that passed meanwhile is recorded with its
@@ -24,25 +44,59 @@ export async function openLedger(db: LedgerDatabase, todayISO: string): Promise<
  * next foreground, or the banner's retry, runs the pass again; a success clears the flag; the deterministic ids make the
  * retry record each instalment once. */
 export async function refreshLedger(db: LedgerDatabase, todayISO: string): Promise<LedgerSession> {
+  return { ...await runCatchUps(db, todayISO), archive: await readArchive(db) };
+}
+
+/** Both passes, each on its own: one failing never hides or skips the other. */
+async function runCatchUps(db: LedgerDatabase, todayISO: string): Promise<Omit<LedgerSession, 'archive'>> {
   let recurringFailures: string[] = [], recurringError = false, installmentError = false;
   try { recurringFailures = (await catchUpRecurring(db, todayISO)).failed; }
   catch { recurringError = true; }
   try { await catchUpInstallments(db, todayISO); }
   catch { installmentError = true; }
-  return { archive: await readArchive(db), recurringFailures, recurringError, installmentError };
+  return { recurringFailures, recurringError, installmentError };
+}
+
+/** 25Q4: a restore. The import is the write: a refusal (conflict, scale, changed baseline) or a failed transaction rolls back
+ * and reaches the review. Then both catch-ups record what fell due since the copy (automatic, owner decision), each in its
+ * own transactions, as on open: a failing catch-up never turns the committed import into a failure; it returns its flag,
+ * for the banner and its retry. */
+export async function restoreFromBackup(db: LedgerDatabase, incoming: LedgerArchive, baseline: string, todayISO: string): Promise<CatchUps> {
+  await importArchive(db, incoming, baseline);
+  const { recurringError, installmentError } = await runCatchUps(db, todayISO);
+  return { recurringError, installmentError };
 }
 
 /** The banner a session needs (a Spanish sentence, translated when shown), or null when both catch-ups ran. The banner
  * carries the retry; the data under it stays open and never claims to be complete while one is shown. */
-export function sessionWarning(session: Pick<LedgerSession, 'recurringError' | 'installmentError'>): string | null {
+export function sessionWarning(session: CatchUps): string | null {
   if (session.recurringError && session.installmentError) {
-    return 'No pudimos verificar los vencimientos recurrentes ni registrar las cuotas vencidas de tus tarjetas. El saldo de tus tarjetas, Reportes y Presupuestos pueden estar incompletos. No se modificó nada fuera de una transacción completa.';
+    return 'No se pudieron verificar los vencimientos recurrentes ni registrar las cuotas vencidas de tus tarjetas. El saldo de tus tarjetas, Reportes y Presupuestos pueden estar incompletos. No se modificó nada a medias.';
   }
-  if (session.recurringError) return 'No pudimos verificar tus datos locales ni los vencimientos recurrentes. No se modificó nada fuera de una transacción completa.';
+  if (session.recurringError) return 'No se pudieron verificar tus datos locales ni los vencimientos recurrentes. No se modificó nada a medias.';
   if (session.installmentError) {
-    return 'No pudimos registrar las cuotas vencidas de tus tarjetas. El saldo de tus tarjetas, Reportes y Presupuestos pueden no incluirlas todavía. No se modificó nada fuera de una transacción completa.';
+    return 'No se pudieron registrar las cuotas vencidas de tus tarjetas. El saldo de tus tarjetas, Reportes y Presupuestos pueden no incluirlas todavía. No se modificó nada a medias.';
   }
   return null;
+}
+
+/** 25Q4: what the launch screen says when the data cannot open. The two refusals storage guarantees left the file untouched,
+ * and that name their own remedy, are said as themselves. Anything else (a locked or unreadable file, a stored row that fails
+ * validation, an engine's error) gets the calm open sentence, never the engine's text. */
+export function openFailureMessage(cause: unknown): string {
+  const message = (cause as { message?: unknown } | null | undefined)?.message;
+  return typeof message === 'string' && (message === NEWER_SCHEMA_MESSAGE || message === MIGRATION_REFERENCES_MESSAGE) ? message
+    : 'No se pudieron abrir tus datos. No se borró ni reemplazó nada. Probá nuevamente o conservá la app para recuperar la base.';
+}
+
+/** A recurring rule saved from its form or a list action (created, edited, paused, resumed, deleted), then the recurring
+ * catch-up (a rule due today is recorded at once). The rule is durable before the catch-up runs: a catch-up that fails is
+ * returned (`recurringError`, the banner's half), never thrown as a failed save that would invite entering the rule again.
+ * A retry of the same rule after the catch-up advanced it is a no-op in storage (`saveRecurringRule`). */
+export async function saveRecurring(db: LedgerDatabase, rule: RecurringRule, todayISO: string): Promise<{ recurringError: boolean }> {
+  await saveRecurringRule(db, rule);
+  try { await processRecurring(db, todayISO); return { recurringError: false }; }
+  catch { return { recurringError: true }; }
 }
 
 /** Producto 24T2: a purchase in instalments saved from the form. The plan is created in its own commit (a retry of the

@@ -53,11 +53,14 @@ interface Ledger {
   calls: unknown[][];
   confirmResult?: () => Promise<{ recorded: boolean }>;
   updateResult?: () => Promise<unknown>;
+  dismissResult?: () => Promise<void>;
   /** 25A-04: the store's own read of one item (default: the tray's, else none) and the tray reload it may ask for. */
   getReviewItem?: (id: string) => Promise<ReviewItem | null>;
   refreshes?: number;
   /** The provider's count of review operations (a stale tray re-reads the store when it changes). */
   reviewVersion?: number;
+  /** 25Q4 review: null while the ledger has not opened (default: the fixture archive). */
+  archive?: domain.LedgerArchive | null;
 }
 function harness(file: string, ledger: Ledger, params: Record<string, string> = {}, options: { locale?: AppLocale; dev?: boolean; canGoBack?: boolean; fontScale?: number; height?: number } = {}) {
   const source = readFileSync(new URL('../app/' + file, import.meta.url), 'utf8');
@@ -74,19 +77,26 @@ function harness(file: string, ledger: Ledger, params: Record<string, string> = 
   const pushed: unknown[] = [];
   const alerts: { title: string; detail: string; buttons: { text: string; style?: string; onPress?: () => void }[] }[] = [];
   const nav = { back: 0, replaced: [] as unknown[] };
+  // 25Q4: every haptic comes from motion.tsx; the recorder keeps each one's kind.
+  const haptics: string[] = [];
+  // 25D2: what VoiceOver was told through motion.tsx's `announce`, in order (its iOS-only queue is tested in motion.node.ts).
+  const announced: string[] = [];
+  const motion = { announce: (text: string, after = 'now') => { announced.push(after === 'leave' ? 'after leaving: ' + text : text); }, successHaptic: () => { haptics.push('Success'); }, errorHaptic: () => { haptics.push('Error'); } };
   const i18n = { useI18n: () => bindLocale(options.locale ?? 'es-AR') };
+  const opened = ledger.archive === undefined ? archive : ledger.archive;
   const useLedger = () => ({
-    archive, snapshot: domain.snapshotFromArchive(archive), review: ledger.review, reviewVersion: ledger.reviewVersion ?? 0,
+    archive: opened, snapshot: opened ? domain.snapshotFromArchive(opened) : null, review: ledger.review, reviewVersion: ledger.reviewVersion ?? 0,
     confirmReview: (...args: unknown[]) => { ledger.calls.push(['confirm', ...args]); return ledger.confirmResult?.() ?? Promise.resolve({ recorded: true }); },
     updateReview: (...args: unknown[]) => { ledger.calls.push(['update', ...args]); return ledger.updateResult?.() ?? Promise.resolve(args[2]); },
-    dismissReview: (...args: unknown[]) => { ledger.calls.push(['dismiss', ...args]); return Promise.resolve(); },
+    dismissReview: (...args: unknown[]) => { ledger.calls.push(['dismiss', ...args]); return ledger.dismissResult?.() ?? Promise.resolve(); },
     getReviewItem: (id: string) => ledger.getReviewItem?.(id)
       ?? Promise.resolve(ledger.review && ledger.review !== 'unavailable' ? ledger.review.items.find(item => item.id === id) ?? null : null),
     refreshReview: () => { ledger.refreshes = (ledger.refreshes ?? 0) + 1; return Promise.resolve(); },
   });
   const names = ['ActionButton', 'AmountField', 'AppText', 'Choices', 'DetailRow', 'EmptyState', 'ErrorMessage', 'Field', 'GlyphTile', 'IconButton', 'LifecycleNote',
     'Money', 'PressFeedback', 'Screen', 'SectionTitle', 'Surface'];
-  const components: Record<string, unknown> = { ...Object.fromEntries(names.map(name => [name, name])), STACK_AT_SCALE: ROW_STACK_SCALE };
+  const components: Record<string, unknown> = { ...Object.fromEntries(names.map(name => [name, name])), STACK_AT_SCALE: ROW_STACK_SCALE,
+    useStacked: () => (options.fontScale ?? 1) > ROW_STACK_SCALE };
   const hues = { useCategoryLabel: (stored: string) => stored, useAccountNameOf: () => (account: domain.Account) => account.name };
   const theme = { space: { s: 8, m: 12, l: 16, xl: 24 }, usePalette: () => ({ ...lightPalette, isDark: false }) };
   const modules: Record<string, unknown> = {
@@ -113,7 +123,6 @@ function harness(file: string, ledger: Ledger, params: Record<string, string> = 
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, useLocalSearchParams: () => params,
       useFocusEffect: (effect: () => unknown) => { const index = focusCursor++; focusEffects[index] = effect; focusCells[index] ??= { cleanup: effect() }; },
       router: { push: (to: unknown) => pushed.push(to), back: () => { nav.back += 1; }, canGoBack: () => options.canGoBack ?? true, replace: (to: unknown) => nav.replaced.push(to) } },
-    'expo-haptics': { notificationAsync: () => Promise.resolve(), NotificationFeedbackType: { Success: 'success' } },
     '@finanzapp/domain': domain,
   };
   for (const prefix of ['../', '../../']) Object.assign(modules, {
@@ -133,6 +142,7 @@ function harness(file: string, ledger: Ledger, params: Record<string, string> = 
     [prefix + 'src/ui/liability-presentation']: liabilityPresentation,
     [prefix + 'src/ui/money-input']: moneyInput,
     [prefix + 'src/ui/geometry']: geometry,
+    [prefix + 'src/ui/motion']: motion,
   });
   modules['../storage/LedgerProvider'] = { useLedger };
   modules['../i18n/provider'] = i18n;
@@ -144,6 +154,7 @@ function harness(file: string, ledger: Ledger, params: Record<string, string> = 
   const reviewItemHook = realModule('src/ui/use-review-item.ts', require);
   for (const prefix of ['../', '../../']) modules[prefix + 'src/ui/use-review-item'] = reviewItemHook;
   // 25A-04: the one Confirmar / Descartar of the detail and the review sheet, real, over the same mocks.
+  modules['./motion'] = motion;
   const reviewActions = realModule('src/ui/review-actions.ts', require);
   for (const prefix of ['../', '../../']) modules[prefix + 'src/ui/review-actions'] = reviewActions;
   const module = { exports: {} as { default?: () => Node } };
@@ -151,7 +162,7 @@ function harness(file: string, ledger: Ledger, params: Record<string, string> = 
   const blur = () => { for (const cell of focusCells) if (typeof cell.cleanup === 'function') (cell.cleanup as () => void)(); };
   /** Focus regained (the screen in front again): each focus effect runs again, as React Navigation does. */
   const refocus = () => { for (const [index, effect] of focusEffects.entries()) focusCells[index] = { cleanup: effect() }; };
-  return { render: () => { cursor = 0; refCursor = 0; effectCursor = 0; focusCursor = 0; return module.exports.default!(); }, pushed, alerts, nav, blur, refocus };
+  return { render: () => { cursor = 0; refCursor = 0; effectCursor = 0; focusCursor = 0; return module.exports.default!(); }, pushed, alerts, nav, blur, refocus, haptics, announced };
 }
 /** Every node, local components rendered once per element (their hooks run in traversal order, as React would). */
 function nodes(value: any): Node[] {
@@ -199,14 +210,28 @@ test('a row names kind, amount, merchant, category, destination, date, source an
   assert.match(emptyRow.props.accessibilityLabel, /^Gasto o ingreso, Sin monto, Sin comercio, Categoría: Falta completar, Dónde se registra: Falta completar, Fecha: Falta completar, Asistente, Faltan 7 datos$/);
 });
 
-test('an incomplete draft reads neutral, never as an error; stale and interrupted ask in amber; only a conflict takes the negative tone; lime is never a state', () => {
+test('25D1: a row keeps the amount beside the merchant up to 1.2×; above, the amount goes under it and every line is whole', () => {
+  const plan = itemOf(drafted({ destinationId: cardAccount.id, purchase: { mode: 'installments', count: 6, placement: 'current' } }));
+  for (const [fontScale, stacked] of [[1, false], [1.2, false], [1.786, true], [3.571, true]] as const) {
+    const [row] = all(harness('review.tsx', { review: trayOf([plan]), calls: [] }, {}, { fontScale }).render(), 'PressFeedback');
+    const line = all(row, 'View').find(node => [node.props.children].flat().some((child: any) => child?.type === 'Money'))!;
+    const [merchant, ...rest] = all(row, 'AppText');
+    assert.equal(line.props.style.flexDirection, stacked ? undefined : 'row', 'at ' + fontScale);
+    assert.equal(merchant.props.numberOfLines, stacked ? undefined : 1, 'at ' + fontScale);
+    for (const text of rest.slice(0, 2)) assert.equal(text.props.numberOfLines, stacked ? undefined : 2, 'at ' + fontScale);
+    assert.equal(all(row, 'Money')[0].props.minor, 1500000);
+    assert.equal(row.props.style.paddingHorizontal, 16, '25T: the row keeps the grouped list\'s 16 pt inset, as every other row');
+  }
+});
+
+test('an incomplete draft reads neutral, never as an error; stale and interrupted ask in amber; only a conflict takes the negative tone; the brand is never a state', () => {
   const incomplete = itemOf(drafted({ category: null }));
   const stale = itemOf({ ...drafted(), basis: [{ kind: 'account', id: bank.id, revision: 4 }] });
   const interrupted = itemOf(drafted(), { attempt: domain.writeForReviewDraft(drafted(), archive as domain.ReviewArchive, { writeId: 'w-x', createdAt, todayISO: today }) });
   const conflict = itemOf(drafted());
   const root = harness('review.tsx', { review: trayOf([incomplete, stale, interrupted, conflict], { conflicts: [conflict.id] }), calls: [] }).render();
   const states = all(root, 'PressFeedback').map(row => all(row, 'AppText').at(-1)!);
-  assert.deepEqual(states.map(text), ['Falta 1 dato', 'Revisala de nuevo', 'Registro sin verificar', 'Ya existe otro registro']);
+  assert.deepEqual(states.map(text), ['Falta 1 dato', 'Revisala de nuevo', 'Falta confirmar si se guardó', 'Ya existe otro registro']);
   assert.deepEqual(states.map(node => node.props.style.color), [lightPalette.secondary, lightPalette.warning, lightPalette.warning, lightPalette.expense]);
   for (const node of states) assert.notEqual(node.props.style.color, lightPalette.primaryFill);
 });
@@ -217,7 +242,7 @@ test('unreadable rows are counted apart and never listed; an empty tray, an unav
   assert.ok(texts(root).includes('2 propuestas no se pueden leer. No se registrará nada con ellas.'));
   assert.equal(all(root, 'EmptyState')[0].props.title, 'Nada para revisar');
   root = harness('review.tsx', { review: 'unavailable', calls: [] }).render();
-  assert.equal(all(root, 'EmptyState')[0].props.detail, 'No pudimos abrir las propuestas. Tus movimientos no cambiaron.');
+  assert.equal(all(root, 'EmptyState')[0].props.detail, 'No se pudieron abrir las propuestas. Tus movimientos no cambiaron.');
   root = harness('review.tsx', { review: trayOf([itemOf(drafted())], { writable: false }), calls: [] }).render();
   assert.equal(all(root, 'LifecycleNote')[0].props.detail, 'Estas propuestas vienen de una versión más nueva de FinanzApp: se pueden ver, no modificar.');
 });
@@ -236,7 +261,7 @@ test('the tray has no in-app producer: no development action creates a proposal,
 
 // ---- the detail ---------------------------------------------------------------------------------------------------------
 
-test('a complete, current proposal: what will be recorded, where and when, and Confirmar (the one lime action) calls the store once at the shown revision', async () => {
+test('a complete, current proposal: what will be recorded, where and when, and Confirmar (the one brand-filled action) calls the store once at the shown revision', async () => {
   const item = itemOf(drafted(), { revision: 3 });
   const ledger: Ledger = { review: trayOf([item]), calls: [] };
   const view = harness('review/[id].tsx', ledger, { id: item.id });
@@ -247,13 +272,16 @@ test('a complete, current proposal: what will be recorded, where and when, and C
     Fecha: i18nFormat.formatDate(today, 'dayYear', 'es-AR'), Origen: 'Asistente' });
   const confirm = button(root, 'Confirmar')!;
   assert.deepEqual([confirm.props.label, confirm.props.spokenLabel, confirm.props.disabled, confirm.props.secondary], ['Confirmar · $ 15.000,00', 'Confirmar, 15000,00 pesos', false, undefined],
-    'the primary (lime) fill; Editar and Descartar are secondary');
+    'the primary (brand) fill; Editar and Descartar are secondary');
   assert.deepEqual(['Editar', 'Descartar'].map(label => button(root, label)!.props.secondary), [true, true]);
   confirm.props.onPress();
   confirm.props.onPress(); // A second tap while the first is in flight does nothing.
   await settle();
   assert.deepEqual(ledger.calls, [['confirm', item.id, 3]]);
   assert.equal(view.nav.back, 1, 'back to the tray once recorded');
+  assert.equal(view.haptics.join(','), 'Success', 'one Success tap; the double tap adds nothing');
+  // 25D2: the detail closes with the write; VoiceOver hears that it was recorded once the tray is back.
+  assert.deepEqual(view.announced, ['after leaving: Registrado.']);
   root = view.render();
   assert.equal(all(root, 'ErrorMessage')[0].props.message, null);
 });
@@ -308,6 +336,11 @@ test('a stale basis keeps Confirmar disabled and asks to review it in Editar; a 
   root = harness('review/[id].tsx', { review: trayOf([conflict], { conflicts: [conflict.id] }), calls: [] }, { id: conflict.id }).render();
   assert.equal(all(root, 'ActionButton').map(node => node.props.label).join(','), 'Descartar', 'the store refuses a confirmation or an edit; a dismissal stays possible');
   assert.match(all(root, 'LifecycleNote')[0].props.detail, /no se puede confirmar ni editar/);
+  // 25T review: a conflict is a different record where the proposal would go (an identical one is already recorded), never «igual».
+  assert.equal(all(root, 'LifecycleNote')[0].props.detail,
+    'Tus datos ya tienen otro registro, distinto, en el lugar de esta propuesta. Para no reemplazarlo, no se puede confirmar ni editar; tus movimientos no cambian.');
+  assert.equal(bindLocale('en-US').t('review.detail.conflictNote'),
+    'Your data already has a different record in this proposal’s place. To keep it from being replaced, this can’t be confirmed or edited; your transactions don’t change.');
   // With a frozen write on it the store refuses the dismissal too (it must settle first): nothing is offered.
   const frozen = itemOf(drafted(), { attempt: domain.writeForReviewDraft(drafted(), archive as domain.ReviewArchive, { writeId: 'w', createdAt, todayISO: today }) });
   root = harness('review/[id].tsx', { review: trayOf([frozen], { conflicts: [frozen.id] }), calls: [] }, { id: frozen.id }).render();
@@ -337,10 +370,21 @@ test('a refusal from the store (the proposal changed, or went stale) is shown an
   await settle();
   const root = view.render();
   assert.equal(all(root, 'ErrorMessage')[0].props.message, domain.REVIEW_STALE_MESSAGE);
+  assert.equal(bindLocale('en-US').errorText(all(root, 'ErrorMessage')[0].props.message), 'The account, card or category changed since the proposal. Review it again.');
   assert.equal(view.nav.back, 0);
+  assert.equal(view.haptics.join(','), 'Error', '25Q4: nothing is kept frozen and Confirmar is offered again, so Error');
   button(root, 'Confirmar')!.props.onPress();
   await settle();
   assert.equal(ledger.calls.length, 2);
+  assert.equal(view.haptics.join(','), 'Error,Error', 'every refused attempt taps');
+  // 25Q4: an engine's error is never shown as itself: Confirmar's own sentence (a retry records it once either way).
+  const failing = itemOf(drafted());
+  const engine: Ledger = { review: trayOf([failing]), calls: [], confirmResult: () => Promise.reject(new Error('disk I/O error')) };
+  const second = harness('review/[id].tsx', engine, { id: failing.id });
+  button(second.render(), 'Confirmar')!.props.onPress();
+  await settle();
+  assert.equal(all(second.render(), 'ErrorMessage')[0].props.message, 'review.detail.confirmFailed');
+  assert.equal(second.nav.back, 0);
 });
 
 test('Entry or InstallmentPlan: the detail says which one Confirmar writes, and a card\'s mode is shown, never assumed', () => {
@@ -349,7 +393,7 @@ test('Entry or InstallmentPlan: the detail says which one Confirmar writes, and 
   const open = itemOf(drafted({ destinationId: cardAccount.id, purchase: null }));
   const income = itemOf(drafted({ kind: 'income', category: 'Sueldo' }));
   const render = (item: ReviewItem) => harness('review/[id].tsx', { review: trayOf([plan, once, open, income]), calls: [] }, { id: item.id }).render();
-  const pago = (root: Node) => all(root, 'DetailRow').find(row => row.props.label === 'Pago')?.props.value;
+  const pago = (root: Node) => all(root, 'DetailRow').find(row => row.props.label === 'Cómo se paga')?.props.value;
   assert.ok(texts(render(plan)).includes('Al confirmar se registra una compra en 6 cuotas: cada cuota se suma al cerrar su resumen, no hoy.'));
   assert.equal(pago(render(plan)), 'En 6 cuotas');
   assert.equal(all(render(plan), 'DetailRow').find(row => row.props.label === 'Tarjeta')!.props.value, 'Visa');
@@ -375,6 +419,17 @@ test('Descartar asks first, then dismisses at the shown revision; cancelling cha
   await settle();
   assert.deepEqual(ledger.calls, [['dismiss', item.id, 2]]);
   assert.equal(view.nav.back, 1);
+});
+
+test('25Q4: a Descartar that fails with an engine\'s error says the proposal is still pending', async () => {
+  const item = itemOf(drafted());
+  const ledger: Ledger = { review: trayOf([item]), calls: [], dismissResult: () => Promise.reject(new Error('disk I/O error')) };
+  const view = harness('review/[id].tsx', ledger, { id: item.id });
+  button(view.render(), 'Descartar')!.props.onPress();
+  view.alerts[0].buttons[1].onPress!();
+  await settle();
+  assert.equal(all(view.render(), 'ErrorMessage')[0].props.message, 'review.detail.dismissFailed');
+  assert.equal(view.nav.back, 0);
 });
 
 test('a confirmed, dismissed or unreadable id is not pending: the detail says so and offers nothing', async () => {
@@ -428,6 +483,7 @@ test('Editar keeps the item\'s id, source and capture, saves at the revision it 
   assert.equal(JSON.stringify(draft.basis), JSON.stringify(domain.reviewBasis(draft, archive as domain.ReviewArchive)), 'reviewed against the ledger now');
   assert.equal(domain.isStaleReviewDraft(draft, archive as domain.ReviewArchive), false);
   assert.equal(view.nav.back, 1);
+  assert.equal(view.haptics.join(','), 'Success', '25Q4 review: a saved edit taps Success, as every other «Guardar cambios» does');
 });
 
 test('Editar refused because the proposal changed since it opened: the message shows, the editor stays open, nothing else is written', async () => {
@@ -439,6 +495,14 @@ test('Editar refused because the proposal changed since it opened: the message s
   assert.equal(all(root(), 'ErrorMessage')[0].props.message, REVIEW_ITEM_CHANGED_MESSAGE);
   assert.equal(view.nav.back, 0);
   assert.equal(ledger.calls.length, 1);
+  assert.equal(view.haptics.join(','), 'Error', '25Q4: nothing is kept frozen and Guardar cambios is offered again, so Error');
+  // 25Q4: an engine's error says Guardar cambios' own sentence; the editor stays open.
+  const engine: Ledger = { review: trayOf([item]), calls: [], updateResult: () => Promise.reject(new Error('disk I/O error')) };
+  const failing = editor(item, engine);
+  button(failing.root(), 'Guardar cambios')!.props.onPress();
+  await settle();
+  assert.equal(all(failing.root(), 'ErrorMessage')[0].props.message, 'review.edit.saveFailed');
+  assert.equal(failing.view.nav.back, 0);
 });
 
 test('nothing is filled in: no kind, destination or amount scale is chosen for the person, and the amount is entered in the destination\'s currency', async () => {
@@ -524,6 +588,24 @@ test('the editor only opens a pending item of a writable store', async () => {
   }
 });
 
+test('25Q4: Editar keeps a close button while the proposal resolves, when it is no longer pending and before the ledger opens; with nothing behind, it goes to Para revisar', async () => {
+  const pending = itemOf(drafted());
+  // 25Q4 review: the third is a pending proposal whose editor waits for the ledger.
+  const ledgers = (): Ledger[] => [{ review: null, calls: [] }, { review: trayOf([]), calls: [], getReviewItem: async () => null },
+    { review: trayOf([pending]), calls: [], archive: null }];
+  for (const [index, canGoBack] of [[0, true], [1, true], [2, true], [0, false], [1, false], [2, false]] as const) {
+    const view = harness('edit-review/[id].tsx', ledgers()[index], { id: index === 2 ? pending.id : 'gone' }, { canGoBack });
+    view.render();
+    await settle();
+    const root = view.render();
+    assert.equal(all(root, 'EmptyState')[0]?.props.title, index === 1 ? 'Esta propuesta ya no está pendiente' : undefined, 'resolving says nothing yet');
+    const close = all(root, 'Stack.Screen')[0].props.options.headerLeft();
+    assert.deepEqual([close.type, close.props.name, close.props.label], ['IconButton', 'close', 'Cerrar'], String(index));
+    close.props.onPress();
+    assert.deepEqual([view.nav.back, view.nav.replaced], canGoBack ? [1, []] : [0, ['/review']]);
+  }
+});
+
 // ---- the pure derivation ------------------------------------------------------------------------------------------------
 
 test('canConfirm follows the domain and the store: gaps, a stale basis, a conflict or a read-only file each withhold it; an interrupted write keeps it', () => {
@@ -549,7 +631,8 @@ test('canConfirm follows the domain and the store: gaps, a stale basis, a confli
 
 test('no second write path: the review screens never build or send a ledger write; the provider confirms only through the store, in the ledger\'s queue', () => {
   const read = (path: string) => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
-  for (const file of ['app/review.tsx', 'app/review/[id].tsx', 'app/edit-review/[id].tsx', 'src/ui/review-presentation.ts']) {
+  // The sheet the Assistant presents and the actions both confirmation surfaces share are where Confirmar and Descartar live.
+  for (const file of ['app/review.tsx', 'app/review/[id].tsx', 'app/edit-review/[id].tsx', 'app/review-sheet/[id].tsx', 'src/ui/review-presentation.ts', 'src/ui/review-actions.ts']) {
     assert.doesNotMatch(read(file), /writeForReviewDraft|createEntry|createInstallmentPlan|savePurchasePlan|addEntry|addInstallmentPlan|newInstallmentPlan|openReviewStore/, file);
     assert.doesNotMatch(read(file), /^import \{[^}]*\} from '[^']*storage\/(review-database|database)'/m, file + ': types only from storage');
   }
@@ -557,7 +640,8 @@ test('no second write path: the review screens never build or send a ledger writ
   assert.match(provider, /const reviewOperation = [\s\S]*?return rereadOnRefusal\(async db => \{[\s\S]*?finally \{\s*await loadReview\(db\);\s*if \(mounted\.current\) setReviewVersion\(value => value \+ 1\);/, 'every review operation runs in the ledger\'s queue (re-reading it on a refusal) and reloads the tray');
   assert.match(provider, /confirmReview: \(id, expectedRevision\) => reviewOperation\(async store => \{\s*const result = await store\.confirm\(id, \{ expectedRevision, todayISO: todayKey\(\), at: new Date\(\)\.toISOString\(\) \}\);/);
   // A review file that cannot be opened never stops the ledger: its failure is caught and the ledger's archive is already set.
-  assert.match(provider, /setArchive\(session\.archive\);\s*setError\(sessionWarning\(session\)\);\s*await loadReview\(db\);/);
+  assert.match(provider, /adopt\(session, today\);\s*await loadReview\(db\);/);
+  assert.match(provider, /function adopt\([\s\S]*?setArchive\(session\.archive\);[\s\S]*?setError\(sessionWarning\(session\)\);/);
   assert.match(provider, /const loadReview = async \(db: LedgerDatabase\) => \{\s*try \{[\s\S]*?\} catch \{/);
 });
 
@@ -642,7 +726,7 @@ test('25A-04 (Codex review of #85): a capture that committed while the tray coul
 
 // ---- 25A-04: the review sheet ------------------------------------------------------------------------------------------
 
-test('the review sheet shows the live item compactly, and Confirmar (the one lime action) calls the same dispatcher once, at the shown revision', async () => {
+test('the review sheet shows the live item compactly, and Confirmar (the one brand-filled action) calls the same dispatcher once, at the shown revision', async () => {
   const item = itemOf(drafted({ destinationId: cardAccount.id, purchase: { mode: 'once' } }), { revision: 2 });
   const ledger: Ledger = { review: trayOf([item]), calls: [] };
   const view = harness('review-sheet/[id].tsx', ledger, { id: item.id });
@@ -651,7 +735,7 @@ test('the review sheet shows the live item compactly, and Confirmar (the one lim
   assert.equal(texts(root)[0], 'Confirmá el gasto');
   assert.deepEqual([all(root, 'Money')[0].props.minor, all(root, 'Money')[0].props.currency], [1500000, 'ARS']);
   const rows = Object.fromEntries(all(root, 'DetailRow').map(row => [row.props.label, row.props.value]));
-  assert.deepEqual(rows, { Categoría: 'Supermercado', Tarjeta: 'Visa', Pago: 'Una vez', Fecha: i18nFormat.formatDate(today, 'dayYear', 'es-AR') });
+  assert.deepEqual(rows, { Categoría: 'Supermercado', Tarjeta: 'Visa', 'Cómo se paga': 'Una vez', Fecha: i18nFormat.formatDate(today, 'dayYear', 'es-AR') });
   const confirm = button(root, 'Confirmar')!;
   assert.deepEqual([confirm.props.label, confirm.props.spokenLabel, confirm.props.secondary, confirm.props.disabled], ['Confirmar · $ 15.000,00', 'Confirmar, 15000,00 pesos', undefined, false]);
   assert.equal(button(root, 'Editar')!.props.secondary, true);
@@ -689,12 +773,16 @@ test('Descartar in the sheet is explicit and asks first; only the destructive an
   const ledger: Ledger = { review: trayOf([item]), calls: [] };
   const view = harness('review-sheet/[id].tsx', ledger, { id: item.id });
   const discard = all(view.render(), 'PressFeedback').find(node => node.props.accessibilityLabel === 'Descartar propuesta')!;
+  const opacity = (node: Node) => Object.assign({}, ...[node.props.style].flat(Infinity).filter(Boolean)).opacity;
+  assert.equal(opacity(discard), 1);
   discard.props.onPress();
   const [alert] = view.alerts;
   assert.equal(alert.title, '¿Descartar esta propuesta?');
   alert.buttons[0].onPress?.();
   assert.equal(ledger.calls.length, 0);
   alert.buttons[1].onPress!();
+  const held = all(view.render(), 'PressFeedback').find(node => node.props.accessibilityLabel === 'Descartar propuesta')!;
+  assert.deepEqual([held.props.disabled, opacity(held)], [true, 0.5], 'while it runs Descartar looks disabled too, not full red');
   await settle();
   assert.deepEqual(ledger.calls, [['dismiss', item.id, 1]]);
   assert.equal(view.nav.back, 1);
@@ -934,4 +1022,107 @@ test('while an item read from the store is read again, it stays drawn but offers
   view.render();
   root = view.render();
   assert.equal(all(root, 'Money')[0].props.minor, 1500000);
+});
+
+test('a refusal line does not outlive the repair: Editar takes it away in the sheet and the detail; a new refusal sets it again', async () => {
+  for (const file of ['review-sheet/[id].tsx', 'review/[id].tsx']) {
+    const item = itemOf(drafted());
+    const ledger: Ledger = { review: trayOf([item]), calls: [], confirmResult: () => Promise.reject(new Error(domain.REVIEW_STALE_MESSAGE)) };
+    const view = harness(file, ledger, { id: item.id });
+    button(view.render(), 'Confirmar')!.props.onPress();
+    await settle();
+    assert.equal(all(view.render(), 'ErrorMessage')[0].props.message, domain.REVIEW_STALE_MESSAGE, file + ': the refusal is shown, so the person sees why');
+    button(view.render(), 'Editar')!.props.onPress();
+    // Back from the editor (saved and re-based): the sheet or detail draws the item with no old red sentence.
+    ledger.review = trayOf([{ ...item, revision: 1 }]);
+    view.refocus();
+    assert.equal(all(view.render(), 'ErrorMessage')[0].props.message, null, file);
+    button(view.render(), 'Confirmar')!.props.onPress();
+    await settle();
+    assert.equal(all(view.render(), 'ErrorMessage')[0].props.message, domain.REVIEW_STALE_MESSAGE, file + ': refused again, said again');
+  }
+});
+
+test('a quick double tap on Editar presents one editor, in the sheet and in the detail; back in front, Editar opens it again', () => {
+  for (const file of ['review-sheet/[id].tsx', 'review/[id].tsx']) {
+    const item = itemOf(drafted());
+    const view = harness(file, { review: trayOf([item]), calls: [] }, { id: item.id });
+    button(view.render(), 'Editar')!.props.onPress();
+    button(view.render(), 'Editar')!.props.onPress();
+    assert.equal(view.pushed.length, 1, file + ': one editor, never two stacked on the same revision');
+    view.refocus();
+    button(view.render(), 'Editar')!.props.onPress();
+    assert.equal(view.pushed.length, 2, file + ': the latch opens again once the screen is in front');
+  }
+});
+
+test('the editor never shows an archived category as chosen: the field starts empty, saving without a choice keeps the gap, choosing another clears it', async () => {
+  const custom = domain.editedCategoryDefinition(domain.resolveCategory('expense', 'Mascotas'), { label: 'Mascotas' }, createdAt);
+  const archived: domain.LedgerArchive = { ...archive, categories: [{ ...custom, archived: true }] };
+  const item = itemOf(drafted({ category: 'Mascotas' }, archived));
+  const { ledger, root } = editor(item, { review: trayOf([item]), calls: [], archive: archived });
+  assert.equal(field(root(), 'CategoryField').props.value, '', 'the field reads «Elegir categoría», and so the picker adds no archived item');
+  button(root(), 'Guardar cambios')!.props.onPress();
+  await settle();
+  const kept = (ledger.calls[0] as any[])[3] as domain.ReviewDraft;
+  assert.ok(domain.reviewGaps(kept, archived as domain.ReviewArchive, today).includes('category'), 'still a gap, never confirmable');
+  field(root(), 'CategoryField').props.onChange('Supermercado');
+  assert.equal(field(root(), 'CategoryField').props.value, 'Supermercado');
+  ledger.calls.length = 0;
+  button(root(), 'Guardar cambios')!.props.onPress();
+  await settle();
+  assert.ok(!domain.reviewGaps((ledger.calls[0] as any[])[3] as domain.ReviewDraft, archived as domain.ReviewArchive, today).includes('category'));
+});
+
+test('the editor checks where it is typed: hidden characters in the merchant and a typed count outside 2-120 are named under their field and hold Guardar cambios', async () => {
+  const item = itemOf(drafted({ destinationId: cardAccount.id, purchase: { mode: 'installments', count: null, placement: 'current' } }));
+  const { ledger, root } = editor(item);
+  const merchant = () => all(root(), 'Field').find(node => /comercio|concepto/i.test(node.props.label))!;
+  merchant().props.onChangeText('Coto' + String.fromCharCode(0x200b));
+  assert.ok(texts(root()).includes('Este nombre tiene caracteres invisibles de un texto copiado. Escribilo de nuevo.'));
+  assert.equal(button(root(), 'Guardar cambios')!.props.disabled, true);
+  merchant().props.onChangeText('Coto');
+  assert.equal(button(root(), 'Guardar cambios')!.props.disabled, false);
+  assert.ok(!texts(root()).some(text => /invisibles/.test(text)));
+  // «Otra» with 1 (or 150) typed: said, and Save waits, instead of saving «sin cantidad» without a word.
+  choices(root())[2].props.onChange('other');
+  all(root(), 'Field').at(-1)!.props.onChangeText('1');
+  assert.ok(texts(root()).includes(bindLocale('es-AR').t('entryForm.plan.countInvalid')));
+  assert.equal(button(root(), 'Guardar cambios')!.props.disabled, true);
+  all(root(), 'Field').at(-1)!.props.onChangeText('15');
+  assert.equal(button(root(), 'Guardar cambios')!.props.disabled, false);
+  button(root(), 'Guardar cambios')!.props.onPress();
+  await settle();
+  assert.deepEqual(((ledger.calls[0] as any[])[3] as domain.ReviewDraft).purchase, { mode: 'installments', count: 15, placement: 'current' });
+  assert.equal(domain.hasHiddenCharacters('Coto'), false);
+  assert.equal(domain.hasHiddenCharacters('Co' + String.fromCharCode(0x202e) + 'to'), true);
+});
+
+test('a destination or category that stopped being valid is drawn with why on every surface, and its gap says what changed', () => {
+  const custom = domain.editedCategoryDefinition(domain.resolveCategory('expense', 'Mascotas'), { label: 'Mascotas' }, createdAt);
+  const live: domain.LedgerArchive = { ...archive, categories: [custom] };
+  const item = itemOf(drafted({ category: 'Mascotas' }, live));
+  // Since the proposal: the account was deleted and the category archived.
+  const changed: domain.LedgerArchive = { ...live, accounts: live.accounts.map(account => account.id === bank.id ? { ...account, deletedAt: createdAt } : account),
+    categories: [{ ...custom, archived: true }] };
+  const facts = reviewPresentation.reviewFacts(item, changed as domain.ReviewArchive, { todayISO: today, writable: true, conflicts: [] });
+  assert.deepEqual([facts.destinationState, facts.categoryState], ['unavailable', 'archived']);
+  assert.deepEqual(facts.gaps.map(gap => reviewPresentation.gapText(gap, facts)), ['review.gaps.destinationUnavailable', 'review.gaps.categoryArchived']);
+  for (const file of ['review-sheet/[id].tsx', 'review/[id].tsx']) {
+    const root = harness(file, { review: trayOf([item]), calls: [], archive: changed }, { id: item.id }).render();
+    const values = all(root, 'DetailRow').map(row => row.props.value);
+    assert.ok(values.includes('Banco (ya no disponible)'), file + ': never drawn as the current account');
+    assert.ok(values.includes('Mascotas (archivada)'), file);
+    const notes = all(root, 'LifecycleNote').map(note => note.props.detail);
+    assert.ok(notes.includes('Esa cuenta o tarjeta ya no está disponible. Elegí otra.') && notes.includes('Esa categoría está archivada. Elegí otra.'), file + ': the specific sentence, not «never chosen»');
+    assert.ok(!notes.includes('Elegí una cuenta o tarjeta disponible.'), file);
+  }
+  const tray = harness('review.tsx', { review: trayOf([item]), calls: [], archive: changed }).render();
+  assert.ok(texts(tray).some(text => text.includes('Mascotas (archivada) · Banco (ya no disponible)')), 'the tray row says it too');
+  // A count the amount cannot hold says so; a never-chosen destination keeps the plain sentence.
+  const tiny = reviewPresentation.reviewFacts(itemOf(drafted({ amountMinor: 5, destinationId: cardAccount.id, purchase: { mode: 'installments', count: 6, placement: 'current' } })),
+    archive as domain.ReviewArchive, { todayISO: today, writable: true, conflicts: [] });
+  assert.equal(reviewPresentation.gapText('installmentCount', tiny), 'review.gaps.installmentCountTooMany');
+  const none = reviewPresentation.reviewFacts(itemOf(drafted({ destinationId: null })), archive as domain.ReviewArchive, { todayISO: today, writable: true, conflicts: [] });
+  assert.deepEqual([none.destinationState, reviewPresentation.gapText('destination', none)], ['none', 'review.gaps.destination']);
 });

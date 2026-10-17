@@ -15,8 +15,13 @@ export function budgetCurrencies(held: readonly Currency[], budgets: readonly Mo
   return sortCurrencies(new Set([...held, ...budgets.filter(budget => budget.active).map(budget => budget.currency)]));
 }
 
-export function percentUsed(progress: Pick<BudgetProgress, 'ratio'>): number {
-  return Math.round(progress.ratio * 100);
+/** The whole percent of the limit spent, shown on Presupuestos, Inicio and Reportes: the largest whole percent not above
+ * what was spent, in exact integers (25D2). So «85 %» appears exactly when the state turns amber (the domain's 0.85) and
+ * «100 %» exactly when the limit is reached or passed; rounding showed «85 %» on a calm 84,6 % and «100 %» with money
+ * left. A net at or below zero (devoluciones) is 0. */
+export function percentUsed(progress: Pick<BudgetProgress, 'spentMinor'> & { budget: Pick<MonthlyBudget, 'amountMinor'> }): number {
+  if (progress.spentMinor <= 0 || progress.budget.amountMinor <= 0) return 0;
+  return Number(BigInt(progress.spentMinor) * 100n / BigInt(progress.budget.amountMinor));
 }
 
 /** The caption of Presupuestos' "Por categoría" section: "3 categorías · 1

@@ -135,6 +135,12 @@ function timestamp(value: unknown): value is string {
   const match = TIMESTAMP.exec(value);
   return !!match && validDateISO(match[1]) && Number.isFinite(Date.parse(value));
 }
+/** Whether a text holds a character that `name` refuses as hidden: what a form says beside the field, before saving, so
+ * the person learns which field to retype instead of meeting the draft's generic refusal at save. */
+export function hasHiddenCharacters(text: string): boolean {
+  return HIDDEN_CHARACTERS.test(text);
+}
+
 /** A name as a person reads it: trimmed, non-empty, bounded, with no hidden characters. */
 function name(value: unknown, max: number): string | null {
   if (value === null) return null;

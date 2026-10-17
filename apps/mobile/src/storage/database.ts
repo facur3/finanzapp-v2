@@ -458,6 +458,9 @@ async function migrateV11(tx: SqlExecutor): Promise<void> {
 /** Every schema script in order, for tests that build a real file at an earlier version (never run by the app outside `initializeDatabase`). */
 export const SCHEMA_SCRIPTS: readonly string[] = [SCHEMA, MIGRATE_V2, MIGRATE_V3, MIGRATE_V4, MIGRATE_V5, MIGRATE_V6, MIGRATE_V7, MIGRATE_V8, MIGRATE_V9, MIGRATE_V10, MIGRATE_V11, MIGRATE_V12, MIGRATE_V13, MIGRATE_V14];
 
+/** 25Q4: the open refusal for a file a newer build wrote; said as itself at launch, with no retry (none can help). */
+export const NEWER_SCHEMA_MESSAGE = 'Estos datos requieren una versión más nueva de FinanzApp. No se modificaron.';
+
 export async function initializeDatabase(db: LedgerDatabase): Promise<void> {
   // Set before opening a transaction; foreign_keys is connection-local.
   await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
@@ -465,7 +468,7 @@ export async function initializeDatabase(db: LedgerDatabase): Promise<void> {
   await db.withExclusiveTransactionAsync(async tx => {
     const version = await readVersion(tx);
     if (version > DATABASE_VERSION) {
-      throw new Error('Estos datos requieren una versión más nueva de FinanzApp. No se modificaron.');
+      throw new Error(NEWER_SCHEMA_MESSAGE);
     }
     if (version === 0) await tx.execAsync(SCHEMA);
     if (version < 2) await tx.execAsync(MIGRATE_V2);
@@ -957,7 +960,7 @@ export async function saveRecurringRule(db: LedgerDatabase, input: RecurringRule
       await insertRecurringRule(tx, rule);
       return;
     }
-    if (sameRecurringRule(existing, rule)) return;
+    if (sameRecurringRule(existing, rule) || advancedSince(existing, rule)) return;
     validateRecurringRuleChange(existing, rule, archive.accounts);
     validateArchive({ ...archive, recurring: archive.recurring!.map(item => item.id === rule.id ? rule : item) });
     // A deletion is this same UPDATE with deleted = 1: the row stays, and no entry it recorded is touched.
@@ -966,6 +969,14 @@ export async function saveRecurringRule(db: LedgerDatabase, input: RecurringRule
     rule.accountId, rule.kind, rule.amountMinor, rule.merchant, rule.category, rule.frequency, rule.anchorDateISO,
     rule.nextDateISO, rule.active ? 1 : 0, rule.deleted ? 1 : 0, rule.revision, rule.updatedAt, rule.id);
   });
+}
+
+/** The submitted rule committed before and the catch-up has since advanced it (a retry after a view refresh that failed): the
+ * stored row is the same rule with a later revision, only its next date moved forward. A no-op, never a «changed» refusal
+ * that would invite entering the rule a second time. */
+function advancedSince(existing: RecurringRule, submitted: RecurringRule): boolean {
+  return existing.revision > submitted.revision && existing.nextDateISO >= submitted.nextDateISO
+    && sameRecurringRule({ ...submitted, nextDateISO: existing.nextDateISO, revision: existing.revision, updatedAt: existing.updatedAt }, existing);
 }
 
 /** What one catch-up did: the movements it recorded, the rules it could not record (their ids, left unchanged), and
@@ -1080,10 +1091,10 @@ export async function saveMonthlyBudget(db: LedgerDatabase, input: MonthlyBudget
       throw new Error('El presupuesto cambió desde que lo abriste. Volvé a revisarlo.');
     }
     if (budget.currency !== existing.currency) {
-      throw new Error('Para cambiar la moneda, creá otro presupuesto.');
+      throw new Error('Para cambiar la moneda, agregá otro presupuesto.');
     }
     if (budget.scope !== existing.scope) {
-      throw new Error('Para cambiar entre presupuesto general y por categoría, creá otro presupuesto.');
+      throw new Error('Para cambiar entre presupuesto general y por categoría, agregá otro presupuesto.');
     }
     const budgets = (archive.budgets ?? []).map(item => item.id === budget.id ? budget : item);
     validateArchive({ ...archive, budgets });
@@ -1126,7 +1137,7 @@ export async function deleteAccount(db: LedgerDatabase, accountId: string, nowIS
   await db.withExclusiveTransactionAsync(async tx => {
     const archive = await readArchive(tx);
     const account = archive.accounts.find(item => item.id === accountId);
-    if (!account) throw new Error('No encontramos esta cuenta.');
+    if (!account) throw new Error('No se encontró esta cuenta.');
     if (hiddenLiabilityAccountIds(archive.cards, archive.debts).has(accountId)) throw new Error(OBLIGATION_ACCOUNT_MESSAGE);
     if (!isLiveAccount(account)) return; // Committed already; a refresh failed.
     const tombstone = deleteAccountRecord(account, nowISO);
@@ -1186,7 +1197,7 @@ export async function saveCreditCard(db: LedgerDatabase, input: CreditCardProfil
     const archive = await readArchive(tx);
     validateCreditCardProfile(card, archive.accounts);
     const existing = archive.cards?.find(item => item.id === card.id);
-    if (!existing) throw new Error('No encontramos esta tarjeta.');
+    if (!existing) throw new Error('No se encontró esta tarjeta.');
     const stored = cardCycleDatesOf(card.id, archive.cardCycleDates);
     if (sameCreditCardProfile(existing, card)) {
       // Committed already (a refresh failed): the calendar shows what was asked. A calendar change always moves the card
@@ -1226,7 +1237,7 @@ export async function deleteCreditCard(db: LedgerDatabase, cardId: string, nowIS
   await db.withExclusiveTransactionAsync(async tx => {
     const archive = await readArchive(tx);
     const card = archive.cards?.find(item => item.id === cardId);
-    if (!card) throw new Error('No encontramos esta tarjeta.');
+    if (!card) throw new Error('No se encontró esta tarjeta.');
     if (card.deleted) return; // Committed already; a refresh failed.
     // 25B2: no balance due; 24T1: no pending plan; 24T3 (B3): no credit in the holder's favour.
     assertCardDeletable(card, snapshotFromArchive(archive), archive.installmentPlans ?? [], archive.records, archive.purchaseOperations ?? []);
@@ -1276,7 +1287,7 @@ export async function savePersonalDebt(db: LedgerDatabase, input: PersonalDebtPr
     const archive = await readArchive(tx);
     validatePersonalDebtProfile(debt, archive.accounts);
     const existing = archive.debts?.find(item => item.id === debt.id);
-    if (!existing) throw new Error('No encontramos esta deuda.');
+    if (!existing) throw new Error('No se encontró esta deuda.');
     if (samePersonalDebtProfile(existing, debt)) return;
     validatePersonalDebtChange(existing, debt);
     // 25B2 close: the deletion record has its own path (`deletePersonalDebt`, which checks the balance and the history).
@@ -1298,7 +1309,7 @@ export async function deletePersonalDebt(db: LedgerDatabase, debtId: string, now
   await db.withExclusiveTransactionAsync(async tx => {
     const archive = await readArchive(tx);
     const debt = archive.debts?.find(item => item.id === debtId);
-    if (!debt) throw new Error('No encontramos esta deuda.');
+    if (!debt) throw new Error('No se encontró esta deuda.');
     if (debt.deleted) return; // Committed already; a refresh failed.
     assertDebtDeletable(debt, snapshotFromArchive(archive));
     const tombstone = deletePersonalDebtRecord(debt, nowISO);
@@ -1416,13 +1427,16 @@ export async function reactivateInstallmentPlan(db: LedgerDatabase, planId: stri
 
 /** The deletion record of a plan that recorded nothing (created by mistake); one with history is cancelled instead. The
  * row and its schedule stay. A retry on a plan already deleted is a no-op. */
-export async function deleteInstallmentPlan(db: LedgerDatabase, planId: string, nowISO: string): Promise<void> {
+export async function deleteInstallmentPlan(db: LedgerDatabase, planId: string, nowISO: string, todayISO: string): Promise<void> {
   await db.withExclusiveTransactionAsync(async tx => {
     const archive = await readArchive(tx);
     const plan = archive.installmentPlans?.find(item => item.id === planId);
     if (!plan) throw new Error(PLAN_MISSING_MESSAGE);
     if (plan.deleted) return; // Committed already; a refresh failed.
-    assertInstallmentPlanDeletable(plan, archive.records, archive.purchaseOperations ?? []); // 24T3: any operation, undone included, is history too.
+    // Judged on the caught-up plan, as every other plan action: an instalment whose statement closed since the last pass is
+    // history too, so the plan is refused (and the refusal's catch-up records that instalment), never deleted with it owed.
+    const { archive: caughtUp } = withPlanCatchUp(archive, planId, todayISO);
+    assertInstallmentPlanDeletable(plan, caughtUp.records, archive.purchaseOperations ?? []); // 24T3: any operation, undone included, is history too.
     const tombstone = deleteInstallmentPlanRecord(plan, nowISO);
     validateInstallmentPlanChange(plan, tombstone);
     validateArchive({ ...archive, installmentPlans: archive.installmentPlans!.map(item => item.id === planId ? tombstone : item) });

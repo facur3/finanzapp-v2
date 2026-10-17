@@ -11,8 +11,27 @@ export const common = {
     addAccount: 'Agregar cuenta',
     retrySave: 'Reintentar guardado',
     retryChange: 'Reintentar cambio',
+    /** Under a form whose save failed while its draft is kept for «Reintentar» (one sentence for every form). {where} is
+     * one of `retryWhere`: the place that shows whether the record exists. */
+    retryNote: 'Reintentar no guarda nada dos veces. Para cambiar algo, cerrá y revisá primero {where}.',
+    retryWhere: {
+      movements: 'Movimientos',
+      cardInstallments: 'las cuotas de la tarjeta en Tarjetas',
+      accounts: 'tus cuentas',
+      account: 'el saldo de la cuenta',
+      budgets: 'Presupuestos',
+      recurring: 'Recurrentes',
+      debts: 'Deudas y cobros',
+      cards: 'Tarjetas',
+      categories: 'la lista de categorías',
+      plan: 'el plan',
+      purchase: 'la compra',
+    },
     saveChanges: 'Guardar cambios',
-    closeAmountKeyboard: 'Cerrar teclado del monto',
+    /** 25D2: VoiceOver, once a form that saved has closed. {amount}: the amount saved, in words («1234,50 pesos»). */
+    saved: 'Guardado, {amount}.',
+    /** 25D2: VoiceOver, once an edit form that saved has closed. */
+    changesSaved: 'Cambios guardados.',
     moreInfoAbout: 'Más información sobre {title}',
     /** VoiceOver name of a metric's help glyph: "Qué significa Disponible". */
     whatIs: 'Qué significa {title}',
@@ -41,8 +60,6 @@ export const common = {
     chooseDate: 'Elegir fecha',
     currency: 'Moneda',
     chooseCurrency: 'Elegir moneda',
-    /** Under the currency sheet of a new account: why the list is short, without naming a currency (the list follows the ledger's gate). */
-    currencyNote: 'Cada cuenta se registra en su propia moneda. Los importes de monedas distintas nunca se suman ni se convierten entre sí.',
     searchOrCreateCategory: 'Buscar o crear categoría',
     categoryNamePlaceholder: 'Nombre de la categoría',
     useCategory: 'Usar categoría {name}',

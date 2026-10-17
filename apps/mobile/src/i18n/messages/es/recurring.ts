@@ -16,9 +16,10 @@ export const recurring = {
     list: {
       add: 'Agregar recurrente',
       emptyTitle: 'Nada recurrente todavía',
-      emptyDetailAccount: 'Creá un gasto o ingreso recurrente para esta cuenta.',
-      emptyDetail: 'Alquiler, suscripciones, sueldo o cualquier movimiento que se repita. FinanzApp lo anota en tus movimientos cuando vence, una sola vez. No paga ni cobra nada.',
-      create: 'Crear recurrente',
+      emptyDetailAccount: 'Agregá un gasto o ingreso recurrente para esta cuenta.',
+      /** 25O1: one line; how a rule records (and that it never pays or collects) is the form's note. */
+      emptyDetail: 'Alquiler, suscripciones, sueldo: lo que se repite.',
+      create: 'Agregar recurrente',
       next30: 'Próximos 30 días',
       /** 24UX6E: the 30-day projection of expenses (it was «Pagos»: FinanzApp never pays anything). */
       payments: 'Gastos',
@@ -81,8 +82,12 @@ export const recurring = {
       },
       deleteDetailEmpty: 'Deja de registrarse. No borra ningún movimiento.',
       deleteConfirm: 'Eliminar',
-      failed: 'No pudimos cambiar el recurrente. Sigue como estaba; probá nuevamente.',
-      deleteFailed: 'No pudimos eliminar el recurrente. Sigue como estaba; probá nuevamente.',
+      failed: 'No se pudo cambiar el recurrente. Sigue como estaba; probá nuevamente.',
+      deleteFailed: 'No se pudo eliminar el recurrente. Sigue como estaba; probá nuevamente.',
+      /** 25D2: VoiceOver, after Pausar, Reanudar or Eliminar. `{merchant}` is the person's own text; {date} written out. */
+      pausedSpoken: '{merchant}: pausado.',
+      resumedSpoken: '{merchant}: reanudado, próxima fecha {date}.',
+      deletedSpoken: '{merchant}: eliminado.',
     },
     form: {
       noAccountTitle: 'Primero, una cuenta',
@@ -95,22 +100,24 @@ export const recurring = {
       merchantIncomePlaceholder: 'Ej. Sueldo',
       frequency: 'Frecuencia',
       nextDate: 'Próxima fecha',
-      todayNote: 'Si la próxima fecha es hoy, FinanzApp anota ese movimiento al guardar. Después lo anota en cada vencimiento, al abrir la app, sin duplicarlo.',
-      retryNote: 'El envío quedó congelado para que Reintentar no cree otra regla.',
-      create: 'Crear recurrente',
+      /** 25O1: under the date, one line with the whole story behind its information button. */
+      note: 'Se anota en cada vencimiento; no paga ni cobra nada.',
+      noteHelpTitle: 'Cómo se anota',
+      noteHelp: 'Si la próxima fecha es hoy, el movimiento se anota al guardar; después, cada vencimiento al abrir la app, una sola vez. Un recurrente solo anota: no paga ni cobra nada.',
+      create: 'Guardar recurrente',
       pastDate: 'La próxima fecha debe ser hoy o una fecha futura.',
-      saveFailed: 'No se pudo guardar el recurrente. Conservamos el mismo envío para reintentar sin duplicarlo.',
+      saveFailed: 'No se pudo guardar el recurrente.',
     },
     /** 24UX2: the movements a rule already recorded, in its detail (25B3: the detail screen, not the form). A scheduled date is not one of them. */
     history: {
       title: 'Registrados',
-      caption: 'Movimientos que FinanzApp anotó por esta regla; no confirman un pago del banco. La próxima fecha es una estimación.',
+      caption: 'Movimientos que FinanzApp anotó por esta regla. La próxima fecha es una estimación.',
       empty: 'Todavía no registró ningún movimiento.',
       older: { one: 'Y {count} registro anterior en Movimientos.', other: 'Y {count} registros anteriores en Movimientos.' },
     },
     /** The not-found state of the rule's detail and of its form (the same sentence). */
     edit: {
-      notFoundTitle: 'No encontramos este recurrente',
+      notFoundTitle: 'No se encontró este recurrente',
       notFoundDetail: 'Volvé a Recurrentes para elegir una regla guardada en este dispositivo.',
     },
   },
