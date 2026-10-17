@@ -144,8 +144,9 @@ export function ValueTransition({ id, children, style, variant = 'rise', exit = 
 /** A block whose presence follows data (a budget line, a commitments list).
  * Siblings slide instead of jumping when it appears or leaves; with `fade`, the
  * block itself fades in and out. Reduce Motion keeps the fade and drops the
- * slide. Use it on tab roots, where data changes are the only reason a block
- * appears; a pushed screen already has the native transition. */
+ * slide. Use it wherever data changes a block in place: a tab root, or a pushed
+ * screen whose own action moves rows between blocks (Tarjetas' snapshot, Deudas'
+ * sections). The native transition covers only arriving at a screen. */
 export function Reflow({ children, style, fade = false }: { children: ReactNode; style?: StyleProp<ViewStyle>; fade?: boolean }) {
   const reduced = useReduceMotion();
   return <Animated.View style={style} layout={reduced ? undefined : reflow}

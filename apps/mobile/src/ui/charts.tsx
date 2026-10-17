@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, { useAnimatedProps, useAnimatedStyle, useSharedValue, withTiming, type SharedValue } from 'react-native-reanimated';
 import Svg, { Circle, Path } from 'react-native-svg';
@@ -161,8 +161,10 @@ export function centreAmountSize(amountText: string, room: number, fontScale: nu
  * the chosen category's) moves under the donut, uncapped and whole, and the hole stays clear.
  *
  * The first chart sweeps in clockwise (480 ms); after that a month or currency change is one crossfade with the slices
- * already final, and a choice changes the opacity at once. Reduce Motion shows the finished chart at once. */
-export function DonutChart({ slices, currency, total, size: sizeProp, thickness: thicknessProp, chosen = null, onChoose, shareOf, caption }: {
+ * already final, and a choice changes the opacity at once. Reduce Motion shows the finished chart at once. 25T: a chart
+ * that mounts where nobody sees it (`visible` false: Reportes behind Inicio at launch) is drawn finished, so the first
+ * look at it is never the end of a sweep that already ran; visibility only ever skips the sweep, it never starts one. */
+export function DonutChart({ slices, currency, total, size: sizeProp, thickness: thicknessProp, chosen = null, onChoose, shareOf, caption, visible = true }: {
   slices: (DonutSlice & { color: string })[]; currency: Currency;
   /** The period's total in minor units, the report's own figure (the slices' sum when absent). */
   total?: number;
@@ -174,6 +176,8 @@ export function DonutChart({ slices, currency, total, size: sizeProp, thickness:
   shareOf: (value: number) => { label: string; spoken: string };
   /** What VoiceOver calls the chart. */
   caption: string;
+  /** Whether its screen is in front when it mounts. */
+  visible?: boolean;
 }) {
   const p = usePalette();
   const { t, speechLanguage, spokenMoney, moneyText } = useI18n();
@@ -183,7 +187,7 @@ export function DonutChart({ slices, currency, total, size: sizeProp, thickness:
   const thickness = thicknessProp ?? geometry.thickness;
   const signature = slices.map(slice => slice.key + ':' + slice.value).join('|');
   const revealed = useRef(false);
-  const reveal = !revealed.current;
+  const reveal = !revealed.current && visible;
   useEffect(() => { revealed.current = true; }, []);
   // Where a touch on the neutral space around the ring started: only a tap (under 10 pt of travel) clears the choice.
   const touch = useRef<{ x: number; y: number } | null>(null);
@@ -270,8 +274,10 @@ function Sweep({ arcs, size, thickness, ring, reveal, chosen }: {
   arcs: DonutArc[]; size: number; thickness: number; ring: string; reveal: boolean; chosen: string | null;
 }) {
   const reduced = useReduceMotion();
-  const progress = useSharedValue(reduced || !reveal ? 1 : 0);
-  useEffect(() => { progress.value = reduced || !reveal ? 1 : withTiming(1, timing('reveal', false)); }, [reduced, reveal, progress]);
+  // 25T: only the mount decides: a second render (any parent update mid-sweep) flips `reveal` and used to end the sweep early.
+  const [play] = useState(reveal);
+  const progress = useSharedValue(reduced || !play ? 1 : 0);
+  useEffect(() => { progress.value = reduced || !play ? 1 : withTiming(1, timing('reveal', false)); }, [reduced, progress]);
   const radius = arcs[0]?.radius ?? (size - thickness - CHOSEN_EXTRA) / 2;
   return <Svg width={size} height={size}>
     <Circle cx={size / 2} cy={size / 2} r={radius} stroke={ring} strokeWidth={thickness} fill="none" />

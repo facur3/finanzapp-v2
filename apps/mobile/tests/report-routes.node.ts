@@ -86,7 +86,7 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': { View: 'View', FlatList: 'FlatList', StyleSheet: { hairlineWidth: 0.5 }, useWindowDimensions: () => window },
     '@expo/vector-icons/Ionicons': 'Ionicons',
-    'expo-router': { useLocalSearchParams: () => params, router: { push: (to: unknown) => pushed.push(to) } },
+    'expo-router': { useLocalSearchParams: () => params, useIsFocused: () => true, router: { push: (to: unknown) => pushed.push(to) } },
     '../src/ui/display-currency-provider': displayProvider, '../src/ui/display-currency': displayCurrency,
     '../src/fx/rates-provider': ratesProvider, '../src/fx/finance-view': financeView, '../src/fx/fx-copy': fxCopy, '../src/fx/rates-store': ratesStore,
     '../src/ui/home-modules': { CurrencyParts: 'CurrencyParts', MetricHelp: 'MetricHelp' },

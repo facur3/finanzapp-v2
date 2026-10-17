@@ -57,6 +57,52 @@ test('category hues are stable, distinct while they can be, and independent of s
 /** Every element of a tree, without rendering function components. */
 const flat = (value: any): any[] => !value || typeof value !== 'object' ? [] : Array.isArray(value) ? value.flatMap(flat) : [value, ...flat(value.props?.children)];
 
+test('25T: the donut\'s sweep is decided once, at mount: a re-render mid-sweep never ends it, and a chart mounted out of sight is drawn finished', () => {
+  const source = readFileSync(new URL('../src/ui/charts.tsx', import.meta.url), 'utf8');
+  const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
+  const jsx = (type: any, props: any) => ({ type, props });
+  // Hooks that persist by call order and run an effect only when its dependencies change, as React does.
+  let slots: unknown[] = [], cursor = 0;
+  const slot = <T,>(init: () => T): T => { const index = cursor++; if (!(index in slots)) slots[index] = init(); return slots[index] as T; };
+  const shared: { value: number }[] = [];
+  const modules: Record<string, any> = {
+    '../i18n/provider': { useI18n: () => bindLocale('es-AR') },
+    react: { useMemo: (fn: () => any) => fn(), useRef: (value: any) => slot(() => ({ current: value })), useState: (initial: unknown) => [slot(() => initial)],
+      useEffect: (fn: () => void, deps?: unknown[]) => { const box = slot(() => ({ deps: undefined as unknown[] | undefined })); if (!box.deps || !deps || deps.some((dep, i) => dep !== box.deps![i])) { box.deps = deps; fn(); } } },
+    'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
+    'react-native': { View: 'View', Pressable: 'Pressable', StyleSheet: { absoluteFill: {}, hairlineWidth: 0.5 }, useWindowDimensions: () => ({ width: 393, height: 852, fontScale: 1 }) },
+    './geometry': geometry,
+    'react-native-reanimated': { __esModule: true, default: { View: 'AnimatedView', Text: 'AnimatedText', createAnimatedComponent: (c: any) => 'Animated(' + c + ')' },
+      useSharedValue: (value: number) => slot(() => { const item = { value }; shared.push(item); return item; }), useAnimatedStyle: (fn: () => any) => fn,
+      useAnimatedProps: (fn: () => any) => fn, withTiming: () => 0.25 },
+    'react-native-svg': { __esModule: true, default: 'Svg', Circle: 'Circle', Path: 'Path' },
+    './components': { AppText: 'AppText', Money: 'Money', PressFeedback: 'PressFeedback' },
+    './category-color': { categoryColor: () => '#111', othersColor: () => '#ccc' },
+    './motion': { ValueTransition: 'ValueTransition', duration: { state: 200, data: 260, reveal: 480 }, timing: () => ({ duration: 480 }) },
+    './theme': { useReduceMotion: () => false, usePalette: () => ({ inset: '#eee', text: '#000', secondary: '#666' }) },
+  };
+  const module = { exports: {} as { DonutChart?: (props: any) => any } };
+  runInNewContext(code, { module, exports: module.exports, require: (name: string) => modules[name] });
+  const slices = [{ key: 'a', label: 'A', value: 300, color: '#1' }, { key: 'b', label: 'B', value: 100, color: '#2' }];
+  const shareOf = (value: number) => ({ label: Math.round((value / 400) * 100) + ' %', spoken: '' });
+  // The DonutChart and its Sweep share one hook list per mount, rendered in order like React would.
+  const render = (props: Record<string, unknown> = {}) => {
+    cursor = 0;
+    const tree = module.exports.DonutChart!({ slices, currency: 'ARS', caption: 'x', shareOf, onChoose: () => {}, ...props });
+    const sweep = flat(flat(tree).find(node => node.type === 'Pressable').props.children).find(node => typeof node.type === 'function' && node.type.name === 'Sweep');
+    sweep.type(sweep.props);
+    return sweep.props.reveal;
+  };
+  assert.equal(render(), true, 'mounted in front: the sweep starts');
+  const clock = shared.at(-1)!;
+  assert.equal(clock.value, 0.25, 'the hand is moving');
+  assert.equal(render(), false, 'a second render no longer asks for a reveal');
+  assert.equal(clock.value, 0.25, 'and the sweep is not cut short to its end');
+  slots = []; shared.length = 0;
+  assert.equal(render({ visible: false }), false, 'mounted behind another tab: no reveal');
+  assert.equal(shared.at(-1)!.value, 1, 'drawn finished, so opening Reportes shows it whole');
+});
+
 test('donut sweeps in from twelve o\'clock only the first time, then crossfades, and skips motion when reduced', () => {
   const source = readFileSync(new URL('../src/ui/charts.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
@@ -66,7 +112,7 @@ test('donut sweeps in from twelve o\'clock only the first time, then crossfades,
   const timings: number[] = [];
   const modules: Record<string, any> = {
     '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
-    react: { useEffect: (fn: () => any) => { fn(); }, useMemo: (fn: () => any) => fn(), useRef: (value: any) => ({ current: value }) },
+    react: { useEffect: (fn: () => any) => { fn(); }, useMemo: (fn: () => any) => fn(), useRef: (value: any) => ({ current: value }), useState: (initial: unknown) => [initial] },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': { View: 'View', Pressable: 'Pressable', StyleSheet: { absoluteFill: {}, hairlineWidth: 0.5 }, useWindowDimensions: () => ({ width: 393, height: 852, fontScale: 1 }) },
     './geometry': geometry,

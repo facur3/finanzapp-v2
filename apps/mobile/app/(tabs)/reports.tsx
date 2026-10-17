@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { FlatList, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated from 'react-native-reanimated';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { categoryKey, dailySpending, expensesInPeriod, monthlySpendingTrend, shiftMonthISO, spendingComparison, spendingInsights, spendingReport,
   summarizeMonthlyBudgets, topMerchants, type CategorySpending, type Currency, type DailySpending, type Entry, type SpendingInsight } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
@@ -71,6 +71,8 @@ export default function ReportsScreen() {
   // 24UX6C2: the category chosen on the donut, for the month and currency it was chosen in (a new month starts with none).
   const [chosen, setChosen] = useState<{ scope: string; key: string } | null>(null);
   const reduced = useReduceMotion();
+  // 25T: the root mounts behind Inicio at launch; a donut drawn then is shown finished, never as the end of an unseen sweep.
+  const focused = useIsFocused();
   // 25UX1: the rows travel to their new places only when the choice changes within one month, currency and mode (the
   // chosen row rises to the top, then returns); a new month, currency or mode reorders at once. `listSeen` is what the
   // latest render drew; after each commit it becomes `listDrawn`, what the next render compares with.
@@ -299,7 +301,7 @@ export default function ReportsScreen() {
             {/* 24UX6D: the donut is the head of Categorías and carries the period's total in its centre (the report's own
                 figure); a chosen category replaces it there. */}
             <DonutChart slices={slices} currency={currency} total={report.expenseMinor} caption={t('reports.chart.byCategory')} chosen={chosenKey} shareOf={shareOf}
-              onChoose={key => setChosen(key ? { scope: scopeKey, key } : null)} />
+              onChoose={key => setChosen(key ? { scope: scopeKey, key } : null)} visible={focused} />
             {slices.some(slice => slice.key === OTHERS_KEY) && <AppText tertiary variant="caption" style={{ textAlign: 'center' }}>{t('reports.othersNote')}</AppText>}
           </View>}
         </View>

@@ -184,7 +184,7 @@ function loadComponents(locale: AppLocale = 'es-AR', deviceLanguage: string | nu
     '@finanzapp/domain': { formatMinorUnits: (minor: number) => (minor / 100).toLocaleString('es-AR', { minimumFractionDigits: 2 }), accountBalanceMinor: () => 0, labelFromISO: () => '',
       draftFitsCurrency: domain.draftFitsCurrency, editedDraftFits: domain.editedDraftFits },
     'expo-router': { router: {} },
-    './theme': { radius: {}, space: {}, type: { body: { fontSize: 17, lineHeight: 22 } }, useCurrentDay: () => '2026-09-20', useReduceMotion: () => true, usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', income: '#008800', transfer: '#03c', warning: '#a60', heroInk: '#131411', heroMoneySymbol: '#3A3C3F', heroMoneyCents: '#505255', ...palette }) },
+    './theme': { radius: {}, space: { xl: 20 }, type: { body: { fontSize: 17, lineHeight: 22 } }, useCurrentDay: () => '2026-09-20', useReduceMotion: () => true, usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', income: '#008800', transfer: '#03c', warning: '#a60', heroInk: '#131411', heroMoneySymbol: '#3A3C3F', heroMoneyCents: '#505255', ...palette }) },
     './categories': { categoryIcon: () => 'pricetag-outline' },
     './palette': paletteModule, './dock-clearance': { useDockInset: () => ({ extraPadding: 0, indicator: undefined }) }, './category-color': { tintOf: (c: string) => c }, './category-hues': { useCategoryColor: () => '#111', useCategoryLook: (label: string) => ({ label, hex: '#111', glyph: 'pricetag-outline' }), useAccountLook: () => ({ glyph: 'wallet-outline', hex: '#2557D6' }) },
     './geometry': geometry, './merchant-mark': merchantMark, './money-input': moneyInput, './motion': { duration: {}, easeOut: {}, selectionHaptic: () => {}, timing: () => ({}) },
@@ -206,7 +206,12 @@ test('Money sizes a hero from its measured width and leaves rows to the native f
   assert.equal(hero.type, 'View', 'a hero measures a stretched wrapper');
   assert.equal(hero.props.style.alignSelf, 'stretch');
   let text = hero.props.children;
-  assert.equal(text.props.style.fontSize, 44, 'base size before layout');
+  // 25T: before layout the hero is already fitted to the content width (393 − 2 × 20), so the measured size is a few points
+  // away at most, never a 44 pt first frame stepping down while it fades in.
+  const seeded = text.props.style.fontSize;
+  assert.equal(seeded, geometry.fitFontSize('$\u00A0999.999.999,99', 353, 44, 22), 'fitted to the window before layout');
+  assert.ok(seeded < 44, 'an eleven-digit amount is not drawn at 44 pt first');
+  assert.equal(render({ minor: 1234, currency: 'ARS', large: true }).props.children.props.style.fontSize, 44, 'a short hero is at its base size from the first frame');
   assert.equal(text.props.adjustsFontSizeToFit, false, 'no native shrink-to-fit on a hero');
   assert.equal(text.props.numberOfLines, 1);
   hero.props.onLayout({ nativeEvent: { layout: { width: PHONE } } });

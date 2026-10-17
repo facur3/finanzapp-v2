@@ -10,6 +10,7 @@ import { useI18n } from '../src/i18n/provider';
 import { DebtRow } from '../src/ui/liability-rows';
 import { debtsByUrgency } from '../src/ui/liability-presentation';
 import { useCurrentDay } from '../src/ui/theme';
+import { Reflow } from '../src/ui/motion';
 import { pairStacks } from '../src/ui/geometry';
 
 /** Open debts and receivables with their totals, then the closed ones (24UX4). Each row settles, closes, reopens
@@ -49,18 +50,20 @@ export default function DebtsScreen() {
           // A sum beyond the safe range is said for that currency, never rounded, dropped or shown as zero.
           : <AppText key={item.currency} secondary variant="subhead">{withCurrencyCode(t('debts.list.outOfRange'), item.currency)}</AppText>)}
       </View>}
-      {!!owedByMe.length && <View>
+      {/* 25T: closing, reopening or deleting moves a row between these blocks: each slides to its new size and a block that
+          appears or empties fades (Reflow, as Tarjetas does); Reduce Motion keeps only the fade. */}
+      {!!owedByMe.length && <Reflow fade>
         <SectionTitle>{t('debts.list.owed')}</SectionTitle>
         <Surface grouped>{owedByMe.map((debt, index) => <DebtRow key={debt.id} debt={debt} last={index === owedByMe.length - 1} actions={manage.actions(debt)} />)}</Surface>
-      </View>}
-      {!!owedToMe.length && <View>
+      </Reflow>}
+      {!!owedToMe.length && <Reflow fade>
         <SectionTitle>{t('debts.list.receivable')}</SectionTitle>
         <Surface grouped>{owedToMe.map((debt, index) => <DebtRow key={debt.id} debt={debt} last={index === owedToMe.length - 1} actions={manage.actions(debt)} />)}</Surface>
-      </View>}
-      {!!closed.length && <View>
+      </Reflow>}
+      {!!closed.length && <Reflow fade>
         <SectionTitle caption={t('debts.list.closedCaption')}>{t('debts.list.closed')}</SectionTitle>
         <Surface grouped>{closed.map((debt, index) => <DebtRow key={debt.id} debt={debt} last={index === closed.length - 1} actions={manage.actions(debt)} />)}</Surface>
-      </View>}
+      </Reflow>}
     </>}
   </Screen>;
 }

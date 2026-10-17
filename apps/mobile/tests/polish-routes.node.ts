@@ -162,8 +162,15 @@ test('budgets without a general budget list the sublimits, offer a compact gener
   assert.equal(texts(root).some(text => text.includes('Además gastaste')), false, 'every September expense has a sublimit here, so no unbudgeted line');
   const partial = harness('budgets.tsx', { currency: 'ARS' }, { ...archive, budgets: [budgets[0]] }).render();
   assert.ok(texts(partial).some(text => text.includes('Además gastaste $\u00A090,00 en categorías sin límite propio')), 'unbudgeted spending stays visible');
+  // 25T: the month and its state cross-fade like Reportes' stepper, and the caption row keeps «Este mes»'s 28 pt line in the
+  // current month too, so stepping away does not push the budgets down.
+  const month = (tree: any) => nodes(tree).find(node => node.type === 'ValueTransition')!;
+  assert.deepEqual([month(root).props.id, month(root).props.variant], ['2026-09|ARS', 'fade']);
+  const captionRow = (tree: any) => nodes(month(tree)).filter(node => node.type === 'View').at(-1)!;
+  assert.equal(captionRow(root).props.style.minHeight, 28);
   find(root, 'IconButton', 'Mes siguiente').props.onPress();
   assert.equal(find(view.render(), 'EmptyState').props.title, 'Dale un límite a tu mes');
+  assert.equal(month(view.render()).props.id, '2026-10|ARS', 'a new id: the old month fades out, the new one in');
 });
 
 test('a general budget is the primary summary over all recorded expenses, with sublimits under it', () => {

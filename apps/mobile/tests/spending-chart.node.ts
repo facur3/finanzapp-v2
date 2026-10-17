@@ -83,7 +83,7 @@ function chartsModule(i18n: ReturnType<typeof bindLocale>) {
   const jsx = (type: any, props: any) => ({ type, props });
   const modules: Record<string, any> = {
     '../i18n/provider': { useI18n: () => i18n },
-    react: { useEffect: () => {}, useMemo: (fn: () => any) => fn(), useRef: (value: any) => ({ current: value }) },
+    react: { useEffect: () => {}, useMemo: (fn: () => any) => fn(), useRef: (value: any) => ({ current: value }), useState: (initial: unknown) => [initial] },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': { View: 'View', Pressable: 'Pressable', StyleSheet: { absoluteFill: {}, hairlineWidth: 0.5 }, useWindowDimensions: () => ({ width: chartWidth, height: 852, fontScale: chartFontScale }) },
     './geometry': geometry,

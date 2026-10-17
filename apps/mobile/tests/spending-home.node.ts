@@ -116,7 +116,7 @@ function routeHarness(file: string, params: Record<string, unknown>, initialData
       useAnimatedStyle: (fn: () => unknown) => fn() },
     'react-native-safe-area-context': { useSafeAreaInsets: () => INSETS },
     'expo-status-bar': { setStatusBarStyle: (style: string) => { statusBar.push(style); } },
-    'expo-router': { useLocalSearchParams: () => params, router: { push: (to: unknown) => pushed.push(to), navigate: (to: unknown) => navigated.push(to) },
+    'expo-router': { useLocalSearchParams: () => params, useIsFocused: () => true, router: { push: (to: unknown) => pushed.push(to), navigate: (to: unknown) => navigated.push(to) },
       useFocusEffect: (effect: () => void | (() => void)) => { focusEffect = effect; if (!focusedOnce) { focusedOnce = true; focusCleanup = effect(); } } },
     '@finanzapp/domain': domain,
     '../src/storage/LedgerProvider': { useLedger: () => ({ snapshot: data, archive: { accounts: data.accounts, records: [], ...extra } }) },

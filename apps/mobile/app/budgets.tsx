@@ -15,7 +15,7 @@ import { useDefaultCurrency } from '../src/ui/use-default-currency';
 import { useI18n } from '../src/i18n/provider';
 import { availableCurrencies, historyCurrencies } from '../src/ui/presentation';
 import { heldCurrency } from '../src/ui/report-presentation';
-import { announce, selectionHaptic, timing } from '../src/ui/motion';
+import { ValueTransition, announce, selectionHaptic, timing } from '../src/ui/motion';
 import { space, useCurrentDay, usePalette, useReduceMotion } from '../src/ui/theme';
 
 /** Hierarchy: the general budget (the month's ceiling over every recorded
@@ -85,12 +85,14 @@ export default function BudgetsScreen() {
       {currencies.length > 1 && <CurrencySwitch value={currency} currencies={currencies} onChange={setSelectedCurrency} />}
       <View style={monthTitle.stacked ? { gap: 8 } : { flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         {!monthTitle.stacked && monthArrow(-1)}
-        <View style={[!monthTitle.stacked && { flex: 1 }, { alignItems: 'center', gap: 2 }]}>
+        {/* 25T: the month and its state cross-fade on a step, as Reportes' identical stepper does (kept under Reduce Motion). */}
+        <ValueTransition id={monthISO + '|' + currency} variant="fade" style={[!monthTitle.stacked && { flex: 1 }, { alignItems: 'center', gap: 2 }]}>
           <AppText accessibilityRole="header" variant="title3" maxFontSizeMultiplier={monthTitle.maxScale} numberOfLines={2}
             style={{ textAlign: 'center' }}>{formatMonthTitle(monthISO)}</AppText>
           {/* 24UX6E: the state and «Este mes» wrap onto two centred lines at large text instead of overflowing the
-              column; the link keeps its 28 pt line and reaches 44 pt with its slop. */}
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', columnGap: 10, rowGap: 2 }}>
+              column; the link keeps its 28 pt line and reaches 44 pt with its slop. 25T: the row holds that 28 pt line in
+              the current month too, so stepping away from it no longer pushes everything below down 12 pt. */}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', columnGap: 10, rowGap: 2, minHeight: 28 }}>
             <AppText secondary variant="caption" style={{ textAlign: 'center' }}>{monthState(monthISO)}</AppText>
             {/* 25D2: named by its visible words (Voice Control: «Tocar Este mes»); the longer sentence is the hint. */}
             {!isCurrent && <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('budgets.screen.thisMonth')} accessibilityHint={t('budgets.screen.backToCurrent')}
@@ -99,7 +101,7 @@ export default function BudgetsScreen() {
               <AppText variant="caption" style={{ fontWeight: '600', color: p.link }}>{t('budgets.screen.thisMonth')}</AppText>
             </PressFeedback>}
           </View>
-        </View>
+        </ValueTransition>
         {monthTitle.stacked ? <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>{monthArrow(-1)}{monthArrow(1)}</View> : monthArrow(1)}
       </View>
       {/* 25Q1: no account ever held this currency, so the spent figure is no data, never a verified zero. */}

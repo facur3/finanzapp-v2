@@ -644,7 +644,9 @@ export function Money({ minor, currency, large = false, color, signed = false, s
   // 25T: a row amount is fitted here too, to the widest column a row gives it (the whole text column once the row stacks),
   // with a real floor: iOS's shrink-to-fit floors at 4 pt and ignores `minimumFontScale`, which only Android reads. A short
   // amount keeps its size and grows with Dynamic Type; the native fit stays as the net for a share narrower than that.
-  const fontSize = hero ? fitFontSize(text, width, base, Math.round(base / 2), Math.min(fontScale, scaleCap))
+  // 25T: before its first measurement a hero is fitted to the screen's content width (the width a hero gets, less at most an
+  // info button), not drawn at its base size for a frame and then stepped down while its crossfade is already visible.
+  const fontSize = hero ? fitFontSize(text, width > 0 ? width : windowWidth - 2 * space.xl, base, Math.round(base / 2), Math.min(fontScale, scaleCap))
     : fitFontSize(text, windowWidth - ROW_CHROME, base, Math.min(base, ROW_MIN_FONT), Math.min(fontScale, scaleCap));
   // An unrepresentable value shows a dash and says so: never NaN, Infinity or a misleading zero (24B3).
   const label = safe ? spokenLabel ?? spokenMoney(minor, currency) : t('amount.unavailable');
