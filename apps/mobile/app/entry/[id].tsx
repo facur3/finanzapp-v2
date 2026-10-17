@@ -89,7 +89,8 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
       confirming.current = true;
       const view = blockingOperation(refusal);
       Alert.alert(t('entryDetail.voidBlockedTitle'), errorText(refusal), [
-        { text: t('common.cancel'), style: 'cancel', onPress: () => { confirming.current = false; } },
+        // With no operation to open the alert only informs: one «OK», never a lone «Cancelar».
+        { text: t(view ? 'common.cancel' : 'common.ok'), style: 'cancel', onPress: () => { confirming.current = false; } },
         ...(view ? [{ text: t(view.kind === 'payoff' ? 'entryDetail.viewPayoff' : 'entryDetail.viewRefund'),
           onPress: () => { confirming.current = false; router.push({ pathname: '/operation/[id]', params: { id: view.id } }); } }] : []),
       ], { cancelable: true, onDismiss: () => { confirming.current = false; } });
@@ -113,7 +114,8 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
         // of an instalment that has another (its principal and its interest) is undone alone: the note says so.
         instalment && !restore ? t(instalment.shared ? 'entryDetail.installmentShareVoidNote' : 'entryDetail.installmentVoidNote') : null].filter(Boolean).join(' '), [
         { text: t('common.cancel'), style: 'cancel', onPress: () => { confirming.current = false; } },
-        { text: t(restore ? 'entryDetail.restore' : 'entryDetail.void'), style: restore ? 'default' : 'destructive', onPress: () => { confirming.current = false; void apply(change); } },
+        // Reversible from Movimientos deshechos: not the destructive style.
+        { text: t(restore ? 'entryDetail.restore' : 'entryDetail.void'), style: 'default', onPress: () => { confirming.current = false; void apply(change); } },
       ], { cancelable: true, onDismiss: () => { confirming.current = false; } });
   }
   /** The dry run of an undo: the domain's deterministic refusal, or null when storage would accept it (or the outcome is not
@@ -212,7 +214,7 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
       {refundable && <ActionButton label={t('operations.entry.refund')} icon="arrow-undo-outline" secondary disabled={busy}
         onPress={() => router.push({ pathname: '/new-refund', params: { entryId: entry.id } })} />}
       <ActionButton label={pending ? t('common.retryChange') : t(record.voided ? 'entryDetail.restoreAction' : 'entryDetail.voidAction')}
-        icon={record.voided ? 'arrow-redo-outline' : 'arrow-undo-outline'} onPress={confirm} busy={busy} secondary={!record.voided} />
+        onPress={confirm} busy={busy} secondary={!record.voided} />
     </View>
   </Screen>;
 }

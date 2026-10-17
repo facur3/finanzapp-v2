@@ -797,7 +797,7 @@ test('24T3: «Dejar de seguir el plan» says what stops, what stays and what it 
   assert.equal(alert.title, '¿Dejar de seguir este plan?');
   assert.equal(alert.message, 'Las cuotas que faltan ($' + NBSP + '1.000.000,00) dejan de registrarse. Las ya registradas siguen en Movimientos. No es una devolución ni un pago: '
     + 'si devolviste la compra, usá Registrar devolución; si adelantaste las cuotas, Registrar adelanto de cuotas.');
-  assert.equal(alert.buttons.map((item: { text: string; style?: string }) => item.text + ':' + item.style).join(','), 'Cancelar:cancel,Dejar de seguir:destructive');
+  assert.equal(alert.buttons.map((item: { text: string; style?: string }) => item.text + ':' + item.style).join(','), 'Cancelar:cancel,Dejar de seguir:default');
   assert.equal(view.writes.length, 0, 'asking writes nothing');
   alert.buttons[1].onPress();
   assert.deepEqual(view.writes.map(item => [item.action, JSON.stringify(item.arg)]), [['stop', JSON.stringify({ planId: 'tv', expectedRevision: 0 })]]);

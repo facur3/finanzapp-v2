@@ -270,6 +270,7 @@ test('category form: a historical string is archived after confirmation, as a de
   assert.equal(view.definitions.length, 0);
   assert.equal(view.alerts.length, 1);
   assert.match(view.alerts[0].message, /anteriores la conservan/);
+  assert.equal(view.alerts[0].buttons.map((button: { style?: string }) => button.style ?? '').join(','), 'cancel,default', 'Desarchivar undoes it: not the destructive style');
   view.alerts[0].buttons[0].onPress();
   assert.equal(view.definitions.length, 0, 'cancel writes nothing');
   find(view.render(), 'ActionButton', 'Archivar categoría').props.onPress();

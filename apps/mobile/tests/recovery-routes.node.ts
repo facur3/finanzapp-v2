@@ -469,6 +469,7 @@ test('transfer undo requires confirmation, affects both sides, and updates detai
   // 25Q4: a plain transfer keeps its sentence, then the record-only note and where an undo is restored from.
   assert.equal(view.alerts[0].message, '10,00 ARS: se descontarán de Destino y se sumarán a Prueba ARS. Solo cambia el registro en esta app, no mueve dinero en el banco. '
     + 'Podés recuperar la transferencia después desde Movimientos deshechos, en Más.');
+  assert.equal(view.alerts[0].buttons.map((button: { style?: string }) => button.style ?? '').join(','), 'cancel,default', 'recoverable from Movimientos deshechos: not the destructive style');
   view.alerts[0].buttons[0].onPress();
   assert.equal(view.transferChanges.length, 0);
   find(view.render(), 'ActionButton', 'Deshacer transferencia').props.onPress();

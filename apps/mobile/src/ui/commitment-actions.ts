@@ -271,6 +271,8 @@ export function useCardManagement() {
       const buttons: Parameters<typeof Alert.alert>[2] = [{ text: t('common.cancel'), style: 'cancel' }];
       if (debt > 0) buttons.push({ text: t('cards.form.blockedPay'), onPress: () => router.push({ pathname: '/new-transfer', params: { toAccountId: account.id, maxAmountMinor: String(debt) } }) });
       if (card.active) buttons.push({ text: t('cards.form.archive'), isPreferred: true, onPress: () => { void archive(card, done); } });
+      // Nothing to offer (an archived card): the alert only informs, so its one button is «OK», not «Cancelar».
+      if (buttons.length === 1) buttons[0] = { text: t('common.ok'), style: 'cancel' };
       Alert.alert(t('cards.form.blockedTitle'), [t(reason, { amount }), t(keep), extra ? t(extra) : ''].filter(Boolean).join(' '), buttons);
       return;
     }
@@ -278,7 +280,7 @@ export function useCardManagement() {
     // never after it.
     if (snapshot) {
       try { assertCardDeletable(card, snapshot, ledger?.installmentPlans ?? [], ledger?.records ?? [], ledger?.purchaseOperations ?? []); } catch (cause) {
-        Alert.alert(t('cards.form.blockedTitle'), errorText(failureMessage(cause, 'cards.form.deleteFailed')), [{ text: t('common.cancel'), style: 'cancel' }]);
+        Alert.alert(t('cards.form.blockedTitle'), errorText(failureMessage(cause, 'cards.form.deleteFailed')), [{ text: t('common.ok'), style: 'cancel' }]);
         return;
       }
     }

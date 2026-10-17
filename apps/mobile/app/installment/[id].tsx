@@ -118,7 +118,7 @@ export default function InstallmentPlanScreen() {
         numbers: numberRanges(actions.stopClosings.numbers), amount: money(actions.stopClosings.totalMinor) }) + ' ' : '';
       Alert.alert(t('installments.detail.stopTitle'), first + t('installments.detail.stopDetail', { amount: money(actions.stopMinor) }), [
         { text: t('common.cancel'), style: 'cancel' },
-        { text: t('installments.detail.stopConfirm'), style: 'destructive', onPress: () => { void commit(next); } },
+        { text: t('installments.detail.stopConfirm'), style: 'default', onPress: () => { void commit(next); } }, // «Reactivar plan» undoes it: never red
       ]);
     } else {
       const closings = actions.reactivateClosings;

@@ -118,7 +118,7 @@ export function CategoryForm({ original, kind: requestedKind }: { original?: Cat
     Alert.alert(t(archiving ? 'categoryManager.form.archiveTitle' : 'categoryManager.form.unarchiveTitle'),
       t(archiving ? 'categoryManager.form.archiveMessage' : 'categoryManager.form.unarchiveMessage', { name: shown }), [
       { text: t('common.cancel'), style: 'cancel', onPress: () => { confirming.current = false; } },
-      { text: t(archiving ? 'categoryManager.form.archiveConfirm' : 'categoryManager.form.unarchiveConfirm'), style: archiving ? 'destructive' : 'default', onPress: () => { confirming.current = false; void apply(definition); } },
+      { text: t(archiving ? 'categoryManager.form.archiveConfirm' : 'categoryManager.form.unarchiveConfirm'), style: 'default', onPress: () => { confirming.current = false; void apply(definition); } }, // reversible: never red
     ], { cancelable: true, onDismiss: () => { confirming.current = false; } });
   }
   const renamed = !!before && storedName(label.trim()) !== before.storedLabel;

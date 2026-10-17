@@ -169,7 +169,7 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
     if (!before.active) { void commitArchive(submission); return; }
     Alert.alert(t('cards.form.archiveTitle'), t('cards.form.archiveDetail'), [
       { text: t('common.cancel'), style: 'cancel' },
-      { text: t('cards.form.archiveConfirm'), style: 'destructive', onPress: () => { void commitArchive(submission); } },
+      { text: t('cards.form.archiveConfirm'), style: 'default', onPress: () => { void commitArchive(submission); } }, // reversible: never red
     ]);
   }
 

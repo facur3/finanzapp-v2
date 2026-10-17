@@ -343,6 +343,7 @@ test('24T2: a failed save keeps the card and its dates frozen; the retry resends
   root = archiving.render();
   nodes(root).find(node => node.type === 'ActionButton' && node.props.label === 'Archivar tarjeta')!.props.onPress();
   assert.equal(archiving.alerts[0].message, 'Las compras y pagos anteriores siguen en tus registros y reportes. La tarjeta pasa a Archivadas en Tarjetas: podés pagarla y reactivarla.');
+  assert.equal(archiving.alerts[0].buttons.map((button: { style?: string }) => button.style ?? '').join(','), 'cancel,default', 'archiving is reversible (Reactivar): not the destructive style');
   archiving.alerts[0].buttons[1].onPress!();
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(archiving.saved.length, 1);

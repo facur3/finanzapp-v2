@@ -112,7 +112,7 @@ function TransferDetail({ record, accounts }: { record: TransferRecord; accounts
     const change = makeTransferChange(randomUUID(), record, record.voided ? 'restore' : 'void', new Date().toISOString());
     Alert.alert(tr(record.voided ? 'transferDetail.restoreQuestion' : 'transferDetail.voidQuestion'), effect(change), [
       { text: tr('common.cancel'), style: 'cancel', onPress: release },
-      { text: tr(record.voided ? 'entryDetail.restore' : 'entryDetail.void'), style: record.voided ? 'default' : 'destructive', onPress: () => { release(); void apply(change); } },
+      { text: tr(record.voided ? 'entryDetail.restore' : 'entryDetail.void'), style: 'default', onPress: () => { release(); void apply(change); } }, // reversible: never red
     ], { cancelable: true, onDismiss: release });
   }
   const [year, month, day] = t.dateISO.split('-').map(Number);
@@ -141,7 +141,7 @@ function TransferDetail({ record, accounts }: { record: TransferRecord; accounts
       {!record.voided && <ActionButton label={tr('transferDetail.edit')} icon="create-outline" disabled={busy || !!pending}
         onPress={() => router.push({ pathname: '/edit-transfer/[id]', params: { id: t.id } })} />}
       <ActionButton label={pending ? tr('common.retryChange') : tr(record.voided ? 'transferDetail.restoreAction' : 'transferDetail.voidAction')}
-        icon={record.voided ? 'arrow-redo-outline' : 'arrow-undo-outline'} busy={busy} secondary={!record.voided} onPress={confirm} />
+        busy={busy} secondary={!record.voided} onPress={confirm} />
     </View>
   </Screen>;
 }
